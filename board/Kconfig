@@ -1,0 +1,169 @@
+menu "Hardware Drivers Config"
+
+menu "Onboard Peripheral Drivers"
+
+endmenu
+
+menu "On-chip Peripheral Drivers"
+
+    config BSP_USING_GPIO
+        bool "Enable GPIO"
+        select RT_USING_PIN
+        default y
+
+    menuconfig BSP_USING_UART
+        bool "Enable UART"
+        default y
+        select RT_USING_SERIAL
+        if BSP_USING_UART
+            config BSP_STM32_UART_V1_TX_TIMEOUT
+                int "UART TX timeout"
+                default 6000
+                depends on RT_USING_SERIAL_V1
+
+            menuconfig BSP_USING_UART1
+                bool "Enable UART1"
+                default n
+                if BSP_USING_UART1
+                    config BSP_UART1_RX_USING_DMA
+                        bool "Enable UART1 RX DMA"
+                        depends on BSP_USING_UART1 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_UART1_TX_USING_DMA
+                        bool "Enable UART1 TX DMA"
+                        depends on BSP_USING_UART1 && RT_SERIAL_USING_DMA
+                        default n
+                endif
+
+            menuconfig BSP_USING_UART2
+                bool "Enable UART2"
+                default n
+                if BSP_USING_UART2
+                    config BSP_UART2_RX_USING_DMA
+                        bool "Enable UART2 RX DMA"
+                        depends on BSP_USING_UART2 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_UART2_TX_USING_DMA
+                        bool "Enable UART2 TX DMA"
+                        depends on BSP_USING_UART2 && RT_SERIAL_USING_DMA
+                        default n
+                endif
+
+            menuconfig BSP_USING_UART3
+                bool "Enable UART3"
+                default n
+                if BSP_USING_UART3
+                    config BSP_UART3_RX_USING_DMA
+                        bool "Enable UART3 RX DMA"
+                        depends on BSP_USING_UART3 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_UART3_TX_USING_DMA
+                        bool "Enable UART3 TX DMA"
+                        depends on BSP_USING_UART3 && RT_SERIAL_USING_DMA
+                        default n
+                endif
+
+        endif
+
+    menuconfig BSP_USING_SPI
+        bool "Enable SPI"
+        default n
+        select RT_USING_SPI
+        if BSP_USING_SPI
+            menuconfig BSP_USING_SPI1
+                bool "Enable SPI1"
+                default n
+                if BSP_USING_SPI1
+                    config BSP_SPI1_TX_USING_DMA
+                        bool "Enable SPI1 TX DMA"
+                        depends on BSP_USING_SPI1 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_SPI1_RX_USING_DMA
+                        bool "Enable SPI1 RX DMA"
+                        depends on BSP_USING_SPI1 && RT_SERIAL_USING_DMA
+                        default n
+                endif
+
+            menuconfig BSP_USING_SPI2
+                bool "Enable SPI2"
+                default n
+                if BSP_USING_SPI2
+                    config BSP_SPI2_TX_USING_DMA
+                        bool "Enable SPI2 TX DMA"
+                        depends on BSP_USING_SPI2 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_SPI2_RX_USING_DMA
+                        bool "Enable SPI2 RX DMA"
+                        depends on BSP_USING_SPI2 && RT_SERIAL_USING_DMA
+                        default n
+                endif
+
+            menuconfig BSP_USING_SPI3
+                bool "Enable SPI3"
+                default n
+                if BSP_USING_SPI3
+                    config BSP_SPI3_TX_USING_DMA
+                        bool "Enable SPI3 TX DMA"
+                        depends on BSP_USING_SPI3 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_SPI3_RX_USING_DMA
+                        bool "Enable SPI3 RX DMA"
+                        depends on BSP_USING_SPI3 && RT_SERIAL_USING_DMA
+                        default n
+                endif
+        endif
+
+    menuconfig BSP_USING_I2C
+        bool "Enable I2C"
+        default n
+        select RT_USING_I2C
+        if BSP_USING_I2C
+            menuconfig BSP_USING_HARD_I2C1
+                bool "Enable Hardware I2C1"
+                default n
+
+            menuconfig BSP_USING_HARD_I2C2
+                bool "Enable Hardware I2C2"
+                default n
+        endif
+
+    menuconfig BSP_USING_TIM
+        bool "Enable Timer"
+        default n
+        if BSP_USING_TIM
+            config BSP_USING_TIM1
+                bool "Enable TIM1"
+                default n
+
+            config BSP_USING_TIM2
+                bool "Enable TIM2"
+                default n
+
+            config BSP_USING_TIM3
+                bool "Enable TIM3"
+                default n
+
+            config BSP_USING_TIM4
+                bool "Enable TIM4"
+                default n
+
+            config BSP_USING_TIM5
+                bool "Enable TIM5"
+                default n
+        endif
+
+    source "$(BSP_DIR)/libraries/HAL_Drivers/drivers/Kconfig"
+
+endmenu
+
+menu "Board extended module Drivers"
+
+endmenu
+
+endmenu
