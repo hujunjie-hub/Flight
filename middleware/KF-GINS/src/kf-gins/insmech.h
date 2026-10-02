@@ -41,6 +41,21 @@ public:
      * */
     static void insMech(const PVA &pvapre, PVA &pvacur, const IMU &imupre, const IMU &imucur);
 
+    /**
+     * @brief velUpdate 首遍 (pvapre 输入) 的地理参数暂存, 供 F 阵构造复用:
+     *        gi_engine::insPropagation 的 F 阵与 velUpdate 用完全相同的输入
+     *        (pvapre.pos/vel) 与公式计算 rmrn/gravity/wie_n/wen_n, 每毫秒
+     *        纯冗余 ~6 次双精三角。insMech 调用后即可读取 (单线程解算)。
+     *        velUpdate first-pass geographic parameters (pvapre inputs),
+     *        shared with the F-matrix construction to skip redundant trig
+     * */
+    struct PreGeo {
+        Eigen::Vector2d rmrn;
+        Eigen::Vector3d wie_n, wen_n;
+        double gravity;
+    };
+    static const PreGeo &preGeo();
+
 private:
     /**
      * @breif 位置更新

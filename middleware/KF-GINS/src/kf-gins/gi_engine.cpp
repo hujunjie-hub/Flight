@@ -44,12 +44,11 @@ GIEngine::GIEngine(GINSOptions &options) {
     Qc_.resize(NOISERANK, NOISERANK);
     dx_.resize(RANK, 1);
 #ifdef KF_GINS_EMBEDDED
-    // F/G 只分配一次, 见 insPropagation
-    F_.resize(RANK, RANK);
-    G_.resize(RANK, NOISERANK);
-
-    // float32 滤波内核初始化 (清零 DTCM 矩阵 + 使能 DWT)
+    // float32 滤波内核初始化 (清零 DTCM 矩阵 + 使能 DWT), 绑定 F/G 内核
+    // 缓冲地址 (传播期经 Eigen::Map 直写, 见 insPropagation)
     kf_math::init();
+    F_kernel_ = kf_math::F_buf();
+    G_kernel_ = kf_math::G_buf();
 #endif
     Cov_.setZero();
     Qc_.setZero();
@@ -292,10 +291,11 @@ void GIEngine::insPropagation(IMU &imupre, IMU &imucur) {
     // 系统噪声传播，姿态误差采用phi角误差模型
     // system noise propagate, phi-angle error model for attitude error
 #ifdef KF_GINS_EMBEDDED
-    // 嵌入式: F/G 为构造时分配的成员, 原地重建, 无逐历元堆分配;
-    // Phi/Qd 的矩阵乘在 float32 内核 (kf_math::predict) 完成
-    Eigen::MatrixXd &F = F_;
-    Eigen::MatrixXd &G = G_;
+    // 嵌入式: F/G 经 Eigen::Map 直写 kf_math 内核 DTCM 缓冲 (构造时绑定
+    // 地址), Phi/Qd 的矩阵乘在内核 (kf_math::predict_inplace) 完成;
+    // 结构性零块仍由 setZero 清出, 数值语义与原 Eigen 侧重建一致
+    Eigen::Map<Eigen::MatrixXd> F(F_kernel_, RANK, RANK);
+    Eigen::Map<Eigen::MatrixXd> G(G_kernel_, RANK, NOISERANK);
     F.setZero();
     G.setZero();
 #else
@@ -318,11 +318,23 @@ void GIEngine::insPropagation(IMU &imupre, IMU &imucur) {
     Eigen::Vector2d rmrn;
     Eigen::Vector3d wie_n, wen_n;
     double gravity;
+#ifdef KF_GINS_EMBEDDED
+    // 复用 velUpdate 首遍 (pvapre 输入, 本函数 290 行 insMech 内) 的地理
+    // 参数: 输入与公式完全相同, 免每毫秒 ~6 次冗余双精三角
+    {
+        const INSMech::PreGeo &g = INSMech::preGeo();
+        rmrn    = g.rmrn;
+        gravity = g.gravity;
+        wie_n   = g.wie_n;
+        wen_n   = g.wen_n;
+    }
+#else
     rmrn    = Earth::meridianPrimeVerticalRadius(pvapre_.pos[0]);
     gravity = Earth::gravity(pvapre_.pos);
     wie_n << WGS84_WIE * cos(pvapre_.pos[0]), 0, -WGS84_WIE * sin(pvapre_.pos[0]);
     wen_n << pvapre_.vel[1] / (rmrn[1] + pvapre_.pos[2]), -pvapre_.vel[0] / (rmrn[0] + pvapre_.pos[2]),
         -pvapre_.vel[1] * tan(pvapre_.pos[0]) / (rmrn[1] + pvapre_.pos[2]);
+#endif
 
     Eigen::Matrix3d temp;
     Eigen::Vector3d accel, omega;
@@ -406,10 +418,12 @@ void GIEngine::insPropagation(IMU &imupre, IMU &imucur) {
     G.block(SA_ID, SASTD_ID, 3, 3) = Eigen::Matrix3d::Identity();
 
 #ifdef KF_GINS_EMBEDDED
-    // float32 EKF 预测: Phi/Qd 构造与 P = Phi·P·Phiᵀ+Qd 全部在内核完成
-    // float32 EKF predict: build Phi/Qd and propagate P inside the kernel
-    kf_math::predict(F.data(), G.data(), imucur.dt, dx_.data());
-    kf_math::cov_to_double(Cov_.data());
+    // F/G 已直写内核: 原地预测。仅在本调用冲刷了 P 传播 (P 已变) 时才
+    // 回写 Eigen 副本 —— 逐历元 cov_to_double 是 3.5KB/ms 的纯搬运;
+    // 回写空窗 (≤一个冲刷周期 ~10ms) 内 checkCov/磁新息门读到的是略
+    // 陈旧的 P, 对自愈检测与门限自适应影响可忽略
+    if (kf_math::predict_inplace(imucur.dt, dx_.data()))
+        kf_math::cov_to_double(Cov_.data());
 #else
     // 状态转移矩阵
     // compute the state transition matrix
@@ -449,20 +463,20 @@ void GIEngine::gnssUpdate(GNSS &gnssdata) {
 
     // GNSS位置测量新息
     // compute GNSS position innovation
-    Eigen::MatrixXd dz;
+    // 固定尺寸 (栈上) 而非 MatrixXd: 观测路径每样本 3~6 次 rt_malloc/free
+    // 会落入 1kHz 解算线程的时间预算并放大最坏步抖动
+    Eigen::Vector3d dz;
     dz = Dr * (antenna_pos - gnssdata.blh);
 
     // 构造GNSS位置观测矩阵
     // construct GNSS position measurement matrix
-    Eigen::MatrixXd H_gnsspos;
-    H_gnsspos.resize(3, Cov_.rows());
-    H_gnsspos.setZero();
+    Eigen::Matrix<double, 3, RANK> H_gnsspos = Eigen::Matrix<double, 3, RANK>::Zero();
     H_gnsspos.block(0, P_ID, 3, 3)   = Eigen::Matrix3d::Identity();
     H_gnsspos.block(0, PHI_ID, 3, 3) = Rotation::skewSymmetric(pvacur_.att.cbn * options_.antlever);
 
     // 位置观测噪声阵
     // construct measurement noise matrix
-    Eigen::MatrixXd R_gnsspos;
+    Eigen::Matrix3d R_gnsspos;
     R_gnsspos = gnssdata.std.cwiseProduct(gnssdata.std).asDiagonal();
 
     // 垂直健康监测: 垂直新息持续超限说明垂直通道滤波异常 (典型: 辅助
@@ -479,6 +493,11 @@ void GIEngine::gnssUpdate(GNSS &gnssdata) {
             if (su < 10.0) {
                 su = 10.0;
             }
+#ifdef KF_GINS_EMBEDDED
+            // P 权威副本在内核且 Cov_ 仅冲刷/更新出口回写: 膨胀前先刷新,
+            // 否则 fmax 基于陈旧对角 + set_P 回写会把内核 P 回退一个冲刷周期
+            kf_math::cov_to_double(Cov_.data());
+#endif
             for (int i = 0; i < 3; i++) {
                 Cov_(P_ID + i, P_ID + i) = fmax(Cov_(P_ID + i, P_ID + i), su * su);
                 Cov_(V_ID + i, V_ID + i) = fmax(Cov_(V_ID + i, V_ID + i), 1.0);
@@ -522,12 +541,13 @@ void GIEngine::gnssUpdate(GNSS &gnssdata) {
         double dvn = pvacur_.vel(0) - gnssdata.velne(0);
         double dve = pvacur_.vel(1) - gnssdata.velne(1);
         if (dvn * dvn + dve * dve < GNSS_VEL_INNOV_MAX_MPS * GNSS_VEL_INNOV_MAX_MPS) {
-            Eigen::MatrixXd dz_gnssvel(2, 1), H_gnssvel(2, RANK), R_gnssvel(2, 2);
+            Eigen::Matrix<double, 2, 1> dz_gnssvel;
             dz_gnssvel(0, 0)  = dvn;
             dz_gnssvel(1, 0)  = dve;
-            H_gnssvel.setZero();
+            Eigen::Matrix<double, 2, RANK> H_gnssvel = Eigen::Matrix<double, 2, RANK>::Zero();
             H_gnssvel(0, V_ID)     = 1.0;
             H_gnssvel(1, V_ID + 1) = 1.0;
+            Eigen::Matrix2d R_gnssvel;
             R_gnssvel = options_.gnssvelstd * options_.gnssvelstd *
                         Eigen::Matrix2d::Identity();
 
@@ -642,15 +662,29 @@ void GIEngine::magUpdate(MAG &magdata) {
         return;
     }
 
+    // 入滤限速 (对齐 baro 先例 barofusedt): BMM350 ~100Hz 生产全量入滤时,
+    // 样本经 τ=20ms EMA 低通相邻相关 ~0.6, 按独立样本定权使 yaw 信息量
+    // 虚增 ~10 倍 (baro 2026-09-29 垂直方差塌缩事故的同款失效模式)。
+    // 航向计算/门限每样本照常, 仅 EKF 融合限速到 1/magfusedt; std 按信息量
+    // 守恒配平 (gins_config.h GINS_MAG_FUSED_STD_DEG), 保持稳态 yaw 刚度
+    // rate-limit the EKF fusion (baro precedent): heading computation and
+    // gating run on every sample, only the filter update is throttled
+    if (options_.magfusedt > 0.0 && magdata.time - magfuset_ < options_.magfusedt) {
+        updstat_.magskip++;
+        return;
+    }
+    magfuset_ = magdata.time;
+
     // 构造磁航向观测矩阵
     // phi角误差模型: C_true = exp(phi x) * C_ins, 对纯航向误差有
     // psi_true = psi_ins + phi_D, 故 dz = psi_ins - psi_meas = -phi_D
     // phi-angle model gives psi_true = psi_ins + phi_D, hence H = -1 on yaw error
-    Eigen::MatrixXd dz_mag(1, 1), H_mag(1, RANK), R_mag(1, 1);
-    dz_mag(0, 0)    = dz;
-    H_mag.setZero();
+    Eigen::Matrix<double, 1, 1> dz_mag;
+    dz_mag(0, 0) = dz;
+    Eigen::Matrix<double, 1, RANK> H_mag = Eigen::Matrix<double, 1, RANK>::Zero();
     H_mag(0, PHI_ID + 2) = -1.0;
-    R_mag(0, 0)     = magstd * magstd;
+    Eigen::Matrix<double, 1, 1> R_mag;
+    R_mag(0, 0) = magstd * magstd;
 
     EKFUpdate(dz_mag, H_mag, R_mag);
     updstat_.magupd++;
@@ -787,11 +821,12 @@ void GIEngine::baroUpdate(BARO &barodata) {
 
     // 构造气压高度观测矩阵: 与 GNSS 位置观测同号, 仅天向分量
     // measurement matrix: same sign as GNSS position update, up component only
-    Eigen::MatrixXd dz_baro(1, 1), H_baro(1, RANK), R_baro(1, 1);
-    dz_baro(0, 0)   = dz;
-    H_baro.setZero();
+    Eigen::Matrix<double, 1, 1> dz_baro;
+    dz_baro(0, 0) = dz;
+    Eigen::Matrix<double, 1, RANK> H_baro = Eigen::Matrix<double, 1, RANK>::Zero();
     H_baro(0, P_ID + 2) = 1.0;
-    R_baro(0, 0)   = options_.barostd * options_.barostd;
+    Eigen::Matrix<double, 1, 1> R_baro;
+    R_baro(0, 0) = options_.barostd * options_.barostd;
 
     EKFUpdate(dz_baro, H_baro, R_baro);
     updstat_.baroupd++;
@@ -824,14 +859,15 @@ void GIEngine::zuptUpdate(ZUPT &zuptdata) {
     }
 
     // 3 维零速观测: H = [0 I 0] (V_ID), R = std^2 * I
-    Eigen::MatrixXd dz_zupt(3, 1), H_zupt(3, RANK), R_zupt(3, 3);
+    Eigen::Matrix<double, 3, 1> dz_zupt;
     dz_zupt(0, 0)     = dz[0];
     dz_zupt(1, 0)     = dz[1];
     dz_zupt(2, 0)     = dz[2];
-    H_zupt.setZero();
+    Eigen::Matrix<double, 3, RANK> H_zupt = Eigen::Matrix<double, 3, RANK>::Zero();
     H_zupt(0, V_ID)         = 1.0;
     H_zupt(1, V_ID + 1)     = 1.0;
     H_zupt(2, V_ID + 2)     = 1.0;
+    Eigen::Matrix3d R_zupt;
     R_zupt = zuptdata.std * zuptdata.std * Eigen::Matrix3d::Identity();
 
     EKFUpdate(dz_zupt, H_zupt, R_zupt);
@@ -870,7 +906,9 @@ void GIEngine::EKFPredict(Eigen::MatrixXd &Phi, Eigen::MatrixXd &Qd) {
     dx_  = Phi * dx_;
 }
 
-void GIEngine::EKFUpdate(Eigen::MatrixXd &dz, Eigen::MatrixXd &H, Eigen::MatrixXd &R) {
+void GIEngine::EKFUpdate(const Eigen::Ref<const Eigen::MatrixXd> &dz,
+                         const Eigen::Ref<const Eigen::MatrixXd> &H,
+                         const Eigen::Ref<const Eigen::MatrixXd> &R) {
 
     assert(H.cols() == Cov_.rows());
     assert(dz.rows() == H.rows());
@@ -917,7 +955,9 @@ void GIEngine::stateFeedback() {
     Eigen::Matrix3d Dr_inv  = Earth::DRi(pvacur_.pos);
 
     /* 调试黑匣子: 单拍位置修正 >100m = 数值爆炸特征 (静态平台任何观测
-     * 都不该产生此量级修正), 节流 0.5s 上报观测源与各状态组修正量 */
+     * 都不该产生此量级修正), 节流 0.5s 上报观测源与各状态组修正量
+     * (钩子为固件侧实现, 仅 KF_GINS_EMBEDDED 下声明) */
+#ifdef KF_GINS_EMBEDDED
     {
         double dm = delta_r.norm();
         if (dm > 100.0) {
@@ -930,6 +970,7 @@ void GIEngine::stateFeedback() {
             }
         }
     }
+#endif
     pvacur_.pos -= Dr_inv * delta_r;
 
     // 速度误差反馈

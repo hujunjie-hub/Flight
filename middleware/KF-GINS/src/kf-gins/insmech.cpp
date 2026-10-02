@@ -34,6 +34,13 @@ void INSMech::insMech(const PVA &pvapre, PVA &pvacur, const IMU &imupre, const I
     attUpdate(pvapre, pvacur, imupre, imucur);
 }
 
+/* velUpdate 首遍 (pvapre 输入) 地理参数暂存: F 阵构造复用, 见 insmech.h */
+static INSMech::PreGeo s_pre_geo;
+
+const INSMech::PreGeo &INSMech::preGeo() {
+    return s_pre_geo;
+}
+
 void INSMech::velUpdate(const PVA &pvapre, PVA &pvacur, const IMU &imupre, const IMU &imucur) {
 
     Eigen::Vector3d d_vfb, d_vfn, d_vgn, gl, midvel, midpos;
@@ -51,6 +58,12 @@ void INSMech::velUpdate(const PVA &pvapre, PVA &pvacur, const IMU &imupre, const
     wen_n << pvapre.vel[1] / (rmrn[1] + pvapre.pos[2]), -pvapre.vel[0] / (rmrn[0] + pvapre.pos[2]),
         -pvapre.vel[1] * tan(pvapre.pos[0]) / (rmrn[1] + pvapre.pos[2]);
     double gravity = Earth::gravity(pvapre.pos);
+
+    // 暂存首遍参数 (pvapre 输入), gi_engine 的 F 阵构造直接复用
+    s_pre_geo.rmrn    = rmrn;
+    s_pre_geo.wie_n   = wie_n;
+    s_pre_geo.wen_n   = wen_n;
+    s_pre_geo.gravity = gravity;
 
     // 旋转效应和双子样划桨效应(基于相同采样间隔推导)
     // rotational and sculling motion (derived under uniform sampling)

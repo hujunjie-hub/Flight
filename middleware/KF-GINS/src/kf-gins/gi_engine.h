@@ -116,6 +116,7 @@ public:
         unsigned int magupd  = 0;   // 磁航向观测已更新次数
         unsigned int magrej  = 0;   // 磁航向观测被拒绝次数 (门限/倾角/场强)
         unsigned int magdrop = 0;   // 磁力计观测因时间过旧被丢弃次数
+        unsigned int magskip = 0;   // 磁航向观测因入滤限速跳过次数 (航向计算仍更新)
         unsigned int baroupd  = 0;  // 气压高度观测已更新次数
         unsigned int barorej  = 0;  // 气压高度观测被拒绝次数 (门限)
         unsigned int barodrop = 0;  // 气压计观测因时间过旧被丢弃次数
@@ -316,8 +317,15 @@ private:
      *                measurement matrix
      * @param [in] R  观测噪声阵
      *                measurement noise matrix
+     *
+     * 本地定制: 参数改 Eigen::Ref 常量引用 —— 调用方可用固定尺寸矩阵
+     * (栈上, 零堆分配) 直接传入, Ref 列主序内步长 1 时无拷贝绑定;
+     * 原 MatrixXd& 签名会迫使固定尺寸实参隐式转换成动态矩阵 (堆分配,
+     * ~420 次/s), 与嵌入式稳态路径零堆操作目标冲突
      * */
-    void EKFUpdate(Eigen::MatrixXd &dz, Eigen::MatrixXd &H, Eigen::MatrixXd &R);
+    void EKFUpdate(const Eigen::Ref<const Eigen::MatrixXd> &dz,
+                   const Eigen::Ref<const Eigen::MatrixXd> &H,
+                   const Eigen::Ref<const Eigen::MatrixXd> &R);
 
     /**
      * @brief 反馈误差状态到当前状态
@@ -410,6 +418,7 @@ private:
     double lastgnssupdate_ = -1.0;    // 最近一次 GNSS 更新时间, s
     double lastgnssalt_    = 0.0;     // 最近一次 GNSS 观测的杆臂补偿高度, m (再锚定目标)
     double barofuset_      = 0.0;     // 上次气压观测入滤时刻, s (入滤限速)
+    double magfuset_       = 0.0;     // 上次磁航向观测入滤时刻, s (入滤限速, 对齐 baro)
     double vinnov_t_       = -1.0;    // GNSS 垂直新息超限起始时刻, s (健康监测)
     double barotema_       = 288.15;  // 测高方程滑动平均温度, K (C9: 穿层飞行温变补偿)
     Eigen::VectorXd Pdiag0_;          // 初始协方差对角 (A4: checkCov 自愈复位基准)
@@ -434,14 +443,17 @@ private:
     Eigen::MatrixXd dx_;
 
 #ifdef KF_GINS_EMBEDDED
-    // 嵌入式: F/G 构造时一次分配, 1kHz 传播期原地重建, 消除逐历元堆分配
-    // embedded: F/G allocated once at construction, rebuilt in-place each epoch
-    Eigen::MatrixXd F_;
-    Eigen::MatrixXd G_;
+    // 嵌入式: F/G 直写 kf_math 内核 DTCM 缓冲 (构造时绑定地址, 传播期经
+    // Eigen::Map 原地重建) —— 消除逐历元 "Eigen 侧清零重建 → memcpy 进
+    // 内核" 的双份搬运; P 权威副本在内核, Cov_ 仅冲刷/更新出口回写
+    double *F_kernel_;
+    double *G_kernel_;
 #endif
 
-    const int RANK      = 21;
-    const int NOISERANK = 18;
+    // static constexpr: 允许在成员函数内作 Eigen 固定尺寸模板实参
+    // (非静态 const 成员作模板实参需读 this, 非常量表达式)
+    static constexpr int RANK      = 21;
+    static constexpr int NOISERANK = 18;
 
     // 状态ID和噪声ID
     // state ID and noise ID

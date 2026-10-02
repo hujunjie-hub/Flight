@@ -90,6 +90,7 @@ typedef struct GINSOptions {
     double magdecl      = 0.0;    // 磁偏角, rad, 东偏为正
     double magstd       = 0.0;    // 磁航向观测噪声标准差, rad
     double maggaterad   = 0.0;    // 磁航向新息门限, rad
+    double magfusedt    = 0.1;    // 磁航向观测入滤最小间隔, s (0=不限速)
 
     // 气压计高度观测参数 (BMP585)
     // barometer height-aid parameters (BMP585)
