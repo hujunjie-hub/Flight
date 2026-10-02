@@ -58,6 +58,33 @@ extern "C" {
 #endif /* UART1_DMA_RX_CONFIG */
 #endif /* BSP_UART1_RX_USING_DMA */
 
+#if defined(BSP_UART1_TX_USING_DMA)
+#ifndef UART1_TX_DMA_PRIORITY
+#define UART1_TX_DMA_PRIORITY                 DMA_PRIORITY_MEDIUM
+#endif /* UART1_TX_DMA_PRIORITY */
+
+#ifndef UART1_TX_DMA_PREEMPT_PRIORITY
+#define UART1_TX_DMA_PREEMPT_PRIORITY         0
+#endif /* UART1_TX_DMA_PREEMPT_PRIORITY */
+
+#ifndef UART1_TX_DMA_SUB_PRIORITY
+#define UART1_TX_DMA_SUB_PRIORITY             0
+#endif /* UART1_TX_DMA_SUB_PRIORITY */
+
+#ifndef UART1_DMA_TX_CONFIG
+#define UART1_DMA_TX_CONFIG            \
+    STM32_DMA_TX_BYTE_CONFIG_INIT_EX(  \
+        UART1_TX_DMA_INSTANCE,         \
+        UART1_TX_DMA_RCC,              \
+        UART1_TX_DMA_IRQ,              \
+        0U,                            \
+        UART1_TX_DMA_REQUEST,          \
+        UART1_TX_DMA_PRIORITY,         \
+        UART1_TX_DMA_PREEMPT_PRIORITY, \
+        UART1_TX_DMA_SUB_PRIORITY)
+#endif /* UART1_DMA_TX_CONFIG */
+#endif /* BSP_UART1_TX_USING_DMA */
+
 #if defined(BSP_USING_UART2)
 #ifndef UART2_CONFIG
 #define UART2_CONFIG             \

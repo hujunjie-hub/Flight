@@ -393,6 +393,14 @@ static rt_ssize_t stm32_transmit(struct rt_serial_device *serial,
 
     if (uart->uart_dma_flag & RT_DEVICE_FLAG_DMA_TX)
     {
+#if defined(__DCACHE_PRESENT) && (__DCACHE_PRESENT == 1U)
+        rt_uint32_t cache_start = ((rt_uint32_t)buf) & ~((rt_uint32_t)0x1F);
+        rt_uint32_t cache_end   = ((rt_uint32_t)buf + size + 31u) & ~((rt_uint32_t)0x1F);
+        /* DMA 直接读调用方缓冲 (NO_BUFFER 模式多为线程栈), D-Cache 开启时
+         * 脏行不落地 DMA 会读到旧数据, 起传前按 32B 行对齐清理 */
+        SCB_CleanDCache_by_Addr((uint32_t *)cache_start, cache_end - cache_start);
+#endif /* defined(__DCACHE_PRESENT) && (__DCACHE_PRESENT == 1U) */
+
         if (HAL_UART_Transmit_DMA(&uart->handle, buf, size) != HAL_OK)
         {
             return -RT_EIO;

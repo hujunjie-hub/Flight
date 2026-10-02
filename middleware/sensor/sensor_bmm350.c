@@ -469,16 +469,21 @@ static rt_err_t bmm_read_compensated(float out[4])
 
 /* 运行期健康监测: 连续 I2C 失败 / 数据超量程 (芯片欠压复位后回挂起态,
  * powered 标志与芯片实际状态失同步, 坏数据会静默直通椭球校正与融合)
- * 累计达阈值即重走配置序列 (磁复位+轴使能+ODR+正常模式), 100Hz 下
- * 300 样本 = 3s 判定窗口 */
+ * 触发重走配置序列 (磁复位+轴使能+ODR+正常模式)。分级判定:
+ *   - I2C 传输失败 = 硬故障 (掉线/挂起), 恢复动作明确廉价, 连续
+ *     20 次 (200ms@100Hz) 即重配置, 不等超界窗口 (3s 磁断供对罗盘
+ *     辅助航向偏长);
+ *   - 数据超界 = 软信号, 维持 300 样本 (3s) 窗口防误判。 */
 #define BMM350_FETCH_BAD_RECFG_N   300
+#define BMM350_FETCH_NAK_RECFG_N   20
 #define BMM350_RANGE_UT_MAX        2500.0f    /* XY 量程 2000uT + 裕量 */
-static rt_uint16_t bmm_bad_cnt;
+static rt_uint16_t bmm_bad_cnt;             /* 数据超界窗口计数 */
+static rt_uint16_t bmm_nak_cnt;             /* I2C 连续失败计数 */
 
 static rt_err_t bmm_recover_runtime(void)
 {
-    LOG_W("BMM350 unhealthy x%d (I2C fail / out-of-range), reconfiguring",
-          BMM350_FETCH_BAD_RECFG_N);
+    LOG_W("BMM350 unhealthy (I2C fail x%d / out-of-range x%d), reconfiguring",
+          BMM350_FETCH_NAK_RECFG_N, BMM350_FETCH_BAD_RECFG_N);
 
     if (bmm_magnetic_reset() != RT_EOK)
         return -RT_EIO;
@@ -498,7 +503,16 @@ static rt_ssize_t bmm_fetch_data(struct rt_sensor_device *sensor, void *buf, rt_
         return 0;
 
     if (bmm_read_compensated(out) != RT_EOK)
-        goto __bad;
+    {
+        /* I2C 失败 (NAK/超时) 硬故障通道: 快速重配置 */
+        if (++bmm_nak_cnt >= BMM350_FETCH_NAK_RECFG_N)
+        {
+            bmm_nak_cnt = 0;
+            (void)bmm_recover_runtime();    /* 失败则下轮 NAK 再试 */
+        }
+        return 0;
+    }
+    bmm_nak_cnt = 0;
 
     /* 数据合理性: 补偿后超量程 = 芯片状态垃圾 (欠压复位/配置丢失),
      * isfinite 拦补偿发散 (交叉轴分母趋零时) */

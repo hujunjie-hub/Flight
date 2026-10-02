@@ -17,7 +17,7 @@ if os.getenv('RTT_ROOT'):
 # EXEC_PATH is the compiler execute path, for example, CodeSourcery, Keil MDK, IAR
 if  CROSS_TOOL == 'gcc':
     PLATFORM    = 'gcc'
-    EXEC_PATH   = r'C:\Users\XXYYZZ'
+    EXEC_PATH   = r'C:/env-windows/tools/gnu_gcc/arm_gcc/mingw/bin'
 elif CROSS_TOOL == 'keil':
     PLATFORM    = 'armcc'
     EXEC_PATH   = r'C:/Keil_v5'
@@ -60,11 +60,14 @@ if PLATFORM == 'gcc':
         CFLAGS += ' -O0 -gdwarf-2 -g'
         AFLAGS += ' -gdwarf-2'
     else:
-        CFLAGS += ' -O2 -gdwarf-2 -g'
+        # -DNDEBUG 对齐 CMakeLists: 关闭 assert()/Eigen 内部断言
+        # (EIGEN_NO_DEBUG 默认跟随 NDEBUG), 两构建产物性能/断言语义一致
+        CFLAGS += ' -O2 -gdwarf-2 -g -DNDEBUG'
 
     # 与 CMakeLists.txt 的 CXX 旗标对齐: C++17 (aligned_new.cpp 的
-    # std::align_val_t 需要) + 无异常/无 RTTI (KF-GINS/Eigen 嵌入式最小配置)。
-    CXXFLAGS = CFLAGS + ' -std=gnu++17 -fno-exceptions -fno-rtti'
+    # std::align_val_t 需要) + 无异常/无 RTTI (KF-GINS/Eigen 嵌入式最小配置)
+    # + FMA 融合放行 (GINS 热路径 -O3 在 middleware/gins/SConscript 组内)
+    CXXFLAGS = CFLAGS + ' -std=gnu++17 -fno-exceptions -fno-rtti -ffp-contract=fast'
     CFLAGS += ' -std=c99'
 
     POST_ACTION = OBJCPY + ' -O binary $TARGET Flight.bin\n' + SIZE + ' $TARGET \n'

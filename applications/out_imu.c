@@ -119,18 +119,22 @@ static void imuout_thread_entry(void *parameter)
      */
     while (1)
     {
+        if (!imuout_ctx.on)
+        {
+            /* 关闭: 不取信号量不弹样本, 环完整留给 gins 桥接线程
+             * (原实现 off 态仍排水, 会偷走 gins 的 IMU 样本) */
+            n = 0;                         /* 重开时块从头累计 */
+            dc_init = RT_FALSE;
+            rt_thread_mdelay(100);
+            continue;
+        }
+
         imu_data_wait(IMUOUT_WAIT_MS);
 
         while (imu_data_pop(&s) == RT_EOK)
         {
             rt_uint8_t i;
             rt_uint32_t dc;
-
-            if (!imuout_ctx.on)
-            {
-                n = 0;                     /* 关闭时只排水, 丢弃半块 */
-                continue;
-            }
 
             /* dt 由 data_cnt 差分换算 (样本不再携带 dt) */
             dc = dc_init ? (s.data_cnt - last_dc) : 1u;

@@ -596,17 +596,29 @@ static rt_ssize_t _serial_fifo_tx_blocking_nbuf(struct rt_device *dev,
     tx_fifo = (struct rt_serial_tx_fifo *)serial->serial_tx;
     RT_ASSERT(tx_fifo != RT_NULL);
 
-    if (rt_thread_self() == RT_NULL || (serial->parent.open_flag & RT_DEVICE_FLAG_STREAM) || (dev == rt_console_get_device()))
+    /* 本地定制: 不再把 console 设备一刀切回退轮询 TX (原判定会在 DMA TX
+     * 使能时让 console/FinSH 的线程上下文输出退化为逐字节忙等)。改为按
+     * 上下文安全判定: ISR 嵌套 / 调度器未启动 / 调度器临界区 / STREAM
+     * 模式才回退轮询, console 的线程上下文输出可走 FIFO/DMA 路径。 */
+    if (rt_thread_self() == RT_NULL || rt_interrupt_get_nest() != 0 ||
+            rt_critical_level() != 0 ||
+            (serial->parent.open_flag & RT_DEVICE_FLAG_STREAM))
     {
         /* using poll tx when the scheduler not startup or in stream mode */
         return _serial_poll_tx(dev, pos, buffer, size);
     }
 
-    /* When serial transmit in tx_blocking mode,
-     * if the activated mode is RT_TRUE, it will return directly */
-    if (rt_atomic_flag_test_and_set(&tx_fifo->activated))
+    /* 本地定制: NO_BUFFER (直发) 模式下另一写者正在传输时不再静默丢数据
+     * (返回 0), 而是等在传帧完成后重试抢占; 超时/非阻塞语义才放弃。
+     * console 日志与数据链路并发写同口时保证不丢行。 */
+    while (rt_atomic_flag_test_and_set(&tx_fifo->activated))
     {
-        return 0;
+        rt_int32_t tx_timeout = rt_atomic_load(&tx_fifo->tx_timeout);
+
+        if (tx_timeout == RT_WAITING_NO)
+            return 0;
+        if (rt_completion_wait(&tx_fifo->tx_cpt, tx_timeout) != RT_EOK)
+            return 0;
     }
 
     /* clear tx_cpt flag */
@@ -669,7 +681,11 @@ static rt_ssize_t _serial_fifo_tx_blocking_buf(struct rt_device *dev,
     tx_fifo = (struct rt_serial_tx_fifo *)serial->serial_tx;
     RT_ASSERT(tx_fifo != RT_NULL);
 
-    if (rt_thread_self() == RT_NULL || (serial->parent.open_flag & RT_DEVICE_FLAG_STREAM) || (dev == rt_console_get_device()))
+    /* 本地定制: 同 _serial_fifo_tx_blocking_nbuf, console 不再一刀切回退
+     * 轮询 TX, 仅 ISR 嵌套 / 调度器未启动 / 调度器临界区 / STREAM 回退 */
+    if (rt_thread_self() == RT_NULL || rt_interrupt_get_nest() != 0 ||
+            rt_critical_level() != 0 ||
+            (serial->parent.open_flag & RT_DEVICE_FLAG_STREAM))
     {
         /* using poll tx when the scheduler not startup or in stream mode */
         return _serial_poll_tx(dev, pos, buffer, size);

@@ -113,6 +113,7 @@ struct adis16505_dr_stats
     rt_uint32_t dma_err;        /* SPI/DMA 错误次数 */
     rt_uint32_t overrun;        /* 处理线程消费不及, 丢弃的帧数 */
     rt_uint32_t recover;        /* 看门狗强制复位传输状态次数 */
+    rt_uint32_t reconfig;       /* 芯片自复位检出后 DEC_RATE 重写成功次数 */
 };
 
 /* 取最近一次采样快照 (线程安全), DR 未触发过时返回 -RT_EEMPTY */

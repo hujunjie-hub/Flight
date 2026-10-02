@@ -91,9 +91,13 @@ struct bmp585_device
 static struct bmp585_device bmp_dev;
 static struct rt_sensor_module sensor_module;   /* baro/temp 共用一个模块 */
 
-/* 运行期压强合理性失败连续计数 (见 bmp_fetch_data) */
+/* 运行期健康监测分级计数 (见 bmp_fetch_data): I2C 传输失败 = 硬故障
+ * (掉线/欠压回挂起态), 连续 20 次 (200ms@100Hz) 即重配置; 压强超界
+ * (饱和垃圾) = 软信号, 维持 200 样本 (2s) 窗口防误判 */
 static rt_uint16_t bmp_bad_cnt;
-#define BMP585_FETCH_BAD_RECFG_N  200    /* 连续坏样本次数触发重配置 (100Hz x 2s) */
+static rt_uint16_t bmp_nak_cnt;
+#define BMP585_FETCH_BAD_RECFG_N  200    /* 连续压强超界触发重配置 (100Hz x 2s) */
+#define BMP585_FETCH_NAK_RECFG_N  20     /* 连续 I2C 失败触发重配置 (100Hz x 200ms) */
 
 static rt_err_t bmp_config_and_selftest(void);   /* 前置: fetch 重配置用 */
 
@@ -249,6 +253,14 @@ static rt_err_t bmp_read_raw(rt_int32_t *temp_raw, rt_int32_t *press_raw)
 
 /* ------------------------- 传感器框架回调 ------------------------- */
 
+/* 同芯片同拍合并读缓存: baro/temp 两个框架设备各 fetch 一次, 同一测量
+ * 周期内 (baro_data.c 先读气压再读温度) 第二次直接取缓存, I2C2 事务
+ * 减半。窗口 2ms << ODR 周期 10ms, 不会合并两个不同测量拍 */
+#define BMP585_RAW_CACHE_WIN_MS  2
+static rt_int32_t s_cache_temp_raw, s_cache_press_raw;
+static rt_tick_t  s_cache_tick;
+static rt_bool_t  s_cache_valid;
+
 static rt_ssize_t bmp_fetch_data(struct rt_sensor_device *sensor, void *buf, rt_size_t len)
 {
     struct rt_sensor_data *data = (struct rt_sensor_data *)buf;
@@ -257,8 +269,36 @@ static rt_ssize_t bmp_fetch_data(struct rt_sensor_device *sensor, void *buf, rt_
     if (data == RT_NULL || len == 0 || !bmp_dev.powered)
         return 0;
 
-    if (bmp_read_raw(&temp_raw, &press_raw) != RT_EOK)
-        return 0;
+    {
+        rt_tick_t now = rt_tick_get();
+
+        if (s_cache_valid &&
+            (now - s_cache_tick) < rt_tick_from_millisecond(BMP585_RAW_CACHE_WIN_MS))
+        {
+            temp_raw  = s_cache_temp_raw;
+            press_raw = s_cache_press_raw;
+        }
+        else
+        {
+            if (bmp_read_raw(&temp_raw, &press_raw) != RT_EOK)
+            {
+                /* I2C 失败 (NAK/超时) 硬故障通道: 快速重配置 */
+                if (++bmp_nak_cnt >= BMP585_FETCH_NAK_RECFG_N)
+                {
+                    bmp_nak_cnt = 0;
+                    LOG_W("BMP585 I2C fail x%d, reconfiguring",
+                          BMP585_FETCH_NAK_RECFG_N);
+                    (void)bmp_config_and_selftest();
+                }
+                return 0;
+            }
+            bmp_nak_cnt = 0;
+            s_cache_temp_raw = temp_raw;
+            s_cache_press_raw = press_raw;
+            s_cache_tick = now;
+            s_cache_valid = RT_TRUE;
+        }
+    }
 
     data->type = sensor->info.type;
     data->timestamp = (rt_uint32_t)(timebase_now_us() / 1000u);  /* T_MCU ms */
@@ -472,6 +512,7 @@ static rt_bool_t bmp_probe(rt_uint8_t addr)
  * (自检失败回待机重配: 覆盖配置写被芯片内部状态吞掉的情况) */
 static rt_err_t bmp_config_and_selftest(void)
 {
+    s_cache_valid = RT_FALSE;   /* 重配置后旧原始值不再同源 */
     for (rt_uint8_t attempt = 0; attempt < 2; attempt++)
     {
         rt_int32_t t_raw, p_raw;

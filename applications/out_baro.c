@@ -32,7 +32,7 @@
 #include <ulog.h>
 
 #define BAROUT_DEV_NAME         "uart1"         /* 与 console/VOFA 同口 */
-#define BAROUT_WAIT_MS          1000            /* 无数据等待超时 */
+#define BAROUT_PERIOD_MS        10              /* 镜像快照轮询周期 (seq 变化才打印) */
 #define BAROUT_THREAD_PRIO      17              /* 低于 gins_fused_data(12)/magout(15) */
 #define BAROUT_THREAD_STACK     2048
 #define BAROUT_THREAD_TICK      10
@@ -43,6 +43,7 @@ static struct
     rt_thread_t thread;
 
     rt_bool_t   on;             /* FinSH 开关 */
+    rt_uint32_t last_seq;       /* 已打印的镜像序号 (判新) */
     rt_uint32_t lines;          /* 累计打印行数 */
 } barout_ctx;
 
@@ -79,7 +80,7 @@ static void barout_line(const struct baro_sample *b)
 static void barout_thread_entry(void *parameter)
 {
     struct baro_sample b;
-    rt_bool_t was_on = RT_FALSE;
+    rt_uint32_t seq;
 
     RT_UNUSED(parameter);
 
@@ -98,25 +99,18 @@ static void barout_thread_entry(void *parameter)
     {
         if (!barout_ctx.on)
         {
-            /* 关闭时不取信号量不弹样本, 完整留给 ginsaux —— off 态排水
-             * 会以"唤醒后空环"竞态把 gins 的气压观测饿死 */
-            was_on = RT_FALSE;
             rt_thread_mdelay(200);
             continue;
         }
 
-        /* 重新开启: 丢弃关闭期间积压的信号量计数 (缓冲区样本仍留给 ginsaux) */
-        if (!was_on)
-        {
-            was_on = RT_TRUE;
-            while (baro_data_wait(0) == RT_EOK)
-                ;
-        }
+        /* 镜像快照轮询 (seq 变化才打印): 不弹 FIFO, 与 ginsaux 融合
+         * 消费方共存 (原排空式 pop 会在开启期抢走气压观测) */
+        rt_thread_mdelay(BAROUT_PERIOD_MS);
 
-        baro_data_wait(BAROUT_WAIT_MS);
-
-        while (baro_data_pop(&b) == RT_EOK)
+        if (baro_data_peek_latest(&b, &seq) == RT_EOK &&
+            seq != barout_ctx.last_seq)
         {
+            barout_ctx.last_seq = seq;
             barout_line(&b);
             barout_ctx.lines++;
         }

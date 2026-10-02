@@ -64,6 +64,13 @@ static struct
 #define ADIS_REG_DEC_RATE       0x64    /* 降采样 2000/(DEC+1) Hz */
 #define ADIS_REG_GLOB_CMD       0x68    /* bit7 软复位, bit2 自检 */
 
+/* DATA_CNTR 回绕式大 gap = 芯片自复位特征 (计数器归零重新累计,
+ * gap = 65536-last+新值, 远超真实丢拍量级): 触发运行配置重写。
+ * 芯片复位后 DEC_RATE 回默认 0 → ODR 静默从 1000Hz 变 2000Hz,
+ * DR 自己恢复翻转所以链路能自愈, 但负载翻倍且元数据失配
+ * (2026-10-01 139.6s 自复位掉线故障的配置侧闭环) */
+#define ADIS_CNTR_RESET_GAP     32768
+
 /* 帧格式: 高字节 = 地址(bit7: 1写/0读), 低字节 = 数据
  * 注意: R/W 位 0=读 1=写 (数据手册 Figure 40, 如 DIN=0x0C00 读 Z_GYRO_LOW) */
 #define ADIS_CMD_READ(reg)      (rt_uint8_t)(0x00u | (reg))
@@ -150,6 +157,8 @@ struct adis16505_device
     rt_bool_t   sample_valid;
     rt_uint16_t last_cntr;          /* DATA_CNTR 连续性基准 */
     rt_bool_t   cntr_init;
+    volatile rt_bool_t reconfig_req; /* 芯片自复位特征检出, 待重写运行配置 */
+    rt_tick_t   reconfig_tick;      /* 重写退避基准 */
 
     struct adis16505_dr_stats stats;
 
@@ -376,6 +385,8 @@ static void adis_snapshot_commit(struct adis16505_snapshot *snap, rt_bool_t indi
         snap->cntr_gap = gap;
         if (gap > 1u)
             adis_dev.stats.drop += (rt_uint32_t)(gap - 1u);
+        if (gap >= ADIS_CNTR_RESET_GAP)
+            adis_dev.reconfig_req = RT_TRUE;   /* 处理线程重写 DEC_RATE */
     }
     else
     {
@@ -563,6 +574,33 @@ static void adis_watchdog(void)
     rt_mutex_release(&adis_dev.xfer_lock);
 }
 
+/*
+ * 芯片自复位后的运行配置重写 (处理线程上下文, 1s 退避):
+ * 复用 adis_set_odr 的寄存器访问路径 (内部自带 xfer_lock + 链路挂起)。
+ * 当前固件写入的运行配置仅 DEC_RATE 一项 (MSC_CTRL 只读不改, 芯片
+ * 默认 DR 极性与驱动期望一致, 复位后无需重写)。
+ */
+static rt_err_t adis_set_odr(rt_uint32_t odr);   /* 定义在 control 段 */
+
+#define ADIS_RECONFIG_BACKOFF_MS  1000
+
+static void adis_reapply_config(void)
+{
+    if (adis_set_odr(ADIS16505_DEFAULT_ODR) == RT_EOK)
+    {
+        adis_dev.stats.reconfig++;
+        adis_dev.reconfig_req = RT_FALSE;
+        LOG_I("adis: chip reset detected, DEC_RATE rewritten (ODR=%dHz)",
+              ADIS16505_DEFAULT_ODR);
+    }
+    else
+    {
+        /* 重写失败保持请求, 下一退避窗口重试 (SPI 恢复中) */
+        LOG_W("adis: DEC_RATE rewrite failed, retry in %dms",
+              ADIS_RECONFIG_BACKOFF_MS);
+    }
+}
+
 /* 处理线程: 等待 DMA 完成通知, 排空完成队列逐帧校验入库 */
 static void adis_dr_thread_entry(void *parameter)
 {
@@ -589,6 +627,15 @@ static void adis_dr_thread_entry(void *parameter)
 
             adis_process_frame(adis_rx_buf[slot], adis_slot_t0[slot]);
             adis_dev.q_tail = (rt_uint8_t)((tail + 1u) & (ADIS_QUEUE_SIZE - 1u));
+        }
+
+        /* 芯片自复位检出 (DATA_CNTR 回绕式 gap): 重写运行配置 */
+        if (adis_dev.reconfig_req &&
+            (rt_tick_get() - adis_dev.reconfig_tick) >=
+                rt_tick_from_millisecond(ADIS_RECONFIG_BACKOFF_MS))
+        {
+            adis_dev.reconfig_tick = rt_tick_get();
+            adis_reapply_config();
         }
     }
 }

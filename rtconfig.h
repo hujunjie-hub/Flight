@@ -90,21 +90,22 @@
 /* end of kservice options */
 #define RT_USING_DEBUG
 #define RT_DEBUGING_ASSERT
-#define RT_DEBUGING_COLOR
-#define RT_DEBUGING_CONTEXT
+/* RT_DEBUGING_COLOR/CONTEXT 关闭 (2026-10-02 裁剪): COLOR 给 rt_kprintf
+ * 每行输出加 ANSI 转义 (轮询 TX 下纯开销), CONTEXT 在 IPC/调度路径加
+ * 上下文校验; ASSERT 保留作固件安全网 */
 
 /* Inter-Thread communication */
 
 #define RT_USING_SEMAPHORE
 #define RT_USING_MUTEX
-#define RT_USING_EVENT
-#define RT_USING_MAILBOX
-#define RT_USING_MESSAGEQUEUE
+/* EVENT/MAILBOX/MESSAGEQUEUE 全仓零引用 (2026-10-02 核验, serial V2 用
+ * completion+ringbuffer), 裁掉减内核编译面; 有需要再开 */
+
 /* end of Inter-Thread communication */
 
 /* Memory Management */
 
-#define RT_USING_MEMPOOL
+/* MEMPOOL 全仓零引用, SMALL_MEM 为实际堆实现 */
 #define RT_USING_SMALL_MEM
 #define RT_USING_SMALL_MEM_AS_HEAP
 #define RT_USING_HEAP
@@ -462,11 +463,16 @@
 #define BSP_USING_UART1
 #define BSP_USING_UART2
 #define BSP_UART2_RX_USING_DMA
+#define BSP_UART1_TX_USING_DMA
 /* serial v2 每串口缓冲 (board/Kconfig 菜单, V2 才导出):
- * UART1 控制台 rx 256/tx 0(轮询发); UART2 与 gnss_data.c 的
- * GNSS_RX_BUF_SZ/ping 尺寸保持一致 (打开前 CTRL_CONFIG 会再显式设置) */
+ * UART1 控制台 rx 256; UART2 与 gnss_data.c 的
+ * GNSS_RX_BUF_SZ/ping 尺寸保持一致 (打开前 CTRL_CONFIG 会再显式设置)。
+ * UART1 TX DMA (DMA1_Stream4): tx_bufsz 非 0 即选 NO_BUFFER 模式, 发送
+ * 直接从调用方缓冲起 DMA (零拷贝), bufsz 仅是准入门槛 (>=64), 不占 RAM。
+ * console/FinSH 线程上下文输出同享 DMA; ISR/调度器未起/临界区上下文由
+ * dev_serial_v2.c 自动回退轮询发送。 */
 #define BSP_UART1_RX_BUFSIZE 256
-#define BSP_UART1_TX_BUFSIZE 0
+#define BSP_UART1_TX_BUFSIZE 64
 #define BSP_UART2_RX_BUFSIZE 4096
 #define BSP_UART2_TX_BUFSIZE 0
 #define BSP_UART2_DMA_PING_BUFSIZE 256

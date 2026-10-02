@@ -5,8 +5,8 @@
  *
  * BMM350 磁力计数据 (原始 + 入环前处理结果) -> 带标记文本打印 (USART1 调试口)
  *
- * 数据来源: middleware/data 的 mag_data 环形缓冲区 (100Hz), mag_data_wait/pop
- *   取数; 每个样本同时携带:
+ * 数据来源: middleware/data 的 mag_data 最新样本镜像 (100Hz, 非消费读),
+ *   seq 变化才打印 —— 不弹 FIFO, 与 ginsaux 融合消费方共存; 每个样本同时携带:
  *     mag[]  原始磁强 µT (传感器坐标系, 仅单位换算)
  *     cal[]  校准 -> 轴映射(前右下) -> 低通 后的磁强 µT (data 层采集线程
  *            入环前完成, 喂 KF-GINS 的同一份数据)
@@ -40,7 +40,7 @@
 #include <ulog.h>
 
 #define MAGOUT_DEV_NAME         "uart1"         /* 与 console/VOFA 同口 */
-#define MAGOUT_WAIT_MS          1000            /* 无数据等待超时 */
+#define MAGOUT_PERIOD_MS        10              /* 镜像快照轮询周期 (seq 变化才打印) */
 #define MAGOUT_THREAD_PRIO      15              /* 低于 gnssout(14), 高于 FinSH(20) */
 #define MAGOUT_THREAD_STACK     2048
 #define MAGOUT_THREAD_TICK      10
@@ -51,6 +51,7 @@ static struct
     rt_thread_t thread;
 
     rt_bool_t   on;             /* FinSH 开关 */
+    rt_uint32_t last_seq;       /* 已打印的镜像序号 (判新) */
     rt_uint32_t lines;          /* 累计打印行数 */
 } magout_ctx;
 
@@ -103,7 +104,7 @@ static void magout_line(const struct mag_sample *m)
 static void magout_thread_entry(void *parameter)
 {
     struct mag_sample m;
-    rt_bool_t was_on = RT_FALSE;
+    rt_uint32_t seq;
 
     RT_UNUSED(parameter);
 
@@ -122,25 +123,19 @@ static void magout_thread_entry(void *parameter)
     {
         if (!magout_ctx.on)
         {
-            /* 关闭时不取信号量不弹样本, 完整留给 ginsaux —— off 态排水
-             * 会以"唤醒后空环"竞态把 gins 的磁观测饿死 (mag_cnt≈0) */
-            was_on = RT_FALSE;
             rt_thread_mdelay(200);
             continue;
         }
 
-        /* 重新开启: 丢弃关闭期间积压的信号量计数 (缓冲区样本仍留给 ginsaux) */
-        if (!was_on)
-        {
-            was_on = RT_TRUE;
-            while (mag_data_wait(0) == RT_EOK)
-                ;
-        }
+        /* 镜像快照轮询 (seq 变化才打印): 不弹 FIFO, 与 ginsaux 融合
+         * 消费方共存 —— 原排空式 pop 会在开启期以不确定比例抢走磁
+         * 观测 (EKF 更新率随机下降), 2026-10-02 改旁路读 */
+        rt_thread_mdelay(MAGOUT_PERIOD_MS);
 
-        mag_data_wait(MAGOUT_WAIT_MS);
-
-        while (mag_data_pop(&m) == RT_EOK)
+        if (mag_data_peek_latest(&m, &seq) == RT_EOK &&
+            seq != magout_ctx.last_seq)
         {
+            magout_ctx.last_seq = seq;
             magout_line(&m);
             magout_ctx.lines++;
         }
@@ -168,7 +163,7 @@ int magout_link_init(void)
         }
     }
 
-    magout_ctx.on = RT_FALSE;   /* 默认关: 开启时与 ginsaux 分抢 mag 样本 */
+    magout_ctx.on = RT_FALSE;   /* 默认关 */
 
     magout_ctx.thread = rt_thread_create("magout", magout_thread_entry, RT_NULL,
                                          MAGOUT_THREAD_STACK, MAGOUT_THREAD_PRIO,

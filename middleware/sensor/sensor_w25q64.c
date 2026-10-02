@@ -56,6 +56,14 @@
 #define W25Q64_T_BE64_MS            2500    /* 64KB 擦除 max 2000ms */
 #define W25Q64_T_CE_MS              120000  /* 整片擦除 max 96s (JV 系列) */
 
+/* 就绪等待起步睡眠值 (各操作 typ 时长, 首查忙后按此起步, 之后 1ms 收敛;
+ * 固定 1ms 轮询在擦除期间发 45+ 次状态事务且页编程平均每页白等 ~0.5ms) */
+#define W25Q64_T_PP_TYP_MS          1
+#define W25Q64_T_SE_TYP_MS          45
+#define W25Q64_T_BE32_TYP_MS        260
+#define W25Q64_T_BE64_TYP_MS        350
+#define W25Q64_T_CE_TYP_MS          40000
+
 /* ------------------------- 框架设备 ------------------------- */
 
 /* BSP 总线 "qspi1" (drv_qspi.c @ OCTOSPI1), 本驱动挂载的设备名 */
@@ -102,24 +110,33 @@ static rt_err_t w25q64_read_status(rt_uint8_t *sr)
 
 /* ------------------------- 驱动接口 ------------------------- */
 
-rt_err_t w25q64_wait_ready(rt_uint32_t timeout_ms)
+/* 就绪轮询: 先立即查一次 BUSY, 忙则按 first_ms (操作 typ 值) 起步睡眠,
+ * 之后 1ms 粒度收敛到 timeout_ms 上限 */
+static rt_err_t w25q64_wait_ready_dly(rt_uint32_t timeout_ms, rt_uint32_t first_ms)
 {
     rt_uint8_t sr = W25X_SR_BUSY;
     rt_tick_t start = rt_tick_get();
     const rt_tick_t max_tick = rt_tick_from_millisecond(timeout_ms);
+    rt_uint32_t gap = 0;
 
-    while ((rt_tick_get() - start) < max_tick)
+    for (;;)
     {
         if (w25q64_read_status(&sr) != RT_EOK)
             return -RT_EIO;
         if ((sr & W25X_SR_BUSY) == 0)
             return RT_EOK;
-        rt_thread_mdelay(1);
+        if ((rt_tick_get() - start) >= max_tick)
+            break;
+        rt_thread_mdelay(gap);
+        gap = (gap == 0) ? first_ms : 1u;
     }
 
-    if ((sr & W25X_SR_BUSY) == 0)
-        return RT_EOK;
     return -RT_ETIMEOUT;
+}
+
+rt_err_t w25q64_wait_ready(rt_uint32_t timeout_ms)
+{
+    return w25q64_wait_ready_dly(timeout_ms, 0);
 }
 
 rt_err_t w25q64_read_jedec_id(rt_uint8_t id[3])
@@ -207,18 +224,26 @@ rt_err_t w25q64_read(rt_uint32_t addr, rt_uint8_t *buf, rt_uint32_t len)
     return err;
 }
 
-/* Page Program (0x02): 指令 + 24bit 地址 + ≤256B 数据, 调用方保证不跨页 */
+/* Page Program (0x02): 指令 + 24bit 地址 + ≤256B 数据, 调用方保证不跨页。
+ * 用 transfer_message 三阶段消息直发用户缓冲 (send_buf 指向调用方数据),
+ * 免去拼帧的 260B 栈拷贝 */
 static rt_err_t w25q64_page_program(rt_uint32_t addr, const rt_uint8_t *buf, rt_uint32_t len)
 {
-    rt_uint8_t cmd[4 + W25Q64_PAGE_SIZE];
+    struct rt_qspi_message msg;
 
-    cmd[0] = W25X_CMD_PAGE_PROGRAM;
-    cmd[1] = (rt_uint8_t)(addr >> 16);
-    cmd[2] = (rt_uint8_t)(addr >> 8);
-    cmd[3] = (rt_uint8_t)addr;
-    rt_memcpy(&cmd[4], buf, len);
+    rt_memset(&msg, 0, sizeof(msg));
+    msg.instruction.content = W25X_CMD_PAGE_PROGRAM;
+    msg.instruction.qspi_lines = 1;
+    msg.address.content = addr;
+    msg.address.size = 24;
+    msg.address.qspi_lines = 1;
+    msg.qspi_data_lines = 1;
+    msg.parent.send_buf = buf;
+    msg.parent.length = len;
+    msg.parent.cs_take = 1;
+    msg.parent.cs_release = 1;
 
-    return w25q64_cmd_send(cmd, 4 + len);
+    return (rt_qspi_transfer_message(qspi_dev, &msg) == (rt_ssize_t)len) ? RT_EOK : -RT_EIO;
 }
 
 rt_err_t w25q64_write(rt_uint32_t addr, const rt_uint8_t *buf, rt_uint32_t len)
@@ -239,7 +264,8 @@ rt_err_t w25q64_write(rt_uint32_t addr, const rt_uint8_t *buf, rt_uint32_t len)
         rt_uint32_t page_left = W25Q64_PAGE_SIZE - (addr % W25Q64_PAGE_SIZE);
         rt_uint32_t chunk = (len < page_left) ? len : page_left;
 
-        err = w25q64_wait_ready(W25Q64_T_CE_MS);
+        /* 逐页等待上一页编程完成 (typ 0.4-0.7ms, 起步 1ms) */
+        err = w25q64_wait_ready_dly(W25Q64_T_CE_MS, W25Q64_T_PP_TYP_MS);
         if (err != RT_EOK)
             break;
 
@@ -258,13 +284,14 @@ rt_err_t w25q64_write(rt_uint32_t addr, const rt_uint8_t *buf, rt_uint32_t len)
 
     /* 最后等待本次编程完成, 返回时器件空闲 */
     if (err == RT_EOK)
-        err = w25q64_wait_ready(W25Q64_T_PP_MS);
+        err = w25q64_wait_ready_dly(W25Q64_T_PP_MS, W25Q64_T_PP_TYP_MS);
 
     rt_mutex_release(&w25q64_lock);
     return err;
 }
 
-static rt_err_t w25q64_erase(rt_uint8_t instr, rt_uint32_t addr, rt_uint32_t t_max_ms)
+static rt_err_t w25q64_erase(rt_uint8_t instr, rt_uint32_t addr,
+                             rt_uint32_t t_max_ms, rt_uint32_t t_typ_ms)
 {
     rt_uint8_t cmd[4];
     rt_err_t err;
@@ -283,7 +310,7 @@ static rt_err_t w25q64_erase(rt_uint8_t instr, rt_uint32_t addr, rt_uint32_t t_m
     if (err == RT_EOK)
         err = w25q64_cmd_send(cmd, 4);
     if (err == RT_EOK)
-        err = w25q64_wait_ready(t_max_ms);
+        err = w25q64_wait_ready_dly(t_max_ms, t_typ_ms);
 
     rt_mutex_release(&w25q64_lock);
     return err;
@@ -293,21 +320,24 @@ rt_err_t w25q64_erase_sector(rt_uint32_t addr)
 {
     if (!w25q64_ready || addr >= W25Q64_TOTAL_SIZE)
         return -RT_EINVAL;
-    return w25q64_erase(W25X_CMD_SECTOR_ERASE, addr, W25Q64_T_SE_MS);
+    return w25q64_erase(W25X_CMD_SECTOR_ERASE, addr,
+                        W25Q64_T_SE_MS, W25Q64_T_SE_TYP_MS);
 }
 
 rt_err_t w25q64_erase_block_32k(rt_uint32_t addr)
 {
     if (!w25q64_ready || addr >= W25Q64_TOTAL_SIZE)
         return -RT_EINVAL;
-    return w25q64_erase(W25X_CMD_BLOCK_ERASE_32K, addr, W25Q64_T_BE32_MS);
+    return w25q64_erase(W25X_CMD_BLOCK_ERASE_32K, addr,
+                        W25Q64_T_BE32_MS, W25Q64_T_BE32_TYP_MS);
 }
 
 rt_err_t w25q64_erase_block_64k(rt_uint32_t addr)
 {
     if (!w25q64_ready || addr >= W25Q64_TOTAL_SIZE)
         return -RT_EINVAL;
-    return w25q64_erase(W25X_CMD_BLOCK_ERASE_64K, addr, W25Q64_T_BE64_MS);
+    return w25q64_erase(W25X_CMD_BLOCK_ERASE_64K, addr,
+                        W25Q64_T_BE64_MS, W25Q64_T_BE64_TYP_MS);
 }
 
 rt_err_t w25q64_erase_chip(void)
@@ -326,7 +356,7 @@ rt_err_t w25q64_erase_chip(void)
     if (err == RT_EOK)
         err = w25q64_cmd_send(cmd, 1);
     if (err == RT_EOK)
-        err = w25q64_wait_ready(W25Q64_T_CE_MS);
+        err = w25q64_wait_ready_dly(W25Q64_T_CE_MS, W25Q64_T_CE_TYP_MS);
 
     rt_mutex_release(&w25q64_lock);
     return err;
@@ -339,45 +369,53 @@ rt_bool_t w25q64_is_ready(void)
 
 /* ------------------------- 初始化 ------------------------- */
 
-int rt_hw_w25q64_init(void)
+/* 上电失败无界重试 (对齐 ADIS/BMM/BMP 自愈风格): JEDEC 探测失败
+ * (总线纹波/上电时序) 不再永久掉线, 后台 10s 周期重探测。
+ * mutex 只在 init 入口初始化一次, 重试线程只做 attach/configure/探测 */
+#define W25Q64_RETRY_MS       10000
+#define W25Q64_RETRY_STACK    2048
+static rt_thread_t w25q64_retry_thr;
+
+/* 总线挂载 + 配置 + JEDEC 探测 (init 与重试线程复用; attach/configure
+ * 以 qspi_dev 是否已挂载做幂等门禁)。探测走内部 cmd_recv, 不带
+ * w25q64_ready 门禁 (公开 API 在探测成功前恒拒且不碰总线) */
+static rt_err_t w25q64_bus_probe(void)
 {
     struct rt_qspi_configuration cfg = {0};
     rt_uint8_t id[3] = {0};
     rt_uint8_t retry;
 
-    if (rt_mutex_init(&w25q64_lock, "w25q64", RT_IPC_FLAG_PRIO) != RT_EOK)
-        return -RT_ERROR;
-
-    /* 挂载 QSPI 设备到 BSP 总线 (qspi1 @ OCTOSPI1, 硬件 NCS=PG6, 1 线) */
-    if (rt_hw_qspi_device_attach(W25Q64_QSPI_BUS_NAME, W25Q64_QSPI_DEV_NAME,
-                                 PIN_NONE, 1, RT_NULL, RT_NULL) != RT_EOK)
-    {
-        LOG_E("QSPI device attach failed");
-        return -RT_ERROR;
-    }
-    qspi_dev = (struct rt_qspi_device *)rt_device_find(W25Q64_QSPI_DEV_NAME);
     if (qspi_dev == RT_NULL)
     {
-        LOG_E("QSPI device %s not found", W25Q64_QSPI_DEV_NAME);
-        return -RT_ERROR;
+        /* 挂载 QSPI 设备到 BSP 总线 (qspi1 @ OCTOSPI1, 硬件 NCS=PG6, 1 线) */
+        if (rt_hw_qspi_device_attach(W25Q64_QSPI_BUS_NAME, W25Q64_QSPI_DEV_NAME,
+                                     PIN_NONE, 1, RT_NULL, RT_NULL) != RT_EOK)
+        {
+            LOG_E("QSPI device attach failed");
+            return -RT_ERROR;
+        }
+        qspi_dev = (struct rt_qspi_device *)rt_device_find(W25Q64_QSPI_DEV_NAME);
+        if (qspi_dev == RT_NULL)
+        {
+            LOG_E("QSPI device %s not found", W25Q64_QSPI_DEV_NAME);
+            return -RT_ERROR;
+        }
+
+        /* 模式3/8bit/≤92MHz; medium_size 供框架判 24bit 地址 (8MB ≤ 16MB 边界) */
+        cfg.parent.mode = RT_SPI_MODE_3 | RT_SPI_MSB;
+        cfg.parent.data_width = 8;
+        cfg.parent.max_hz = W25Q64_SPI_MAX_HZ;
+        cfg.medium_size = W25Q64_TOTAL_SIZE;
+        cfg.ddr_mode = 0;
+        cfg.qspi_dl_width = 1;
+        if (rt_qspi_configure(qspi_dev, &cfg) != RT_EOK)
+        {
+            LOG_E("QSPI configure failed");
+            return -RT_ERROR;
+        }
     }
 
-    /* 模式3/8bit/≤92MHz; medium_size 供框架判 24bit 地址 (8MB ≤ 16MB 边界) */
-    cfg.parent.mode = RT_SPI_MODE_3 | RT_SPI_MSB;
-    cfg.parent.data_width = 8;
-    cfg.parent.max_hz = W25Q64_SPI_MAX_HZ;
-    cfg.medium_size = W25Q64_TOTAL_SIZE;
-    cfg.ddr_mode = 0;
-    cfg.qspi_dl_width = 1;
-    if (rt_qspi_configure(qspi_dev, &cfg) != RT_EOK)
-    {
-        LOG_E("QSPI configure failed");
-        return -RT_ERROR;
-    }
-
-    /* JEDEC ID 校验 (0xEF 0x40 0x17), 重试覆盖上电复位窗口。
-     * 注意走内部 w25q64_cmd_recv (不带 w25q64_ready 门禁): ready 标志
-     * 在探测成功后才置位, 公开 API 在此恒拒 (-RT_EIO) 且不碰总线 */
+    /* JEDEC ID 校验 (0xEF 0x40 0x17), 快速重试覆盖上电复位窗口 */
     {
         rt_uint8_t cmd[1] = {W25X_CMD_JEDEC_ID};
 
@@ -397,6 +435,42 @@ int rt_hw_w25q64_init(void)
         LOG_E("W25Q64 not found (JEDEC=%02X %02X %02X), check OCTOSPI1 wiring "
               "CLK=PF10 IO0=PF8 IO1=PF9 WP=PF7 HOLD=PF6 CS=PG6",
               id[0], id[1], id[2]);
+        return -RT_ERROR;
+    }
+
+    return RT_EOK;
+}
+
+static void w25q64_retry_entry(void *parameter)
+{
+    RT_UNUSED(parameter);
+
+    while (w25q64_bus_probe() != RT_EOK)
+        rt_thread_mdelay(W25Q64_RETRY_MS);
+
+    w25q64_ready = RT_TRUE;
+    LOG_I("W25Q64 online after retry, 8MB via %s (OCTOSPI1, 1-1-1)",
+          W25Q64_QSPI_DEV_NAME);
+}
+
+int rt_hw_w25q64_init(void)
+{
+    if (rt_mutex_init(&w25q64_lock, "w25q64", RT_IPC_FLAG_PRIO) != RT_EOK)
+        return -RT_ERROR;
+
+    if (w25q64_bus_probe() != RT_EOK)
+    {
+        /* 派生后台重试线程 (单实例; init 本身不会被 components 框架重入) */
+        if (w25q64_retry_thr == RT_NULL)
+        {
+            w25q64_retry_thr = rt_thread_create("w25qrty", w25q64_retry_entry,
+                                                RT_NULL, W25Q64_RETRY_STACK,
+                                                20, 10);
+            if (w25q64_retry_thr != RT_NULL)
+                rt_thread_startup(w25q64_retry_thr);
+            else
+                LOG_E("W25Q64 retry thread create failed");
+        }
         return -RT_ERROR;
     }
 

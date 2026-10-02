@@ -44,7 +44,7 @@
 #include <ulog.h>
 
 #define GNSSOUT_DEV_NAME        "uart1"         /* 与 console/VOFA 同口 */
-#define GNSSOUT_WAIT_MS         1000            /* 无数据等待超时 */
+#define GNSSOUT_PERIOD_MS       10              /* 镜像快照轮询周期 (seq 变化才打印) */
 #define GNSSOUT_THREAD_PRIO     14              /* 低于 imuout(13), 高于 FinSH(20) */
 #define GNSSOUT_THREAD_STACK    4096
 #define GNSSOUT_THREAD_TICK     10
@@ -55,6 +55,7 @@ static struct
     rt_thread_t thread;
 
     rt_bool_t   on;             /* FinSH 开关 */
+    rt_uint32_t last_seq;       /* 已打印的镜像序号 (判新) */
     rt_uint32_t lines;          /* 累计打印行数 */
 } gnssout_ctx;
 
@@ -89,7 +90,7 @@ static void gnssout_line(const struct gnss_sample *s)
 static void gnssout_thread_entry(void *parameter)
 {
     struct gnss_sample s;
-    rt_bool_t was_on = RT_FALSE;
+    rt_uint32_t seq;
 
     RT_UNUSED(parameter);
 
@@ -108,29 +109,24 @@ static void gnssout_thread_entry(void *parameter)
     {
         if (!gnssout_ctx.on)
         {
-            /* 关闭时不取信号量不弹样本, 环形缓冲区完整留给 gins 桥接线程 */
-            was_on = RT_FALSE;
             rt_thread_mdelay(200);
             continue;
         }
 
-        /* 重新开启: 丢弃关闭期间积压的信号量计数 (缓冲区样本仍留给 gins) */
-        if (!was_on)
-        {
-            was_on = RT_TRUE;
-            while (gnss_data_wait(0) == RT_EOK)
-                ;
-        }
+        /* 镜像快照轮询 (seq 变化才打印): 不弹 FIFO, 与 gins 桥接线程
+         * 融合消费方共存 (原排空式 pop 会在开启期抢走 GNSS 观测) */
+        rt_thread_mdelay(GNSSOUT_PERIOD_MS);
 
-        gnss_data_wait(GNSSOUT_WAIT_MS);
-
-        while (gnss_data_pop(&s) == RT_EOK)
+        if (gnss_data_peek_latest(&s, &seq) == RT_EOK &&
+            seq != gnssout_ctx.last_seq)
         {
+            gnssout_ctx.last_seq = seq;
             gnssout_line(&s);
             gnssout_ctx.lines++;
         }
     }
 }
+
 
 /* ---------------------------- 初始化 ---------------------------- */
 

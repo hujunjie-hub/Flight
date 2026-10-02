@@ -6,11 +6,13 @@
  * CPU 负载遥测 (路线图 B6): FinSH `cpuload [秒 1-10]`
  *
  * 免标定原理: idle 钩子对空闲线程空转计数, 测量时先统计正常运行下的
- * N_idle (每秒空闲自旋数), 再起一个最高线程优先级 (1, 低于 ISR 高于一切
- * 应用线程) 的满载自旋线程统计同循环体的 N_busy —— 即本核"空闲容量",
+ * N_idle (每秒空闲自旋数), 再与"本核满载容量"N_busy 比较,
  * load = 1-N_idle/N_busy。
- * 满载窗 (~2s) 会饿死传感器链路一小段: data_cntr 如实记丢拍, IWDG
- * 15s 超时不受威胁, 属按需诊断动作。
+ * 容量只在本板上电后首次测量 (定频 550MHz 下是常量, 见 board.c
+ * SystemClock_Config): 首次起一个最高线程优先级 (1, 低于 ISR 高于一切
+ * 应用线程) 的满载自旋线程统计同循环体的 N_busy 并缓存; 后续调用只测
+ * idle 率即时返回, 不再以 2s 满载饿死传感器链路。容量缓存失效场景
+ * (改主频) 重上电即可。
  */
 
 #include <rtthread.h>
@@ -47,7 +49,9 @@ static void cpuload_busy_entry(void *p)
     rt_sem_release(c->done);
 }
 
-/* 满载自旋测本核空闲容量, 返回每秒自旋数 (0 = 线程创建失败) */
+/* 满载自旋测本核空闲容量, 返回每秒自旋数 (0 = 线程创建失败)。
+ * 仅容量缓存未建立时调用 (每上电一次), 满载窗内应用线程被饿死属
+ * 按需诊断动作: data_cntr 如实记丢拍, IWDG 15s 超时不受威胁 */
 static double cpuload_capacity(rt_uint32_t ms)
 {
     struct cpuload_busy_ctx c;
@@ -74,6 +78,9 @@ static double cpuload_capacity(rt_uint32_t ms)
 
 static void cpuload(int argc, char **argv)
 {
+    static double s_capacity = 0.0;         /* 本核容量缓存 (定频常量) */
+    static rt_bool_t s_cap_valid = RT_FALSE;
+
     rt_uint32_t win_ms = 2000;
     rt_uint32_t i0, i1;
     double n_idle, cap, load;
@@ -85,18 +92,31 @@ static void cpuload(int argc, char **argv)
 
         while (*p >= '0' && *p <= '9')
             v = v * 10u + (rt_uint32_t)(*p++ - '0');
-        if (v >= 1u && *p == '\0')
+        if (v >= 1u && v <= 10u && *p == '\0')
             win_ms = v * 1000u;
     }
 
     rt_thread_idle_sethook(cpuload_idle_hook);
 
-    i0 = s_cpuload_idle_spins;                  /* 阶段 1: 正常运行空闲率 */
+    if (!s_cap_valid)
+    {
+        /* 首次: 测容量 (2s 满载窗) 后缓存, 之后调用不再饿死系统 */
+        cap = cpuload_capacity(win_ms);
+        if (cap >= 1.0)
+        {
+            s_capacity = cap;
+            s_cap_valid = RT_TRUE;
+        }
+    }
+    else
+    {
+        cap = s_capacity;
+    }
+
+    i0 = s_cpuload_idle_spins;              /* 正常运行空闲率 */
     rt_thread_mdelay((rt_int32_t)win_ms);
     i1 = s_cpuload_idle_spins;
     n_idle = (double)(i1 - i0) * 1000.0 / (double)win_ms;
-
-    cap = cpuload_capacity(win_ms);             /* 阶段 2: 满载容量 */
 
     rt_thread_idle_delhook(cpuload_idle_hook);
 
@@ -112,8 +132,10 @@ static void cpuload(int argc, char **argv)
     if (load > 1.0)
         load = 1.0;
 
-    LOG_I("CPU load: %.1f%% (idle %.0f/s, capacity %.0f/s, 窗口 %ums)",
-          load * 100.0, n_idle, cap, win_ms);
+    LOG_I("CPU load: %.1f%% (idle %.0f/s, capacity %.0f/s%s, 窗口 %ums)",
+          load * 100.0, n_idle, cap,
+          s_cap_valid ? ", 缓存" : ", 首测",
+          win_ms);
 }
 MSH_CMD_EXPORT(cpuload, CPU load via idle-spin counting: cpuload [sec 1-10]);
 
