@@ -21,15 +21,30 @@ CPPPATH = [
     cwd + '/../KF-GINS/src',
     cwd + '/../KF-GINS/ThirdParty/eigen-3.3.9',
     cwd + '/../timebase',
+    cwd + '/../param_calib',
 ]
 
 # M_PI: 工程定义 _POSIX_C_SOURCE=1 后 newlib 隐藏 M_PI, KF-GINS 依赖之,
 # 与 CMakeLists.txt CMAKE_CXX_FLAGS 的 -DM_PI=... 保持一致。
-# -fno-exceptions/-fno-rtti 由 rtconfig.py 的 CXXFLAGS 全局生效 (勿用
-# LOCAL_CCFLAGS —— 会同时作用于组内 .c 文件, cc1 告警非法选项)
-group = DefineGroup('GINS', src,
+# -fno-exceptions/-fno-rtti 由 rtconfig.py 的 CXXFLAGS 全局生效。
+# -O3 + FMA 融合只给 C++ 内核 (对齐 CMakeLists rtt_GINS 的
+# TARGET_COMPILE_OPTIONS -O3 -ffp-contract=fast): LOCAL_CCFLAGS 作用于
+# 全组, .c 文件 (gins_wdt.c) 单独拆组避免混入
+src_cpp = [
+    'gins_bridge.cpp',
+    'aligned_new.cpp',
+    'kf_math.cpp',
+    '../KF-GINS/src/kf-gins/gi_engine.cpp',
+    '../KF-GINS/src/kf-gins/insmech.cpp',
+]
+group = DefineGroup('GINS', src_cpp,
     depend = [''],
     CPPPATH = CPPPATH,
-    CPPDEFINES = ['KF_GINS_EMBEDDED', ('M_PI', '3.14159265358979323846')])
+    CPPDEFINES = ['KF_GINS_EMBEDDED', ('M_PI', '3.14159265358979323846')],
+    LOCAL_CCFLAGS = '-O3 -ffp-contract=fast')
+
+group = group + DefineGroup('GINSC', ['gins_wdt.c'],
+    depend = [''],
+    CPPPATH = CPPPATH)
 
 Return('group')

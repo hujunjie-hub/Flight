@@ -72,6 +72,10 @@ int mag_data_init(void);
 /* 读出一个样本 (FIFO); 空时返回 -RT_EEMPTY */
 rt_err_t mag_data_pop(struct mag_sample *out);
 
+/* 取最新样本镜像 (非消费, 不动 FIFO/信号量): 调试打印读者专用, 与
+ * ginsaux 融合消费方共存; *seq 返回镜像序号, 比对变化判新 */
+rt_err_t mag_data_peek_latest(struct mag_sample *out, rt_uint32_t *seq);
+
 /* 阻塞等待新样本 (每个推送释放一次), 超时返回 -RT_ETIMEOUT */
 rt_err_t mag_data_wait(rt_int32_t timeout_ms);
 

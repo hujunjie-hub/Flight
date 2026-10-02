@@ -26,7 +26,8 @@
 #include "record_ring.h"
 #include "sensor_bmm350.h"
 #include "mag_calib.h"                      /* middleware/calibration 椭球校正 */
-#include "gins_config.h"                    /* 轴映射宏 + GINS_MAG_LPF_TAU_S */
+#include "gins_config.h"                    /* GINS_MAG_LPF_TAU_S */
+#include "param_nav.h"                      /* 轴映射镜像 (安装参数, nav 分区) */
 #include "timebase.h"                       /* middleware/timebase T_MCU 时基 */
 #include <rtdevice.h>
 #include <drivers/sensor.h>
@@ -66,15 +67,16 @@
 
 /* ------------------------- 入环前处理链 ------------------------- */
 
-/* 磁力计轴映射到体系前右下: 与 gins 安装参数同源 (gins_config.h 宏).
+/* 磁力计轴映射到体系前右下: 安装参数取 param_nav 镜像 (W25Q64 nav 分区,
+ * 缺省 = gins_config.h 编译期宏); `nav set maxis` 现场改向即时生效.
  * 软磁矩阵与轴重排不可交换, 因此本函数只在 mag_calib_apply 之后调用 */
 static void mag_axis_map(const double src[3], double dst[3])
 {
-    const int axis[3]    = GINS_MAG_AXIS_SRC;
-    const double sign[3] = GINS_MAG_AXIS_SIGN;
+    const struct nav_params *nav = param_nav();
 
     for (int i = 0; i < 3; i++)
-        dst[i] = sign[i] * src[axis[i]];
+        dst[i] = (double)nav->mag_axis_sign[i] *
+                 src[nav->mag_axis_src[i]];
 }
 
 /* 一阶 EMA 低通状态 (体系内逐轴), 首样本直通避免零起瞬态 */
@@ -226,6 +228,12 @@ static void mag_thread_entry(void *parameter)
 }
 
 /* ------------------------- 对外接口 ------------------------- */
+
+rt_err_t mag_data_peek_latest(struct mag_sample *out, rt_uint32_t *seq)
+{
+    /* 最新样本镜像 (非消费): magout 等调试读者专用, 不与 ginsaux 抢环 */
+    return record_ring_peek_latest(&ctx.ring, out, seq);
+}
 
 rt_err_t mag_data_pop(struct mag_sample *out)
 {

@@ -44,6 +44,7 @@ INCLUDE_DIRECTORIES(
 	middleware/gins
 	middleware/so3
 	middleware/calibration
+	middleware/param_calib
 	middleware/timebase
 	middleware/KF-GINS/src
 	middleware/KF-GINS/ThirdParty/eigen-3.3.9
@@ -381,7 +382,15 @@ SET(RT_CALIBRATION_SOURCES
 	middleware/calibration/ellipsoid_fit.c
 	middleware/calibration/mag_calib.c
 	middleware/calibration/baro_calib.c
-	middleware/calibration/calib_store.c
+)
+
+# 飞控参数分区存储 (W25Q64): 分区引擎 + calib/nav/sys 三个参数域,
+# 与 middleware/param_calib/SConscript 的 Glob('*.c') 保持一致
+SET(RT_PARAMCALIB_SOURCES
+	middleware/param_calib/param_part.c
+	middleware/param_calib/param_calib.c
+	middleware/param_calib/param_nav.c
+	middleware/param_calib/param_sys.c
 )
 
 # MAVLink 官方生成代码: packed 结构 encode 函数触发已知告警, 按惯例
@@ -432,6 +441,7 @@ ADD_LIBRARY(rtt_STM32H7-HAL OBJECT ${RT_STM32H7-HAL_SOURCES})
 ADD_LIBRARY(rtt_GINS OBJECT ${RT_GINS_SOURCES})
 ADD_LIBRARY(rtt_SO3 OBJECT ${RT_SO3_SOURCES})
 ADD_LIBRARY(rtt_Calibration OBJECT ${RT_CALIBRATION_SOURCES})
+ADD_LIBRARY(rtt_ParamCalib OBJECT ${RT_PARAMCALIB_SOURCES})
 
 # Interface libraries
 ADD_LIBRARY(rtt_CMSIS-Core INTERFACE)
@@ -464,6 +474,7 @@ TARGET_LINK_LIBRARIES(${FIRMWARE_TARGET}
 	rtt_STM32H7-HAL
 	rtt_CMSIS-Core
 	rtt_Calibration
+	rtt_ParamCalib
 	rtt_POSIX
 	rtt_SO3
 )

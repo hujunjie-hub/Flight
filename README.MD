@@ -56,12 +56,14 @@ Flight/
 │   │   └── mavlink/           #     MAVLink 库 + 链路层封装
 │   ├── data/                  #   原始数据环形缓冲区层 (imu / gnss / gnss_raw / mag / baro
 │   │                          #   + record_ring 定长记录环公共层, 四模块共用)
-│   ├── calibration/           #   磁力计椭球校准 + 气压计基准校准 (参数持久化片内 Flash 扇区 7)
+│   ├── calibration/           #   磁力计椭球校准 + 气压计基准校准 (参数经 param_calib 持久化)
+│   ├── param_calib/           #   飞控参数分区存储 (W25Q64): 分区引擎 + calib/nav/sys 三参数域,
+│   │                          #   追加式记录 + CRC32 + 磨损均衡, 掉电原子
 │   ├── gins/                  #   KF-GINS 桥接: gins 解算线程 (1kHz) + ginsaux 消费线程
 │   │                          #   + C++ 对齐 new 堆适配 (aligned_new.cpp)
 │   ├── KF-GINS/               #   上游组合导航算法内核 (C++, 21 状态 EKF, 最小嵌入)
 │   ├── so3/                   #   SO(3) 姿态误差解算 (验收测试用)
-│   ├── control/               #   (预留, 暂空)
+│   ├── control/               #   (预留, 暂空; 参数分区预留 ctrl 分区)
 │   ├── timebase               #   时间同步基座
 │   ├── SConscript             #   注: sensor(驱动)/protocol(协议) 等子模块构建入口
 │   └── README.md              #   数据流架构 + FinSH 命令速查 (必读)
@@ -300,12 +302,13 @@ UART 字节到达) 与总线 (SPI/I2C/UART)。本节为四链统一的目标架�
   设备刷新快照), 传感器拔线不会挂死系统 —— 超时路径与
   [异常值处理流程](#异常值处理流程-三级递进) 链路级的错误率路径
   互补, 归并到同一恢复入口。
-- **校准维护窗口**: 磁/气压校准参数持久化 (`calib_store_save`)
-  需**关全局中断**擦写片内 Flash 扇区 7, 持续数百 ms —— 期间四链
-  EXTI/DMA 全部停摆、SysTick 慢走, 丢拍属预期, 恢复后由
-  DATA_CNTR 连续性/丢拍计数覆盖确认。校准经 FinSH 命令手动触发,
-  天然避开飞行/记录窗口; 时基侧配套的回绕核对见降级策略
-  "CNT 回绕"条。
+- **校准维护窗口**: 磁/气压校准与导航参数持久化 (`calib_store_save` /
+  `nav save`) 写 W25Q64 (OCTOSPI1 间接模式, middleware/param_calib):
+  编程/擦除期间 CPU 照常取指执行、中断照常响应, **不关全局中断**,
+  四链 EXTI/DMA 不停摆; 器件忙等待在保存线程上下文 mdelay 轮询,
+  仅该线程阻塞 (页编程 ≤3ms/页, 4KB 扇区擦 ≤400ms)。校准经 FinSH
+  命令手动触发, 天然避开飞行/记录窗口; W25Q64 缺失时自动降级:
+  参数仅本次上电有效, 系统其余部分不受影响。
 - **现状与迁移**: ADIS16505 已完全按本流程实现 (含 SPI DMA burst 与
   cnt_event 时戳捕获 —— DR EXTI ISR 内 `timebase_now_us()` 按槽位打戳);
   BMM350/BMP585 的 INT 引脚硬件已预留, 当前事件源为 10ms 周期采集,
@@ -792,12 +795,12 @@ libstdc++ locale 链, 双端 ROM 曾高达 63%/97%, 详见"已闭环能力速查
 
 | # | 问题 | 现象/影响 | 建议 |
 | --- | --- | --- | --- |
-| 1 | **磁航向观测已启用, 轴向映射待台架核对** (2026-09-30 起 `GINS_MAG_ENABLE=1` + 无 GNSS 部署模式 `GINS_NOGNSS_MODE=1`) | 倒装安装下 `GINS_MAG_AXIS_SRC/SIGN` 仍为直通缺省, 未经指北核对; 错误映射表现为磁航向系统性偏差或 `mag_rej_cnt` 飙升 (新息门禁拒绝)。磁数据链路本身已修复 (cal 正确跟踪 raw, 椭球标定生效) | 指北静置跑 FinSH `magdata` 看 `last cal` 三轴 (FRD): 前向应出最大水平分量、垂直分量符号与安装面一致 → 修 SRC/SIGN → 转动板子 `magcal start` 复核椭球 |
+| 1 | **磁航向观测已启用, 轴向映射待台架核对** (2026-09-30 起 `GINS_MAG_ENABLE=1` + 无 GNSS 部署模式 `GINS_NOGNSS_MODE=1`) | 倒装安装下轴向映射仍为直通缺省, 未经指北核对; 错误映射表现为磁航向系统性偏差或 `mag_rej_cnt` 飙升 (新息门禁拒绝)。磁数据链路本身已修复 (cal 正确跟踪 raw, 椭球标定生效)。2026-10-02 起映射为运行期参数 (W25Q64 nav 分区, 缺省=编译期宏) | 指北静置跑 FinSH `magdata` 看 `last cal` 三轴 (FRD): 前向应出最大水平分量、垂直分量符号与安装面一致 → `nav set maxis <sx sy sz kx ky kz>` + `nav save` 现场修正 (立即生效, 掉电保持) → 转动板子 `magcal start` 复核椭球 |
 | 2 | **GNSS 观测门限定权矛盾** (gins_config.h) | 质量门放行 hdop≤8 的观测 (std 按 8m/16m 定权), 但相邻跳变门 10Hz 下仅 21m —— hdop 5~8 时合法观测被跳变门连续拒绝, 形成 ~1s 观测空泡 (有自愈但属无谓损耗) | 跳变门限增加 hdop 项 (k·hdop²·UERE²), 或运行期 hdop 门收到 4~5; 需现场数据标定, 不宜盲改 |
 | 3 | **BMM350 硬磁未标定** | 实测场强 ~70µT vs 当地预期 ~58µT (历史值; 类型双关修复后待复测), yaw 绝对精度受限 | 解决 #1 轴向映射后转动板子跑 `magcal start` 椭球标定 (椭球拟合大半径误判已修复) |
 | 4 | **ADIS DR 丢拍 ~1.7%** | `dr_drop/imu_cnt` (DATA_CNTR 跳变统计), 增量不可恢复, EKF 按实际间隔积分已自洽 | 提高 gins 线程 SPI 读优先级或迁移 DMA 链 |
-| 5 | **calib_store 扇区写满时的掉电窗口** | 追加式日志每 1024 次 save 需整擦一次, 擦除进行中掉电会丢全部标定记录 —— 概率已降 3 个数量级, 未彻底消除 | 需第二备份扇区才能彻底消除 (当前 ROM 布局无空闲扇区); 或接受残余风险 (人工标定频率下 ~千年一遇量级) |
-| 6 | **工程结构债** | `middleware/control` 目录为空 (飞控控制律未实现); W25Q64 驱动无生产调用方 (标定实际存内部 flash); ulog 同步后端迫使各线程栈为格式化尖峰放大 (~3KB/线程)。~~data 模块六件套重复~~ (2026-09-30 已抽公共 `data/record_ring`, imu/mag/baro/gnss_data 四模块收敛, 对外 API 不变)。~~main.c 单文件承载全部调试输出链路~~ (2026-09-30 已拆 `applications/out_*.c` 每链路一文件 + `app_out.c` 公共设施, main.c 收敛为入口/装配) | 控制律开发是下一阶段主体; ulog 换异步 backend |
+| 5 | **参数分区写满时的掉电窗口** (2026-10-02 迁 W25Q64 后重述) | 标定/导航参数存 W25Q64 追加式记录区 (calib 128 槽), 分区写满需整擦重写 —— 擦除进行中掉电丢该分区记录。相对原片内 Flash 方案已改善: 擦除不再关全局中断 (CPU/四链照常运行), 窗口概率 = 1/槽数 每次保存 | 彻底消除需双分区轮换 (A/B 两份记录区交替整擦); 人工标定频率下接受残余风险 (~千年一遇量级)。`param` 命令可查各分区 seq/槽位, `param erase <part>` 恢复出厂 |
+| 6 | **工程结构债** | `middleware/control` 目录为空 (飞控控制律未实现); ulog 同步后端迫使各线程栈为格式化尖峰放大 (~3KB/线程)。~~W25Q64 驱动无生产调用方 (标定实际存内部 flash)~~ (2026-10-02 已建 `middleware/param_calib` 分区存储, 标定/导航/系统参数全部落 W25Q64)。~~data 模块六件套重复~~ (2026-09-30 已抽公共 `data/record_ring`, imu/mag/baro/gnss_data 四模块收敛, 对外 API 不变)。~~main.c 单文件承载全部调试输出链路~~ (2026-09-30 已拆 `applications/out_*.c` 每链路一文件 + `app_out.c` 公共设施, main.c 收敛为入口/装配) | 控制律开发是下一阶段主体 (参数分区已预留 ctrl 分区); ulog 换异步 backend |
 | 7 | **SWO (PB3) 链路未验证** | MCU 侧配置全部就绪 (PB3=AF0、DBGMCU_CR.TRACE_IOEN、ITM/TPIU 编程成功), 但 OpenOCD 0.12 经 ST-LINK 的 TPIU 捕获路径拿不到数据 | 用 CubeProgramer GUI 的 SWV 视图验证物理连线, 或在固件中加入 ITM printf 输出后再测 |
 | 8 | **平台升级未上板回归** (2026-09-30) | RT-Thread 5.3.0 + 串口 V2 + scons -O0→-O2; V2 改变了 GNSS 环满丢数据点位置与事件粒度, -O2 改变运行时序。**首个回归已兑现并于 2026-10-01 修复+上板闭环 (详见 middleware/README.md)**: 5.3.0 drv_hard_i2c 传输后端全靠 BSP_I2C 模式宏条件编译, rtconfig.h 迁移时模式宏全丢 → I2C 两总线所有传输被驱动直接拒绝; 补 `BSP_I2C1/2_TX/RX_USING_INT` 后上板实测 BMM350/BMP585 boot 首次上电即上线 (561/598ms), mag/baro ~90.8 obs/s 零丢失零错误, 压强 100139Pa/磁场 47.8µT 数值正常 | 剩余项: csum 监控 (B5 判据) + EKF 单步耗时复测 + 控制台/GNSS/ADIS 链路实测 (utest 用例已随测试框架一并移除, 2026-09-30)。ADIS 见 #9 |
 | 9 | ~~ADIS16505 总线零响应~~ **已翻案并恢复 (2026-10-01 晚, 详见 middleware/README.md)** | 曾判定"物理层无响应"是**错误结论**: 芯片一直在线, 是陷入了**跨 MCU 复位持续数小时的粘滞异常态** (类似 BMP585 当年 NVM 停摆), 期间对一切固件探测零响应 (MISO/DR 静默)。最终被 "OpenOCD halt CPU + SWD 裸寄存器访问序列 + 全片擦除重烧" 唤醒; 此后连续 5 次硬复位全部首次探测上线 (`PROD_ID=0x4079`), IMU 精确 1000/s, 室内无 GNSS 下 NOGNSS 冗余链 (IMU+磁+气压) 实测 `RUNNING`。诱因疑与 5.3.0 首次上板有关 (spixfer DMA 化的探测路径/上电时序), 未能最终定罪; W25Q64 (OCTOSPI) "零响应" **同期破案 (2026-10-01 晚)**: 芯片一直正常, 是移植错误 —— PF10 CLK 复用号应为 **AF9** (旧驱动六脚全按 AF10 配置, 时钟根本没接到引脚) + IO2/IO3(WP/HOLD) 须 GPIO 驱动为高 (1-1-1 下 OCTOSPI 不驱动这两脚); 已随 QSPI 驱动框架化一并修复 (BSP drv_qspi.c 重写 OCTOSPI 版 + w25q64 走 rt_qspi_* API), 板上 JEDEC/读写擦全验收通过, 详见 middleware/README.md | 复发观察: 若 ADIS 再次静默, 先 `adisdbg probe` 取证 (驱动已带 adisretry 无界重试, 自愈路径与本次相同); W25Q64 无生产调用方, 优先级低 |

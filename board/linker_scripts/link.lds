@@ -6,14 +6,17 @@
 /* Program Entry, set to mark it as "used" and avoid gc */
 MEMORY
 {
-    /* 896KB 固件区; 最后 128KB (扇区7, 0x080E0000) 保留给校准参数
-     * (middleware/calibration/calib_store), 勿改回 1024k */
+    /* 896KB 固件区; 最后 128KB (扇区7, 0x080E0000) 暂留: 标定参数已迁
+     * W25Q64 (middleware/param_calib), 首次上电从本扇区导入旧格式记录
+     * (param_calib.c), 导入完成前勿改回 1024k 覆盖 */
     ROM (rx)  : ORIGIN = 0x08000000, LENGTH = 896k
     RAM (rw)  : ORIGIN = 0x24000000, LENGTH =  320k /* 320KB AXI SRAM (D1), 注意不含 DTCM/D2/D3 */
     DTCM (rw) : ORIGIN = 0x20000000, LENGTH =  128k /* 128KB DTCM, CPU 专用零等待 */
 }
 ENTRY(Reset_Handler)
-_system_stack_size = 0x400;
+/* MSP (中断/ISR 栈): 6 级抢占嵌套 + ulog ISR 日志路径, 1KB 偏紧,
+ * 提到 2KB (RAM 富余) */
+_system_stack_size = 0x800;
 
 SECTIONS
 {

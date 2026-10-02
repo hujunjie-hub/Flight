@@ -133,11 +133,13 @@ inline GINSOptions gins_build_options(double lat_deg, double lon_deg, double alt
     double lever[3] = GINS_ANT_LEVER;
     opt.antlever << lever[0], lever[1], lever[2];
 
-    /* 磁力计航向观测 (BMM350), 角度量换算到 rad */
+    /* 磁力计航向观测 (BMM350), 角度量换算到 rad
+     * magstd 用入滤限速后的等效 std (信息量守恒配平, 见 gins_config.h) */
     opt.magenable    = GINS_MAG_ENABLE ? true : false;
     opt.magdecl      = GINS_MAG_DECL_DEG * D2R;
-    opt.magstd       = GINS_MAG_STD_DEG * D2R;
+    opt.magstd       = GINS_MAG_FUSED_STD_DEG * D2R;
     opt.maggaterad   = GINS_MAG_GATE_DEG * D2R;
+    opt.magfusedt    = GINS_MAG_FUSE_DT_S;
 
     /* 气压高度观测 (BMP585) */
     /* GNSS 水平速度观测 (RMC, 方案A) */

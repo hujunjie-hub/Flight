@@ -23,7 +23,8 @@
 #include "mag_data.h"                       /* middleware/data 环形缓冲区 */
 #include "baro_data.h"                      /* middleware/data 环形缓冲区 */
 #include "baro_calib.h"                     /* middleware/calibration */
-#include "calib_store.h"                    /* middleware/calibration C8 零偏持久化 */
+#include "param_calib.h"                    /* middleware/param_calib C8 零偏持久化 (W25Q64) */
+#include "param_nav.h"                      /* middleware/param_calib 导航参数镜像 (磁偏角/部署位置/观测开关) */
 #include "timebase.h"                       /* middleware/timebase T_MCU 时基 */
 #include "board.h"                          /* DWT */
 
@@ -48,6 +49,13 @@ enum gins_align_res
 };
 
 static GIEngine *s_engine = RT_NULL;        /* 运行期构造, 不销毁 */
+
+/* 引擎生命周期互斥: 只串行化 FinSH 读端与 reseed 拆建两侧。解算线程
+ * 热路径不加锁 (它自身就是 reseed 执行者, 判空+解引用在同一线程内
+ * 天然一致); FinSH 判空后解引用与 reseed delete 之间的 use-after-free
+ * 窗口 (P2 优先级高于 FinSH, 随时可拆引擎) 由此关闭 */
+static struct rt_mutex s_engine_lk;
+static rt_bool_t s_engine_lk_ready = RT_FALSE;
 
 static struct
 {
@@ -388,8 +396,12 @@ static void gins_reseed(void)
 {
     if (s_engine != RT_NULL)
     {
+        if (s_engine_lk_ready)
+            rt_mutex_take(&s_engine_lk, RT_WAITING_FOREVER);
         delete s_engine;
         s_engine = RT_NULL;
+        if (s_engine_lk_ready)
+            rt_mutex_release(&s_engine_lk);
     }
     g_anchor.valid = RT_FALSE;
     memset(&g_gq, 0, sizeof(g_gq));
@@ -454,7 +466,7 @@ static void gins_reseed_request(const char *why, rt_bool_t force)
 
 /*
  * 加计零偏快照 (C8): 取引擎 EKF 当前零偏估值, 过合理性界后写入
- * calib_store 并保存 (追加式日志)。temp 为 IMU 内部温度标签 (°C)。
+ * param_calib 镜像并保存 (W25Q64 calib 分区追加式记录)。temp 为 IMU 内部温度标签 (°C)。
  * force=TRUE 跳过静止/时长条件 (FinSH 手动路径, 仍受合理性界约束)。
  */
 static rt_err_t gins_accbias_snapshot(double temp_c, rt_bool_t force)
@@ -464,8 +476,21 @@ static rt_err_t gins_accbias_snapshot(double temp_c, rt_bool_t force)
     double mgal[3];
     int i;
 
-    if (s_engine == RT_NULL)
-        return -RT_EEMPTY;
+    {
+        /* FinSH 侧 (accbias save) 与解算线程 (自动快照) 都会进入本函数;
+         * 引擎生命周期锁关闭 FinSH 判空后 reseed 拆引擎的 UAF 窗口 */
+        if (s_engine_lk_ready)
+            rt_mutex_take(&s_engine_lk, RT_WAITING_FOREVER);
+        if (s_engine == RT_NULL)
+        {
+            if (s_engine_lk_ready)
+                rt_mutex_release(&s_engine_lk);
+            return -RT_EEMPTY;
+        }
+        ns = s_engine->getNavState();
+        if (s_engine_lk_ready)
+            rt_mutex_release(&s_engine_lk);
+    }
 
     if (!force)
     {
@@ -590,7 +615,7 @@ static rt_int8_t gins_seed_engine(double lat_deg, double lon_deg, double alt_m,
 
         rt_bool_t yaw_seeded = RT_FALSE;
 
-        if (nognss && GINS_MAG_ENABLE)
+        if (nognss && param_nav()->mag_enable)
         {
             /* yaw 磁航向倾角补偿直接初始化 (levelMagHeading 只用 roll/pitch,
              * 与 yaw 无关): 消除半圆先验及其与位置先验的巨大交叉项, 磁观测
@@ -624,7 +649,8 @@ static rt_int8_t gins_seed_engine(double lat_deg, double lon_deg, double alt_m,
                                      (double)m.mag_ut[2]);
 
                 opt.initstate.euler[2]     = GIEngine::levelMagHeading(
-                    magv, roll_rad, pitch_rad, (double)GINS_MAG_DECL_DEG * D2R);
+                    magv, roll_rad, pitch_rad,
+                    (double)param_nav()->mag_decl_deg * D2R);
                 opt.initstate_std.euler[2] = (double)GINS_NOGNSS_YAW_STD_DEG * D2R;
                 yaw_seeded = RT_TRUE;
             }
@@ -850,9 +876,9 @@ static enum gins_align_res gins_try_init_engine(const struct gnss_sample *gs,
                 w_mean[2] = g_align_w.sum[2] / (double)g_align_w.n;
             }
 #endif
-            rt_int8_t r = gins_seed_engine((double)GINS_NOGNSS_LAT_DEG,
-                                           (double)GINS_NOGNSS_LON_DEG,
-                                           (double)GINS_NOGNSS_ALT_M,
+            rt_int8_t r = gins_seed_engine(param_nav()->nognss_lat,
+                                           param_nav()->nognss_lon,
+                                           param_nav()->nognss_alt,
                                            0.0, 0.0, 0.0,
                                            0.0, s0, f_sum, n,
                                            w_mean, g_align_w.n, dt, RT_TRUE);
@@ -944,7 +970,7 @@ static void gins_publish(void)
         s.mag_rej_cnt  = us.magrej + us.magdrop;
         s.baro_rej_cnt = us.barorej + us.barodrop;
         s.baro_height  = s_engine->baroHeight();
-        s.mag_decl_deg = GINS_MAG_DECL_DEG;
+        s.mag_decl_deg = param_nav()->mag_decl_deg;
         s.baro_skip_cnt = us.baroskip;
         s.vreset_cnt    = us.vreset;
         s.updfail_cnt   = us.updfail;
@@ -1291,8 +1317,13 @@ static void gins_thread_entry(void *parameter)
     {
         rt_uint32_t n = 0;
 
-        gins_wdt_feed();                        /* 线程活着即喂狗 (1kHz) */
-        rt_thread_mdelay(1);                    /* tick = 1ms, 与 DR 同频 */
+        gins_wdt_feed();                        /* 线程活着即喂狗 */
+        /* IMU 事件驱动等待: 样本入环 (rx_indicate → 信号量) 即醒, 消费
+         * 延迟比 1ms 轮询少一拍且免去 1kHz 无效唤醒。dt 由 T_event 差分
+         * 计算不受唤醒相位影响; 断流时按 2ms 超时醒来维持喂狗与 aux
+         * 排空节拍。数据链未运行时 wait 立即返回错误, 退回 1ms 节拍。 */
+        if (imu_data_wait(2) != RT_EOK)
+            rt_thread_mdelay(1);
         loops++;
 
         /* utest 暂停: 睡眠等待恢复 (kf_math 静态态让给测试引擎) */
@@ -1855,9 +1886,9 @@ static void gins_thread_entry(void *parameter)
             }
             else
             {
-                double dn = (g_sol.latitude - (double)GINS_NOGNSS_LAT_DEG) * 111320.0;
-                double de = (g_sol.longitude - (double)GINS_NOGNSS_LON_DEG) * 111320.0 *
-                            cos((double)GINS_NOGNSS_LAT_DEG * D2R);
+                double dn = (g_sol.latitude - param_nav()->nognss_lat) * 111320.0;
+                double de = (g_sol.longitude - param_nav()->nognss_lon) * 111320.0 *
+                            cos(param_nav()->nognss_lat * D2R);
 
                 if (dn * dn + de * de >
                     (double)GINS_NOGNSS_POSGUARD_KM * 1000.0 * (double)GINS_NOGNSS_POSGUARD_KM * 1000.0)
@@ -1940,6 +1971,16 @@ void gins_bridge_get_solution(struct gins_solution *out)
 rt_err_t gins_bridge_init(void)
 {
     rt_thread_t tid;
+
+    /* 引擎生命周期互斥 (FinSH 读端 vs reseed 拆建), 见 s_engine_lk 注释;
+     * init 幂等 (autoinit 与可能的显式调用), 已就绪则跳过 */
+    if (!s_engine_lk_ready)
+    {
+        if (rt_mutex_init(&s_engine_lk, "ginsegn", RT_IPC_FLAG_PRIO) == RT_EOK)
+            s_engine_lk_ready = RT_TRUE;
+        else
+            LOG_W("engine lifecycle mutex init failed, FinSH 读端无保护");
+    }
 
     /* 看门狗已由 gins_wdt.c 的 INIT_BOARD_EXPORT 更早启动 (早于任何
      * 可能卡死的组件初始化), 此处只保留喂狗 (解算线程循环) */
@@ -2024,12 +2065,17 @@ static void gins(int argc, char **argv)
     {
         unsigned int zupd = 0, zrej = 0;
 
+        /* FinSH 线程读引擎: 引擎生命周期锁关闭与 reseed delete 的竞态 */
+        if (s_engine_lk_ready)
+            rt_mutex_take(&s_engine_lk, RT_WAITING_FOREVER);
         if (s_engine != RT_NULL)
         {
             const GIEngine::UpdateStat &us2 = s_engine->updateStat();
             zupd = us2.zuptupd;
             zrej = us2.zuptrej;
         }
+        if (s_engine_lk_ready)
+            rt_mutex_release(&s_engine_lk);
         LOG_I("zupt    : inject=%u (eng upd=%u rej=%u), static=%s "
               "(w²=%.1f n |f|-g=%.3f)",
               s.zupt_cnt, zupd, zrej,
@@ -2104,6 +2150,8 @@ static void accbias(int argc, char **argv)
           cal->acc_valid ? "VALID" : "none",
           (double)cal->acc_bias_mgal[0], (double)cal->acc_bias_mgal[1],
           (double)cal->acc_bias_mgal[2], (double)cal->acc_cal_temp);
+    if (s_engine_lk_ready)
+        rt_mutex_take(&s_engine_lk, RT_WAITING_FOREVER);
     if (s_engine != RT_NULL)
     {
         NavState ns = s_engine->getNavState();
@@ -2112,6 +2160,8 @@ static void accbias(int argc, char **argv)
               ns.imuerror.accbias[0] * 1e5, ns.imuerror.accbias[1] * 1e5,
               ns.imuerror.accbias[2] * 1e5);
     }
+    if (s_engine_lk_ready)
+        rt_mutex_release(&s_engine_lk);
     LOG_I("autosnap: %s (引擎就绪 %us 后静止自动, 累计 %u 次)",
           g_accsnap.saved ? "本上电已存" : "等待条件",
           (unsigned)GINS_ACCBIAS_SAVE_S, g_accsnap.auto_cnt);

@@ -130,7 +130,8 @@ rt_bool_t timebase_mcu_to_utc(rt_uint64_t t_mcu_us, rt_uint64_t *t_utc_us);
 rt_bool_t timebase_map_valid(void);
 
 /*
- * 校准擦写窗口回绕核对 (calib_store 全局关中断擦写前后调用):
+ * 关中断窗口回绕核对 (任意需要长时间关中断的驱动前后调用; 原调用方
+ * calib_store 迁移 W25Q64 后不再关中断, 保留为通用工具):
  *   begin 关中断前取当前时戳快照; end 开中断后核对 CNT 单调性,
  *         检测到回绕未被溢出中断通知即补计, 消除 +71.6min 级静默跳变。
  */

@@ -226,6 +226,21 @@ void predict(const double *F_cm, const double *G_cm, double dt, double *dx_inout
 {
     memcpy(s_dtc.F, F_cm, sizeof(s_dtc.F));
     memcpy(s_dtc.G, G_cm, sizeof(s_dtc.G));
+    predict_inplace(dt, dx_inout);
+}
+
+double *F_buf(void)
+{
+    return s_dtc.F;
+}
+
+double *G_buf(void)
+{
+    return s_dtc.G;
+}
+
+int predict_inplace(double dt, double *dx_inout)
+{
     memcpy(s_dtc.dx, dx_inout, sizeof(s_dtc.dx));
 
     /* dx += dt·F·dx (逐历元一阶推进, 与冲刷的 Phi=I+F·dt 一致) */
@@ -249,15 +264,18 @@ void predict(const double *F_cm, const double *G_cm, double dt, double *dx_inout
         s_dtc.dx[i] += s_dtc.dxt[i];
 
     s_dtc.dt_acc += dt;
+    int flushed = 0;
     if (s_dtc.dt_acc >= KF_PRED_MIN_DT)
     {
         uint32_t t0 = kf_tmark();
 
         pred_flush();
         stat_step(t0, &s_pd_avg, &s_pd_max);
+        flushed = 1;
     }
 
     memcpy(dx_inout, s_dtc.dx, sizeof(s_dtc.dx));
+    return flushed;
 }
 
 /* S(m×m) = L·Lᵀ 的 Cholesky 分解, 并求 S⁻¹ = (L⁻¹)ᵀ·(L⁻¹).

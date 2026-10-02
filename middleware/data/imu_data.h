@@ -49,6 +49,9 @@ int imu_data_init(void);
 /* 读出一个样本 (FIFO); 空时返回 -RT_EEMPTY */
 rt_err_t imu_data_pop(struct imu_sample *out);
 
+/* 取最新样本镜像 (非消费, 不动 FIFO/信号量): 调试打印读者专用; *seq 比对变化判新 */
+rt_err_t imu_data_peek_latest(struct imu_sample *out, rt_uint32_t *seq);
+
 /* 阻塞等待新样本 (每个推送释放一次), 超时返回 -RT_ETIMEOUT;
  * 与 imu_data_pop 配合: imu_data_wait(...) 后循环 pop 直到 -RT_EEMPTY */
 rt_err_t imu_data_wait(rt_int32_t timeout_ms);

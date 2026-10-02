@@ -29,7 +29,7 @@
 #include "imu_data.h"
 #include "record_ring.h"
 #include "sensor_adis16505.h"
-#include "gins_config.h"                /* 轴映射宏 (安装参数, 与 GINS 同源) */
+#include "param_nav.h"                  /* 轴映射镜像 (安装参数, 与 GINS 同源) */
 #include <rtdevice.h>
 #include <drivers/sensor.h>
 #include <ipc/ringbuffer.h>
@@ -109,15 +109,15 @@ static rt_uint32_t imu_extend_cntr(rt_uint16_t raw)
 
 /* ------------------------- 入环前处理链 ------------------------- */
 
-/* 体坐标系轴映射 (前右下): 与 GINS 安装参数同源 (gins_config.h 宏),
- * 单位换算后调用, 环形缓冲区内即为可解算的体系样本 */
+/* 体坐标系轴映射 (前右下): 安装参数取 param_nav 镜像 (W25Q64 nav 分区,
+ * 缺省 = gins_config.h 编译期宏), 单位换算后调用, 环形缓冲区内即为
+ * 可解算的体系样本; `nav set iaxis` 现场改向即时生效 */
 static void imu_axis_map(const float src[3], float dst[3])
 {
-    const int   axis[3] = GINS_AXIS_SRC;
-    const float sign[3] = GINS_AXIS_SIGN;
+    const struct nav_params *nav = param_nav();
 
     for (int i = 0; i < 3; i++)
-        dst[i] = sign[i] * src[axis[i]];
+        dst[i] = nav->imu_axis_sign[i] * src[nav->imu_axis_src[i]];
 }
 
 /* ------------------------- 缓冲区操作 ------------------------- */
@@ -206,6 +206,12 @@ static void imu_thread_entry(void *parameter)
 }
 
 /* ------------------------- 对外接口 ------------------------- */
+
+rt_err_t imu_data_peek_latest(struct imu_sample *out, rt_uint32_t *seq)
+{
+    /* 最新样本镜像 (非消费): out_* 调试读者专用, 不与融合消费方抢环 */
+    return record_ring_peek_latest(&ctx.ring, out, seq);
+}
 
 rt_err_t imu_data_pop(struct imu_sample *out)
 {

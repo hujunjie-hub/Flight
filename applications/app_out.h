@@ -25,6 +25,14 @@ void app_out_init(void);
 /* 整段加锁写出 (帧/行不被其他数据链插断), 内含 STREAM 标志兜底清除 */
 void app_out_write(rt_device_t dev, const void *buf, rt_size_t len);
 
+/*
+ * ulog 控制台后端 (console_be.c) 的整行串行化钩子 (强实现覆写组件侧
+ * 弱缺省): 与六条输出链路共用同一把 uart1wr 互斥, 高频日志行与高频
+ * 数据帧互不插断。ISR/调度器未起上下文自动放行。
+ */
+void ulog_console_tx_lock(void);
+void ulog_console_tx_unlock(void);
+
 /* 追加一个带标记浮点字段 (前导空格): "label:-i.ffffff" 拆成 符号+整数+6 位定点
  * (tiny klibc 无 %f, 同 gins_bridge.cpp 做法; 定点 1e6 下满量程 < 2^27,
  * ULP <= 4µ, 远小于传感器 LSB, 无有效精度损失) */

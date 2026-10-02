@@ -11,7 +11,8 @@
 | `protocol/` | 纯协议解析 (um982_nmea: NMEA RMC/GGA/ZDA → GNSS PVT) |
 | `data/` | 原始数据环形缓冲区层 (gnss_raw_data/gnss_data/mag_data/baro_data/imu_data) |
 | `timebase/` | 时间同步基座: TIM2 @1MHz T_MCU 时基 + PA0 PPS 输入捕获 + UTC↔T_MCU 映射 |
-| `calibration/` | 磁力计椭球校准 + 气压计基准校准 (参数持久化片内 Flash 扇区 7) |
+| `calibration/` | 磁力计椭球校准 + 气压计基准校准 (参数经 param_calib 持久化到 W25Q64) |
+| `param_calib/` | 飞控参数分区存储 (W25Q64): param_part 分区引擎 + calib/nav/sys 三参数域 |
 | `gins/` | KF-GINS 桥接 (gins 解算线程 1kHz + ginsaux 消费线程) + C++ 对齐 new 堆适配 (aligned_new.cpp) |
 | `KF-GINS/` | 上游组合导航算法内核 (C++, 21 状态 EKF, 最小嵌入) |
 | `so3/` | SO(3) 姿态误差解算 (验收测试用) |
@@ -40,8 +41,8 @@ BMP585 100Hz ─ I2C2 → baro_data 环 (data/, Pa + 芯片温度)              
               ├→ [ginsaux 线程] baro_calib 偏移 → 气压观测(Pa) ────────────→  │ (Pa→高度换算在引擎内)
               └→ [barocal 采集线程] 基准偏移 → 参数                          │
 
-校准参数: middleware/calibration ↔ 片内 Flash 扇区7 (0x080E0000, 上电加载;
-          擦写窗口经 timebase 核对 TIM2 回绕)
+校准/导航参数: middleware/param_calib ↔ W25Q64 分区 (calib/nav/sys,
+          上电加载; 追加式记录, 擦写不关中断不占用时基)
 
 USART1 调试输出 (applications/out_*.c, 460800, 与 console 同口):
   gins 线程解算快照 ─→ [vofa 线程]  JustFloat 50Hz 二进制帧
@@ -184,8 +185,9 @@ imu_data:<n> gnss_data:<n> mag_calib_data:<n> baro_calib_data:<n> fused_data
    `timebase_mcu_to_utc()` 反向换算 (不参与融合)。
 3. **磁链路处理链在入环前完成**: mag_data 采集线程内固定执行 校准→轴映射→
    低通, 环内样本同时携带 raw (传感器系原始值) 与 cal (体系处理值); 气压
-   校准仍挂喂引擎路径 (baro_calib_apply 在 ginsaux)。校准参数上电从 Flash
-   扇区 7 加载 (链接脚本已把固件 ROM 截到 896KB)。
+   校准仍挂喂引擎路径 (baro_calib_apply 在 ginsaux)。校准与导航参数上电
+   从 W25Q64 分区加载 (middleware/param_calib, 2026-10-02 迁移, 原
+   片内 Flash 扇区 7 记录自动导入一次)。
 4. **线程优先级**: gins 解算 (9) > ginsaux (10) ≈ main (10) > data 层采集
    线程 (11) > vofa/gins_fused_data (12) > 校准采集 (13) > gnssout (14) >
    magout (15) > barout (17) > FinSH (20); 例外: gnssrx 接收线程 (8) 与
@@ -212,7 +214,10 @@ imu_data:<n> gnss_data:<n> mag_calib_data:<n> baro_calib_data:<n> fused_data
 | `gins_fused_data [on\|off]` | KF-GINS 带标记文本开关 (fused_data 后缀, 默认 off) |
 | `gnssout [on\|off]` | UM982 定位解文本开关 (开启时与 gins 分抢样本) |
 | `magout [on\|off]` / `barout [on\|off]` | 磁/气压计 raw+calib 文本开关 |
-| `w25q64 id/read/write/erase` | 外置 SPI Flash 调试 |
+| `nav` / `nav set ...` / `nav save` | 导航参数镜像查看/修改 (磁偏角/NOGNSS 位置/轴向映射/磁开关) /持久化 (W25Q64 nav 分区) |
+| `param` / `param erase <part>` | W25Q64 参数分区状态查看 / 分区擦除 (恢复出厂) |
+| `sysinfo` | 系统参数 (启动计数/固件标识/迁移标志) |
+| `w25q64 id/read/write/erase` | 外置 SPI Flash 调试 (底层) |
 
 ## 2026-09-29 修复记录 (SWD 直读诊断, 静置台架验证)
 
@@ -514,3 +519,32 @@ lost=0 errors=0, 压强 100120Pa/30.8°C、磁场量值正常。测试设施:
 有效) + erase 4k/32k OK + 擦后读全 FF + 写读回逐字节一致。
 `build_host/w25q64_onboard_test.ps1` 为验收脚本 (COM9 console +
 OpenOCD 4444 复位)。
+
+## 2026-10-02 飞控参数分区存储落地 (middleware/param_calib, W25Q64)
+
+作为成熟飞控的参数持久化基础设施: 标定/导航/系统参数按分区存 W25Q64,
+原片内 Flash 方案 (`calibration/calib_store.c/.h`) 删除。设计见
+`param_calib/README.md`, 要点:
+
+- **分区** (编译期权威 `param_part.c`): ptbl 4KB (分区表自描述副本) /
+  calib 16KB (磁椭球+气压偏移+加计零偏) / nav 16KB (磁偏角/NOGNSS 部署
+  位置/IMU+磁轴向映射/磁观测开关) / sys 8KB (启动计数/固件标识/迁移
+  标志) / ctrl 20KB (控制律预留); 其余 ~7.9MB 未分配 (未来黑匣子)。
+- **记录纪律** (沿袭已验证的追加式日志): 128B/64B 槽 + magic/ver/seq/
+  CRC32 头, 追加写满整擦回卷, 掉电至多损失最新一条, 磨损均衡随回卷
+  获得; 引擎锁串行化跨域并发保存。
+- **不关中断**: OCTOSPI 间接模式, 擦写期间 CPU/四链 EXTI/DMA 照常,
+  原片内方案的 DCache 开关/关中断窗口/timebase 回绕核对全部不再需要
+  (timebase 的窗口工具保留为通用设施)。
+- **calib_store_* API 原样保留** (mag_calib/baro_calib/gins_bridge 零
+  改动), 首次上电自动把片内扇区 7 旧记录导入 calib 分区一次 (sys 标志
+  防重复, `param erase calib` 后不复活旧值)。
+- **导航参数运行期化**: 原编译期宏 `GINS_MAG_DECL_DEG` /
+  `GINS_NOGNSS_LAT/LON/ALT` / `GINS_AXIS_*` / `GINS_MAG_ENABLE` 改由
+  param_nav 镜像提供 (缺省仍来自宏, 无记录行为不变); 消费点 gins_bridge
+  (播种/磁初始化/位置守卫) 与 data 层 (imu/mag 轴映射热路径) 直读镜像。
+  台架核对轴向映射 (遗留问题 #1) 现可用 `nav set maxis ...` + `nav save`
+  现场修正, 不再重编译。
+- **降级**: W25Q64 缺失时告警一次, 参数仅本次上电有效, 其余不受影响。
+- **构建接线**: SCons 经 middleware/SConscript 自动收录 (DefineGroup
+  'ParamCalib'); CMake 新增 rtt_ParamCalib 库 (RT_PARAMCALIB_SOURCES)。

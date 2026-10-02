@@ -47,6 +47,17 @@ void set_Qc(const double *Qc_cm);
  * @param dx_inout 21×1 误差状态 (double, 原地更新) */
 void predict(const double *F_cm, const double *G_cm, double dt, double *dx_inout);
 
+/* F/G 内核缓冲地址 (21×21 / 21×18, 列主序 double, DTCM): 引擎以
+ * Eigen::Map 直写内核缓冲, 免逐历元 "Eigen 侧清零重建 → memcpy 进内核"
+ * 的双份搬运。写毕调用 predict_inplace (勿再走 predict, 会自我拷贝) */
+double *F_buf(void);
+double *G_buf(void);
+
+/* 原地预测: F/G 已在内核缓冲 (F_buf/G_buf 写毕后调用), 语义同 predict。
+ * 返回 1 = 本次冲刷了完整 P 传播 (P 已变, 调用方此时才需要回写 Eigen
+ * 副本); 0 = 仅 dx 逐历元推进, P 未动 */
+int predict_inplace(double dt, double *dx_inout);
+
 /* EKF 量测更新 (观测历元, ~10Hz), Joseph 形式:
  *   K   = P·Hᵀ·(H·P·Hᵀ+R)⁻¹        <- (·)⁻¹ 用 Cholesky
  *   dx  = dx + K·(dz - H·dx)

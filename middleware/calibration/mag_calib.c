@@ -15,7 +15,7 @@
 #include <math.h>
 
 #include "mag_calib.h"
-#include "calib_store.h"
+#include "param_calib.h"                 /* middleware/param_calib 持久化 (W25Q64) */
 #include "ellipsoid_fit.h"
 #include "mag_data.h"                   /* middleware/data 环形缓冲区 */
 

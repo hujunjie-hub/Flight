@@ -4,8 +4,10 @@ cwd = GetCurrentDir()
 
 src = Glob('*.c')
 # 传感器数据环形缓冲区层: 依赖 sensor 框架设备与 timebase (T_event 时戳);
-# mag_data 入环前处理链还需 mag_calib (椭球校正) 与 gins_config (轴映射/低通宏)
-CPPPATH = [cwd, cwd + '/../calibration', cwd + '/../gins', cwd + '/../timebase']
+# mag_data 入环前处理链还需 mag_calib (椭球校正) 与 gins_config (低通宏);
+# 轴映射安装参数经 param_nav 镜像 (W25Q64 nav 分区, 缺省=gins_config.h 宏)
+CPPPATH = [cwd, cwd + '/../calibration', cwd + '/../gins',
+           cwd + '/../timebase', cwd + '/../param_calib']
 
 group = DefineGroup('DataBuf', src, depend = ['RT_USING_SENSOR'], CPPPATH = CPPPATH)
 

@@ -296,6 +296,12 @@ static void gnss_thread_entry(void *parameter)
 
 /* ------------------------- 对外接口 ------------------------- */
 
+rt_err_t gnss_data_peek_latest(struct gnss_sample *out, rt_uint32_t *seq)
+{
+    /* 最新样本镜像 (非消费): out_* 调试读者专用, 不与融合消费方抢环 */
+    return record_ring_peek_latest(&ctx.ring, out, seq);
+}
+
 rt_err_t gnss_data_pop(struct gnss_sample *out)
 {
     rt_err_t ret = record_ring_pop(&ctx.ring, out);

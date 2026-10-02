@@ -21,6 +21,9 @@ extern "C" {
 #endif
 
 #define STM32_FLASH_START_ADRESS     ((uint32_t)0x08000000)
+/* 芯片物理 1MB; 链接脚本固件区只到 896K (尾 128KB 扇区7 为旧标定参数
+ * 导入保留, 见 link.lds 与 param_calib) —— 打开 BSP_USING_ON_CHIP_FLASH
+ * 类功能时勿把可写范围当成这里的 1MB 全量 */
 #define STM32_FLASH_SIZE             (1024 * 1024)
 #define STM32_FLASH_END_ADDRESS      ((uint32_t)(STM32_FLASH_START_ADRESS + STM32_FLASH_SIZE))
 

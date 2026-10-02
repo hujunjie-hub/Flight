@@ -23,12 +23,18 @@
 #include <rtthread.h>
 #include <ipc/ringbuffer.h>
 
+#define RECORD_RING_MAX_REC_SIZE   128
+
 struct record_ring
 {
     struct rt_ringbuffer rb;    /* 底层字节流环 (关中断保护) */
     struct rt_semaphore  data_sem;  /* 消费等待: 每推送一条释放 */
     rt_uint16_t          rec_size;  /* 定长记录字节数 */
     rt_uint32_t          lost;      /* 满时挤掉的记录数 (诊断) */
+    /* 最新样本镜像 (调试快照): push 时在同一关中断临界区内顺带更新,
+     * 供打印类"旁路读者"取最新值而不与融合消费方抢环 (2026-10-02) */
+    rt_uint8_t           mirror[RECORD_RING_MAX_REC_SIZE];
+    volatile rt_uint32_t mirror_seq;    /* 镜像更新序号, 0 = 尚无样本 */
 };
 
 /*
@@ -40,6 +46,11 @@ rt_err_t record_ring_init(struct record_ring *rr, void *pool, rt_size_t pool_siz
 
 /* 推入一条记录; 满时挤掉最旧一条并 lost++ (中断/线程上下文均可调用) */
 void record_ring_push(struct record_ring *rr, const void *rec);
+
+/* 取最新样本镜像 (非消费, 不动环/信号量): seq 返回镜像序号, 读侧比对
+ * seq 变化判新。无样本 (从未推送) 返回 -RT_EEMPTY */
+rt_err_t record_ring_peek_latest(struct record_ring *rr, void *out,
+                                 rt_uint32_t *seq);
 
 /* 弹出一条; 空或环未初始化返回 -RT_EEMPTY, out 为空返回 -RT_EEMPTY */
 rt_err_t record_ring_pop(struct record_ring *rr, void *out);

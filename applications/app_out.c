@@ -9,6 +9,7 @@
 
 #include <rtthread.h>
 #include <rtdevice.h>
+#include <rthw.h>                       /* rt_interrupt_get_nest (ISR 上下文放行判断) */
 #include "app_out.h"
 
 #define APP_OUT_UART_DEV        "uart1"         /* 与 console 同口 (PA9/PA10) */
@@ -17,9 +18,33 @@
 /* ------------------------- USART1 共享写互斥 -------------------------
  * 串口驱动 (DMA TX) 无跨线程写保护, 多输出线程 (vofa 二进制帧 / 各文本
  * 链 / console) 并发写在字节级交错, 实测文本行被插花、VOFA 帧夹在行中。
- * 各链路整行/整帧 rt_device_write 由本模块统一加锁; ulog 控制台后端内部走
- * rt_kprintf 无法上锁 (可能来自中断), 依赖日志默认关闭 + 低频降低冲突概率。 */
+ * 各链路整行/整帧 rt_device_write 由本模块统一加锁; ulog 日志行经
+ * console_be 的 ulog_console_tx_lock/unlock 弱钩子共用本互斥 (2026-10-02,
+ * 替换原 "日志默认关闭避冲突" 的权宜), 高频日志与高频帧同开时行/帧
+ * 完整不插花 (UTF-8 多字节序列不再被拆断)。ISR/调度器未起上下文放行。 */
 static rt_mutex_t s_uart1_lock = RT_NULL;
+
+/* console_be.c 弱钩子的强实现: 与六条输出链路同一把 uart1wr 互斥
+ * (rt_mutex 递归持有, 链路锁内打日志不死锁)。锁不存在 (main() 之前
+ * 的启动期日志) 或 ISR/调度器未起上下文时放行 —— 此时帧链路必然未
+ * 运行, 无冲突对象。 */
+void ulog_console_tx_lock(void)
+{
+    if (s_uart1_lock == RT_NULL ||
+        rt_interrupt_get_nest() != 0u ||
+        rt_thread_self() == RT_NULL)
+        return;
+    rt_mutex_take(s_uart1_lock, RT_WAITING_FOREVER);
+}
+
+void ulog_console_tx_unlock(void)
+{
+    if (s_uart1_lock == RT_NULL ||
+        rt_interrupt_get_nest() != 0u ||
+        rt_thread_self() == RT_NULL)
+        return;
+    rt_mutex_release(s_uart1_lock);
+}
 
 void app_out_init(void)
 {
