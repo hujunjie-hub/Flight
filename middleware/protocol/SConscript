@@ -1,0 +1,15 @@
+import os
+from building import *
+
+cwd = GetCurrentDir()
+
+# 协议层: 按协议族一目录, 各自的 SConscript 汇入
+#   nmea/    UM982 NMEA PVT 解析 (组合导航 GNSS 观测输入)
+#   mavlink/ MAVLink v2 链路 (地面站遥测/指令, 官方库 + 适配层)
+objs = []
+list = os.listdir(cwd)
+for item in list:
+    if os.path.isfile(os.path.join(cwd, item, 'SConscript')):
+        objs = objs + SConscript(os.path.join(item, 'SConscript'))
+
+Return('objs')

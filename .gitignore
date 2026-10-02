@@ -1,0 +1,62 @@
+*.pyc
+__pycache__/
+*.map
+*.dblite
+*.elf
+*.bin
+*.hex
+*.axf
+*.exe
+*.pdb
+*.idb
+*.ilk
+*.old
+build
+cmake-build-debug/
+build-check/
+Debug
+documentation/html
+# packages/ 不再忽略: CMakeLists.txt 与 SCons 均直接引用 packages/ 下
+# CMSIS-Core / stm32h7_hal_driver / stm32h7_cmsis_driver, 必须随仓库分发
+*~
+*.o
+*.obj
+*.out
+*.bak
+*.dep
+*.lib
+*.i
+*.d
+.DS_Stor*
+.config.bak
+*.uimg
+GPATH
+GRTAGS
+GTAGS
+JLinkLog.txt
+JLinkSettings.ini
+DebugConfig/
+RTE/
+.settings/
+*.uvguix*
+cconfig.h
+# 主机侧调试日志 (OpenOCD 会话动辄数十 MB); test10/ 回归证据日志除外
+openocd*.log
+
+# ===== 大体积参考资料/数据集 (仅本地保留, 不入仓库) =====
+# FMT-Firmware / FMT-Model 参考仓库 (1.6G)
+ref/
+# RT-Thread 5.3.0 dist 暂存 (rt-thread/ 目录本身已入库)
+dist/
+# KF-GINS 上游数据集与主机侧构建产物 (数据集可从 i2Nav-WHU 发布页获取)
+middleware/KF-GINS/dataset/
+middleware/KF-GINS/build-win/
+middleware/KF-GINS/bin/
+middleware/KF-GINS/lib/
+# ADI no-OS 参考仓库整仓克隆 (102M, 仅本地保留; ADIS16505 数据手册 PDF 仍入库)
+doc/ADIS16505/no-OS/
+# Python 虚拟环境 / IDE 本地状态
+.venv/
+.venv-eval/
+.idea/
+.zcode/

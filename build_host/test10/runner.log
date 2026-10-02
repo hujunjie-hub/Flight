@@ -1,0 +1,49 @@
+
+########## ROUND 1/10 ##########
+[round 1] 17/17 PASS, drift=+0.006 m/s, vd_mean=-0.011 m/s
+
+########## ROUND 2/10 ##########
+[round 2] 16/17 PASS, drift=-0.002 m/s, vd_mean=+0.027 m/s
+    FAIL: [FAIL] imu 621.9/s ≥ 990
+
+########## ROUND 3/10 ##########
+[round 3] 17/17 PASS, drift=+0.003 m/s, vd_mean=+0.002 m/s
+
+########## ROUND 4/10 ##########
+[round 4] 15/17 PASS, drift=-0.000 m/s, vd_mean=+0.038 m/s
+    FAIL: [FAIL] tick 速率≈墙钟 (无复位/死机)
+    FAIL: [FAIL] ts_zero 增量 1 = 0
+
+########## ROUND 5/10 ##########
+[round 5] 17/17 PASS, drift=+0.001 m/s, vd_mean=+0.007 m/s
+
+########## ROUND 6/10 ##########
+[round 6] 17/17 PASS, drift=-0.003 m/s, vd_mean=+0.012 m/s
+
+########## ROUND 7/10 ##########
+[round 7] 17/17 PASS, drift=-0.003 m/s, vd_mean=+0.010 m/s
+
+########## ROUND 8/10 ##########
+[round 8] 17/17 PASS, drift=+0.006 m/s, vd_mean=-0.004 m/s
+
+########## ROUND 9/10 ##########
+[round 9] 17/17 PASS, drift=+0.005 m/s, vd_mean=-0.002 m/s
+
+########## ROUND 10/10 ##########
+[round 10] 17/17 PASS, drift=-0.002 m/s, vd_mean=+0.020 m/s
+
+================ 10 轮汇总 ================
+  round  1: 17/17  FULL-PASS
+  round  2: 16/17  INVESTIGATE
+      FAIL: [FAIL] imu 621.9/s ≥ 990
+  round  3: 17/17  FULL-PASS
+  round  4: 15/17  INVESTIGATE
+      FAIL: [FAIL] tick 速率≈墙钟 (无复位/死机)
+      FAIL: [FAIL] ts_zero 增量 1 = 0
+  round  5: 17/17  FULL-PASS
+  round  6: 17/17  FULL-PASS
+  round  7: 17/17  FULL-PASS
+  round  8: 17/17  FULL-PASS
+  round  9: 17/17  FULL-PASS
+  round 10: 17/17  FULL-PASS
+  总计: 8/10 轮全过, 总耗时 104 min

@@ -1,0 +1,190 @@
+menu "Hardware Drivers Config"
+
+menu "Onboard Peripheral Drivers"
+
+endmenu
+
+menu "On-chip Peripheral Drivers"
+
+    config BSP_USING_GPIO
+        bool "Enable GPIO"
+        select RT_USING_PIN
+        default y
+
+    menuconfig BSP_USING_UART
+        bool "Enable UART"
+        default y
+        select RT_USING_SERIAL
+        if BSP_USING_UART
+            config BSP_STM32_UART_V1_TX_TIMEOUT
+                int "UART TX timeout"
+                default 6000
+                depends on RT_USING_SERIAL_V1
+
+            menuconfig BSP_USING_UART1
+                bool "Enable UART1 (debug console, PA9/PA10)"
+                default y
+                if BSP_USING_UART1
+                    config BSP_UART1_RX_USING_DMA
+                        bool "Enable UART1 RX DMA (DMA1 Stream3)"
+                        depends on BSP_USING_UART1 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_UART1_TX_USING_DMA
+                        bool "Enable UART1 TX DMA (DMA1 Stream4)"
+                        depends on BSP_USING_UART1 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_UART1_RX_BUFSIZE
+                        int "Set UART1 RX buffer size"
+                        range 64 65535
+                        depends on RT_USING_SERIAL_V2
+                        default 256
+
+                    config BSP_UART1_TX_BUFSIZE
+                        int "Set UART1 TX buffer size"
+                        range 0 65535
+                        depends on RT_USING_SERIAL_V2
+                        default 0
+
+                    config BSP_UART1_DMA_PING_BUFSIZE
+                        int "Set UART1 RX DMA ping-pong buffer size"
+                        range 32 65535
+                        depends on RT_USING_SERIAL_V2 && BSP_UART1_RX_USING_DMA
+                        default 64
+                endif
+
+            menuconfig BSP_USING_UART2
+                bool "Enable UART2 (UM982 GNSS, PA2/PA3)"
+                default n
+                if BSP_USING_UART2
+                    config BSP_UART2_RX_USING_DMA
+                        bool "Enable UART2 RX DMA (DMA1 Stream2)"
+                        depends on BSP_USING_UART2 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_UART2_TX_USING_DMA
+                        bool "Enable UART2 TX DMA"
+                        depends on BSP_USING_UART2 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_UART2_RX_BUFSIZE
+                        int "Set UART2 RX buffer size"
+                        range 64 65535
+                        depends on RT_USING_SERIAL_V2
+                        default 512
+
+                    config BSP_UART2_TX_BUFSIZE
+                        int "Set UART2 TX buffer size"
+                        range 0 65535
+                        depends on RT_USING_SERIAL_V2
+                        default 0
+
+                    config BSP_UART2_DMA_PING_BUFSIZE
+                        int "Set UART2 RX DMA ping-pong buffer size"
+                        range 32 65535
+                        depends on RT_USING_SERIAL_V2 && BSP_UART2_RX_USING_DMA
+                        default 64
+                endif
+
+        endif
+
+    menuconfig BSP_USING_SPI
+        bool "Enable SPI BUS"
+        default n
+        select RT_USING_SPI
+        if BSP_USING_SPI
+            config BSP_USING_SPI1
+                bool "Enable SPI1 BUS (ADIS16505 IMU, PA5/PA6/PA7)"
+                default n
+
+            config BSP_SPI1_TX_USING_DMA
+                bool "Enable SPI1 TX DMA (DMA1 Stream1)"
+                depends on BSP_USING_SPI1
+                default n
+
+            config BSP_SPI1_RX_USING_DMA
+                bool "Enable SPI1 RX DMA (DMA1 Stream0)"
+                depends on BSP_USING_SPI1
+                default n
+        endif
+
+    menuconfig BSP_USING_HARD_I2C
+        bool "Enable I2C BUS (hardware)"
+        default n
+        select RT_USING_I2C
+        if BSP_USING_HARD_I2C
+            config BSP_USING_HARD_I2C4
+                bool "Enable I2C4 BUS (BMM350, PF14/PF15)"
+                default n
+
+            config BSP_USING_HARD_I2C2
+                bool "Enable I2C2 BUS (BMP585, PB10/PB11)"
+                default n
+
+            config BSP_I2C2_RX_USING_DMA
+                bool "Enable I2C2 RX DMA (DMA2 Stream0)"
+                depends on BSP_USING_HARD_I2C2
+                default n
+
+            config BSP_I2C2_TX_USING_DMA
+                bool "Enable I2C2 TX DMA (DMA2 Stream1)"
+                depends on BSP_USING_HARD_I2C2
+                default n
+
+            # 5.3.0 drv_hard_i2c 的传输后端全部条件编译, INT/DMA/POLL 一个
+            # 都不开 = 三后端全缺 -> 一切传输失败 (2026-10-01 两总线无响应
+            # 事故)。传感器驱动的写地址+读数据是两消息 repeated-start 序列,
+            # 仅 INT/DMA 支持 (B5: DMA 直写调用方栈缓冲 DCache 不可维护),
+            # 故总线开启时 INT 默认开。
+            config BSP_I2C4_TX_USING_INT
+                bool "I2C4 TX using interrupt"
+                depends on BSP_USING_HARD_I2C4
+                default y
+
+            config BSP_I2C4_RX_USING_INT
+                bool "I2C4 RX using interrupt"
+                depends on BSP_USING_HARD_I2C4
+                default y
+
+            config BSP_I2C2_TX_USING_INT
+                bool "I2C2 TX using interrupt"
+                depends on BSP_USING_HARD_I2C2
+                default y
+
+            config BSP_I2C2_RX_USING_INT
+                bool "I2C2 RX using interrupt"
+                depends on BSP_USING_HARD_I2C2
+                default y
+        endif
+
+    menuconfig BSP_USING_TIM
+        bool "Enable hardware timer"
+        default n
+        # RT-Thread 5.3.0: hwtimer 框架已移除, drv_tim 改注册 clock_timer
+        # (rt_clock_timer_register)。注意 TIM2 由 middleware/timebase 独占
+        # (HAL TIM 直驱), 除非明确知道用途否则保持关闭。
+        select RT_USING_CLOCK_TIME
+        if BSP_USING_TIM
+            config BSP_USING_TIM2
+                bool "Enable TIM2 (1PPS input capture, PA0)"
+                default n
+        endif
+
+    config BSP_SCB_ENABLE_I_CACHE
+        bool "Enable SCB I-Cache"
+        default y
+
+    config BSP_SCB_ENABLE_D_CACHE
+        bool "Enable SCB D-Cache"
+        default y
+
+    source "$(BSP_DIR)/libraries/HAL_Drivers/drivers/Kconfig"
+
+endmenu
+
+menu "Board extended module Drivers"
+
+endmenu
+
+endmenu

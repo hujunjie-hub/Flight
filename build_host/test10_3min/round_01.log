@@ -1,0 +1,35 @@
+===== 稳定性+高度通道监控 3 分钟 (每 60s 采样) =====
+t(s)    tick    zda/s rmc/s csum  imu/s gnss/s rst vld | stale rej tsz0 | gnss_alt ins_alt d(I-G) baro_h d(I-B)   vd | b c/r/s fix hdop
+    0    16798  ---- ---- ----    0   ----     0   0 | ---- --- ---- |      0.0      0.0    0.0      0.0    0.0   0.00 |     0   0/  0  0  0.0
+   69    80995   0.0   0.0    0    0.0   0.0   0   0 |     0   0    0 |      0.0      0.0    0.0      0.0    0.0   0.00 |     0   0/  0  0  0.0 | eng up  0.0/s rj  0.0/s sk   0.0/s vrs   0 ealt     nan
+  133   145194   0.0   0.0    0    0.0   0.0   0   0 |     0   0    0 |      0.0      0.0    0.0      0.0    0.0   0.00 |     0   0/  0  0  0.0 | eng up  0.0/s rj  0.0/s sk   0.0/s vrs   0 ealt     nan
+  197   209378   0.0   0.0    0    0.0   0.0   0   0 |     0   0    0 |      0.0      0.0    0.0      0.0    0.0   0.00 |     0   0/  0  0  0.0 | eng up  0.0/s rj  0.0/s sk   0.0/s vrs   0 ealt     nan
+
+===== 判据汇总 (窗口 193s, 起止 uptime 17→209s) =====
+  [PASS] tick 速率≈墙钟 (无复位/死机)
+  [FAIL] zda 0.0/s ≥ 9.5
+  [FAIL] rmc 0.0/s ≥ 9.5
+  [PASS] csum 增量 0 = 0
+  [PASS] timebase restart 增量 0 = 0
+  [FAIL] map.valid=1 (末次) 
+  [PASS] stale 增量 0 = 0
+  [PASS] rej 增量 0 = 0
+  [PASS] ts_zero 增量 0 = 0
+  [FAIL] imu 0.0/s ≥ 990
+  [FAIL] gnss 观测 0.0/s ≥ 8
+  [FAIL] INS 位置偏差 2513495m ≤ 200
+  [PASS] raw lost 增量 0 = 0
+  [PASS] NaN cnt = 0 = 0
+  [PASS] 发布降级 degraded 末次 = 0 = 0
+  [PASS] Cholesky 失败 updfail 增量 0 = 0
+  [PASS] 重对准 reseed 增量 0 = 0
+===== 结果: 11/17 PASS =====
+
+----- 高度通道专项 -----
+  INS 融合高度漂移率  : +0.000 m/s (0.0 -> 0.0 m)
+  GNSS 原始高度漂移率 : +0.000 m/s (0.0 -> 0.0 m)
+  气压模型高度漂移率  : +0.000 m/s (0.0 -> 0.0 m)
+  气压观测: 入滤 0 次, 门限拒绝 +0, 过旧丢弃 +0
+  融合垂速 vd 均值    : +0.000 m/s (正=下沉)
+  INS-GNSS 高度差     : min 0.0 / max 0.0 / 末值 0.0 m
+  INS-baro 高度差(新息): min 0.0 / max 0.0 / 末值 0.0 m

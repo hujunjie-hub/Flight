@@ -1,0 +1,14 @@
+import os
+from building import *
+
+cwd = GetCurrentDir()
+
+# 中间件层: 凡含 SConscript 的子目录自动编入 —— sensor / protocol / data
+# / calibration / gins (含 KF-GINS 内核, 见 gins/SConscript) / so3 / timebase
+objs = []
+list = os.listdir(cwd)
+for item in list:
+    if os.path.isfile(os.path.join(cwd, item, 'SConscript')):
+        objs = objs + SConscript(os.path.join(item, 'SConscript'))
+
+Return('objs')

@@ -1,0 +1,17 @@
+init
+echo "DHCSR DFSR:"
+mdw 0xE000EDF0
+mdw 0xE000ED30
+echo "CFSR HFSR SHCSR BFAR:"
+mdw 0xE000ED28
+mdw 0xE000ED2C
+mdw 0xE000ED24
+mdw 0xE000ED38
+echo "TRY HALT:"
+halt
+echo "PC LR SP XPSR:"
+reg pc
+reg lr
+reg sp
+reg xpsr
+shutdown

@@ -1,0 +1,41 @@
+ready:1 time:450.758 roll:102.415776 pitch:-48.866064 yaw:76.875648 vn:-2147.483648 ve:-1206.733056 vd:1680.186240 lat:18.1417825 lon:110.8932173 alt:-238957.978 imu_data:901804 gnss_data:0 mag_calib_data:40230 baro_calib_data:40070 fused_data
+reboot
+[timebase] TIM2 @1MHz free-run + PPS capture (PA0) ready
+
+ \ | /
+- RT -     Thread Operating System
+ / | \     5.3.0 build Oct  1 2026 07:10:58
+ 2006 - 2024 Copyright by RT-Thread team
+[32m[652] I/sensor.adis: ADIS16505 found, PROD_ID=16505, gyro range ±500 dps, ODR=1000 Hz, DR->DMA on
+[0m[32m[655] I/sensor: rt_sensor[acce_adis16505] init success
+[0m[32m[656] I/sensor: rt_sensor[gyro_adis16505] init success
+[0m[32m[658] I/sensor: rt_sensor[temp_adis16505] init success
+[0m[32m[827] I/sensor.bmm350: BMM350 ready (addr=0x14, id=0x33)
+[0m[32m[829] I/sensor: rt_sensor[mag_bmm350] init success
+[0m[32m[830] I/sensor: rt_sensor[temp_bmm350] init success
+[0m[32m[864] I/sensor.bmp585: BMP585 ready (addr=0x46, id=0x51, ODR=100Hz, 1000.41 hPa)
+[0m[32m[866] I/sensor: rt_sensor[baro_bmp585] init success
+[0m[32m[868] I/sensor: rt_sensor[temp_bmp585] init success
+[0m[32m[869] I/drv.qspi: qspi1 ready @ OCTOSPI1, kernel=275000000 Hz prescaler=3 SCK=91666666 Hz
+[0m[32m[871] I/sensor.w25q64: W25Q64 ready, 8MB via qspi10 (OCTOSPI1, 1-1-1)
+[0m[32m[873] I/data.gnssraw: ready: 4096 bytes raw UART buffer (460800 baud ~90ms)
+[0m[32m[875] I/calib: calib: record loaded (slot seq=28, next write slot=28)
+[0m[32m[877] I/magcal: 无校准参数, 磁力计直通 (执行 magcal start 开始校准)
+[0m[32m[879] I/barocal: 无校准参数, 气压计直通 (barocal ref/refalt + start 开始校准)
+[0m[32m[881] I/gins: 陀螺灵敏度 25.00 mdps/LSB (驱动 RANG_MDL 自动识别)
+[0m[32m[883] I/gins: GINS bridge: ADIS16505 + UM982 + BMM350(磁航向) + BMP585(气压高) -> KF-GINS (EKF 21 状态), 初始化需静止 3000ms + GNSS 定位收敛稳定 (hdop<=2.5 且连续 10 样本互差达标) + PPS 时间映射就绪
+[0m[32m[889] I/data.imu: ready: 512 samples x 40 bytes, 1000 Hz, trig=acce_adis16505 (lazy open)
+[0m[33m[891] W/gins: ginsaux: mag_data/baro_data 链路均未运行, 等待中 (0s) (查 FinSH `magdata`/`barodata` 与传感器接线)
+[0m[32m[930] I/data.mag: ready: 128 samples x 40 bytes, 10 ms period, dev=mag_bmm350
+[0m[32m[933] I/data.baro: ready: 128 samples x 16 bytes, 10 ms period, dev=baro_bmp585+temp_bmp585
+[0m[32m[935] I/data.gnss: rx link: uart2 @460800 8N1 DMA_RX (bufsz 4096), mirror -> gnss_raw_data
+[0m[32m[937] I/data.gnss: ready: 32 samples x 72 bytes, parse from gnss_raw_data -> um982_nmea
+[0m[32m[939] I/main: Flight: UM982 + KF-GINS tagged print on USART1 @460800 (VOFA JustFloat / magout 同口)
+[0m[32m[942] I/vofa: vofa: JustFloat 10 ch @ 50 Hz on uart1 (ch0-2 r/p/y deg, ch3-5 vn/ve/vd m/s, ch6-8 lat/lon/alt, ch9 ready)
+[0m[32m[945] I/gnssout: gnssout: UM982 gnss_data tagged text 10Hz on uart1 @460800 (time/utc/fix/sats/rtk/lat/lon/alt/vn/ve/vu/hdop)
+[0m[32m[948] I/magout: magout: BMM350 raw+calib tagged text 100Hz on uart1 @460800 (time/act/rx../cx../rmag/cmag)
+[0m[32m[951] I/ginsout: gins_fused_data: KF-GINS tagged text 10 Hz on uart1 @460800 (ready/time/roll/pitch/yaw/vn/ve/vd/lat/lon/alt/imu_data/gnss_data/mag_calib_data/baro_calib_data)
+[0m[32m[955] I/barout: barout: BMP585 raw+calib tagged text 100Hz on uart1 @460800 (time/pa/pac/temp, baro_calib_data)
+[0mmsh >[32m[1894] I/gins: ginsaux: mag_data + baro_data 环形缓冲区, 10ms 等待超时
+[0m[32m[8687] I/gins: ZUPT: 静止确认 (w²=441288.5 n(rad/s)², |f|-g=0.074 m/s²), 开始零速修正
+[0m

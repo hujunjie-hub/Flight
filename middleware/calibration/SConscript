@@ -1,0 +1,12 @@
+from building import *
+
+cwd = GetCurrentDir()
+
+# 传感器校准中间件: ellipsoid_fit(纯数学) + calib_store(Flash 持久化)
+#                  + mag_calib(磁力计椭球) + baro_calib(气压计偏移)
+src = Glob('*.c')
+CPPPATH = [cwd, cwd + '/../timebase']
+
+group = DefineGroup('Calibration', src, depend = [''], CPPPATH = CPPPATH)
+
+Return('group')

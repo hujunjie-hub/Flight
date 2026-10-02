@@ -1,0 +1,46 @@
+[31C[hwi2c2] multi-message transfer requires both TX and RX sequential DMA/IT capability
+[0m[31m[70456] E/sensor.bmp585: BMP585 not found, check I2C2 wiring PB10=SCL PB11=SDA
+[0m[31m[70461] E/drv.i2c.hw: I2C[hwi2c1] Write error(1)!
+[0m[31m[70462] [31m[80458] E/drv.i2c.hw: I2C[hwi2c2] multi-message transfer requires both TX and RX sequential DMA/IT capability
+[0m[31m[80460] E/drv.i2c.hw: I2C[hwi2c2] multi-message transfer requires both TX and RX sequential DMA/IT capability
+[0m[31m[80463] E/sensor.bmp585: BMP585 not found, check I2C2 wiring PB10=SCL PB11=SDA
+[0m[31m[80468] E/drv.i2c.hw: I2C[hwi2c1] Write error(1)!
+[0m[31m[80469] E/drv.i2c.hw: I2C[hwi2c1] Write error(1)!
+[0m[31m[80470] E/sensor.bmm350: BMM350 not found, check I2C1 wiring PB6=SCL PB7=SDA
+[0m[33m[82463] W/data.mag: mag: device "mag_bmm350" not ready, waiting for driver retry
+[0m[timebase] TIM2 @1MHz free-run + PPS capture (PA0) ready
+
+ \ | /
+- RT -     Thread Operating System
+ / | \     5.3.0 build Sep 30 2026 23:23:53
+ 2006 - 2024 Copyright by RT-Thread team
+[31m[391] E/sensor.adis: ADIS16505 not found (PROD_ID=0x0000), check SPI1 wiring PA5/PA6/PA7, CS=PC4
+[0m[31m[396] E/drv.i2c.hw: I2C[hwi2c1] Write error(1)!
+[0m[31m[397] E/drv.i2c.hw: I2C[hwi2c1] Write error(1)!
+[0m[31m[398] E/sensor.bmm350: BMM350 not found, check I2C1 wiring PB6=SCL PB7=SDA
+[0m[33m[400] W/sensor.bmm350: BMM350 init failed, background retry every 10s
+[0m[31m[402] E/drv.i2c.hw: I2C[hwi2c2] multi-message transfer requires both TX and RX sequential DMA/IT capability
+[0m[31m[404] E/drv.i2c.hw: I2C[hwi2c2] multi-message transfer requires both TX and RX sequential DMA/IT capability
+[0m[31m[407] E/sensor.bmp585: BMP585 not found, check I2C2 wiring PB10=SCL PB11=SDA
+[0m[31m[469] E/sensor.w25q64: W25Q64 not found (JEDEC=00 00 00), check OCTOSPI1 wiring CLK=PF10 IO0=PF8 IO1=PF9 WP=PF7 HOLD=PF6 CS=PG6
+[0m[32m[472] I/data.gnssraw: ready: 4096 bytes raw UART buffer (460800 baud ~90ms)
+[0m[32m[473] I/calib: calib: record loaded (slot seq=1, next write slot=3)
+[0m[32m[475] I/magcal: ????????????????????? (radius=48.8 uT, samples=7682)
+[0m[32m[477] I/barocal: ???????????????, ??????????????? (barocal ref/refalt + start ????????????)
+[0m[32m[479] I/gins: ??????????????? 6.25 mdps/LSB (?????? RANG_MDL ????????????)
+[0m[33m[481] W/gins: ginsaux: mag_data/baro_data ??????????????????, ????????? (0s) (??? FinSH `magdata`/`barodata` ??????????????????)
+[0m[32m[484] I/gins: GINS bridge: ADIS16505 + UM982 + BMM350(?????????) + BMP585(?????????) -> KF-GINS (EKF 21 ??????), ?????????????????? 3000ms + GNSS ?????????????????? (hdop<=2.5 ????????? 10 ??????????????????) + PPS ??????????????????
+[0m[33m[490] W/data.imu: device "acce_adis16505" not found, IMU data link disabled
+[0m[33m[492] W/data.mag: device "mag_bmm350" not found yet, link starts when driver retry succeeds
+[0m[33m[494] W/data.baro: device "baro_bmp585"/"temp_bmp585" not found yet, deferred retry in thread
+[0m[32m[496] I/data.gnss: rx link: uart2 @460800 8N1 DMA_RX (bufsz 4096), mirror -> gnss_raw_data
+[0m[32m[498] I/data.gnss: ready: 32 samples x 72 bytes, parse from gnss_raw_data -> um982_nmea
+[0m[32m[501] I/main: Flight: UM982 + KF-GINS tagged print on USART1 @460800 (VOFA JustFloat / magout ??????)
+[0m[32m[503] I/vofa: vofa: JustFloat 10 ch @ 50 Hz on uart1 (ch0-2 r/p/y deg, ch3-5 vn/ve/vd m/s, ch6-8 lat/lon/alt, ch9 ready)
+[0m[32m[506] I/gnssout: gnssout: UM982 gnss_data tagged text 10Hz on uart1 @460800 (time/utc/fix/sats/rtk/lat/lon/alt/vn/ve/vu/hdop)
+[0m[32m[509] I/magout: magout: BMM350 raw+calib tagged text 100Hz on uart1 @460800 (time/act/rx../cx../rmag/cmag)
+[0m[32m[512] I/ginsout: gins_fused_data: KF-GINS tagged text 10 Hz on uart1 @460800 (ready/time/roll/pitch/yaw/vn/ve/vd/lat/lon/alt/imu_data/gnss_data/mag_calib_data/baro_calib_data)
+[0m[32m[516] I/barout: barout: BMP585 raw+calib tagged text 100Hz on uart1 @460800 (time/pa/pac/temp, baro_calib_data)
+[0mmsh >[33m[528] W/data.mag: mag: device "mag_bmm350" not ready, waiting for driver retry
+[0m[32m[1484] I/gins: ginsaux: mag_data + baro_data(??????) ???????????????, 10ms ????????????
+[0m

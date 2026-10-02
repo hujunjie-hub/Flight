@@ -1,0 +1,14 @@
+from building import *
+
+cwd = GetCurrentDir()
+src = Glob('*.c')
+CPPPATH = [cwd]
+
+# MAVLink 官方生成代码的 packed 结构 encode 函数触发已知告警, 抑制之。
+# 注: DefineGroup 的 CCFLAGS 在 RT-Thread SCons 构建中是全局追加 (LOCAL_*
+# 不参与实际编译), 故全局抑制该告警; 必须不带前导空格, 否则 Windows
+# win32_spawn 会把带空格的整串加引号传给 gcc, 被当作文件名报错。
+group = DefineGroup('Protocol-Mavlink', src, depend = [''], CPPPATH = CPPPATH,
+                    CCFLAGS = '-Wno-address-of-packed-member')
+
+Return('group')

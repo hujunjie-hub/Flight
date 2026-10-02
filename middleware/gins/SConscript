@@ -1,0 +1,35 @@
+from building import *
+
+cwd = GetCurrentDir()
+
+# KF-GINS 算法内核 (C++) + double EKF 内核 (kf_math) + 本工程桥接层
+# (v2: kf_math 回归 double 并将 P 传播节流到 ~100Hz, 不再依赖 CMSIS-DSP)
+# aligned_new.cpp: C++17 对齐 new/delete (GIEngine 含 Eigen 定长成员,
+# alignas 16) —— 必须与 CMakeLists 的 RT_GINS_SOURCES 保持一致, 缺席时
+# scons 固件对齐性静默退化为 8 字节 (-Waligned-new 可捕获)
+src = [
+    'gins_bridge.cpp',
+    'aligned_new.cpp',
+    'kf_math.cpp',
+    'gins_wdt.c',
+    '../KF-GINS/src/kf-gins/gi_engine.cpp',
+    '../KF-GINS/src/kf-gins/insmech.cpp',
+]
+
+CPPPATH = [
+    cwd,
+    cwd + '/../KF-GINS/src',
+    cwd + '/../KF-GINS/ThirdParty/eigen-3.3.9',
+    cwd + '/../timebase',
+]
+
+# M_PI: 工程定义 _POSIX_C_SOURCE=1 后 newlib 隐藏 M_PI, KF-GINS 依赖之,
+# 与 CMakeLists.txt CMAKE_CXX_FLAGS 的 -DM_PI=... 保持一致。
+# -fno-exceptions/-fno-rtti 由 rtconfig.py 的 CXXFLAGS 全局生效 (勿用
+# LOCAL_CCFLAGS —— 会同时作用于组内 .c 文件, cc1 告警非法选项)
+group = DefineGroup('GINS', src,
+    depend = [''],
+    CPPPATH = CPPPATH,
+    CPPDEFINES = ['KF_GINS_EMBEDDED', ('M_PI', '3.14159265358979323846')])
+
+Return('group')

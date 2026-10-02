@@ -1,0 +1,8 @@
+Exception calling "Open" with "0" argument(s): "Access to the port 'COM9' is denied."
+At D:\STM32Project\Flight\build_host\com_logger.ps1:12 char:5
++     $sp.Open()
++     ~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException
+    + FullyQualifiedErrorId : UnauthorizedAccessException
+ 
+captured 0 bytes -> build_host/boot_adis.txt

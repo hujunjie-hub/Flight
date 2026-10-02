@@ -1,0 +1,149 @@
+Open On-Chip Debugger 0.12.0 (2026-03-02) [https://github.com/sysprogs/openocd]
+Licensed under GNU GPL v2
+libusb1 d52e355daa09f17ce64819122cb067b8a2ee0d4b
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+adapter speed: 10000 kHz
+Info : tcl server disabled
+Info : Listening on port 4444 for telnet connections
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: FW Version = 2.2.3R
+Info : CMSIS-DAP: Serial# = D17708E4C284
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 1 TDI = 0 TDO = 0 nTRST = 0 nRESET = 1
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 10000 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : [stm32h7x.ap2] Examination succeed
+Info : [stm32h7x.cpu0] Cortex-M7 r1p2 processor detected
+Warn : [stm32h7x.cpu0] Erratum 3092511: Cortex-M7 can halt in an incorrect address when breakpoint and exception occurs simultaneously
+Info : [stm32h7x.cpu0] The erratum 3092511 workaround will resume after an incorrect halt
+Info : [stm32h7x.cpu0] target has 8 breakpoints, 4 watchpoints
+Info : [stm32h7x.cpu0] Examination succeed
+Info : [stm32h7x.ap2] gdb port disabled
+Info : [stm32h7x.cpu0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+Error: [stm32h7x.cpu0] clearing lockup after double fault
+Info : [stm32h7x.cpu0] external reset detected
+[stm32h7x.cpu0] halted due to debug-request, current mode: Handler HardFault
+xPSR: 0x01000003 pc: 0xfffffffe msp: 0xfffffffc
+Warn : [stm32h7x.cpu0] external resume detected
+[stm32h7x.cpu0] halted due to debug-request, current mode: Handler HardFault
+xPSR: 0x01000003 pc: 0xfffffffe msp: 0xfffffffc
+Info : [stm32h7x.cpu0] external reset detected
+[stm32h7x.cpu0] halted due to debug-request, current mode: Handler HardFault
+xPSR: 0x01000003 pc: 0xfffffffe msp: 0xfffffffc
+Warn : [stm32h7x.cpu0] external resume detected
+[stm32h7x.cpu0] halted due to debug-request, current mode: Handler HardFault
+xPSR: 0x01000003 pc: 0xfffffffe msp: 0xfffffffc
+Warn : [stm32h7x.cpu0] external resume detected
+[stm32h7x.cpu0] halted due to debug-request, current mode: Handler HardFault
+xPSR: 0x01000003 pc: 0xfffffffe msp: 0xfffffffc
+Warn : [stm32h7x.cpu0] external resume detected
+[stm32h7x.cpu0] halted due to debug-request, current mode: Handler HardFault
+xPSR: 0x01000003 pc: 0xfffffffe msp: 0xfffffffc
+Error: [stm32h7x.cpu0] clearing lockup after double fault
+Error: [stm32h7x.cpu0] Polling failed, trying to reexamine
+Info : [stm32h7x.cpu0] Cortex-M7 r1p2 processor detected
+Warn : [stm32h7x.cpu0] Erratum 3092511: Cortex-M7 can halt in an incorrect address when breakpoint and exception occurs simultaneously
+Info : [stm32h7x.cpu0] The erratum 3092511 workaround will resume after an incorrect halt
+Info : [stm32h7x.cpu0] target has 8 breakpoints, 4 watchpoints
+Info : [stm32h7x.cpu0] Examination succeed
+Info : [stm32h7x.cpu0] external reset detected
+[stm32h7x.cpu0] halted due to debug-request, current mode: Handler HardFault
+xPSR: 0x01000003 pc: 0xfffffffe msp: 0xfffffffc
+Info : [stm32h7x.cpu0] external reset detected
+[stm32h7x.cpu0] halted due to debug-request, current mode: Handler HardFault
+xPSR: 0x01000003 pc: 0xfffffffe msp: 0xfffffffc
+Warn : [stm32h7x.cpu0] external resume detected
+[stm32h7x.cpu0] halted due to debug-request, current mode: Handler HardFault
+xPSR: 0x01000003 pc: 0xfffffffe msp: 0xfffffffc
+Error: [stm32h7x.cpu0] clearing lockup after double fault
+Error: [stm32h7x.cpu0] Polling failed, trying to reexamine
+Info : [stm32h7x.cpu0] Cortex-M7 r1p2 processor detected
+Warn : [stm32h7x.cpu0] Erratum 3092511: Cortex-M7 can halt in an incorrect address when breakpoint and exception occurs simultaneously
+Info : [stm32h7x.cpu0] The erratum 3092511 workaround will resume after an incorrect halt
+Info : [stm32h7x.cpu0] target has 0 breakpoints, 0 watchpoints
+Info : [stm32h7x.cpu0] Examination succeed
+Info : [stm32h7x.cpu0] external reset detected
+[stm32h7x.cpu0] halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0xfffffffe msp: 0xfffffffc
+Error: [stm32h7x.cpu0] clearing lockup after double fault
+Error: [stm32h7x.cpu0] Polling failed, trying to reexamine
+Info : [stm32h7x.cpu0] Cortex-M7 r1p2 processor detected
+Warn : [stm32h7x.cpu0] Erratum 3092511: Cortex-M7 can halt in an incorrect address when breakpoint and exception occurs simultaneously
+Info : [stm32h7x.cpu0] The erratum 3092511 workaround will resume after an incorrect halt
+Info : [stm32h7x.cpu0] target has 0 breakpoints, 1 watchpoints
+Info : [stm32h7x.cpu0] Examination succeed
+Warn : [stm32h7x.cpu0] external resume detected
+Info : [stm32h7x.cpu0] external reset detected
+Info : accepting 'telnet' connection on tcp/4444
+Error: [stm32h7x.cpu0] DP initialisation failed
+Info : SWD DPIDR 0x6ba02477
+Error: timed out while waiting for target halted
+TARGET: stm32h7x.cpu0 - Not halted
+Info : SWD DPIDR 0x6ba02477
+Error: Failed to read memory at 0x5c001000
+Error: auto_probe failed
+
+Error: [stm32h7x.cpu0] DP initialisation failed
+Info : SWD DPIDR 0x6ba02477
+Error: timed out while waiting for target halted
+embedded:startup.tcl:1792: Error: ** Unable to reset target **
+Traceback (most recent call last):
+  File "embedded:startup.tcl", line 1829, in program
+    program_error {** Unable to reset target **} 0
+  File "embedded:startup.tcl", line 1792, in program_error
+    error {** Unable to reset target **}
+Error: [stm32h7x.cpu0] DP initialisation failed
+Info : SWD DPIDR 0x6ba02477
+Info : dropped 'telnet' connection (error -400)
+[stm32h7x.cpu0] halted due to debug-request, current mode: Handler HardFault
+xPSR: 0x01000003 pc: 0xfffffffe msp: 0xffffffd8
+Info : accepting 'telnet' connection on tcp/4444
+[stm32h7x.cpu0] halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0xfffffffe msp: 0xfffffffc
+[stm32h7x.cpu0] halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0xfffffffe msp: 0xfffffffc
+** Programming Started **
+Info : Device: STM32H72x/73x
+Info : flash size probed value 1024k
+Info : STM32H7 flash has a single bank
+Info : Bank (0) size is 1024 kb, base address is 0x08000000
+Info : Padding image section 1 at 0x0803c2a4 with 28 bytes (bank write end alignment)
+Warn : Adding extra erase range, 0x0803c2c0 .. 0x0803ffff
+Error: flash not unlocked STM32_FLASH_CRx: 0x10f01a1
+Error: failed erasing sectors 0 to 1
+embedded:startup.tcl:1792: Error: ** Programming Failed **
+Traceback (most recent call last):
+  File "embedded:startup.tcl", line 1857, in program
+    program_error {** Programming Failed **} 0
+  File "embedded:startup.tcl", line 1792, in program_error
+    error {** Programming Failed **}
+Info : dropped 'telnet' connection (error -400)
+Info : accepting 'telnet' connection on tcp/4444
+[stm32h7x.cpu0] halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0xfffffffe msp: 0xfffffffc
+Info : dropped 'telnet' connection (error -400)
+Info : accepting 'telnet' connection on tcp/4444
+[stm32h7x.cpu0] halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0xfffffffe msp: 0xfffffffc
+Info : dropped 'telnet' connection (error -400)
+Info : accepting 'telnet' connection on tcp/4444
+[stm32h7x.cpu0] halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0xfffffffe msp: 0xfffffffc
+Info : dropped 'telnet' connection (error -400)
+Info : accepting 'telnet' connection on tcp/4444
+[stm32h7x.cpu0] halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0xfffffffe msp: 0xfffffffc
+** Programming Started **
+Info : Padding image section 1 at 0x0803c2a4 with 28 bytes (bank write end alignment)
+Warn : Adding extra erase range, 0x0803c2c0 .. 0x0803ffff
+** Programming Finished **
+** Verify Started **
+** Verified OK **
+Info : dropped 'telnet' connection (error -400)
+Info : accepting 'telnet' connection on tcp/4444
+shutdown command invoked
+Info : dropped 'telnet' connection (error -400)

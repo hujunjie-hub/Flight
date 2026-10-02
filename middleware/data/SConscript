@@ -1,0 +1,12 @@
+from building import *
+
+cwd = GetCurrentDir()
+
+src = Glob('*.c')
+# 传感器数据环形缓冲区层: 依赖 sensor 框架设备与 timebase (T_event 时戳);
+# mag_data 入环前处理链还需 mag_calib (椭球校正) 与 gins_config (轴映射/低通宏)
+CPPPATH = [cwd, cwd + '/../calibration', cwd + '/../gins', cwd + '/../timebase']
+
+group = DefineGroup('DataBuf', src, depend = ['RT_USING_SENSOR'], CPPPATH = CPPPATH)
+
+Return('group')
