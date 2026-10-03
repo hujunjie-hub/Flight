@@ -292,7 +292,7 @@ UART 字节到达) 与总线 (SPI/I2C/UART)。本节为四链统一的目标架�
 | 传感器 | 事件源 (DR/INT) | 总线搬运 | 数据率 | 一级唤醒 (信号量) | 样本环 (信号量) | 消费线程 | 环形缓冲区大小 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | ADIS16505 | DR = PA4 (EXTI4) | SPI1 burst 22B (DMA) | 1kHz | 驱动帧队列×4 (`adispr`) | imu_data 环 512 样本 (`imutrig`/`imudat`) | gins (p9) | 20KB (512×40B, `IMU_DATA_BUF_COUNT`) |
-| UM982 | 字节到达 (UART 变体) | USART2 DMA_RX (460800, 空闲线批量指示) | 10Hz | gnss_raw_data 字节环 4KB (`gnssrsem`) | gnss_data 环 32 样本 (`gnssdat`) | gins (p9) | 字节环 4KB + 样本环 2.2KB (32×72B) |
+| UM982 | 字节到达 (UART 变体) | UART4 DMA_RX (460800, 空闲线批量指示) | 10Hz | gnss_raw_data 字节环 4KB (`gnssrsem`) | gnss_data 环 32 样本 (`gnssdat`) | gins (p9) | 字节环 4KB + 样本环 2.2KB (32×72B) |
 | BMM350 | INT = PF12 (EXTI12/EXTI15_10, 预留) | I2C4 (SCL=PF14, SDA=PF15; 2026-10-02 由 I2C1/PB6/PB7 迁) | 100Hz | — | mag_data 环 128 样本 (`magdat`) | ginsaux (p10) | 5KB (128×40B, ≈1.28s) |
 | BMP585 | INT = PE13 (EXTI15_10, 预留) | I2C2 (DMA2) | 100Hz | — | baro_data 环 128 样本 (`bardat`) | ginsaux (p10) | 2KB (128×16B, ≈1.28s) |
 
@@ -324,17 +324,17 @@ UART 字节到达) 与总线 (SPI/I2C/UART)。本节为四链统一的目标架�
 
 ### UM982 UART 变体 (两级环形缓冲区)
 
-GNSS 无 DR/INT 引脚, 事件源为 USART2 字节到达; 与统一流程的差别是用
+GNSS 无 DR/INT 引脚, 事件源为 UART4 字节到达; 与统一流程的差别是用
 "驱动层 RX 环 → 专属字节环"两级缓冲替代 EXTI→DMA, 组句/校验/解析/换算
 全部在线程上下文完成:
 
 ```
 UM982
   │
-  │ UART2 460800 8N1
+  │ UART4 460800 8N1
   ▼
 ┌──────────────────────────────┐
-│ USART2 驱动层 RX 环           │  RT-Thread serial (DMA_RX, 空闲线批量指示)
+│ UART4 驱动层 RX 环            │  RT-Thread serial (DMA_RX, 空闲线批量指示)
 └───────────────┬──────────────┘
                 │ rx_indicate 唤醒接收线程, rt_device_read() 搬出
                 ▼
@@ -396,7 +396,7 @@ UM982
   (同步拟合 clock_map_t), 一路做样本时戳换算 (换算规则与未就绪时的
   降级见 [GPS 缺失与降级](#gps-缺失与降级-两态模型))。
 - **现状**: 接收线程 (gnssrx)、解析线程 (gnssdata) 与两级缓冲均已实现:
-  USART2 以 DMA_RX 打开 (460800 8N1, RX 环现为 4KB `GNSS_RAW_DATA_BUF_SIZE`;
+  UART4 以 DMA_RX 打开 (460800 8N1, RX 环现为 4KB `GNSS_RAW_DATA_BUF_SIZE`;
   512B 在 ~4KB/s NMEA 流下仅 128ms 余量, 接收线程偶发调度延迟被 DMA
   套圈后未读区被硬件覆写, 读出"句子缝合+重复"流, 校验失败率 ~50%,
   2026-09-29 扩到 2KB, 后随 DMA 链重整扩到 4KB, 套圈余量 ~1s),
@@ -437,11 +437,11 @@ epoch 选择不影响换算, 但日志/导出对齐外部数据时以 Unix µs �
 │   语句时标 → T_UTC      │        │   + 溢出累计 → T_MCU (64bit µs)  │
 └────────────┬────────────┘        └────────┬──────────────┬──────────┘
              │                             │              │
-             │ 整秒配对                     │ EXTI 打戳     │ TIM2_CH1 (PA0)
+             │ 整秒配对                     │ EXTI 打戳     │ TIM2_CH3 (PA2)
              │ (NMEA 整秒 ↔ PPS 沿)         │ DR/INT 沿     │ 输入捕获 PPS
              ▼                             ▼              ▼
 ┌──────────────────────┐        ┌──────────────────────────────────┐
-│ T_UTC,PPS_k          │        │ T_MCU,PPS_k (CCR1 硬件锁存)       │
+│ T_UTC,PPS_k          │        │ T_MCU,PPS_k (CCR3 硬件锁存)       │
 └──────────┬───────────┘        └────────────────┬─────────────────┘
            └──────────────┬──────────────────────┘
                           ▼
@@ -466,8 +466,8 @@ epoch 选择不影响换算, 但日志/导出对齐外部数据时以 Unix µs �
 
 ### PPS 配对与滑窗校准
 
-- PPS (1Hz) 从 PA0 进入, 走 **TIM2_CH1 输入捕获**: 脉冲沿时刻由硬件锁存进
-  CCR1, 消除中断响应延迟抖动; 捕获 ISR 内只合成 64 位 `T_MCU,PPS_k` 并置
+- PPS (1Hz) 从 PA2 进入, 走 **TIM2_CH3 输入捕获**: 脉冲沿时刻由硬件锁存进
+  CCR3, 消除中断响应延迟抖动; 捕获 ISR 内只合成 64 位 `T_MCU,PPS_k` 并置
   配对等待标志。
 - NMEA 语句到达后按 **"时标整秒 ↔ 该整秒对应的最近一次 PPS 沿"** 配对:
   语句时标 hh:mm:ss 即该秒起点 PPS 的 `T_UTC,PPS_k` (整秒, µs)。配对
@@ -491,7 +491,7 @@ epoch 选择不影响换算, 但日志/导出对齐外部数据时以 Unix µs �
 #define PPS_WINDOW_SIZE    3
 static struct
 {
-    uint64_t t_mcu_pps;      // T_MCU,PPS：PPS 秒沿到达时 TIM2_CH1 (PA0) 硬件捕获的本地时间，单位：us
+    uint64_t t_mcu_pps;      // T_MCU,PPS：PPS 秒沿到达时 TIM2_CH3 (PA2) 硬件捕获的本地时间，单位：us
     uint64_t t_utc_pps;      // T_UTC,PPS：该秒沿对应的 UTC 时间（解析 NMEA 语句时标整秒），单位：us
 } pps_ref[PPS_WINDOW_SIZE];
 
@@ -544,7 +544,7 @@ typedef struct
 | BMM350 | INT 沿 | 同上 | T_MCU | 直接使用 |
 | BMP585 | INT 沿 | 同上 | T_MCU | 直接使用 |
 | UM982 | NMEA 语句时标 | 语句自带 | T_UTC | 解析线程内按[映射公式](#utc-与-t_mcu-映射公式)换算为 T_MCU, 再写入 `T_event` |
-| PPS | 秒脉冲沿 | TIM2_CH1 (PA0) 输入捕获 | T_MCU + 配对 T_UTC | 填 `pps_ref` 滑窗 |
+| PPS | 秒脉冲沿 | TIM2_CH3 (PA2) 输入捕获 | T_MCU + 配对 T_UTC | 填 `pps_ref` 滑窗 |
 
 **KF-GINS 融合约定**: imu/gnss/mag/baro 四类样本环中的 `T_event` 一律为
 T_MCU —— GNSS 的 UTC→T_MCU 换算发生在解析线程写入 `gnss_data` 环**之前**,
@@ -575,7 +575,7 @@ TIM2 本身, 见设计底线 1):
 - **CNT 回绕** (与 GPS 有无无关): 32bit @1MHz 约 71.6min 回绕一次, 溢出
   累计与捕获/打戳统一经 64 位合成接口取时, 对上层透明。合成接口含两道
   回绕防护:
-  - **竞态修正**: 读 `CNT`/`CCR1` 后检查 TIM 溢出标志 (UIF), 已置位则
+  - **竞态修正**: 读 `CNT`/`CCR3` 后检查 TIM 溢出标志 (UIF), 已置位则
     修正高位并复核, 防止"计数已回绕、高位未进位"造成的时戳静默倒退
     71.6min (打戳与 PPS 捕获同理);
   - **擦写漏计核对**: 校准参数擦写期间全局关中断 (见
@@ -589,7 +589,7 @@ TIM2 本身, 见设计底线 1):
 `timebase` 查运行状态):
 
 - TIM2 @1MHz 自由计数 + 溢出累计 → `timebase_now_us()` 64 位 T_MCU,
-  INIT_BOARD 级启动 (早于所有传感器驱动打戳); PA0 (TIM2_CH1) 输入捕获
+  INIT_BOARD 级启动 (早于所有传感器驱动打戳); PA2 (TIM2_CH3) 输入捕获
   锁存 PPS 沿, 回绕防护双保险 (溢出计数双读跨夹 + UIF 竞态修正,
   校准擦写窗口经 `timebase_irq_window_begin/end()` 核对补计);
 - PPS 配对四道门槛 + 滑窗 (窗口 3) + 最小二乘拟合 + 残差剔除 (>10µs)
@@ -781,7 +781,7 @@ gins 桥接" 拆分, 同 `so3/` 模式; 纯核心无 RT-Thread 依赖, 主机可
 | --- | --- | --- | --- | --- | --- |
 | adis_dr | `middleware/sensor/sensor_adis16505.c` | **6** (DR EXTI 中断 NVIC=2) | 1024 | 1kHz DR 事件 | ADIS 寄存器突发读出/校验 → 原始快照入 imu_data 环 |
 | imudata | `middleware/data/imu_data.c` | **7** | 1536 | 事件驱动 | 单位换算 + 轴映射 → imu_data 结构环 + 最新样本镜像 (**内环 ω̂ 与 dt 的来源**) |
-| gnssrx | `middleware/data/gnss_data.c` | **8** | 1024 | UART2 DMA 事件 | GNSS 原始字节搬运入字节环 |
+| gnssrx | `middleware/data/gnss_data.c` | **8** | 1024 | UART4 DMA 事件 | GNSS 原始字节搬运入字节环 |
 | gins | `middleware/gins/gins_bridge.cpp` | **9** | 8192 (Eigen 局部对象大) | 1kHz 轮询 | KF-GINS 21 状态 EKF 融合 → `gins_solution` 快照 (**外环 p/v 与内环 R̂ 的来源**) |
 | ginsaux | `middleware/gins/gins_bridge.cpp` | **10** | 2048 | 事件驱动 | mag/baro 环消费 → 磁航向/气压观测喂引擎 |
 | barodata | `middleware/data/baro_data.c` | **11** | 4096 (ulog 格式化尖峰, 见栈预算教训) | 事件驱动 (100Hz) | BMP585 I2C 采集入环 (气压原始量) |
