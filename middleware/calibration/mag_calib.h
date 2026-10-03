@@ -8,7 +8,7 @@
  * 校准流程 (FinSH, 见 README.md):
  *   magcal start [秒]   启动采集: 期间手持整机缓慢旋转/翻转, 尽量覆盖
  *                       所有姿态 (画 8 字 + 三轴各朝天地转), 结束后自动
- *                       拟合并保存到 Flash, 立即生效
+ *                       拟合并保存到 W25Q64 (param_calib), 立即生效
  *   magcal show/on/off/clear
  *
  * 数据链: 采集输入来自 middleware/data 的 mag_data 环形缓冲区 (100Hz,
@@ -46,7 +46,7 @@ struct mag_calib_status
     rt_uint32_t samples;
 };
 
-int  mag_calib_init(void);          /* INIT 自动调用: 从 Flash 加载 */
+int  mag_calib_init(void);          /* INIT 自动调用: 从 W25Q64 加载 (param_calib) */
 void mag_calib_apply(const double raw_ut[3], double out_ut[3]);
                                     /* 无效/关闭时原样直通 */
 rt_bool_t mag_calib_active(void);   /* 当前是否在校正输出 */

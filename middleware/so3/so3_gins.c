@@ -86,9 +86,9 @@ void so3_target_clear(void)
 /* ------------------------- 当前姿态 (KF-GINS) ------------------------- */
 
 /*
- * 测试注入口 (utest 用): 非 NULL 时 current_rpy_from_gins 用该快照代替真实
- * gins 桥接 (原主机测试用假 gins_bridge_get_solution, 上板会与真实符号
- * 冲突)。固件正常运行保持 NULL。
+ * 测试注入口: 非 NULL 时 current_rpy_from_gins 用该快照代替真实
+ * gins 桥接; 传 NULL 恢复真实桥接 (主机交叉验证见
+ * build_host/so3_xcheck.py, 不经此口)。固件正常运行不调用。
  */
 static const struct gins_solution *s_test_sol;
 

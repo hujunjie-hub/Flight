@@ -43,7 +43,7 @@ struct baro_calib_status
     double      mean_pa;            /* 标定时实测均值 (Pa) */
 };
 
-int    baro_calib_init(void);       /* INIT 自动调用: 从 Flash 加载 */
+int    baro_calib_init(void);       /* INIT 自动调用: 从 W25Q64 加载 (param_calib) */
 double baro_calib_apply(double pa_raw);
                                      /* 无效/关闭时原样直通 */
 rt_bool_t baro_calib_active(void);

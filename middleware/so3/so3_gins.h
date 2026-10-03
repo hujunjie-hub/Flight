@@ -62,11 +62,12 @@ rt_bool_t so3_current_rpy_rad(double rpy[3]);
  */
 rt_bool_t so3_att_error(struct so3_att_err *out);
 
-/* ------------------------- 测试注入口 (utest) ------------------------- */
+/* ------------------------- 测试注入口 (板上注入测试) ------------------------- */
 
 /*
- * 注入固定的当前姿态快照, 代替真实 gins 桥接 (middleware/so3/test/tc_so3.c
- * 用); 传 NULL 恢复真实桥接。固件正常运行不调用。
+ * 注入固定的当前姿态快照, 代替真实 gins 桥接 (板上注入测试用;
+ * 主机交叉验证见 build_host/so3_xcheck.py); 传 NULL 恢复真实桥接。
+ * 固件正常运行不调用。
  */
 void so3_test_inject(const struct gins_solution *sol);
 

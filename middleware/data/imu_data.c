@@ -43,7 +43,7 @@
 /* 是否启用该链路 (0=跳过初始化, IMU 未接线时置 0) */
 #define IMU_DATA_ENABLE         1
 
-/* 缓冲区容量 (样本数): 512 @1kHz ≈ 0.5s 历史数据, 占 24KB */
+/* 缓冲区容量 (样本数): 512 @1kHz ≈ 0.5s 历史数据, 占 20KB */
 #define IMU_DATA_BUF_COUNT      512
 
 /* 事件源设备: acce/gyro/temp 共用驱动快照, 挂任一设备即可 */

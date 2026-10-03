@@ -40,7 +40,8 @@
 #define LOG_LVL LOG_LVL_INFO
 #include <ulog.h>
 
-#define IMUOUT_ENABLE           0               /* 0=不启动 IMU 打印链路 (当前只测 UM982) */
+#define IMUOUT_ENABLE           0               /* 0=不启动 IMU 打印链路 (IMU 状态已有
+                                                * `imudata` 命令覆盖; 需要波形流时再开) */
 #define IMUOUT_DEV_NAME         "uart1"         /* 与 console/VOFA 同口 */
 #define IMUOUT_DECIMATE         8               /* 块均值窗口: N 个样本平均成 1 行 (125Hz) */
 #define IMUOUT_WAIT_MS          1000            /* 无数据等待超时 */

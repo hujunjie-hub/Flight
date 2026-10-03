@@ -5,7 +5,7 @@
  *
  * ADIS16505 IMU RT-Thread 传感器驱动实现 (SPI1, DR 中断直启 DMA burst)
  *
- * 移植自 Analog Devices no-OS 驱动 (doc/IMUTest/ADIS16505) 与数据手册
+ * 移植自 Analog Devices no-OS 驱动 (doc/ADIS16505/no-OS) 与数据手册
  * Rev.C (doc/ADIS16505/adis16505.pdf):
  *  - 寄存器读: 两帧 16-bit, 第一帧发地址(bit7=0), 第二帧收数据, 帧间 tSTALL≥16us
  *  - 寄存器写: 每字节地址一帧, bit7=1, LSB 在低地址

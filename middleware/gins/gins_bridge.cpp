@@ -1288,7 +1288,7 @@ static void gins_aux_feed(GIEngine *eng)
  * 样本逐拍消化而不丢弃; 常态下每拍恰好 1 个 */
 #define GINS_IMU_CATCHUP_MAX        10
 
-/* utest 暂停开关 (gins_bridge_set_pause): 见 gins_bridge.h 注释 */
+/* 测试暂停开关 (gins_bridge_set_pause): 见 gins_bridge.h 注释 */
 static volatile rt_bool_t s_thread_pause;
 
 void gins_bridge_set_pause(rt_bool_t on)
@@ -1326,7 +1326,7 @@ static void gins_thread_entry(void *parameter)
             rt_thread_mdelay(1);
         loops++;
 
-        /* utest 暂停: 睡眠等待恢复 (kf_math 静态态让给测试引擎) */
+        /* 测试暂停: 睡眠等待恢复 (kf_math 静态态让给外部测试引擎) */
         while (s_thread_pause)
         {
             rt_thread_mdelay(20);

@@ -131,10 +131,12 @@ rt_err_t gins_bridge_init(void);
 void gins_bridge_get_solution(struct gins_solution *out);
 
 /*
- * 暂停/恢复实时解算线程 (utest 用): kf_math 的 EKF 工作矩阵为全局静态,
- * tc_gins_engine 构造测试引擎前必须暂停实时引擎, 防止两引擎交替踩踏
- * P/Qc 状态。暂停期间观测丢弃, 解算冻结; 恢复后继续 (协方差已被测试
- * 引擎复写, 导航精度需复位恢复)。
+ * 暂停/恢复实时解算线程 (测试注入用): kf_math 的 EKF 工作矩阵为全局静态,
+ * 外部构造第二个测试引擎前必须暂停实时引擎, 防止两引擎交替踩踏 P/Qc
+ * 状态。暂停期间观测丢弃, 解算冻结; 恢复后继续 (协方差已被测试引擎
+ * 复写, 导航精度需复位恢复)。
+ * 现状核注 (2026-10-03): 原消费者为板上 utest 用例 tc_gins_engine,
+ * utest 框架 2026-09-30 移除后暂无调用方, 机制保留备用。
  */
 void gins_bridge_set_pause(rt_bool_t on);
 

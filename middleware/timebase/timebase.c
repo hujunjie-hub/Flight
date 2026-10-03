@@ -444,6 +444,8 @@ rt_err_t timebase_pps_pair(rt_uint64_t t_utc_pps, rt_uint64_t t_arrival)
 }
 
 /* ------------------------- 擦写窗口回绕核对 ------------------------- */
+/* 现状核注 (2026-10-03): 标定参数迁移 W25Q64 后擦写不再关中断,
+ * 本组接口当前无调用方, 保留备用 (见 timebase.h 头注)。 */
 
 rt_uint64_t timebase_irq_window_begin(void)
 {

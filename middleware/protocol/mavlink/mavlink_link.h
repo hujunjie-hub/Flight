@@ -24,8 +24,9 @@
  *   地面站 <──驱动写── mavlink_link_set_sender() 注入的 sender
  *                          <── mavlink_link_send_msg() (组帧+发序号)
  *
- * MAVLink 官方 C 库 (本目录核心头 + common/ 方言) 取自 doc/IMUTest 内
- * FMT-Firmware 的生成件 (common.xml, 2020-08-18); helper 函数以
+ * MAVLink 官方 C 库 (本目录核心头 + common/ 方言) 取自 ref/FMT-Firmware
+ * 的生成件 (common.xml, 2020-08-18; 历史来源为 doc/IMUTest 时代的 FMT
+ * 拷贝, 参考工程已迁至 ref/); helper 函数以
  * MAVLINK_SEPARATE_HELPERS 方式单点编译在 mavlink_helpers.c, 通道
  * 缓冲只此一份 (MAVLINK_COMM_NUM_BUFFERS=1)。
  *

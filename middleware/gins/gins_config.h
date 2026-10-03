@@ -53,8 +53,9 @@
 
 /* 体坐标系(前右下)各轴取 ADIS 的哪根轴 (0=X, 1=Y, 2=Z) 及符号.
  * 缺省片上 X/Y/Z = 前/右/下 (右手系): 静止时加计 Z 读数约为 -g,
- * X 向北时前向加速读数为正; 换安装方向时同时修改 SRC 与 SIGN。
- * 默认片上 X/Y/Z 直接对应前/右/下; 按实际安装方向修改 */
+ * X 向北时前向加速读数为正.
+ * 部署现场改用运行期参数: FinSH `nav set iaxis` (W25Q64 nav 分区,
+ * 本宏为缺省值), 见 middleware/param_calib/param_nav.h */
 #define GINS_AXIS_SRC               { 0, 1, 2 }
 #define GINS_AXIS_SIGN              { 1.0, 1.0, 1.0 }
 
@@ -100,8 +101,9 @@
 #define GINS_MAG_FUSED_STD_DEG      6.3
 
 /* 体坐标系(前右下)各轴取 BMM350 芯片的哪根轴 (0=X, 1=Y, 2=Z) 及符号.
- * BMM350 是独立芯片, 安装方向与 ADIS 可能不同, 按实际安装修改;
+ * BMM350 是独立芯片, 安装方向与 ADIS 可能不同;
  * 注意右手系一致性: 映射后必须是 前右下 右手系, 否则航向符号翻转.
+ * 部署现场改用运行期参数: FinSH `nav set maxis` (本宏为缺省值).
  * 该映射在 data 层采集线程入环前生效 (middleware/data/mag_data.c) */
 #define GINS_MAG_AXIS_SRC           { 0, 1, 2 }
 #define GINS_MAG_AXIS_SIGN          { 1.0, 1.0, 1.0 }

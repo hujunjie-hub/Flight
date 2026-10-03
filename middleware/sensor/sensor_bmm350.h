@@ -10,7 +10,7 @@
  *   INT = PF12 (EXTI12/EXTI15_10, 预留: 数据就绪中断未接, 轮询采集)
  *
  * 补偿算法与 OTP 系数下载流程移植自 Bosch 官方 API
- * (doc/IMUTest/BMM350/bmm350, 即 doc/BMM350 官方参考),
+ * (doc/BMM350 内官方参考工程),
  * 输出补偿后的磁感应强度 (单位 uT, 框架单位 mGauss) 与芯片温度。
  *
  * 注册设备 (RT-Thread sensor 框架, 轮询模式):
