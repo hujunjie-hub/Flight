@@ -188,6 +188,7 @@ ENDIF()
 		middleware/sensor/sensor_bmm350.c
 		middleware/sensor/sensor_bmp585.c
 			middleware/sensor/sensor_w25q64.c
+			middleware/sensor/sensor_sdmmc.c
 			middleware/protocol/nmea/um982_nmea.c
 		middleware/protocol/mavlink/mavlink_link.c
 		middleware/protocol/mavlink/mavlink_helpers.c
@@ -351,6 +352,10 @@ SET(RT_STM32H7-HAL_SOURCES
 	# middleware/timebase (TIM2 时基 + PPS 输入捕获) 独占 HAL TIM
 	packages/stm32h7_hal_driver-latest/Src/stm32h7xx_hal_tim.c
 	packages/stm32h7_hal_driver-latest/Src/stm32h7xx_hal_tim_ex.c
+	# middleware/sensor SD 驱动 (miniTF, SDMMC1 轮询) 直用 HAL SD,
+	# 不经 RT SDIO 框架; delayblock 仅高速时钟调谐需要, 不编
+	packages/stm32h7_hal_driver-latest/Src/stm32h7xx_hal_sd.c
+	packages/stm32h7_hal_driver-latest/Src/stm32h7xx_ll_sdmmc.c
 )
 
 # HAL modules required by the drivers registered in board/Kconfig

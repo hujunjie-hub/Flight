@@ -32,6 +32,11 @@ os.path.join(src_path, 'stm32h7xx_hal_ospi.c'),
 # 不经 hwtimer 框架 (RT_USING_HWTIMER 已关闭), 源文件常编
 os.path.join(src_path, 'stm32h7xx_hal_tim.c'),
 os.path.join(src_path, 'stm32h7xx_hal_tim_ex.c'),
+# middleware/sensor SD 驱动 (miniTF, SDMMC1 轮询) 直用 HAL SD,
+# 不经 RT SDIO 框架 (RT_USING_SDIO 已关闭), 源文件常编;
+# delayblock 仅高速时钟调谐需要, 10MHz 轮询不编
+os.path.join(src_path, 'stm32h7xx_hal_sd.c'),
+os.path.join(src_path, 'stm32h7xx_ll_sdmmc.c'),
 ]
 
 if GetDepend(['RT_USING_SERIAL']) or GetDepend(['RT_USING_NANO', 'RT_USING_CONSOLE']):

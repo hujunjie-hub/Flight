@@ -53,7 +53,7 @@ Flight/
 │   ├── linker_scripts/        #   链接脚本 (GCC link.lds / Keil link.sct / IAR link.icf)
 │   └── SConscript
 ├── middleware/                # 传感器数据处理与组合导航中间件 (详见 middleware/README.md)
-│   ├── sensor/                #   传感器驱动层: ADIS16505 / BMM350 / BMP585 / W25Q64
+│   ├── sensor/                #   传感器驱动层: ADIS16505 / BMM350 / BMP585 / W25Q64 / miniTF SD (SDMMC1)
 │   ├── protocol/              #   纯协议解析 (不含硬件访问)
 │   │   ├── nmea/              #     um982_nmea: NMEA RMC/GGA/ZDA → GNSS PVT
 │   │   └── mavlink/           #     MAVLink 库 + 链路层封装

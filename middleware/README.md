@@ -7,7 +7,7 @@
 
 | 目录 | 职责 |
 | --- | --- |
-| `sensor/` | 传感器驱动 (ADIS16505/BMM350/BMP585/W25Q64) |
+| `sensor/` | 传感器驱动 (ADIS16505/BMM350/BMP585/W25Q64/miniTF SD) |
 | `protocol/` | 纯协议解析 (um982_nmea: NMEA RMC/GGA/ZDA → GNSS PVT) |
 | `data/` | 原始数据环形缓冲区层 (gnss_raw_data/gnss_data/mag_data/baro_data/imu_data) |
 | `timebase/` | 时间同步基座: TIM2 @1MHz T_MCU 时基 + PA2 PPS 输入捕获 + UTC↔T_MCU 映射 |
@@ -121,6 +121,21 @@ DATA_CNTR 扩展为 32bit 单调 `data_cnt` 后推入 imu_data 环; gins 线程�
 首个有效 GNSS 样本锚定 (T_MCU 锚点时刻 ↔ 语句 UTC → GPST), 之后所有观测
 统一按 T_MCU 差分换算。
 
+### miniTF (microSD, sensor_sdmmc.c)
+
+SDMMC1 四线 (D0-D3=PC8..PC11, CMD=PD2, CLK=PC12, AF12, 接线见
+doc/Flight.xlsx) + HAL SD **轮询** 驱动: 无中断无外部 DMA, FIFO 逐字节
+拆包 (数据缓冲无对齐要求, 与 DCache 无关)。内核时钟取 PLL1Q 61.111MHz,
+两段分频: 识别 397kHz (规格 ≤400kHz) -> 传输 10.19MHz (Default Speed
+≤25MHz 带内; CLKDIV=0 的 30.6MHz 超 DS 规格且未做 CMD6 高速切换, 不用;
+后续要提速需启用 PLL2R 50/100MHz 作 SDMMC 内核时钟)。时钟换挡借道
+`HAL_SD_ConfigWideBusOperation` (其内部用 hsd->Init 重跑 SDMMC_Init)。
+
+对标 w25q64 模式: 互斥锁串行化 + 就绪门控 + `sdmmc` MSH 命令
+(info/probe/read/write/erase); 差异是 TF 为可移介质且无 CD 引脚 ——
+上电识别失败仅告警, 插卡后 `sdmmc probe` 重识别, 不派生重试线程。
+写/擦后等卡回 TRANSFER 态 (CMD13 探询) 才返回, 慢卡单块写可耗数百 ms。
+
 ### KF-GINS 引擎的堆分配 (gins/aligned_new.cpp)
 
 GIEngine 的固定尺寸 Eigen 成员带 alignas, 构造触发 C++17 对齐
@@ -230,6 +245,7 @@ imu_data:<n> gnss_data:<n> mag_calib_data:<n> baro_calib_data:<n> fused_data
 | `param` / `param erase <part>` | W25Q64 参数分区状态查看 / 分区擦除 (恢复出厂) |
 | `sysinfo` | 系统参数 (启动计数/固件标识/迁移标志) |
 | `w25q64 id/read/write/erase` | 外置 SPI Flash 调试 (底层) |
+| `sdmmc info/probe/read/write/erase` | miniTF TF 卡调试: 卡信息/重识别/块读写/擦除 |
 
 ## 2026-09-29 修复记录 (SWD 直读诊断, 静置台架验证)
 
