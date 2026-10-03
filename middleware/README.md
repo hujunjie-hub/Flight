@@ -15,7 +15,8 @@
 | `param_calib/` | 飞控参数分区存储 (W25Q64): param_part 分区引擎 + calib/nav/sys 三参数域 |
 | `gins/` | KF-GINS 桥接 (gins 解算线程 1kHz + ginsaux 消费线程) + C++ 对齐 new 堆适配 (aligned_new.cpp) |
 | `KF-GINS/` | 上游组合导航算法内核 (C++, 21 状态 EKF, 最小嵌入) |
-| `so3/` | SO(3) 姿态误差解算 (验收测试用) |
+| `so3/` | SO(3) 姿态误差解算 (姿态控制误差 + 验收测试) |
+| `control/` | 飞控控制律 (级联): `position_mpc` 外环位置 MPC (凝结 QP+SCA) + `attitude_so3` 内环 SO(3)/PID 姿态, 见根 README "飞行控制" 章 |
 
 ## 数据流架构
 
@@ -210,6 +211,9 @@ imu_data:<n> gnss_data:<n> mag_calib_data:<n> baro_calib_data:<n> fused_data
 | `magcal start [sec]` / `show` / `clear` | 磁力计椭球校准 |
 | `barocal ref <pa>` / `refalt <m>` / `start [sec]` | 气压计基准校准 |
 | `gins` | KF-GINS 解算结果与各观测统计 (含 stale 计数) |
+| `so3` | SO(3) 姿态误差 vs 期望姿态 (`so3 target r p y`/`clear`; 姿态控制同拍自动发布目标) |
+| `mpc` / `mpc set ...` | 位置 MPC 外环: 状态/调参/设定点 (`mpc pos x y z`)/参考点 (`mpc ref`)/单步 (`mpc step`) |
+| `att` / `att set ...` | SO(3)+PID 姿态内环: 状态/调参/航向 (`att yaw <deg>`/`att hold`)/单步 (`att step`) |
 | `vofa [on\|off]] [log on\|off]` | KF-GINS JustFloat 50Hz 二进制流开关 (默认 off, 单写者约定) |
 | `gins_fused_data [on\|off]` | KF-GINS 带标记文本开关 (fused_data 后缀, 默认 off) |
 | `gnssout [on\|off]` | UM982 定位解文本开关 (开启时与 gins 分抢样本) |
@@ -317,7 +321,7 @@ km; 加门禁后同样 RX 劣化条件下静置位置全程稳定在 <50m 包络
 
 ## 2026-10-01 修复: 5.3.0 升级后 I2C 两总线全无响应 (BMM350/BMP585 探测恒失败)
 
-平台升级 (RT-Thread 5.3.0, 已知问题 #8 "未上板回归") 上板兑现的第一个
+平台升级 (RT-Thread 5.3.0, 已知问题 #5 "未上板回归") 上板兑现的第一个
 真实回归: **I2C1/I2C2 上所有传输 100% 失败**, 两个传感器驱动探测超时,
 baro/mag 链路整体 dead。构建零警告 (宏条件编译, 缺宏不报错), 纯运行时
 路径故障。
@@ -460,7 +464,7 @@ MAX_AGE_S 相关); W25Q64 "零响应" **已于 2026-10-01 晚破案**: 非芯片
 正常融合。室内验证步骤 (ADIS 接好后): 静置上电 → boot 后 ~35s
 FinSH `gins` 应离开 ALIGN/WAIT (NOGNSS 播种) → `imudata`(如有)/
 `magdata`/`barodata` 计数增长, vofa 观 r/p/y 收敛 (yaw 靠磁航向,
-轴向映射核对属已知问题 #1)。
+轴向映射核对属已知问题 #2)。
 
 验证 (构建级): 双构建清洁全量零警告; 新符号 (`adisdbg`/`adisretry`)
 编入 ELF 并上板实跑 (probe/raw 取证即由板端新命令产出)。
@@ -468,7 +472,7 @@ FinSH `gins` 应离开 ALIGN/WAIT (NOGNSS 播种) → `imudata`(如有)/
 **2026-10-01 10 轮 × 3min 回归 (test10_3min/, DAPLink/OpenOCD 版 runner
 `swd_10rounds_3min.py`)**: 10/10 轮 11/17 PASS, 失败 6 项完全一致且均为
 器件缺席类 (zda/rmc/gnss obs/map.valid/INS 位置 ← UM982 室内无输出;
-imu ← ADIS 物理不在线, 见已知问题 #9)。**可评估判据全过**: 10 次硬复位
+imu ← ADIS 物理不在线, 见已知问题 #7)。**可评估判据全过**: 10 次硬复位
 冷启动零复位核验失败/零 warn, tick 走速、csum/timebase restart/stale/
 rej/ts_zero/raw lost/NaN/degraded/updfail/reseed 增量全 0; 末轮 230s 时
 mag pushed=popped=20843 (90.8 obs/s)、baro 21024 (90.8 obs/s), 均

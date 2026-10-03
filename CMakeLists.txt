@@ -44,6 +44,8 @@ INCLUDE_DIRECTORIES(
 	middleware/gins
 	middleware/so3
 	middleware/calibration
+	middleware/control/position_mpc
+	middleware/control/attitude_so3
 	middleware/param_calib
 	middleware/timebase
 	middleware/KF-GINS/src
@@ -378,6 +380,15 @@ SET(RT_SO3_SOURCES
 	middleware/so3/so3_gins.c
 )
 
+# 飞控控制层 (级联: 位置 MPC 外环 + SO3/PID 姿态内环),
+# 与两个子目录 SConscript 的 Glob('*.c') 保持一致
+SET(RT_CONTROL_SOURCES
+	middleware/control/position_mpc/mpc_pos.c
+	middleware/control/position_mpc/mpc_pos_gins.c
+	middleware/control/attitude_so3/att_pid.c
+	middleware/control/attitude_so3/att_pid_gins.c
+)
+
 SET(RT_CALIBRATION_SOURCES
 	middleware/calibration/ellipsoid_fit.c
 	middleware/calibration/mag_calib.c
@@ -440,6 +451,7 @@ ADD_LIBRARY(rtt_STM32H7-CMSIS OBJECT ${RT_STM32H7-CMSIS_SOURCES})
 ADD_LIBRARY(rtt_STM32H7-HAL OBJECT ${RT_STM32H7-HAL_SOURCES})
 ADD_LIBRARY(rtt_GINS OBJECT ${RT_GINS_SOURCES})
 ADD_LIBRARY(rtt_SO3 OBJECT ${RT_SO3_SOURCES})
+ADD_LIBRARY(rtt_Control OBJECT ${RT_CONTROL_SOURCES})
 ADD_LIBRARY(rtt_Calibration OBJECT ${RT_CALIBRATION_SOURCES})
 ADD_LIBRARY(rtt_ParamCalib OBJECT ${RT_PARAMCALIB_SOURCES})
 
@@ -477,6 +489,7 @@ TARGET_LINK_LIBRARIES(${FIRMWARE_TARGET}
 	rtt_ParamCalib
 	rtt_POSIX
 	rtt_SO3
+	rtt_Control
 )
 
 ADD_CUSTOM_COMMAND(TARGET ${FIRMWARE_TARGET} POST_BUILD
