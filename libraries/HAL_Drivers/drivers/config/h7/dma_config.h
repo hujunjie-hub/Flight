@@ -24,7 +24,7 @@ extern "C" {
  * STM32H723 Flight board DMA mapping (see board/CubeMX_Config/Flight.ioc):
  *   DMA1 Stream0 : SPI1_RX   (ADIS16505 DOUT)      IRQ priority 3
  *   DMA1 Stream1 : SPI1_TX   (ADIS16505 DIN)       IRQ priority 3
- *   DMA1 Stream2 : USART2_RX (UM982 GNSS, circ.)   IRQ priority 3
+ *   DMA1 Stream2 : UART4_RX  (UM982 GNSS, circ.)   IRQ priority 3
  *   DMA1 Stream3 : USART1_RX (debug console)       IRQ priority 5
  *   DMA1 Stream4 : USART1_TX (debug console)       IRQ priority 5
  *   DMA2 Stream0 : I2C2_RX   (BMP585 barometer)    IRQ priority 6
@@ -50,12 +50,12 @@ extern "C" {
 #endif
 
 /* DMA1 stream2 */
-#if defined(BSP_UART2_RX_USING_DMA) && !defined(UART2_RX_DMA_INSTANCE)
-#define UART2_DMA_RX_IRQHandler          DMA1_Stream2_IRQHandler
-#define UART2_RX_DMA_RCC                 RCC_AHB1ENR_DMA1EN
-#define UART2_RX_DMA_INSTANCE            DMA1_Stream2
-#define UART2_RX_DMA_REQUEST             DMA_REQUEST_USART2_RX
-#define UART2_RX_DMA_IRQ                 DMA1_Stream2_IRQn
+#if defined(BSP_UART4_RX_USING_DMA) && !defined(UART4_RX_DMA_INSTANCE)
+#define UART4_DMA_RX_IRQHandler          DMA1_Stream2_IRQHandler
+#define UART4_RX_DMA_RCC                 RCC_AHB1ENR_DMA1EN
+#define UART4_RX_DMA_INSTANCE            DMA1_Stream2
+#define UART4_RX_DMA_REQUEST             DMA_REQUEST_UART4_RX
+#define UART4_RX_DMA_IRQ                 DMA1_Stream2_IRQn
 #endif
 
 /* DMA1 stream3 */

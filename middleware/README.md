@@ -10,7 +10,7 @@
 | `sensor/` | 传感器驱动 (ADIS16505/BMM350/BMP585/W25Q64) |
 | `protocol/` | 纯协议解析 (um982_nmea: NMEA RMC/GGA/ZDA → GNSS PVT) |
 | `data/` | 原始数据环形缓冲区层 (gnss_raw_data/gnss_data/mag_data/baro_data/imu_data) |
-| `timebase/` | 时间同步基座: TIM2 @1MHz T_MCU 时基 + PA0 PPS 输入捕获 + UTC↔T_MCU 映射 |
+| `timebase/` | 时间同步基座: TIM2 @1MHz T_MCU 时基 + PA2 PPS 输入捕获 + UTC↔T_MCU 映射 |
 | `calibration/` | 磁力计椭球校准 + 气压计基准校准 (参数经 param_calib 持久化到 W25Q64) |
 | `param_calib/` | 飞控参数分区存储 (W25Q64): param_part 分区引擎 + calib/nav/sys 三参数域 |
 | `gins/` | KF-GINS 桥接 (gins 解算线程 1kHz + ginsaux 消费线程) + C++ 对齐 new 堆适配 (aligned_new.cpp) |
@@ -20,14 +20,14 @@
 ## 数据流架构
 
 ```
-timebase/ (TIM2 @1MHz T_MCU + PA0 PPS 捕获): 全部事件打戳的统一时基
+timebase/ (TIM2 @1MHz T_MCU + PA2 PPS 捕获): 全部事件打戳的统一时基
     PPS 滑窗 (窗口3, 四道门槛+最小二乘+残差剔除) → clock_map UTC↔T_MCU 映射
 
 ADIS16505  1kHz DR中断 (EXTI ISR 捕获 T_event + 启 SPI DMA burst)          ┐
     → adis_dr 处理线程 (校验/解析) → 快照 → imu_data 环 → [imudata 采集线程]  │
       (单位换算+轴映射) → imu_data 结构环 ─────────────────────────────────→ │
                                                                              │
-UM982 10Hz ─ USART2 460800 (DMA_RX) → [gnssrx 接收线程] 只搬字节              │
+UM982 10Hz ─ UART4 460800 (DMA_RX) → [gnssrx 接收线程] 只搬字节              │
              └→ gnss_raw_data 字节环 (data/, buffer/head/tail/size)          │
                  └→ [gnssdata 解析线程] 组句 → um982_nmea (protocol/ 纯解析)  │
                      ├─ 整秒 UTC (定位有效) → timebase PPS 配对刷新滑窗        │ → KF-GINS EKF
@@ -56,8 +56,8 @@ USART1 调试输出 (applications/out_*.c, 460800, 与 console 同口):
 
 ### UM982 (GNSS)
 
-- USART2 460800 8N1 接收链路已接入: `data/gnss_data.c` 的 **gnssrx 接收线程**
-  (只搬字节不解析, DMA_RX 空闲线批量指示) 把 USART2 原始字节镜像写入
+- UART4 460800 8N1 接收链路已接入: `data/gnss_data.c` 的 **gnssrx 接收线程**
+  (只搬字节不解析, DMA_RX 空闲线批量指示) 把 UART4 原始字节镜像写入
   `gnss_raw_data` 字节环; 波特率/RX 环 (4KB, `GNSS_RAW_DATA_BUF_SIZE`)
   在链路初始化时配置 (512B 在 ~4KB/s NMEA 流下仅 128ms 余量, gnssrx
   偶发调度延迟被 DMA 套圈后未读区被硬件覆写, 读出"句子缝合+重复"流,

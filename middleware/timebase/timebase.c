@@ -32,7 +32,7 @@
  * 间隔容差按 du 比例缩放 (tol = 1ms x du), 10s 间隙下晶振误差余量 >500x */
 #define TB_RESTART_UTC_GAP_US   10000000ULL        /* 失锁后再捕获门限 */
 
-/* 半量程判别阈值: 双读溢出计数不一致时, CNT/CCR1 小于半量程视为已回绕 */
+/* 半量程判别阈值: 双读溢出计数不一致时, CNT/CCR3 小于半量程视为已回绕 */
 #define TB_HALF_PERIOD          0x80000000UL
 
 /* ------------------------- TIM2 句柄与运行状态 ------------------------- */
@@ -480,7 +480,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         s_ovf++;
 }
 
-/* PPS 捕获: 脉冲沿时刻已由硬件锁存进 CCR1, 此处只合成 64 位 T_MCU,PPS */
+/* PPS 捕获: 脉冲沿时刻已由硬件锁存进 CCR3, 此处只合成 64 位 T_MCU,PPS */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance != TIM2)
@@ -488,10 +488,10 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 
     {
         rt_uint32_t hi1 = s_ovf;
-        rt_uint32_t ccr = (rt_uint32_t)HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
+        rt_uint32_t ccr = (rt_uint32_t)HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_3);
         rt_uint32_t hi2 = s_ovf;
 
-        /* CCR1 在沿时刻硬件锁存 (早于本中断执行), 更新与捕获同属 TIM2
+        /* CCR3 在沿时刻硬件锁存 (早于本中断执行), 更新与捕获同属 TIM2
          * 中断无嵌套, 双读为冗余防护; UIF 修正覆盖"沿后回绕、更新分支
          * 尚未执行"的窗口 */
         s_pps.t_mcu = ((rt_uint64_t)tb_resolve_hi(hi1, ccr, hi2) << 32) | ccr;
@@ -507,9 +507,9 @@ void TIM2_IRQHandler(void)
 /* ------------------------- 初始化 ------------------------- */
 
 /*
- * TIM2: 1MHz 自由计数 + PA0 (TIM2_CH1) 输入捕获。
+ * TIM2: 1MHz 自由计数 + PA2 (TIM2_CH3) 输入捕获。
  * GPIO/NVIC/时钟由 CubeMX 生成的 HAL_TIM_Base_MspInit (stm32h7xx_hal_msp.c)
- * 配置 (PA0 AF1, TIM2_IRQn 抢占优先级 1 与 board.c 表一致);
+ * 配置 (PA2 AF1, TIM2_IRQn 抢占优先级 1 与 board.c 表一致);
  * 本模块 INIT_BOARD 级启动, 早于所有传感器驱动 (INIT_DEVICE) 打戳。
  */
 static int timebase_init(void)
@@ -526,25 +526,25 @@ static int timebase_init(void)
     if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
         return -RT_ERROR;
 
-    /* PPS 上升沿直接捕获: 沿时刻硬件锁存 CCR1, 与中断响应延迟解耦 */
+    /* PPS 上升沿直接捕获: 沿时刻硬件锁存 CCR3, 与中断响应延迟解耦 */
     ic.ICPolarity  = TIM_INPUTCHANNELPOLARITY_RISING;
     ic.ICSelection = TIM_ICSELECTION_DIRECTTI;
     ic.ICPrescaler = TIM_ICPSC_DIV1;
     ic.ICFilter    = 0;
-    if (HAL_TIM_IC_ConfigChannel(&htim2, &ic, TIM_CHANNEL_1) != HAL_OK)
+    if (HAL_TIM_IC_ConfigChannel(&htim2, &ic, TIM_CHANNEL_3) != HAL_OK)
         return -RT_ERROR;
 
     __HAL_TIM_URS_ENABLE(&htim2);         /* 仅计数器溢出产生更新中断 */
-    __HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_UPDATE | TIM_FLAG_CC1 | TIM_FLAG_CC1OF);
+    __HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_UPDATE | TIM_FLAG_CC3 | TIM_FLAG_CC3OF);
 
     if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK)      /* 自由计数 + 溢出中断 */
         return -RT_ERROR;
-    if (HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1) != HAL_OK)   /* PPS 捕获 */
+    if (HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_3) != HAL_OK)   /* PPS 捕获 */
         return -RT_ERROR;
 
     HAL_NVIC_SetPriority(TIM2_IRQn, 1, 0);            /* 与 board.c NVIC 表一致 */
 
-    rt_kprintf("[timebase] TIM2 @1MHz free-run + PPS capture (PA0) ready\n");
+    rt_kprintf("[timebase] TIM2 @1MHz free-run + PPS capture (PA2) ready\n");
     return RT_EOK;
 }
 INIT_BOARD_EXPORT(timebase_init);

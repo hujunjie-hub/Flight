@@ -54,36 +54,36 @@ menu "On-chip Peripheral Drivers"
                         default 64
                 endif
 
-            menuconfig BSP_USING_UART2
-                bool "Enable UART2 (UM982 GNSS, PA2/PA3)"
+            menuconfig BSP_USING_UART4
+                bool "Enable UART4 (UM982 GNSS, PA0/PA1)"
                 default n
-                if BSP_USING_UART2
-                    config BSP_UART2_RX_USING_DMA
-                        bool "Enable UART2 RX DMA (DMA1 Stream2)"
-                        depends on BSP_USING_UART2 && RT_SERIAL_USING_DMA
+                if BSP_USING_UART4
+                    config BSP_UART4_RX_USING_DMA
+                        bool "Enable UART4 RX DMA (DMA1 Stream2)"
+                        depends on BSP_USING_UART4 && RT_SERIAL_USING_DMA
                         default n
 
-                    config BSP_UART2_TX_USING_DMA
-                        bool "Enable UART2 TX DMA"
-                        depends on BSP_USING_UART2 && RT_SERIAL_USING_DMA
+                    config BSP_UART4_TX_USING_DMA
+                        bool "Enable UART4 TX DMA"
+                        depends on BSP_USING_UART4 && RT_SERIAL_USING_DMA
                         default n
 
-                    config BSP_UART2_RX_BUFSIZE
-                        int "Set UART2 RX buffer size"
+                    config BSP_UART4_RX_BUFSIZE
+                        int "Set UART4 RX buffer size"
                         range 64 65535
                         depends on RT_USING_SERIAL_V2
                         default 512
 
-                    config BSP_UART2_TX_BUFSIZE
-                        int "Set UART2 TX buffer size"
+                    config BSP_UART4_TX_BUFSIZE
+                        int "Set UART4 TX buffer size"
                         range 0 65535
                         depends on RT_USING_SERIAL_V2
                         default 0
 
-                    config BSP_UART2_DMA_PING_BUFSIZE
-                        int "Set UART2 RX DMA ping-pong buffer size"
+                    config BSP_UART4_DMA_PING_BUFSIZE
+                        int "Set UART4 RX DMA ping-pong buffer size"
                         range 32 65535
-                        depends on RT_USING_SERIAL_V2 && BSP_UART2_RX_USING_DMA
+                        depends on RT_USING_SERIAL_V2 && BSP_UART4_RX_USING_DMA
                         default 64
                 endif
 
@@ -167,7 +167,7 @@ menu "On-chip Peripheral Drivers"
         select RT_USING_CLOCK_TIME
         if BSP_USING_TIM
             config BSP_USING_TIM2
-                bool "Enable TIM2 (1PPS input capture, PA0)"
+                bool "Enable TIM2 (1PPS input capture, PA2)"
                 default n
         endif
 

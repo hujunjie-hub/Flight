@@ -9,7 +9,7 @@
  *   - head: 写位置 (只在 push 侧推进)
  *   - tail: 读位置 (只在 pop 侧推进, 溢出挤旧时由 push 侧代推)
  *   - 空: head == tail;  满: (head + 1) % size == tail (保留一格区分空满)
- * push/pop 均在关中断临界区内完成 (push 在 USART2 接收线程,
+ * push/pop 均在关中断临界区内完成 (push 在 UART4 接收线程,
  * pop 在任意消费线程, 单写多读由临界区串行化)。
  */
 
@@ -202,7 +202,7 @@ static void gnssraw(void)
           gnss_raw_data_count(), (unsigned)GNSS_RAW_DATA_BUF_SIZE);
     LOG_I("stats   : pushed=%u popped=%u lost=%u",
           st.pushed, st.popped, st.lost);
-    LOG_I("hint    : push 由 gnssrx 接收线程镜像写入 (USART2); "
+    LOG_I("hint    : push 由 gnssrx 接收线程镜像写入 (UART4); "
           "pop 出的字节由解析线程组句解析");
 }
 MSH_CMD_EXPORT(gnssraw, GNSS raw UART ring buffer status);

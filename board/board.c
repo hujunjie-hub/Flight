@@ -28,7 +28,7 @@ DMA_HandleTypeDef hdma_spi1_rx;
 DMA_HandleTypeDef hdma_spi1_tx;
 DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
-DMA_HandleTypeDef hdma_usart2_rx;
+DMA_HandleTypeDef hdma_uart4_rx;
 
 /*
  * NVIC preemption priorities (priority group 4) of every interrupt this board
@@ -57,8 +57,8 @@ void board_nvic_set_priority(IRQn_Type irq, uint32_t default_preempt)
 
     /* UM982 RTK GNSS */
     case TIM2_IRQn:         preempt = 1; break;   /* 1PPS input capture      */
-    case USART2_IRQn:       preempt = 5; break;   /* USART2 TX/RX            */
-    case DMA1_Stream2_IRQn: preempt = 3; break;   /* USART2 RX (circular)    */
+    case UART4_IRQn:        preempt = 5; break;   /* UART4 TX/RX (UM982)     */
+    case DMA1_Stream2_IRQn: preempt = 3; break;   /* UART4 RX (circular)     */
 
     /* BMM350 magnetometer / BMP585 barometer */
     case EXTI15_10_IRQn:    preempt = 7; break;   /* BMP585 INT (PE13) / BMM350 INT (PF12, 预留) */

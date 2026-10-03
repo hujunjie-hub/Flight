@@ -10,7 +10,7 @@
 
 ```
 ADIS16505 --1kHz DR--> imu_data 结构环 ----1kHz 排空----\
-UM982 ---10Hz USART2--> gnss_data 结构环 (T_event) -----+--> gins 线程 (1kHz 轮询)
+UM982 ---10Hz UART4--> gnss_data 结构环 (T_event) -----+--> gins 线程 (1kHz 轮询)
                                                         |     GIEngine (EKF)
 BMM350 --100Hz--> mag_data 环 (cal 字段) --wait--+
 BMP585 --100Hz--> baro_data 环 -----------------+----> ginsaux 线程: 磁航向/气压观测

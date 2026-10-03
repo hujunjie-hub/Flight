@@ -6,7 +6,7 @@
  * UM982 UART 原始字节环形缓冲区
  *
  * 数据链路 (生产者为 gnss_data.c 的接收线程 gnssrx):
- *   UM982 --460800--> USART2 接收线程读取 (只搬字节, 不解析)
+ *   UM982 --460800--> UART4 接收线程读取 (只搬字节, 不解析)
  *         -> gnss_raw_data_push() 原始字节环形缓冲区 (本模块)
  *   消费方 (middleware/data/gnss_data.c 解析线程) gnss_raw_data_wait()
  *   阻塞等新字节, gnss_raw_data_pop() 取出后组句喂 um982_nmea 解析,
@@ -42,7 +42,7 @@ struct gnss_raw_data_status
 
 /* ------------------------- 接口 ------------------------- */
 
-/* 推入一批 UART 原始字节 (USART2 接收方调用; 满时挤掉最旧) */
+/* 推入一批 UART 原始字节 (UART4 接收方调用; 满时挤掉最旧) */
 void gnss_raw_data_push(const rt_uint8_t *data, rt_size_t len);
 
 /* 读出最多 len 字节 (FIFO), 返回实际读出数 (0 = 空) */

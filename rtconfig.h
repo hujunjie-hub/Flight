@@ -461,11 +461,11 @@
 #define BSP_USING_GPIO
 #define BSP_USING_UART
 #define BSP_USING_UART1
-#define BSP_USING_UART2
-#define BSP_UART2_RX_USING_DMA
+#define BSP_USING_UART4
+#define BSP_UART4_RX_USING_DMA
 #define BSP_UART1_TX_USING_DMA
 /* serial v2 每串口缓冲 (board/Kconfig 菜单, V2 才导出):
- * UART1 控制台 rx 256; UART2 与 gnss_data.c 的
+ * UART1 控制台 rx 256; UART4 (UM982, PA0/PA1) 与 gnss_data.c 的
  * GNSS_RX_BUF_SZ/ping 尺寸保持一致 (打开前 CTRL_CONFIG 会再显式设置)。
  * UART1 TX DMA (DMA1_Stream4): tx_bufsz 非 0 即选 NO_BUFFER 模式, 发送
  * 直接从调用方缓冲起 DMA (零拷贝), bufsz 仅是准入门槛 (>=64), 不占 RAM。
@@ -473,9 +473,9 @@
  * dev_serial_v2.c 自动回退轮询发送。 */
 #define BSP_UART1_RX_BUFSIZE 256
 #define BSP_UART1_TX_BUFSIZE 64
-#define BSP_UART2_RX_BUFSIZE 4096
-#define BSP_UART2_TX_BUFSIZE 0
-#define BSP_UART2_DMA_PING_BUFSIZE 256
+#define BSP_UART4_RX_BUFSIZE 4096
+#define BSP_UART4_TX_BUFSIZE 0
+#define BSP_UART4_DMA_PING_BUFSIZE 256
 #define BSP_USING_SPI
 #define BSP_USING_SPI1
 #define BSP_SPI1_TX_USING_DMA

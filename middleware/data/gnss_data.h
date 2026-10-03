@@ -6,7 +6,7 @@
  * GNSS (UM982) 结构化数据环形缓冲区
  *
  * 数据链路 (两级环形缓冲区, 见根 README "UM982 UART 变体"):
- *   UM982 --460800 8N1--> USART2 (INT_RX)
+ *   UM982 --460800 8N1--> UART4 (INT_RX)
  *     -> 本模块接收线程 (只搬字节, 不解析)
  *       -> gnss_raw_data_push() 原始字节环形缓冲区 (middleware/data)
  *   本模块解析线程 (字节环唯一常驻消费者):
@@ -43,8 +43,8 @@ extern "C" {
 
 /* ------------------------- 配置 ------------------------- */
 
-/* 接收线程 (只搬字节): USART2 事件源, 优先级高于解析线程 */
-#define GNSS_RX_DEV_NAME            "uart2"     /* UM982, 460800 8N1 */
+/* 接收线程 (只搬字节): UART4 事件源, 优先级高于解析线程 */
+#define GNSS_RX_DEV_NAME            "uart4"     /* UM982, 460800 8N1 (PA0/PA1) */
 #define GNSS_RX_THREAD_PRIO         8           /* 高于解析(11), 低于 imudata(7) */
 #define GNSS_RX_THREAD_STACK        1024
 #define GNSS_RX_THREAD_TICK         10

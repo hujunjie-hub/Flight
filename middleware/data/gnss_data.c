@@ -5,10 +5,10 @@
  *
  * GNSS (UM982) 结构化数据环形缓冲区实现 (接口说明见 gnss_data.h)
  *
- * 接收线程 (gnssrx, 只搬字节不解析): USART2 rx_indicate 唤醒 ->
+ * 接收线程 (gnssrx, 只搬字节不解析): UART4 rx_indicate 唤醒 ->
  *   rt_device_read 搬出 -> gnss_raw_data_push() 原始字节环。
  *   串口开 DMA_RX: RX 空闲线批量指示 (每语句至多唤醒一次, 与统一流程
- *   "ISR 最短路径"同构; BSP_UART2_RX_USING_DMA 已在 .config 使能,
+ *   "ISR 最短路径"同构; BSP_UART4_RX_USING_DMA 已在 .config 使能,
  *   DMA1_Stream2 见 board.c NVIC 表)。
  *
  * 解析线程 (gnssdata, 字节环唯一常驻消费者):
@@ -64,7 +64,7 @@
 /* 接收线程单次搬运上限 (字节) */
 #define GNSS_RX_CHUNK            128
 
-/* 串口配置: 460800 8N1 (Flight.ioc USART2), 消费环 (rx_bufsz) 4KB
+/* 串口配置: 460800 8N1 (Flight.ioc UART4), 消费环 (rx_bufsz) 4KB
  * (serial v2 默认 rx 64B/ping 32B 在 460800 下仅 1.4ms 缓冲, 不足一句
  * GGA; 512B 在 ~4KB/s NMEA 流下仅 128ms 余量 —— rx 线程偶发调度延迟导致
  * 消费环满后按 OVERWRITE 策略丢最旧数据, 读出"句子缝合+重复"流, 校验
@@ -80,7 +80,7 @@
 
 static struct
 {
-    /* 接收线程 (USART2 -> gnss_raw_data) */
+    /* 接收线程 (UART4 -> gnss_raw_data) */
     rt_device_t          rx_dev;
     struct rt_semaphore  rx_sem;      /* 接收唤醒: rx_indicate 释放 */
     rt_thread_t          rx_thread;
@@ -144,7 +144,7 @@ static void gnss_rx_thread_entry(void *parameter)
     {
         rt_size_t n;
 
-        /* 事件驱动: 等 USART2 新字节 (UM982 断连时静默超时空转) */
+        /* 事件驱动: 等 UART4 新字节 (UM982 断连时静默超时空转) */
         if (rt_sem_take(&ctx.rx_sem,
                         rt_tick_from_millisecond(GNSS_RX_WAIT_MS)) != RT_EOK)
             continue;

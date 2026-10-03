@@ -6,7 +6,7 @@
  * UM982 GNSS 数据 -> 带标记文本打印 (USART1 调试口)
  *
  * 数据来源: middleware/data 的 gnss_data 环形缓冲区 (gnss_data_wait/pop,
- *   10Hz 结构化定位解, 样本自带统一 UTC 时间戳), 验证 USART2 INT_RX ->
+ *   10Hz 结构化定位解, 样本自带统一 UTC 时间戳), 验证 UART4 INT_RX ->
  *   gnss_raw_data -> um982_nmea -> gnss_data 整条解析链路。
  *   注意: 环形缓冲区是 FIFO, 每个样本只能弹出一次, 本调试线程与 gins
  *   桥接线程 (优先级 9, 1ms 轮询排空) 消费同一个缓冲区 —— 本线程由信号量

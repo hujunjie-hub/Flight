@@ -75,7 +75,7 @@ mavlink_link_send_msg(&msg);
 
 ## 硬件（待绑定）
 
-板级当前只启用 USART1（console+VOFA）与 USART2（UM982，见 `../nmea`），
+板级当前只启用 USART1（console+VOFA）与 UART4（UM982，见 `../nmea`），
 MAVLink 尚未绑定物理串口。绑定后在串口接收线程 `feed`、写函数注入
 `set_sender` 即可，协议层无需改动。本机标识 `MAVLINK_LINK_SYS_ID=1` /
 `COMP_ID=AUTOPILOT1`，心跳内容在 `mavlink_link.h` 配置。

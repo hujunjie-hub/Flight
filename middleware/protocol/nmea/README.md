@@ -4,14 +4,14 @@
 
 ## 定位
 
-**纯协议解析模块**：不开线程、不占串口。USART2 (PA3, 460800, 10Hz) 的
+**纯协议解析模块**：不开线程、不占串口。UART4 (PA1, 460800, 10Hz) 的
 接收链路在 `middleware/data`：**gnssrx 接收线程**只搬字节入
 `gnss_raw_data` 字节环，**gnssdata 解析线程**按 `'\n'` 组句后喂
 `um982_nmea_feed_line()`（协议层内部验校验和, 见 middleware/README.md
 "UM982" 节的完整链路说明）。
 
 ```
-UM982 ──460800──> USART2 (DMA_RX) ──> [gnssrx 线程] ──> gnss_raw_data 字节环
+UM982 ──460800──> UART4 (DMA_RX) ──> [gnssrx 线程] ──> gnss_raw_data 字节环
                                                             │ '\n' 组句
                                                             ▼
                                      [gnssdata 解析线程] um982_nmea.c ──解析──> struct gnss_data

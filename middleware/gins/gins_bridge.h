@@ -7,7 +7,7 @@
  *
  * 硬件/数据流 (见 doc/Flight.xlsx 接口配置页):
  *   ADIS16505  1kHz DR 中断 (EXTI ISR 捕获 T_MCU 时戳) -> imu_data 环
- *   UM982      10Hz USART2 -> gnssrx 接收线程 -> gnss_raw_data 字节环
+ *   UM982      10Hz UART4 -> gnssrx 接收线程 -> gnss_raw_data 字节环
  *                             -> gnss_data 解析线程 (组句 + PPS 配对 +
  *                             UTC->T_MCU 换算) -> gnss_data 结构环
  *                             -> 本模块消费 (GNSS 位置观测)
