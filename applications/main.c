@@ -19,14 +19,16 @@
 #include <rtdevice.h>
 #include <board.h>                 /* GET_PIN(): LED/按键 引脚号 (PA/PB/PC 宏) */
 #include "app_out.h"
+#include "quad_model.h"            /* quad_model_init(): 四旋翼控制模型 (ctl 线程) */
 
 /* ulog 日志 (原 rt_kprintf 全部替换): LOG_E/LOG_W/LOG_I/LOG_D, 行尾自动补 \r\n */
 #define LOG_TAG "main"
 #define LOG_LVL LOG_LVL_INFO
 #include <ulog.h>
 
+/* LED 心跳脚: LED0=PB0 / LED2=PB14 (开发板)。
+ * 注意: PE1 2026-10-04 起 = BMP585 INT (EXTI1), 旧 LED1(PE1) 已移除。 */
 #define LED0_PIN    GET_PIN(B, 0)
-#define LED1_PIN    GET_PIN(E, 1)
 #define LED2_PIN    GET_PIN(B, 14)
 #define USER_KEY    GET_PIN(C, 13)
 #define DELAY       100
@@ -44,7 +46,6 @@ int main(void)
 {
     /* set GPIO pin mode to output */
     rt_pin_mode(LED0_PIN, PIN_MODE_OUTPUT);
-    rt_pin_mode(LED1_PIN, PIN_MODE_OUTPUT);
     rt_pin_mode(LED2_PIN, PIN_MODE_OUTPUT);
     rt_pin_mode(USER_KEY, PIN_MODE_INPUT_PULLDOWN);
     rt_pin_attach_irq(USER_KEY, PIN_IRQ_MODE_RISING, irq_callback, RT_NULL);
@@ -74,23 +75,26 @@ int main(void)
     /* 气压计原始+校准打印链路 (无数据时静默等待, baro_calib_data 后缀) */
     barout_link_init();
 
+    /* QGC 地面站 MAVLink 链路 (USART1 阶段 0, 默认 off, `gcs on` 启动会话) */
+    mavgcs_link_init();
+
+    /* 四旋翼控制模型 (ctl 线程: MPC 外环+SO3/PID 内环+混控, 默认 DISARM
+     * + dry-run, FinSH `quad` 操作, 见 middleware/control/model) */
+    quad_model_init();
+
     /* 主线程只做 LED 心跳, 数据推送在 "vofa" 线程里按固定节拍进行 */
     while (1)
     {
         rt_pin_write(LED0_PIN, PIN_HIGH);
-        rt_pin_write(LED1_PIN, PIN_LOW);
         rt_pin_write(LED2_PIN, PIN_LOW);
         rt_thread_mdelay(DELAY);
         rt_pin_write(LED0_PIN, PIN_LOW);
-        rt_pin_write(LED1_PIN, PIN_HIGH);
-        rt_pin_write(LED2_PIN, PIN_LOW);
-        rt_thread_mdelay(DELAY);
-        rt_pin_write(LED0_PIN, PIN_LOW);
-        rt_pin_write(LED1_PIN, PIN_LOW);
         rt_pin_write(LED2_PIN, PIN_HIGH);
         rt_thread_mdelay(DELAY);
         rt_pin_write(LED0_PIN, PIN_LOW);
-        rt_pin_write(LED1_PIN, PIN_HIGH);
+        rt_pin_write(LED2_PIN, PIN_LOW);
+        rt_thread_mdelay(DELAY);
+        rt_pin_write(LED0_PIN, PIN_LOW);
         rt_pin_write(LED2_PIN, PIN_LOW);
         rt_thread_mdelay(DELAY);
     }

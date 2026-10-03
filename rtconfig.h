@@ -462,8 +462,14 @@
 #define BSP_USING_UART
 #define BSP_USING_UART1
 #define BSP_USING_UART4
+/* 2026-10-04 硬件定案: USART2 = 数传电台 (PD5 TX/PD6 RX, 中断收发),
+ * USART3 = ELRS 遥控接收机 (PD8 TX/PD9 RX, 420000, RX DMA ping 环
+ * DMA1_Stream6) —— 引脚见 Flight.ioc, rc_data/mavgcs 设备名对应。 */
+#define BSP_USING_UART2
+#define BSP_USING_UART3
 #define BSP_UART4_RX_USING_DMA
 #define BSP_UART1_TX_USING_DMA
+#define BSP_UART3_RX_USING_DMA
 /* serial v2 每串口缓冲 (board/Kconfig 菜单, V2 才导出):
  * UART1 控制台 rx 256; UART4 (UM982, PA0/PA1) 与 gnss_data.c 的
  * GNSS_RX_BUF_SZ/ping 尺寸保持一致 (打开前 CTRL_CONFIG 会再显式设置)。
@@ -476,6 +482,14 @@
 #define BSP_UART4_RX_BUFSIZE 4096
 #define BSP_UART4_TX_BUFSIZE 0
 #define BSP_UART4_DMA_PING_BUFSIZE 256
+/* UART2 数传电台: rx 512 (MAVLink 上行低频小帧), tx 256 (环形 + 中断断续发)。
+ * UART3 ELRS CRSF: rx 1024 + ping 256 (与 UART4 同款 DMA ping 环,
+ * DMA1_Stream6), tx 0 (CRSF 下行遥测暂未实现, 打开即阻塞直写)。 */
+#define BSP_UART2_RX_BUFSIZE 512
+#define BSP_UART2_TX_BUFSIZE 256
+#define BSP_UART3_RX_BUFSIZE 1024
+#define BSP_UART3_TX_BUFSIZE 0
+#define BSP_UART3_DMA_PING_BUFSIZE 256
 #define BSP_USING_SPI
 #define BSP_USING_SPI1
 #define BSP_SPI1_TX_USING_DMA
@@ -483,8 +497,11 @@
 /* OCTOSPI1 QSPI 总线 (硬件 NCS=PG6, 间接模式轮询) */
 #define BSP_USING_QSPI
 #define BSP_USING_HARD_I2C
+#define BSP_USING_HARD_I2C1
 #define BSP_USING_HARD_I2C4
 #define BSP_USING_HARD_I2C2
+#define BSP_I2C1_TX_USING_INT 1
+#define BSP_I2C1_RX_USING_INT 1
 #define BSP_I2C4_TX_USING_INT 1
 #define BSP_I2C4_RX_USING_INT 1
 #define BSP_I2C2_TX_USING_INT 1
@@ -496,9 +513,11 @@
  * 时 init/IRQ 回调照常跑但 xfer 三个后端全不命中 -> 一切传输 (含写寄存器
  * 地址+读数据的两消息序列, seq 检查要求 TX+RX 异步后端) 直接失败, BMM350/
  * BMP585 探测恒超时。传感器读时序天然 repeated-start, POLL 不支持 seq,
- * 故按 B5 结论统一开 INT (TX+RX), I2C1/2 同配。
- * 2026-10-02 BMM350 由 I2C1 重映射到 I2C4 (SCL=PF14/SDA=PF15):
- * I2C1 宏删除, 现 I2C4/2 同配 (均 INT)。 */
+ * 故按 B5 结论统一开 INT (TX+RX), 三总线同配。 */
+/* 2026-10-02 BMM350 由 I2C1 重映射到 I2C4 (SCL=PF14/SDA=PF15)。
+ * 2026-10-04 硬件定案再迁移: BMM350 -> I2C1 (SCL=PB8/SDA=PB7, INT PB5),
+ * BMP585 -> I2C4 (SCL=PB6/SDA=PB9, INT PE1), I2C2 (PB10/PB11) 留给
+ * 电流计; 三总线内核时钟同为 137.5MHz (D2PCLK1/D3PCLK1), TIMINGR 通用。 */
 /* TIM2 空闲 (时间基座已移除) */
 /* end of On-chip Peripheral Drivers */
 

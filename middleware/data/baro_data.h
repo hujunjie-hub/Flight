@@ -6,8 +6,8 @@
  * BARO (BMP585) 原始数据环形缓冲区
  *
  * 数据链路 (只打时间标签 + 单位换算, 不做校准):
- *   本模块采集线程 100Hz 轮询 baro_bmp585 + temp_bmp585 设备 (I2C2)
- *     -> 时间标签 (T_MCU 时基, timebase; BMP585 INT 引脚 PE13 硬件已
+ *   本模块采集线程 100Hz 轮询 baro_bmp585 + temp_bmp585 设备 (I2C4)
+ *     -> 时间标签 (T_MCU 时基, timebase; BMP585 INT 引脚 PE1 硬件已
  *        预留, 迁移到 EXTI 事件源后时戳改为 EXTI ISR 捕获)
  *     + 单位换算 -> rt_ringbuffer 环形缓冲区
  *   消费方 baro_data_pop() 读出后再自行校准 (基准偏移: baro_calib_apply)。

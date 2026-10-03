@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * USART1 调试输出层公共设施 (vofa / imuout / gnssout / gins_fused_data /
- * magout / barout 六条输出链路共用, 见各自 out_*.c)
+ * magout / barout 六条输出链路 + mavgcs 地面站链路共用, 见各自
+ * out_*.c / mavgcs.c)
  */
 
 #ifndef __APP_OUT_H__
@@ -58,6 +59,7 @@ int gnssout_link_init(void);          /* UM982 定位解 -> 带标记文本 */
 int gins_fused_data_link_init(void);  /* KF-GINS 融合结果 -> 带标记文本 */
 int magout_link_init(void);           /* BMM350 原始+校准 -> 带标记文本 */
 int barout_link_init(void);           /* BMP585 原始+校准 -> 带标记文本 */
+int mavgcs_link_init(void);           /* QGC 地面站 MAVLink 链路 (USART1 阶段 0) */
 
 #ifdef __cplusplus
 }

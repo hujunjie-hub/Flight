@@ -91,6 +91,8 @@ struct gnss_data_status
     rt_uint32_t popped;         /* 累计读出样本数 */
     rt_uint32_t lost;           /* 缓冲区满被挤掉的样本数 */
     rt_uint32_t ts_zero;        /* T_event=0 入环样本数 (映射未就绪/作废) */
+    rt_bool_t   rtk_pin;        /* UM982 RTK 状态引脚 (PC0, 高=固定解);
+                                 * 硬件选配交叉校验, 与 NMEA quality 相互印证 */
 };
 
 /* ------------------------- 接口 ------------------------- */
@@ -109,6 +111,11 @@ rt_err_t gnss_data_wait(rt_int32_t timeout_ms);
 
 /* 当前缓冲样本数 */
 rt_uint32_t gnss_data_count(void);
+
+/* UM982 RTK 状态引脚即时读取 (PC0 输入, 高电平 = RTK 固定解)。
+ * 引脚在 gnss_data_init 配置; 未接线时恒读低 (与 NMEA quality 相互印证,
+ * 不一致时优先怀疑接线/模块配置)。 */
+rt_bool_t gnss_data_rtk_pin_high(void);
 
 /* 清空缓冲区 */
 void gnss_data_flush(void);

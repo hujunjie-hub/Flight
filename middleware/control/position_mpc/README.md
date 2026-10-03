@@ -10,7 +10,7 @@ NED 位置/速度 → 期望加速度 `a_cmd` (m/s²), 作为内环
 | 文件 | 说明 |
 |------|------|
 | `mpc_pos.h` / `mpc_pos.c`       | 纯 C 核心: 闭式预计算 (H/M + Riccati 终端权) + SCA 求解 + step。无 RT-Thread 依赖, 可主机测试 |
-| `mpc_pos_gins.h` / `mpc_pos_gins.c` | 桥接: 经纬高→本地 NED (等距圆柱), 设定点管理, 单步入口 + FinSH `mpc` |
+| `mpc_pos_gins.h` / `mpc_pos_gins.c` | 桥接: 经纬高→本地 NED (等距圆柱), 设定点管理 (NED 与 LLA 两个入口, LLA 带相对当前位置 h50/v10 m 钳位 —— QGC DO_REPOSITION 通路), 单步入口 + FinSH `mpc` |
 
 ## 方法摘要 (公式与推导见 `mpc_pos.h` 头注)
 

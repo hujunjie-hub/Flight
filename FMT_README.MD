@@ -392,3 +392,121 @@ task 层除 vehicle 线程栈常量一行 (§12.2-6, 6144→16384) 外 0 行: �
 5. my_controller 上线 (mc_controller 回退路径保留: model.py 一行切回) → mlog 录 `u_norm`/`u_pred` 整链对拍 → QGC 全消息回归
 6. flag/status 填全 → SYS_STATUS / ATTITUDE_QUATERNION / GLOBAL_POSITION_INT → CPU 余量与栈水位 (§12.2-6 的 16384 预算) 确认
 7. 上板: actuator TOML 配 DShot/PWM → 系留测试
+
+## 13. QGC 地面站连接 — FMT 链路梳理与本工程落地方案
+
+> 定位: 在**当前 RT-Thread 工程**上直连 QGC (导航验证阶段就有地面站: 态势/地图/曲线);实现逐条参照 FMT (事实见 §13.1-13.2)。走 FMT 基座时 task_comm 整链白拿 (§12.6), 本章装配层日后可平移——pack 是纯函数, 数据源从 gins 快照换成 ins_output 即可。
+
+### 13.1 FMT 的 QGC 链路构成 (事实速查)
+
+**三层**: MAVLink 库 (`src/lib/mavlink`, v2.0 vendored, common + fmt 自定义方言 FMT_* 12000-12003) → mavproxy 模块 (通道/设备/路由) → comm 任务线程。
+
+**线程表** (`task_comm.c:907-927`, `fmt_def.h:34-36`):
+
+| 线程 | 优先级 | 栈 | 职责 |
+|---|---|---|---|
+| mav_rx | 10 | 6144 | 全通道 RX: 串口 rx_indicate→事件唤醒, 逐字节 `mavlink_parse_char`, 按通道分离解析状态→handler 链表分发 (`mavproxy_monitor.c:61-90`) |
+| mavgcs | 11 | 5120 | chan0 (GCS) 主循环 `mavproxy_channel_loop`, 1ms 定时器事件驱动下行 |
+| mavobc | 12 | 2048 | chan1 (伴飞计算机), `dependency` 依赖 mavgcs |
+
+**mavproxy 通道机制** (`mavproxy.c`): 每通道 = 1ms rt_timer + event + 立即消息环形队列 (20 深) + 周期消息表 (25 项, msgid+rate+pack 回调) + tx 锁 + 1024B 发送缓冲;`mavproxy_register_msg(chan, msgid, rate_hz, pack_cb, start)` 注册周期下行;`mavproxy_send_msg(sync)` 直发 (500ms 超时) 或入队。
+
+**串口配置走 TOML 不在代码里** (`sysconfig.toml:20-41`): chan0=serial1@57600 + usbd0 (auto-switch, 插拔自动切), chan1=serial2@115200, rtcm=serial3;pixhawk TELEM1/2 = USART2/3 注册名 serial1/2 (`drv_usart.c:26-30`)。`mavproxy_init` 在 board.c `bsp_initialize` (param_init 之后) 调用。
+
+**QGC 握手三板斧** (`mavgcs.c`): ① HEARTBEAT 1Hz——type=QUADROTOR、**autopilot=MAV_AUTOPILOT_PX4 (伪装)**、custom_mode 按 `px4_custom_mode.h` 编码 (MAIN_MODE<<16 | SUB_MODE<<24)、armed→SAFETY_ARMED+ACTIVE;② MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES → capabilities 声明 MAVLINK2|PARAM_FLOAT|MISSION_*|FTP、**flight_sw_version 伪装 PX4 v1.10.0** (源码注释原话 "cheat QGC");③ MAV_CMD_REQUEST_PROTOCOL_VERSION → version=200。sysid/compid 出自参数组 SYS.MAV_SYS_ID/MAV_COMP_ID (默认 1/1)。
+
+### 13.2 FMT GCS 消息集
+
+下行 (注册表 `mavgcs.c:519-543`):
+
+| 消息 | 频率 | 数据源 |
+|---|---|---|
+| HEARTBEAT | 1 Hz | fms_output (status/state/mode) |
+| SYS_STATUS | 1 Hz | ins status/flag 位图 + 电池 + `get_cpu_usage()` |
+| SYSTEM_TIME / EXTENDED_SYS_STATE | 1 Hz | systime / fms landed_state |
+| ATTITUDE_QUATERNION | 10 Hz | ins_output quat + p/q/r |
+| LOCAL_POSITION_NED | 5 Hz | x_R/y_R/-h_R + vn/ve/vd |
+| GLOBAL_POSITION_INT | 5 Hz | lat/lon/alt/h_R + vel + yaw |
+| VFR_HUD / ALTITUDE | 5 Hz | 地速/航向/高度/爬升;ALTITUDE 汇集 AMSL/相对/AGL |
+| GPS_RAW_INT | 5 Hz | sensor_gps 原始定位 |
+| RC_CHANNELS | 5 Hz | rc_channels 话题 |
+| STATUSTEXT | 事件 | 校准进度 (QGC `[cal]` 格式) 等 |
+
+上行 (`handle_mavlink_message`, `mavgcs.c:156-507`): SET_MODE→`gcs_set_mode/cmd`;PARAM_REQUEST_READ/LIST/SET——**两段参数空间**: ~150 个 PX4 虚拟参数在前 (SYS_AUTOSTART=4001/CAL_*/RC*, 供 QGC 机架识别) + FMT 真参数按 index 偏移, 逐个下发按带宽自适应节流 (默认 ~20ms/个, 占链路 ≤30%);COMMAND_LONG (arm/disarm/takeoff/land/校准), COMMAND_INT DO_REPOSITION→单航点+Mission 模式;MISSION_* 状态机→文本任务文件 (`sysio/mission_data`);SERIAL_CONTROL→QGC 内嵌 MAVLink Console;FTP;LOG_*;MANUAL_CONTROL 虚拟摇杆 (真实 RC 失联 1s 才接管);GPS_RTCM_DATA→RTCM 转发。
+
+### 13.3 本工程现状盘点 (已就绪 / 缺口)
+
+| 件 | 状态 |
+|---|---|
+| MAVLink 库 | ✅ `middleware/protocol/mavlink` = 官方 v2.0 common 库, 与 FMT 同源同版 (均为 2020-08-18 vendored, 零漂移;仅去掉 fmt 方言)——FMT 的 GCS 消息全在 common.xml, **无方言缺口** |
+| 协议适配层 | ✅ `mavlink_link.c/h`: feed 逐字节收 / attach handler (容量 8) / send_msg / 心跳 / v1 兼容 / 统计 / FinSH `mavlink`;单通道缓冲 ~0.8KB;sysid=1 / compid=AUTOPILOT1 |
+| 业务消息 | ✅ `applications/mavgcs.c` (2026-10-03): 8 类消息 (见 §13.4 装配表), `gcs on` 会话启动 |
+| 握手 | ✅ 同上: COMMAND_LONG(519/520) 应答 AUTOPILOT_VERSION (伪装 PX4 v1.10.0) + PROTOCOL_VERSION(200) + COMMAND_ACK |
+| 串口 | ✅ 阶段 1 已落地 (2026-10-04) = USART2 独占数传电台 (PD5 TX/PD6 RX @115200, mavgcs 显式下发波特率, RX 从设备接管/恢复逻辑不变);USART1 仍为 console/数据链路;USART3 = ELRS CRSF (PD8/PD9 @420000, RC 遥控) |
+| 数据源 | ✅ `gins_bridge_get_solution()` 关中断快照 (线程安全): latitude/longitude/altitude、vn/ve/vd、roll/pitch/yaw(deg)、ready/degraded/nognss + 各观测计数;`gnss_data_peek_latest()` 原始 UM982;`cpuload` CPU 遥测 |
+
+### 13.4 落地方案 — 三阶段 + 一个新文件
+
+**阶段 0 (零硬件, 当天可通)**: 复用 USART1/COM9——QGC 串口连接 COM9@460800 (MAVLink2);先 `vofa off`/关调试文本流, 残余文本混线时 QGC 解析器丢弃坏帧, 只影响观感。验收: QGC 连接绿、心跳 1Hz、姿态/位置随晃动变化。
+
+**阶段 1 (正式数传口)**: ✅ 已落地 (2026-10-04)——定案 USART2 PD5/PD6 @115200 (数传电台, 波特率经 mavgcs 显式下发, 电台侧改参数时同步 `GCS_UART_BAUD`);CubeMX 重生成按回植清单走。带宽预算: 下行满配 ~1.4 KB/s ≈ 11 kbps, 富余一倍以上。
+
+**阶段 2 (参数 + 控制)**: 上行控制指令**已先行落地 (2026-10-03)**——COMMAND_LONG 400 解锁/上锁 (走 quad_model 预检, 拒绝回 DENIED)、COMMAND_INT DO_REPOSITION 点地图定点 (LLA→NED, 相对当前位置钳位 h50/v10 m, `mpc_pos_gins_set_sp_lla`)、SET_MODE 接受 POSCTL、心跳如实上报 armed/POSCTL (见 mavgcs.c 头注"上行指令"节);剩余: PARAM_* 接 param_calib sys/nav 域 + MANUAL_CONTROL 虚拟摇杆 + Mission 航线。
+
+**新增代码只有一个文件**: `applications/mavgcs.c` (本工程惯例: 协议层不占串口不开线程, 装配在 applications 层):
+- 线程 "mavgcs", prio 12 (与 vofa 同级), 栈 4096 (FMT 5120, 我们消息少一档);
+- 收: 串口 rx_indicate→信号量唤醒 (100ms 超时兜底) → 排空读 → `mavlink_link_feed()`;
+- 发: 周期 timetag 门控 pack → `mavlink_link_send_msg` (sender 注入串口写; 阶段 0 走 app_out 共享互斥);
+- attach: REQUEST_AUTOPILOT_CAPABILITIES / REQUEST_PROTOCOL_VERSION / GCS 心跳记录 (链路监控);
+- 拷 FMT `px4_custom_mode.h` (纯枚举头) 供 custom_mode 编码;sysid/compid 后续参数化。
+
+**消息装配表 (数据源 = gins 快照 + 原始 GNSS)**:
+
+| 消息 | 频率 | 装配 (本工程字段) |
+|---|---|---|
+| HEARTBEAT | 1 Hz | QUADROTOR + 伪装 PX4 + custom_mode=POSCTL;armed/ACTIVE 如实反映 quad_model 状态机 (2026-10-03 升级) |
+| SYS_STATUS | 1 Hz | imu/gnss/mag/baro_cnt>0 → 传感器在位/健康位;cpuload;无电池→0 (QGC 电池区显示 0, 台架可接受) |
+| ATTITUDE_QUATERNION | 10 Hz | roll/pitch/yaw (deg→rad) → `so3_euler_to_quat` (复用 control/so3 纯 C) |
+| LOCAL_POSITION_NED | 5 Hz | latlon→NED 球面近似 (逻辑同 `mpc_pos_gins.c:71-79`, 抽公共) + vn/ve/vd |
+| GLOBAL_POSITION_INT | 5 Hz | latitude/longitude/altitude + vn/ve/vd + yaw |
+| GPS_RAW_INT | 5 Hz | `gnss_data_peek_latest`: lat/lon/alt/hAcc/sAcc/numSV;fix 映射 NMEA quality→GPS_FIX_TYPE (3D=3, RTK float=5, RTK fixed=6) |
+| VFR_HUD | 5 Hz | √(vn²+ve²) 地速, yaw, altitude, -vd 爬升率 |
+| STATUSTEXT | 事件 | ready/degraded/nognss 进出/reseed/协方差告警 (gins_solution 计数边沿触发) |
+
+**与 FMT 的有意差异**: 不做 mavgcs/mavobc 双通道与 fmt 方言 (单 GCS 通道, MAVLINK_COMM_NUM_BUFFERS=1);不做 150 个 PX4 虚拟参数表 (监控用途 QGC 不强制, 机架识别不可用不影响地图/曲线);MISSION/SERIAL_CONTROL/FTP/RTCM 后置 (FinSH console 已够调试, 任务规划对导航验证非必需);SYSTEM_TIME/EXTENDED_SYS_STATE/ALTITUDE 裁剪 (信息已被其余消息覆盖)。
+
+### 13.5 实施顺序
+
+1. ~~阶段 0: mavgcs.c 上 USART1 (COM9)~~ **已落地 (2026-10-03)**: `applications/mavgcs.c` 单文件——"mavgcs" 线程 (prio 12, 栈 4096) + RX 从 finsh 接管/恢复 (`gcs on/off`, 保存并归还 `dev->rx_indicate`) + 心跳/握手 (伪装 PX4 v1.10.0) + 全部 8 类消息 (HEARTBEAT+SYS_STATUS 1Hz / ATTITUDE_QUATERNION 10Hz / LOCAL+GLOBAL+VFR_HUD+GPS_RAW_INT 5Hz / STATUSTEXT 边沿事件);双构建 0 告警。剩余: 上板接 QGC 实测 (COM9@460800, 先 `vofa log off`)
+2. ~~补全消息表~~ 已随 1 一起交付;latlon→NED 抽公共 (现随 mavgcs 内联, 球面公式同 mpc_pos_gins) 与 FinSH 丢帧率核对留待上板
+3. ~~阶段 1 数传 UART 板级启用~~ **板级已落地 (2026-10-04, USART2 PD5/PD6)**: 剩余数传电台硬件实测
+4. 阶段 2 参数协议 (param_calib sys/nav 域) + 控制链上线后补 SET_MODE/arm
+5. (远期) FMT 基座路线成行后本章装配层退役, 由 task_comm 白拿 (§12.6)
+
+**QGC 点地图→定点飞行 打通任务清单** (2026-10-03 备注于此; 状态随进度更新, 未完成项的落地步骤附表后):
+
+| # | 事项 | 依赖 | 状态 |
+|---|---|---|---|
+| 1 | 电机输出硬件落地 (dshot 引脚/TIM/DMA 从占位变实际) | 无 | **未完成** (占位 TIM4+PB6-9+DMA1_S5, 见 dshot_hw.h) |
+| 2 | 机体参数辨识与整定 (质量/惯量/静推力界/姿态增益) | #1 | **未完成** (500g 级占位值, 从未上机) |
+| 3 | QGC 上行指令: DO_REPOSITION 定点 (LLA→NED, h50/v10 m 钳位) + 400 arm/disarm (预检拒 DENIED) + SET_MODE (POSCTL) + 心跳如实回显 armed/模式 | 无 | **已完成** (2026-10-03, 双构建 0 告警): QGC 地图 Go-To → MPC 定点全链, dry-run 可验 |
+| 4 | RC 遥控 (手动接管安全底线): CRSF 硬件接收 + QGC 虚拟摇杆源 + 摇杆叠加/kill 开关/失联保护 | 无 (软件) / #1#2 (真飞) | **已完成 (软件链, 2026-10-03, 双构建 0 告警)**: crsf 协议层 + rc_data 双源快照 + 叠加/kill/失联保护全链; 残留: CRSF 硬件已启用 (2026-10-04, USART3 PD8/PD9 @420000, BSP_USING_UART3 + RX DMA ping 环), 剩余接收机接线实测 |
+| 5 | RTK 前提: UM982 RTK 固定解 → KF-GINS cm 级位置 (NOGNSS 位置开环不可定点) | QGC 侧 NTRIP + UM982 口配置 | **已完成 (转发链 + 状态引脚, 2026-10-03, 双构建 0 告警)**: GPS_RTCM_DATA 重组 → UART4 回注 + `gcs rtcm` 开关/计数; **RTK 状态引脚 PC0** (GPIO 输入, 固定解=高; `gnss_data_rtk_pin_high()` + `gnssdata` 命令显示, 与 NMEA quality 交叉校验; .ioc/xlsx 已同步); 残留: UM982 口配置 RTCM3 (步骤 3) 与 NTRIP 实测 (步骤 4) |
+
+**#1 输出硬件 — 未完成, 落地步骤**: ① xlsx 引脚表给 4 路电机输出分配 TIM 通道 (占位 TIM4 CH1-4@PB6-9 须按实际空闲复核); ② dshot_hw.h 头注四步清单改硬件定义 (引脚/AF/TIM/DMA/DMAMUX); ③ 拆桨台架 `quad power on` 后 `dshot` 命令逐通道验帧 (示波器/单电机); ④ u_norm→电机映射与实际桨向对表 (m0 FR CW/m1 FL CCW/m2 RR CCW/m3 RL CW)。
+
+**#2 机体参数 — 未完成, 落地步骤**: ① 称重 + 摆法/天平法测 m/J, 静推力台架测单电机 f(u) 得 f_min/f_max; ② `mix set l|cq|j|fmin|fmax` 现场整定 (占位 l=0.11/cq=0.015); ③ att 增益保守起步悬停整定 (`att set`, 权威清单见根 README 调参清单章); ④ 增益持久化接 param_part ctrl 分区 (已预留)。
+
+**#4 RC 遥控 — 已完成 (软件链 2026-10-03), 落地步骤** (步骤 1-4 已交付, 步骤 5 硬件后置):
+1. `middleware/protocol/crsf/`: 纯 CRSF 解析层 (帧 sync 0xC8/len/type/CRC8 poly 0xD5; RC_CHANNELS_PACKED 0x16 = 16ch×11bit, 值域 172..1811 中点 992 → 归一化 [-1,1]), 仿 nmea/mavlink 约定不占串口不开线程;
+2. `middleware/data/rc_data.c/h`: 源无关遥控快照 (4 摇杆 + ch5-8 开关 + 源标签 + 时间戳), publish/get/age 关中断快照 (双发布者并发安全); CRSF UART 接收线程 "rcrx" (占位 RC_CRSF_DEV="uart3"@420k 8N1, 设备不存在则告警不启动); FinSH `rc`;
+3. mavgcs: MANUAL_CONTROL (QGC 虚拟摇杆) → rc_data 发布 (双源并存以最新到达为准); RC_CHANNELS 5Hz 下行 (QGC 摇杆页回显);
+4. quad_model ARM 期 20Hz 摇杆叠加 (POSCTL 语义): 死区 0.08 外杆量 → v_ref (水平 5 m/s / 爬升 2 m/s NED) + 滑设定点 (p_ref = 当前位姿 + v_ref×0.5s 视界, 复用 h50/v10 钳位), yaw 杆 → 航向速率 90°/s; 全中位 → 复捕当前位置保持; **ch5 kill → 立即 disarm**; RC 曾在线后失联 >3s 且 ARM → 失效保护自动 disarm;
+5. 硬件落地 (后置): xlsx 给接收机分 UART (USART2 不可用, PA2=PPS), CubeMX 重生成 + .config BSP_USING_UARTx。
+
+**#5 RTK — 已完成 (转发链 2026-10-03), 实施步骤** (步骤 1-2 已交付, 3-4 板侧配置与实测):
+1. mavgcs: GPS_RTCM_DATA (msgid 126) 分片重组 (frag_id 0-3, flags bit0=末片) → 整包写 UART4 (与 UM982 NMEA 同口双向; RTCM 1-5 kB/s @460800 带宽富余);
+2. FinSH `gcs rtcm on|off` (默认 on) + 转发字节/包计数入 `gcs` 状态;
+3. UM982 侧 (Unicore 工具配置, 非固件职责): 对应 COM 口使能 RTCM3 输入;
+3b. **RTK 状态引脚 (已落地 2026-10-03)**: UM982 RTK 指示脚 → STM32 **PC0** (GPIO 输入, 固定解=高电平; 注意 H723 的 PC0 无任何 UART 复用, 仅 ADC/GPIO —— CubeMX DB 逐脚核实, 作状态脚恰合适); 读取: `gnss_data_rtk_pin_high()` / `gnssdata` 命令 rtk pin 行 / `gnss_data_status.rtk_pin`, 与 NMEA GGA quality 交叉校验 (不一致优先怀疑接线/模块配置); .ioc PC0.GPIO_Label=UM982_RTK;
+4. 验收: QGC Application Settings 配 NTRIP 源 → `gcs` 看 rtcm 计数增长 → GPS_RAW_INT fix_type 5→6 (RTK fixed) → gins ready → 定点前提闭环。

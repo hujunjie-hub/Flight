@@ -5,9 +5,9 @@
  *
  * BMP585 气压计 RT-Thread 传感器驱动
  *
- * 硬件连接 (doc/Flight.xlsx 接口配置页):
- *   I2C2: SCL=PB10, SDA=PB11 (DMA2), 400 kHz
- *   INT  = PE13 (EXTI13/EXTI15_10, 预留: 数据就绪中断未接, 轮询采集)
+ * 硬件连接 (2026-10-04 定案: I2C2/PB10/PB11 -> I2C4/PB6/PB9):
+ *   I2C4: SCL=PB6, SDA=PB9 (AF6 开漏), 400 kHz
+ *   INT  = PE1 (EXTI1, 预留: 数据就绪中断未接, 轮询采集)
  *
  * 按数据手册 BST-BMP585-DS003 (doc/BMP585) 编写:
  *  - CHIP_ID(0x01) = 0x51; 软复位 CMD(0x7E)=0xB6 后等 NVM 就绪
@@ -28,7 +28,7 @@
 /* ------------------------- 板级配置 (按需修改) ------------------------- */
 
 /* I2C 总线名 */
-#define BMP585_I2C_BUS_NAME         "hwi2c2"
+#define BMP585_I2C_BUS_NAME         "hwi2c4"
 
 /* 7 位 I2C 地址: SDO=0 -> 0x46, SDO=1 -> 0x47 (默认 0x46, 探测时自动兼容) */
 #define BMP585_I2C_ADDR_DEFAULT     0x46

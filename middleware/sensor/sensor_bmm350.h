@@ -5,9 +5,10 @@
  *
  * BMM350 三轴磁力计 RT-Thread 传感器驱动
  *
- * 硬件连接 (2026-10-02 由 I2C1/PB6/PB7/PB5 重映射):
- *   I2C4: SCL=PF14, SDA=PF15 (AF4 开漏), 400 kHz
- *   INT = PF12 (EXTI12/EXTI15_10, 预留: 数据就绪中断未接, 轮询采集)
+ * 硬件连接 (2026-10-04 定案: I2C4/PF14/PF15 -> I2C1/PB8/PB7):
+ *   I2C1: SCL=PB8, SDA=PB7 (AF4 开漏), 400 kHz
+ *   INT = PB5 (EXTI5/EXTI9_5, 预留: 数据就绪中断未接, 轮询采集)
+ *   (PB7 仅 I2C1_SDA / PB8 仅 I2C1_SCL, 接线时勿按 SCL=PB7 交叉)
  *
  * 补偿算法与 OTP 系数下载流程移植自 Bosch 官方 API
  * (doc/BMM350 内官方参考工程),
@@ -27,7 +28,7 @@
 /* ------------------------- 板级配置 (按需修改) ------------------------- */
 
 /* I2C 总线名 */
-#define BMM350_I2C_BUS_NAME         "hwi2c4"
+#define BMM350_I2C_BUS_NAME         "hwi2c1"
 
 /* 7 位 I2C 地址: ADSEL 拉低 0x14 / 拉高 0x15 (默认低, 探测时自动兼容) */
 #define BMM350_I2C_ADDR_DEFAULT     0x14

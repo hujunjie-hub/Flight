@@ -28,6 +28,17 @@ void mpc_pos_gins_set_sp(const double p_ned[3], const double v_ned[3]);
 
 void mpc_pos_gins_get_sp(double p_ned[3], double v_ned[3]);
 
+/*
+ * 经纬高定点设定 (QGC DO_REPOSITION 通路): LLA -> 相对参考点 NED 后走
+ * set_sp; 相对当前位置水平 >50m / 垂直 >10m 按界钳位 (拒绝台架跳点)。
+ * 高度口径 = gins 椭球高 (与 GLOBAL_POSITION_INT 上报一致, QGC 往返自洽)。
+ * gins 未就绪返回 -RT_ERROR。
+ */
+rt_err_t mpc_pos_gins_set_sp_lla(double lat_deg, double lon_deg, double alt_m);
+
+/* 最近一拍 step 时的当前位置 NED m (摇杆叠加层用; 未 step 过为 0) */
+void mpc_pos_gins_get_p_ned(double p_ned[3]);
+
 /* 一拍外环 (读 KF-GINS 快照 -> 本地 NED -> mpc_pos_step)。
  * gins 未就绪/参考点或设定点未设/解降级时返回 RT_FALSE。 */
 rt_bool_t mpc_pos_gins_step(struct mpc_pos_out *out);

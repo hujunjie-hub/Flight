@@ -47,17 +47,17 @@ static struct
 /* DMAR 突发装载缓冲: 17 组 (16 bit + 复位) x 4 电机, 32B 对齐 (DCache 行) */
 static rt_uint32_t s_frame[17 * DSHOT_CH_NUM] __attribute__((aligned(32)));
 
-/* 占位引脚表: m0..m3 -> TIM4_CH1..CH4 (dshot_hw.h) */
+/* 引脚表: m0..m3 -> TIM1_CH1..CH4 (dshot_hw.h, 2026-10-04 硬件定案) */
 static const struct
 {
     GPIO_TypeDef *port;
     rt_uint16_t   pin;
 } s_pins[DSHOT_CH_NUM] =
 {
-    { GPIOB, GPIO_PIN_6 },  /* m0 FR */
-    { GPIOB, GPIO_PIN_7 },  /* m1 FL */
-    { GPIOB, GPIO_PIN_8 },  /* m2 RR */
-    { GPIOB, GPIO_PIN_9 },  /* m3 RL */
+    { GPIOE, GPIO_PIN_9 },  /* m0 FR -> TIM1_CH1 */
+    { GPIOE, GPIO_PIN_11 }, /* m1 FL -> TIM1_CH2 */
+    { GPIOE, GPIO_PIN_13 }, /* m2 RR -> TIM1_CH3 */
+    { GPIOE, GPIO_PIN_14 }, /* m3 RL -> TIM1_CH4 */
 };
 
 static const struct stm32_dma_config s_dma_cfg =
@@ -121,7 +121,7 @@ int dshot_out_init(enum dshot_out_proto proto)
     memset(&g_out.dma, 0, sizeof(g_out.dma));
     g_out.proto = (int)proto;
 
-    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOE_CLK_ENABLE();
     DSHOT_TIM_CLK_ENABLE();
 
     /* 引脚: AF 推挽, DShot 沿速率要求 very high */
@@ -375,7 +375,7 @@ static void dshot(int argc, char **argv)
     {
         struct dshot_out_status st;
         dshot_out_get_status(&st);
-        LOG_I("=== dshot output (HW placeholder: TIM4 PB6..PB9, dshot_hw.h) ===");
+        LOG_I("=== dshot output (TIM1 PE9/PE11/PE13/PE14, dshot_hw.h) ===");
         LOG_I("state : inited=%d armed=%d proto=%s", st.inited, st.armed,
               proto_name(st.proto));
         if (st.inited && proto_is_dshot(st.proto))

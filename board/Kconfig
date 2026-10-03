@@ -54,6 +54,51 @@ menu "On-chip Peripheral Drivers"
                         default 64
                 endif
 
+            menuconfig BSP_USING_UART2
+                bool "Enable UART2 (数传电台/MAVLink GCS, PD5/PD6)"
+                default n
+                if BSP_USING_UART2
+                    config BSP_UART2_RX_BUFSIZE
+                        int "Set UART2 RX buffer size"
+                        range 64 65535
+                        depends on RT_USING_SERIAL_V2
+                        default 512
+
+                    config BSP_UART2_TX_BUFSIZE
+                        int "Set UART2 TX buffer size"
+                        range 0 65535
+                        depends on RT_USING_SERIAL_V2
+                        default 256
+                endif
+
+            menuconfig BSP_USING_UART3
+                bool "Enable UART3 (ELRS CRSF 遥控, PD8/PD9)"
+                default n
+                if BSP_USING_UART3
+                    config BSP_UART3_RX_USING_DMA
+                        bool "Enable UART3 RX DMA (DMA1 Stream6)"
+                        depends on BSP_USING_UART3 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_UART3_RX_BUFSIZE
+                        int "Set UART3 RX buffer size"
+                        range 64 65535
+                        depends on RT_USING_SERIAL_V2
+                        default 1024
+
+                    config BSP_UART3_TX_BUFSIZE
+                        int "Set UART3 TX buffer size"
+                        range 0 65535
+                        depends on RT_USING_SERIAL_V2
+                        default 0
+
+                    config BSP_UART3_DMA_PING_BUFSIZE
+                        int "Set UART3 RX DMA ping-pong buffer size"
+                        range 32 65535
+                        depends on RT_USING_SERIAL_V2 && BSP_UART3_RX_USING_DMA
+                        default 256
+                endif
+
             menuconfig BSP_USING_UART4
                 bool "Enable UART4 (UM982 GNSS, PA0/PA1)"
                 default n
@@ -114,12 +159,16 @@ menu "On-chip Peripheral Drivers"
         default n
         select RT_USING_I2C
         if BSP_USING_HARD_I2C
+            config BSP_USING_HARD_I2C1
+                bool "Enable I2C1 BUS (BMM350, PB8/PB7)"
+                default n
+
             config BSP_USING_HARD_I2C4
-                bool "Enable I2C4 BUS (BMM350, PF14/PF15)"
+                bool "Enable I2C4 BUS (BMP585, PB6/PB9)"
                 default n
 
             config BSP_USING_HARD_I2C2
-                bool "Enable I2C2 BUS (BMP585, PB10/PB11)"
+                bool "Enable I2C2 BUS (电流计, PB10/PB11)"
                 default n
 
             config BSP_I2C2_RX_USING_DMA
@@ -137,6 +186,16 @@ menu "On-chip Peripheral Drivers"
             # 事故)。传感器驱动的写地址+读数据是两消息 repeated-start 序列,
             # 仅 INT/DMA 支持 (B5: DMA 直写调用方栈缓冲 DCache 不可维护),
             # 故总线开启时 INT 默认开。
+            config BSP_I2C1_TX_USING_INT
+                bool "I2C1 TX using interrupt"
+                depends on BSP_USING_HARD_I2C1
+                default y
+
+            config BSP_I2C1_RX_USING_INT
+                bool "I2C1 RX using interrupt"
+                depends on BSP_USING_HARD_I2C1
+                default y
+
             config BSP_I2C4_TX_USING_INT
                 bool "I2C4 TX using interrupt"
                 depends on BSP_USING_HARD_I2C4

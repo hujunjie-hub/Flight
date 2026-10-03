@@ -29,11 +29,20 @@ DMA_HandleTypeDef hdma_spi1_tx;
 DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
 DMA_HandleTypeDef hdma_uart4_rx;
+DMA_HandleTypeDef hdma_usart3_rx;   /* USART3 RX (ELRS CRSF), 同上占位 */
 
 /*
  * NVIC preemption priorities (priority group 4) of every interrupt this board
  * uses.  The values come from board/CubeMX_Config/Flight.ioc, which is the
  * single source of truth for the hardware checklist.
+ *
+ * 2026-10-04 抢占优先级全表重排 (与 doc/Flight.xlsx 接口配置页一致):
+ *   1  UM982 PPS (TIM2 输入捕获)          —— 时间同步最高
+ *   2  ADIS DR EXTI + ADIS SPI1 DMA       —— 1kHz 惯导主观测链
+ *   3  UM982 UART4 RX DMA / ELRS USART3 RX DMA —— 遥控链与 IMU 同级兜底
+ *   5  BMM350/BMP585 INT+I2C EV / 数传 USART2 RX
+ *   6  电流计 I2C2 DMA/EV / USART1 调试链
+ *   7  其他非实时 (I2C 错误中断等)
  *
  * The RT-Thread STM32 drivers set hard-coded priorities when they initialize
  * (DMA RX=0, DMA TX=1, peripheral IRQ=1/2/3) and again when a device is opened
@@ -49,28 +58,50 @@ void board_nvic_set_priority(IRQn_Type irq, uint32_t default_preempt)
 
     switch (irq)
     {
-    /* ADIS16505 IMU (SPI1 burst) */
-    case EXTI4_IRQn:        preempt = 2; break;   /* DR  - data ready        */
-    case SPI1_IRQn:         preempt = 0; break;   /* SPI1 global interrupt   */
-    case DMA1_Stream0_IRQn: preempt = 3; break;   /* SPI1 RX (DOUT)          */
-    case DMA1_Stream1_IRQn: preempt = 3; break;   /* SPI1 TX (DIN)           */
-
-    /* UM982 RTK GNSS */
+    /* P1: UM982 1PPS 时间同步 (最高实时) */
     case TIM2_IRQn:         preempt = 1; break;   /* 1PPS input capture      */
-    case UART4_IRQn:        preempt = 5; break;   /* UART4 TX/RX (UM982)     */
+
+    /* P2: ADIS16505 IMU 1kHz 观测链 (DR EXTI 由驱动宏
+     * ADIS16505_DR_IRQ_PRIO=2 直设, 同级) */
+    case EXTI4_IRQn:        preempt = 2; break;   /* DR  - data ready        */
+    case SPI1_IRQn:         preempt = 2; break;   /* SPI1 global (原 0 越过 PPS, 已归链) */
+    case DMA1_Stream0_IRQn: preempt = 2; break;   /* SPI1 RX (DOUT)          */
+    case DMA1_Stream1_IRQn: preempt = 2; break;   /* SPI1 TX (DIN)           */
+
+    /* P3: UM982 GNSS 观测链 (UART4 TX/RX 与 RX DMA 同向量族) */
+    case UART4_IRQn:        preempt = 3; break;   /* UART4 TX/RX (UM982)     */
     case DMA1_Stream2_IRQn: preempt = 3; break;   /* UART4 RX (circular)     */
 
-    /* BMM350 magnetometer / BMP585 barometer */
-    case EXTI15_10_IRQn:    preempt = 7; break;   /* BMP585 INT (PE13) / BMM350 INT (PF12, 预留) */
-    case I2C4_EV_IRQn:      preempt = 2; break;   /* I2C4 event (BMM350)      */
-    case I2C2_EV_IRQn:      preempt = 2; break;   /* I2C2 event              */
-    case DMA2_Stream0_IRQn: preempt = 6; break;   /* I2C2 RX                 */
-    case DMA2_Stream1_IRQn: preempt = 6; break;   /* I2C2 TX                 */
+    /* P3: ELRS CRSF 遥控接收链 (USART3 与 RX DMA 同向量族) */
+    case USART3_IRQn:       preempt = 3; break;   /* USART3 (ELRS)           */
+    case DMA1_Stream6_IRQn: preempt = 3; break;   /* USART3 RX (circular)    */
 
-    /* debug console */
-    case USART1_IRQn:       preempt = 5; break;   /* USART1                  */
-    case DMA1_Stream3_IRQn: preempt = 5; break;   /* USART1 RX               */
-    case DMA1_Stream4_IRQn: preempt = 5; break;   /* USART1 TX               */
+    /* P5: BMM350 磁链路 (I2C1, INT PB5) / BMP585 气压链路 (I2C4, INT PE1)
+     * 2026-10-04 迁移: 传感器 INT 自 EXTI15_10 (PF12/PE13) 拆到
+     * EXTI9_5 (BMM350 PB5) 与 EXTI1 (BMP585 PE1), EXTI15_10 释放
+     * (PE13 让位 TIM1_CH3 电调输出)。 */
+    case EXTI9_5_IRQn:      preempt = 5; break;   /* BMM350 INT (PB5)         */
+    case EXTI1_IRQn:        preempt = 5; break;   /* BMP585 INT (PE1)         */
+    case I2C1_EV_IRQn:      preempt = 5; break;   /* I2C1 event (BMM350)      */
+    case I2C4_EV_IRQn:      preempt = 5; break;   /* I2C4 event (BMP585)      */
+
+    /* P5: 数传电台 (MAVLink GCS) */
+    case USART2_IRQn:       preempt = 5; break;   /* USART2 (数传)            */
+
+    /* P6: 电流计 I2C2 链 (DMA2 Stream0/1 保留) */
+    case I2C2_EV_IRQn:      preempt = 6; break;   /* I2C2 event (电流计)      */
+    case DMA2_Stream0_IRQn: preempt = 6; break;   /* I2C2 RX                  */
+    case DMA2_Stream1_IRQn: preempt = 6; break;   /* I2C2 TX                  */
+
+    /* P6: USART1 debug console / 数据链路 */
+    case USART1_IRQn:       preempt = 6; break;   /* USART1                  */
+    case DMA1_Stream3_IRQn: preempt = 6; break;   /* USART1 RX               */
+    case DMA1_Stream4_IRQn: preempt = 6; break;   /* USART1 TX               */
+
+    /* P7: 其他非实时 (I2C 总线错误中断, drv_hard_i2c 经本表设置) */
+    case I2C1_ER_IRQn:      preempt = 7; break;
+    case I2C2_ER_IRQn:      preempt = 7; break;
+    case I2C4_ER_IRQn:      preempt = 7; break;
 
     default:
         break;

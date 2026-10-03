@@ -7,7 +7,7 @@
  *
  * 采集线程按 ODR 周期 (100Hz -> 10ms) 轮询: 先读 baro_bmp585, 再读
  * temp_bmp585 取同芯片温度。T_event 在读取触发时刻打戳 (timebase T_MCU
- * 时基; BMP585 INT 引脚 PE13 硬件已预留, 迁移到 EXTI 事件源后时戳改为
+ * 时基; BMP585 INT 引脚 PE1 硬件已预留, 迁移到 EXTI 事件源后时戳改为
  * EXTI ISR 捕获)。
  *
  * 环形缓冲区用 RT-Thread 的 rt_ringbuffer (字节流), 本模块按定长记录读写:

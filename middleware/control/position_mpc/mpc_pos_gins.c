@@ -121,6 +121,54 @@ void mpc_pos_gins_get_sp(double p_ned[3], double v_ned[3])
 }
 
 /*
+ * 经纬高定点设定 (QGC 地面站 DO_REPOSITION 通路, FMT_README §13.5 任务#3):
+ * LLA -> 相对参考点的 NED 后走 set_sp。高度基准约定: 调用方传入的 alt
+ * 与本模块 GLOBAL_POSITION_INT 上报口径一致 (gins 椭球高, QGC 地图往返
+ * 自洽; MSL 与椭球高之差 = 大地水准面起伏, 未修正, 台架量级 m 级)。
+ * 安全钳位: 相对当前位置水平 >50m / 垂直 >10m 的设定点按界截断
+ * (MPC 只限加速度不限速度, 远距设定会积累大速度, 台架阶段拒收跳点)。
+ * gins 未就绪 (无法取当前位姿钳位) 返回 -RT_ERROR。
+ */
+rt_err_t mpc_pos_gins_set_sp_lla(double lat_deg, double lon_deg, double alt_m)
+{
+    struct gins_solution s;
+    double p_sp[3], d[3];
+    double dh, dv;
+
+    gins_bridge_get_solution(&s);
+    if (!s.ready || !isfinite(lat_deg) || !isfinite(lon_deg) || !isfinite(alt_m))
+        return -RT_ERROR;
+
+    if (!g_run.ref.valid)
+        mpc_pos_gins_set_ref_here();
+    if (!g_run.ref.valid)
+        return -RT_ERROR;
+
+    p_sp[0] = SO3_DEG2RAD(lat_deg - g_run.ref.lat0) * MPC_REF_EARTH_A;
+    p_sp[1] = SO3_DEG2RAD(lon_deg - g_run.ref.lon0) * MPC_REF_EARTH_A
+              * g_run.ref.coslat0;
+    p_sp[2] = -(alt_m - g_run.ref.alt0);
+
+    latlon_to_ned(&s, d);                       /* 当前位置 NED */
+    dh = sqrt((p_sp[0] - d[0]) * (p_sp[0] - d[0]) +
+              (p_sp[1] - d[1]) * (p_sp[1] - d[1]));
+    dv = p_sp[2] - d[2];
+    if (dh > 50.0 || fabs(dv) > 10.0)
+    {
+        double h_scale = (dh > 50.0) ? 50.0 / dh : 1.0;
+        double v_scale = (fabs(dv) > 10.0) ? 10.0 / fabs(dv) : 1.0;
+        double k = h_scale < v_scale ? h_scale : v_scale;
+
+        p_sp[0] = d[0] + (p_sp[0] - d[0]) * k;
+        p_sp[1] = d[1] + (p_sp[1] - d[1]) * k;
+        p_sp[2] = d[2] + (p_sp[2] - d[2]) * k;
+    }
+
+    mpc_pos_gins_set_sp(p_sp, RT_NULL);
+    return RT_EOK;
+}
+
+/*
  * 一拍外环: 读 KF-GINS 快照 -> 本地 NED -> MPC step。
  * 未就绪 (gins 未对准 / 参考点未设 / 设定点未设) 返回 RT_FALSE。
  */
@@ -165,6 +213,14 @@ void mpc_pos_gins_get_last(struct mpc_pos_out *out)
     rt_base_t level = rt_hw_interrupt_disable();
     *out = g_run.last;
     rt_hw_interrupt_enable(level);
+}
+
+/* 最近一拍 step 时的当前位置 NED m (摇杆叠加层滑设定点用; 未 step 过为 0) */
+void mpc_pos_gins_get_p_ned(double p_ned[3])
+{
+    p_ned[0] = g_run.p_ned[0];
+    p_ned[1] = g_run.p_ned[1];
+    p_ned[2] = g_run.p_ned[2];
 }
 
 /* 内环 (attitude_so3) 取最近一拍期望加速度; 无有效输出时返回 RT_FALSE */

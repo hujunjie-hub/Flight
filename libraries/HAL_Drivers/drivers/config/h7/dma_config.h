@@ -27,8 +27,11 @@ extern "C" {
  *   DMA1 Stream2 : UART4_RX  (UM982 GNSS, circ.)   IRQ priority 3
  *   DMA1 Stream3 : USART1_RX (debug console)       IRQ priority 5
  *   DMA1 Stream4 : USART1_TX (debug console)       IRQ priority 5
- *   DMA2 Stream0 : I2C2_RX   (BMP585 barometer)    IRQ priority 6
- *   DMA2 Stream1 : I2C2_TX   (BMP585 barometer)    IRQ priority 6
+ *   DMA1 Stream5 : TIM1_UP   (dshot 电调输出, 引擎轮询完成态, 不经本表)
+ *   DMA1 Stream6 : USART3_RX (ELRS CRSF, circ.)    IRQ priority 3
+ *   DMA2 Stream0 : I2C2_RX   (电流计, 前气压计)    IRQ priority 6
+ *   DMA2 Stream1 : I2C2_TX   (电流计, 前气压计)    IRQ priority 6
+ *   USART2 (数传电台) 中断收发, 不占 DMA。
  */
 
 /* DMA1 stream0 */
@@ -74,6 +77,15 @@ extern "C" {
 #define UART1_TX_DMA_INSTANCE            DMA1_Stream4
 #define UART1_TX_DMA_REQUEST             DMA_REQUEST_USART1_TX
 #define UART1_TX_DMA_IRQ                 DMA1_Stream4_IRQn
+#endif
+
+/* DMA1 stream6 */
+#if defined(BSP_UART3_RX_USING_DMA) && !defined(UART3_RX_DMA_INSTANCE)
+#define UART3_DMA_RX_IRQHandler          DMA1_Stream6_IRQHandler
+#define UART3_RX_DMA_RCC                 RCC_AHB1ENR_DMA1EN
+#define UART3_RX_DMA_INSTANCE            DMA1_Stream6
+#define UART3_RX_DMA_REQUEST             DMA_REQUEST_USART3_RX
+#define UART3_RX_DMA_IRQ                 DMA1_Stream6_IRQn
 #endif
 
 /* DMA2 stream0 */

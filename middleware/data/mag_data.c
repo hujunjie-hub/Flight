@@ -7,7 +7,7 @@
  *
  * 采集线程按 ODR 周期 (100Hz -> 10ms) 轮询 mag_bmm350: 每次 rt_device_read
  * 触发一次 I2C 读取。T_event 在读取触发时刻打戳 (timebase T_MCU 时基);
- * BMM350 INT 引脚 (PF12) 硬件已预留, 迁移到 EXTI 事件源后时戳改为
+ * BMM350 INT 引脚 (PB5) 硬件已预留, 迁移到 EXTI 事件源后时戳改为
  * EXTI ISR 捕获 (缓冲区与线程结构不变)。
  *
  * 入环前处理链 (顺序不可调): mag_calib_apply 椭球硬/软磁校正 (传感器系)

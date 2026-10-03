@@ -3,7 +3,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * BMP585 气压计 RT-Thread 传感器驱动实现 (I2C2)
+ * BMP585 气压计 RT-Thread 传感器驱动实现 (I2C4: SCL=PB6/SDA=PB9, INT PE1;
+ *           2026-10-04 由 I2C2/PB10/PB11 迁出, I2C2 让位电流计)
  *
  * 寄存器定义与数据格式依据 Bosch BMP585 数据手册 (BST-BMP585-DS003-02):
  *  - TEMP_DATA  (0x1D..0x1F) 小端 24-bit, 单位 (signed,24,16) °C
@@ -37,6 +38,10 @@
  *     属驱动 bug, 非硬件故障。修复: nvm_err 才硬失败, nvm_rdy 尽力
  *     等待 (LOG_W 放行), 入正常模式后增加压强合理性自检 (含一次整段
  *     配置重试) 兜底 NVM 异常。
+ * * -------------------------------------------------------------------------
+ * 2026-10-04 硬件迁移: I2C2(PB10/PB11, INT PE13) -> I2C4(PB6/PB9, INT PE1),
+ *  I2C2 让位电流计。驱动与总线无耦合 (设备名 hwi2c4 见 sensor_bmp585.h),
+ *  下方 2026-09 诊断记录为 I2C2 时期历史, 引脚描述不再适用。
  * -------------------------------------------------------------------------
  */
 
@@ -352,7 +357,7 @@ static rt_err_t bmp_control(struct rt_sensor_device *sensor, int cmd, void *arg)
     case RT_SENSOR_CTRL_SET_MODE:
         if ((rt_uint32_t)arg == RT_SENSOR_MODE_POLLING)
             return RT_EOK;
-        return -RT_ERROR;               /* INT 引脚(PE13) 未使用 */
+        return -RT_ERROR;               /* INT 引脚(PE1) 未使用 */
     case RT_SENSOR_CTRL_SET_POWER:
         if ((rt_uint32_t)arg == RT_SENSOR_POWER_NORMAL || (rt_uint32_t)arg == RT_SENSOR_POWER_HIGH)
             return bmp_set_power_mode(BMP585_PWR_NORMAL);
@@ -381,7 +386,7 @@ static rt_err_t bmp_register_sensors(void)
 
     cfg.intf.type = RT_SENSOR_INTF_I2C;
     cfg.intf.dev_name = BMP585_I2C_BUS_NAME;
-    cfg.irq_pin.pin = RT_PIN_NONE;      /* 轮询模式, INT(PE13) 未使用 */
+    cfg.irq_pin.pin = RT_PIN_NONE;      /* 轮询模式, INT(PE1) 未使用 */
     cfg.mode = RT_SENSOR_MODE_POLLING;
     cfg.power = RT_SENSOR_POWER_NORMAL;
     cfg.odr = BMP585_DEFAULT_ODR_HZ;

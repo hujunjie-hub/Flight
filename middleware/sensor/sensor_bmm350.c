@@ -3,7 +3,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * BMM350 磁力计 RT-Thread 传感器驱动实现 (I2C4, 2026-10-02 重映射)
+ * BMM350 磁力计 RT-Thread 传感器驱动实现 (I2C1: SCL=PB8/SDA=PB7, INT PB5;
+ *           2026-10-04 由 I2C4/PF14/PF15 迁回, 寄存器时序与总线无耦合)
  *
  * 寄存器访问与补偿算法按 Bosch Sensortec BMM350 API (BSD-3) 移植:
  *  - I2C 读时序: 先返回 2 个 dummy 字节, 之后才是寄存器数据
@@ -595,7 +596,7 @@ static rt_err_t bmm_control(struct rt_sensor_device *sensor, int cmd, void *arg)
     case RT_SENSOR_CTRL_SET_MODE:
         if ((rt_uint32_t)arg == RT_SENSOR_MODE_POLLING)
             return RT_EOK;
-        return -RT_ERROR;               /* INT 引脚(PF12) 未使用 */
+        return -RT_ERROR;               /* INT 引脚(PB5) 未使用 */
     case RT_SENSOR_CTRL_SET_POWER:
         if ((rt_uint32_t)arg == RT_SENSOR_POWER_NORMAL || (rt_uint32_t)arg == RT_SENSOR_POWER_HIGH)
             return bmm_set_normal_mode();
@@ -624,7 +625,7 @@ static rt_err_t bmm_register_sensors(void)
 
     cfg.intf.type = RT_SENSOR_INTF_I2C;
     cfg.intf.dev_name = BMM350_I2C_BUS_NAME;
-    cfg.irq_pin.pin = RT_PIN_NONE;      /* 轮询模式, INT(PF12) 未使用 */
+    cfg.irq_pin.pin = RT_PIN_NONE;      /* 轮询模式, INT(PB5) 未使用 */
     cfg.mode = RT_SENSOR_MODE_POLLING;
     cfg.power = RT_SENSOR_POWER_NORMAL;
     cfg.odr = BMM350_DEFAULT_ODR_HZ;
@@ -726,7 +727,7 @@ int rt_hw_bmm350_init(void)
     bmm_delay_us(BMM350_STARTUP_DELAY_US);
     if (!bmm_probe(BMM350_I2C_ADDR_DEFAULT) && !bmm_probe(BMM350_I2C_ADDR_ALT))
     {
-        LOG_E("BMM350 not found, check I2C4 wiring PF14=SCL PF15=SDA");
+        LOG_E("BMM350 not found, check I2C1 wiring PB8=SCL PB7=SDA");
         return -RT_ERROR;
     }
 

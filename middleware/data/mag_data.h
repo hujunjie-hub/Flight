@@ -7,7 +7,7 @@
  *
  * 数据链路 (采集线程入环前完成 校准 -> 轴映射 -> 低通):
  *   BMM350 驱动 (解析 + Bosch OTP 出厂补偿, mGauss)
- *     -> 本模块采集线程 100Hz 轮询 mag_bmm350 设备 (I2C4)
+ *     -> 本模块采集线程 100Hz 轮询 mag_bmm350 设备 (I2C1)
  *     -> 单位换算 (mGauss->µT)
  *     -> mag_calib_apply  椭球硬/软磁校正 (传感器坐标系内, middleware/calibration)
  *     -> 轴映射到体系前右下 (gins_config.h 的 GINS_MAG_AXIS_SRC/SIGN;

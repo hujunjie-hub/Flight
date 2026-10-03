@@ -33,6 +33,7 @@
 #include "um982_nmea.h"                 /* middleware/protocol 解析 */
 #include "timebase.h"                   /* middleware/timebase 时间基座 */
 #include <rtdevice.h>
+#include <board.h>                      /* GET_PIN(): UM982 RTK 状态引脚 */
 #include <ipc/ringbuffer.h>
 
 #define LOG_TAG "data.gnss"
@@ -52,6 +53,10 @@
 
 /* 组句缓冲: 与协议层 UM982_NMEA_LINE_MAX 一致 (GGA 最长约 103 字节) */
 #define GNSS_DATA_LINE_MAX       UM982_NMEA_LINE_MAX
+
+/* UM982 RTK 状态引脚 (PC0 输入, 固定解=高; doc/Flight.xlsx UM982 段,
+ * Flight.ioc PC0.GPIO_Label=UM982_RTK)。硬件选配交叉校验: 未接线恒低 */
+#define GNSS_RTK_PIN            GET_PIN(C, 0)
 
 /* 采集线程: GNSS 观测无硬实时要求, 与 magdata/barodata 同级
  * 栈预算: feed_line buf[256]+f[24] (~360B) + 组句/样本局部 (~300B) +
@@ -332,7 +337,13 @@ void gnss_data_get_status(struct gnss_data_status *st)
         return;
 
     ctx.st.lost = ctx.ring.lost;      /* 挤掉计数在公共层维护 */
+    ctx.st.rtk_pin = gnss_data_rtk_pin_high();
     *st = ctx.st;
+}
+
+rt_bool_t gnss_data_rtk_pin_high(void)
+{
+    return rt_pin_read(GNSS_RTK_PIN) == PIN_HIGH ? RT_TRUE : RT_FALSE;
 }
 
 /* ------------------------- 初始化 ------------------------- */
@@ -390,7 +401,10 @@ int gnss_data_init(void)
 #if GNSS_DATA_ENABLE
     record_ring_init(&ctx.ring, gnss_pool, sizeof(gnss_pool),
                      sizeof(struct gnss_sample), "gnssdat");
-    
+
+    /* UM982 RTK 状态引脚 (PC0 输入, 浮空; 模块推挽输出无需上下拉) */
+    rt_pin_mode(GNSS_RTK_PIN, PIN_MODE_INPUT);
+
     /* 接收线程 (生产者): 失败时解析线程照常等待 (字节环无数据, 静默) */
     gnss_rx_start();
 
@@ -427,6 +441,8 @@ static void gnssdata(void)
           gnss_data_count(), GNSS_DATA_BUF_COUNT);
     LOG_I("stats   : pushed=%u popped=%u lost=%u ts_zero=%u (T_event=0, 映射未就绪)",
           st.pushed, st.popped, st.lost, st.ts_zero);
+    LOG_I("rtk pin : %s (PC0, 高=固定解; 与 NMEA quality 互校)",
+          st.rtk_pin ? "HIGH (RTK fixed)" : "low");
     if (st.pushed > 0)
     {
         rt_uint64_t delay_us = (ctx.last.T_arrival > ctx.last.T_event)

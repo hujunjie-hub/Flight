@@ -1,0 +1,12 @@
+from building import *
+
+cwd = GetCurrentDir()
+src = Glob('*.c')
+# 依赖: position_mpc / attitude_so3 / control_allocation (mixer_cmd.h) /
+# dshot_output / gins / imu_data —— 各目录头文件经全局 CPPPATH 可见
+# (同层各 SConscript 已把自身目录并入)
+CPPPATH = [cwd]
+
+group = DefineGroup('QuadModel', src, depend = [''], CPPPATH = CPPPATH)
+
+Return('group')

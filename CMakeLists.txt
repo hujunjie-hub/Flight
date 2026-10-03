@@ -39,6 +39,7 @@ INCLUDE_DIRECTORIES(
 	board/CubeMX_Config/Inc
 	middleware/sensor
 	middleware/protocol/nmea
+	middleware/protocol/crsf
 	middleware/protocol/mavlink
 	middleware/data
 	middleware/gins
@@ -48,6 +49,7 @@ INCLUDE_DIRECTORIES(
 	middleware/control/attitude_so3
 	middleware/control/control_allocation
 	middleware/control/dshot_output
+	middleware/control/model
 	middleware/param_calib
 	middleware/timebase
 	middleware/KF-GINS/src
@@ -87,7 +89,8 @@ ADD_DEFINITIONS(
 
 # Library source files
 # 应用层: main 入口 + USART1 调试输出层 (app_out 公共设施 + 六条 out_* 链路
-# + cmd_* 辅助命令); 与 applications/SConscript 的 Glob('*.c') 保持一致
+# + mavgcs QGC 链路 + cmd_* 辅助命令); 与 applications/SConscript 的
+# Glob('*.c') 保持一致
 SET(RT_APPLICATIONS_SOURCES
 	applications/main.c
 	applications/app_out.c
@@ -97,6 +100,7 @@ SET(RT_APPLICATIONS_SOURCES
 	applications/out_gins.c
 	applications/out_mag.c
 	applications/out_baro.c
+	applications/mavgcs.c
 	applications/cmd_cpuload.c
 )
 
@@ -192,12 +196,14 @@ ENDIF()
 			middleware/protocol/nmea/um982_nmea.c
 		middleware/protocol/mavlink/mavlink_link.c
 		middleware/protocol/mavlink/mavlink_helpers.c
+		middleware/protocol/crsf/crsf.c
 		middleware/data/record_ring.c
 		middleware/data/imu_data.c
 		middleware/data/mag_data.c
 		middleware/data/baro_data.c
 		middleware/data/gnss_raw_data.c
 		middleware/data/gnss_data.c
+		middleware/data/rc_data.c
 	)
 	IF(RTT_USING_SENSOR_CMD)
 		LIST(APPEND RT_DEVICEDRIVERS_SOURCES
@@ -387,8 +393,8 @@ SET(RT_SO3_SOURCES
 	middleware/control/so3/so3_gins.c
 )
 
-# 飞控控制层 (级联: 位置 MPC 外环 + SO3/PID 姿态内环 + 控制分配 + 电调输出),
-# 与各子目录 SConscript 的 Glob('*.c') 保持一致
+# 飞控控制层 (级联: 位置 MPC 外环 + SO3/PID 姿态内环 + 控制分配 + 电调输出
+# + model/quad_model 执行模型), 与各子目录 SConscript 的 Glob('*.c') 保持一致
 SET(RT_CONTROL_SOURCES
 	middleware/control/position_mpc/mpc_pos.c
 	middleware/control/position_mpc/mpc_pos_gins.c
@@ -398,6 +404,7 @@ SET(RT_CONTROL_SOURCES
 	middleware/control/control_allocation/mixer_cmd.c
 	middleware/control/dshot_output/dshot_enc.c
 	middleware/control/dshot_output/dshot.c
+	middleware/control/model/quad_model.c
 )
 
 SET(RT_CALIBRATION_SOURCES
@@ -420,6 +427,7 @@ SET(RT_PARAMCALIB_SOURCES
 SET_SOURCE_FILES_PROPERTIES(
 	middleware/protocol/mavlink/mavlink_link.c
 	middleware/protocol/mavlink/mavlink_helpers.c
+	applications/mavgcs.c
 	PROPERTIES COMPILE_OPTIONS "-Wno-address-of-packed-member")
 
 # Library search paths

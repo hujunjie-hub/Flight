@@ -37,7 +37,8 @@ enum dshot_out_proto
     DSHOT_OUT_DSHOT600,
 };
 
-/* 初始化输出引擎 (GPIO/TIM/DMA 按占位配置), 初始为 disarm 态。
+/* 初始化输出引擎 (TIM1/PE9/PE11/PE13/PE14 + DMA1_Stream5, 见 dshot_hw.h),
+ * 初始为 disarm 态。
  * 重复调用返回 -RT_EBUSY (先 dshot_out_deinit)。成功 0。 */
 int dshot_out_init(enum dshot_out_proto proto);
 
