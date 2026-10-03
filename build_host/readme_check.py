@@ -21,7 +21,7 @@ READMES = [
     "middleware/control/position_mpc/README.md",
     "middleware/gins/README.md", "middleware/param_calib/README.md",
     "middleware/protocol/README.md", "middleware/protocol/mavlink/README.md",
-    "middleware/protocol/nmea/README.md", "middleware/so3/README.md",
+    "middleware/protocol/nmea/README.md", "middleware/control/so3/README.md",
 ]
 EXT = (".c", ".h", ".cpp", ".hpp", ".py", ".md", ".bat", ".ps1", ".exe",
        ".gdb", ".ocd", ".json", ".xml", ".ioc", ".lds", ".icf", ".sct",

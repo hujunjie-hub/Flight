@@ -7,7 +7,7 @@
 
 | 文件 | 说明 |
 |------|------|
-| `att_pid.h` / `att_pid.c`       | 纯 C 核心: 推力矢量→期望姿态 (含倾斜限幅) + 串级 PID。仅依赖 `middleware/so3` 的纯数学, 可主机测试 |
+| `att_pid.h` / `att_pid.c`       | 纯 C 核心: 推力矢量→期望姿态 (含倾斜限幅) + 串级 PID。仅依赖同层 `control/so3` 的纯数学, 可主机测试 |
 | `att_pid_gins.h` / `att_pid_gins.c` | 桥接: KF-GINS 姿态/IMU 陀螺/外环 a_des 采集, 期望姿态发布到 so3_target + FinSH `att` |
 
 ## 控制律结构 (一拍)
@@ -17,7 +17,7 @@ a_des (NED) ──▶ z_b_des = unit(g_vec − a_des)     倾斜限幅 (30° 锥
                 f      = m·‖g_vec − a_des‖          总推力 (按未限幅方向计算)
 yaw_des ─────▶ R_des:  y_b = unit(z_b × x_c), x_b = y_b × z_b   (Lee/PX4 标准构造)
                          │
-                         ▼  e_b = Log(R_desᵀ·R_cur)   SO(3) 体轴误差 (middleware/so3)
+                         ▼  e_b = Log(R_desᵀ·R_cur)   SO(3) 体轴误差 (control/so3)
 角度环 P     ω_des = Kp_att · e_b                    (逐轴限幅)
 角速度环 PID  α = Kp·e_ω + Ki·∫e_ω − Kd·dω/dt|LPF    (D 项作用于测量, 30Hz 低通;
                                                       条件积分抗饱和: 饱和方向冻结)
@@ -41,6 +41,9 @@ yaw_des ─────▶ R_des:  y_b = unit(z_b × x_c), x_b = y_b × z_b   (L
 - q_des 同拍发布到 `so3_target` —— `so3` 命令可直接观察 e_b/e_n, 链路同源。
 
 ## FinSH `att`
+
+参数含义/缺省值/调参顺序的权威清单见根 README "调参清单" 章
+(缺省值源码: `att_pid.h` 的 `att_pid_cfg_default`)。
 
 ```
 att                      # 配置/最近一拍输出 (期望姿态/误差/推力/alpha)

@@ -42,10 +42,12 @@ INCLUDE_DIRECTORIES(
 	middleware/protocol/mavlink
 	middleware/data
 	middleware/gins
-	middleware/so3
+	middleware/control/so3
 	middleware/calibration
 	middleware/control/position_mpc
 	middleware/control/attitude_so3
+	middleware/control/control_allocation
+	middleware/control/dshot_output
 	middleware/param_calib
 	middleware/timebase
 	middleware/KF-GINS/src
@@ -376,17 +378,21 @@ SET(RT_GINS_SOURCES
 )
 
 SET(RT_SO3_SOURCES
-	middleware/so3/so3.c
-	middleware/so3/so3_gins.c
+	middleware/control/so3/so3.c
+	middleware/control/so3/so3_gins.c
 )
 
-# 飞控控制层 (级联: 位置 MPC 外环 + SO3/PID 姿态内环),
-# 与两个子目录 SConscript 的 Glob('*.c') 保持一致
+# 飞控控制层 (级联: 位置 MPC 外环 + SO3/PID 姿态内环 + 控制分配 + 电调输出),
+# 与各子目录 SConscript 的 Glob('*.c') 保持一致
 SET(RT_CONTROL_SOURCES
 	middleware/control/position_mpc/mpc_pos.c
 	middleware/control/position_mpc/mpc_pos_gins.c
 	middleware/control/attitude_so3/att_pid.c
 	middleware/control/attitude_so3/att_pid_gins.c
+	middleware/control/control_allocation/mixer.c
+	middleware/control/control_allocation/mixer_cmd.c
+	middleware/control/dshot_output/dshot_enc.c
+	middleware/control/dshot_output/dshot.c
 )
 
 SET(RT_CALIBRATION_SOURCES

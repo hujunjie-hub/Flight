@@ -3,9 +3,10 @@ from building import *
 
 cwd = GetCurrentDir()
 
-# 飞控控制层: 凡含 SConscript 的子目录自动编入 —— position_mpc (外环 MPC)
-# / attitude_so3 (内环 SO3+PID), 两个目录均 "纯 C 核心 + gins 桥接" 拆分
-# (同 middleware/so3 模式)
+# 飞控控制层: 凡含 SConscript 的子目录自动编入 —— position_mpc (外环
+# MPC) / attitude_so3 (内环 SO3+PID) / so3 (SO(3) 姿态误差数学), 前两者为
+# "纯 C 核心 + gins 桥接" 拆分 (同 so3 模式, so3 于 2026-10-03 由
+# middleware 顶层迁入)
 objs = []
 list = os.listdir(cwd)
 for item in list:

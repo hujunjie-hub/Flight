@@ -5,7 +5,7 @@ cwd = GetCurrentDir()
 
 # 中间件层: 凡含 SConscript 的子目录自动编入 —— sensor / protocol / data
 # / calibration / param_calib / gins (含 KF-GINS 内核, 见 gins/SConscript)
-# / so3 / control (position_mpc + attitude_so3) / timebase
+# / control (position_mpc + attitude_so3 + so3) / timebase
 objs = []
 list = os.listdir(cwd)
 for item in list:

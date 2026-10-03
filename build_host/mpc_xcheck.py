@@ -58,6 +58,8 @@ DRIVER = r"""
 #include <string.h>
 #include "mpc_pos.h"
 #include "att_pid.h"
+#include "mixer.h"
+#include "dshot_enc.h"
 
 static unsigned long long ls = 20261003ULL;
 static double frand(void)
@@ -267,6 +269,67 @@ int main(void)
                    out.alpha_b[0], out.alpha_b[1], out.alpha_b[2], out.tilt_limited);
         }
     }
+    /* ---------- 6. mixer: 往返 / 饱和 / 非有限 ---------- */
+    {
+        struct mixer_ctx mx;
+        struct mixer_out out;
+        mixer_setup(&mx, &mixer_cfg_default);
+        /* 悬停: T = m*g (缺省 mass 1.0, g0 9.80665) */
+        double T0 = 1.0 * 9.80665;
+        double a0[3] = {0, 0, 0};
+        mixer_step(&mx, T0, a0, &out);
+        printf("MX hover %.17g %.17g %.17g %.17g %d\n",
+               out.f_n[0], out.f_n[1], out.f_n[2], out.f_n[3], out.n_sat);
+        /* 随机: T in [1,8], alpha in ±8 rad/s^2 (该缺省参数下多数不触界) */
+        for (int t = 0; t < 80; t++)
+        {
+            double T = 1.0 + 7.0 * frand();
+            double a[3];
+            for (int i = 0; i < 3; i++)
+                a[i] = 16.0 * fsym();
+            mixer_step(&mx, T, a, &out);
+            printf("MX %d T %.17g a %.17g %.17g %.17g f %.17g %.17g %.17g %.17g sat %d\n",
+                   t, T, a[0], a[1], a[2],
+                   out.f_n[0], out.f_n[1], out.f_n[2], out.f_n[3], out.n_sat);
+        }
+        /* 饱和: T 超 4*fmax -> 全触上界; 大 alpha + T=0 -> 触下界 */
+        mixer_step(&mx, 20.0, a0, &out);
+        printf("MX satT %.17g %.17g %.17g %.17g %d\n",
+               out.f_n[0], out.f_n[1], out.f_n[2], out.f_n[3], out.n_sat);
+        double abig[3] = {100, -100, 100};
+        mixer_step(&mx, 0.0, abig, &out);
+        printf("MX satA %.17g %.17g %.17g %.17g %d\n",
+               out.f_n[0], out.f_n[1], out.f_n[2], out.f_n[3], out.n_sat);
+        double anan[3] = {0, NAN, 0};
+        int rc = mixer_step(&mx, 1.0, anan, &out);
+        printf("MX nan rc %d u %.17g %.17g %.17g %.17g valid %d\n",
+               rc, out.u_norm[0], out.u_norm[1], out.u_norm[2], out.u_norm[3],
+               out.valid);
+    }
+
+    /* ---------- 7. dshot 编码黄金值 / 节流映射 ---------- */
+    {
+        /* 黄金值: value=2047 telem=0 -> 0xFFEE; value=48 -> 0x0606 */
+        printf("DS gold %u %u %u\n",
+               (unsigned)dshot_enc_frame(2047, 0),
+               (unsigned)dshot_enc_frame(48, 0),
+               (unsigned)dshot_enc_frame(0, 0));
+        /* 节流映射端点/中点/单调性 */
+        printf("DS thr %.17g %.17g %.17g %.17g %.17g\n",
+               (double)dshot_enc_throttle(-0.1),
+               (double)dshot_enc_throttle(0.0),
+               (double)dshot_enc_throttle(0.5),
+               (double)dshot_enc_throttle(1.0),
+               (double)dshot_enc_throttle(1.5));
+        /* 全值域 CRC: python 独立公式对拍 */
+        for (int t = 0; t < 500; t++)
+        {
+            unsigned v = (unsigned)(frand() * 2048.0);
+            int tel = frand() > 0.5;
+            printf("DS %d v %u tel %d frame %u\n",
+                   t, v, tel, (unsigned)dshot_enc_frame(v, tel));
+        }
+    }
     return 0;
 }
 """
@@ -280,7 +343,9 @@ def build_driver(workdir):
     inc = [
         os.path.join(ROOT, "middleware", "control", "position_mpc"),
         os.path.join(ROOT, "middleware", "control", "attitude_so3"),
-        os.path.join(ROOT, "middleware", "so3"),
+        os.path.join(ROOT, "middleware", "control", "so3"),
+        os.path.join(ROOT, "middleware", "control", "control_allocation"),
+        os.path.join(ROOT, "middleware", "control", "dshot_output"),
     ]
     exe = os.path.join(workdir, "_xcheck_driver.exe")
     cmd = [gcc, "-std=c99", "-O2", "-Wall", "-Wextra", "-Wno-unused-parameter"]
@@ -288,7 +353,9 @@ def build_driver(workdir):
     cmd += [src,
             os.path.join(ROOT, "middleware", "control", "position_mpc", "mpc_pos.c"),
             os.path.join(ROOT, "middleware", "control", "attitude_so3", "att_pid.c"),
-            os.path.join(ROOT, "middleware", "so3", "so3.c"),
+            os.path.join(ROOT, "middleware", "control", "so3", "so3.c"),
+            os.path.join(ROOT, "middleware", "control", "control_allocation", "mixer.c"),
+            os.path.join(ROOT, "middleware", "control", "dshot_output", "dshot_enc.c"),
             "-lm", "-o", exe]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if r.returncode != 0:
@@ -591,6 +658,64 @@ def main():
     check("PD e_b = Log(q_des^-1 ⊗ q_cur)", err_eb, 1e-12)
     check("PD omega_des = clip(katt*e_b)", err_om, 1e-15)
     check("PD alpha within amax", err_alpha_bound, 1e-15)
+
+    # ---- 6. mixer: 正映射重建往返 / 饱和 / 非有限 ----
+    cfgd = {"arm_l_m": 0.11, "tau_coeff": 0.015,     # 与 mixer_cfg_default 手抄对拍
+            "inertia": [2.0e-3, 2.0e-3, 3.5e-3], "f_min_n": 0.2, "f_max_n": 3.0}
+    l, cq = cfgd["arm_l_m"], cfgd["tau_coeff"]
+    J = np.array(cfgd["inertia"])
+    fmin, fmax = cfgd["f_min_n"], cfgd["f_max_n"]
+
+    def fwd(f):                        # 正映射 (mixer.h 公式独立转写)
+        T = f.sum()
+        tx = l / np.sqrt(2.0) * (-f[0] + f[1] - f[2] + f[3])
+        ty = l / np.sqrt(2.0) * (f[0] + f[1] - f[2] - f[3])
+        tz = cq * (-f[0] + f[1] + f[2] - f[3])
+        return T, np.array([tx, ty, tz])
+
+    h = B["MX hover"][0]
+    check("MX hover 各电机 = T/4", np.max(np.abs(np.array(h[0:4]) - 1.0 * 9.80665 / 4)), 1e-12)
+    assert h[4] == 0
+
+    err_rt = 0.0
+    n_free = 0
+    for row in B["MX"]:
+        if len(row) != 10:
+            continue                   # hover/sat/nan 行
+        T, a = row[1], np.array(row[2:5])
+        f = np.array(row[5:9])
+        sat = int(row[9])
+        if sat == 0:                   # 未触界才有精确往返
+            Tc, tau = fwd(f)
+            err_rt = max(err_rt, abs(Tc - T) / max(1.0, T),
+                         np.max(np.abs(tau - J * a)) / max(1.0, np.max(np.abs(J * a))))
+            n_free += 1
+    assert n_free > 40, "随机样本未触界过少"
+    check("MX 往返 Σf=T, A·f=J·α", err_rt, 1e-12)
+
+    st = B["MX satT"][0]
+    assert st[4] == 4 and np.allclose(st[0:4], fmax), "T 超界应全触 fmax"
+    sa = B["MX satA"][0]
+    assert sa[4] == 4, "大 alpha 应全部触界"
+    mn = B["MX nan"][0]
+    assert mn[0] == -1 and mn[5] == 0, "NaN alpha 拒绝且 valid=0"
+
+    # ---- 7. dshot 编码 ----
+    g = B["DS gold"][0]
+    assert g[0] == 0xFFEE and g[1] == 0x0606 and g[2] == 0x0000, \
+        f"dshot 黄金值不符: {[hex(x) for x in g]}"
+    th = B["DS thr"][0]
+    assert th[0] == 0 and th[1] == 0, "u<=0 应为停转命令 0"
+    assert th[3] == 2047 and th[4] == 2047, "u>=1 应为 2047"
+    assert 1047 <= th[2] <= 1049, "u=0.5 应约 1048"
+
+    def ref_frame(v, tel):             # 独立公式 (DShot 规范)
+        packet = ((v & 0x7FF) << 1) | (1 if tel else 0)
+        csum = (packet ^ (packet >> 4) ^ (packet >> 8)) & 0xF
+        return (packet << 4) | csum
+
+    err_ds = sum(abs(row[3] - ref_frame(int(row[1]), int(row[2]))) for row in B["DS"])
+    check("DS 帧编码 = 规范公式", err_ds, 0)
 
     print()
     if fails:

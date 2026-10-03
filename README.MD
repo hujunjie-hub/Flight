@@ -12,10 +12,11 @@ BMM350 (磁力计, 100Hz) + BMP585 (气压计, 100Hz),融合算法为 KF-GINS
 3. [时间同步框架](#时间同步框架) — 双时间体系 / 总体框图 / PPS 校准 / 映射公式 / GPS 缺失降级
 4. [传感器数据结构](#传感器数据结构)
 5. [飞行控制](#飞行控制) — 级联结构 / 位置 MPC 外环 / SO(3)+PID 姿态内环 / 验证
-6. [构建与烧录](#构建与烧录)
-7. [使用说明](#使用说明)
-8. [已知问题与遗留项](#已知问题与遗留项)
-9. [提升路线图](#提升路线图)
+6. [调参清单](#调参清单) — 控制器参数表 (含义/缺省/位置) 与调参顺序
+7. [构建与烧录](#构建与烧录)
+8. [使用说明](#使用说明)
+9. [已知问题与遗留项](#已知问题与遗留项)
+10. [提升路线图](#提升路线图)
 
 > **阅读须知**: 本文档是全项目设计文档,"传感器数据流架构"与"时间同步
 > 框架"两章描述目标架构与实现约定, "飞行控制"章描述级联控制链与线程
@@ -64,9 +65,11 @@ Flight/
 │   ├── gins/                  #   KF-GINS 桥接: gins 解算线程 (1kHz) + ginsaux 消费线程
 │   │                          #   + C++ 对齐 new 堆适配 (aligned_new.cpp)
 │   ├── KF-GINS/               #   上游组合导航算法内核 (C++, 21 状态 EKF, 最小嵌入)
-│   ├── so3/                   #   SO(3) 姿态误差解算 (姿态控制/验收测试共用)
 │   ├── control/               #   飞控控制律 (级联): position_mpc 外环位置 MPC
-│   │                          #   + attitude_so3 内环 SO(3)/PID 姿态 (2026-10-03)
+│   │                          #   + attitude_so3 内环 SO(3)/PID 姿态 + so3
+│   │                          #   姿态误差数学 (2026-10-03, so3 自 middleware
+│   │                          #   顶层迁入) + control_allocation 混控
+│   │                          #   + dshot_output 电调输出 (PWM/DShot, 硬件占位)
 │   ├── timebase               #   时间同步基座
 │   ├── SConscript             #   注: sensor(驱动)/protocol(协议) 等子模块构建入口
 │   └── README.md              #   数据流架构 + FinSH 命令速查 (必读)
@@ -720,7 +723,7 @@ gins 桥接" 拆分, 同 `so3/` 模式; 纯核心无 RT-Thread 依赖, 主机可
               ┌─────────────┐
               │ SO(3)姿态误差 │◄──── R̂ ← KF-GINS 融合姿态          [已建]
               └──────┬──────┘    e_R = e_b = Log(R_dᵀ·R̂)
-                     │           (middleware/so3, 期望体轴系)
+                     │           (control/so3, 期望体轴系)
                     e_R
                      ▼
               ┌─────────────┐
@@ -734,10 +737,13 @@ gins 桥接" 拆分, 同 `so3/` 模式; 纯核心无 RT-Thread 依赖, 主机可
                      │           30Hz 低通, 条件积分抗饱和)
               alpha_b (rad/s², 角加速度指令; τ_cmd = J·alpha_b)
                      ▼
-                控制分配 (混控) ◄── alpha_b + T_d                   [未建]
-                     │
+                控制分配 (混控) ◄── alpha_b + T_d                   [已建·框架]
+                     │           control_allocation: quad-X 解析逆 + 饱和,
+                     │           机体参数 (l/J/c_q/推力界) 为占位待整定
                      ▼
-                 PWM/DShot (电调接口)                               [未建]
+                 PWM/DShot (电调接口)                               [已建·框架]
+                                 dshot_output: PWM400Hz / DShot150-600 双引擎,
+                                 TIM/引脚/DMA 占位 (dshot_output/dshot_hw.h), 未上板
 ```
 
 **外环 position_mpc** — NED 位置/速度 → 期望加速度:
@@ -751,7 +757,7 @@ gins 桥接" 拆分, 同 `so3/` 模式; 纯核心无 RT-Thread 依赖, 主机可
 推力方向 `z_b_des = unit(g_vec − a_des)` (**NED/FRD, 悬停 = 铅垂向下**),
 总推力 `f = m‖g_vec − a_des‖`; 倾斜限幅 (30° 锥, 超界投影回边界, 推力
 大小不受影响); R_des 由 z_b_des 与期望航向正交化 (Lee/PX4 标准构造)。
-姿态误差用 `middleware/so3` 的 `e_b = Log(R_desᵀ R_cur)` (期望体轴系,
+姿态误差用 `middleware/control/so3` 的 `e_b = Log(R_desᵀ R_cur)` (期望体轴系,
 对 yaw 缠绕不敏感, 与欧拉角差**不等价**)。串级: 角度环 P
 `ω_des = Kp·e_b` → 角速度环 PID (D 作用于测量 + 一阶低通; 条件积分
 抗饱和)。输出 `alpha_b` 为**角加速度指令** (与转动惯量解耦, 混控换算),
@@ -766,7 +772,7 @@ gins 桥接" 拆分, 同 `so3/` 模式; 纯核心无 RT-Thread 依赖, 主机可
 
 | 线程 | 所在位置 | 优先级 | 栈 | 周期/唤醒 | 任务内容 |
 | --- | --- | --- | --- | --- | --- |
-| ctl_att 内环 | `control/attitude_so3` (att_pid_gins.c 加线程入口) | 建议 **8** (低于 imudata 7, 高于 gins 9 —— 控制延迟须不受解算阻塞) | 建议 **2048** (纯 double 运算无格式化; 若加 LOG_x 按项目教训 ≥3072) | **500Hz**, `imu_data_wait` 事件驱动 (IMU DR 释放) | 读 KF-GINS 姿态 R̂ + IMU 陀螺 ω̂ (含 T_event 差算 dt) + 外环最新 a_des → `att_pid_gins_step()` → thrust/alpha_b → (混控落地后) 控制分配输出 |
+| ctl_att 内环 | `control/attitude_so3` (att_pid_gins.c 加线程入口) | 建议 **8** (低于 imudata 7, 高于 gins 9 —— 控制延迟须不受解算阻塞) | 建议 **2048** (纯 double 运算无格式化; 若加 LOG_x 按项目教训 ≥3072) | **500Hz**, `imu_data_wait` 事件驱动 (IMU DR 释放) | 读 KF-GINS 姿态 R̂ + IMU 陀螺 ω̂ (含 T_event 差算 dt) + 外环最新 a_des → `att_pid_gins_step()` → thrust/alpha_b → `mixer_cmd_step_att()` 混控 → `dshot_out_write()` 电调输出 |
 | ctl_mpc 外环 | `control/position_mpc` (mpc_pos_gins.c 加线程入口) | 建议 **12** (与 vofa 同层, 高于 FinSH 20) | 建议 **2048** (QP 求解为静态数组无堆; 同上 LOG_x 教训) | **20Hz** (1/cfg.dt, mdelay 定时) | 读 gins 快照 → 经纬高换算本地 NED → `mpc_pos_gins_step()` → a_des 快照 (关中断发布供内环取用) |
 
 *控制链上游既有线程 (已建, 控制器的数据供给)*
@@ -788,6 +794,9 @@ gins 桥接" 拆分, 同 `so3/` 模式; 纯核心无 RT-Thread 依赖, 主机可
 (FinSH `so3` 可直接观察误差, 链路同源)。桥接层另有 `mpc`/`att` 调参
 命令 (权重/增益/设定点/单步台架验证)。
 
+控制器调参清单 (参数含义/缺省值/所在位置/调参顺序) 独立成章, 见
+[调参清单](#调参清单)。
+
 **验证** (2026-10-03, `build_host/mpc_xcheck.py`): 主机 gcc 直接编译固件
 三个纯 C 源码跑确定性用例, numpy 独立构造对拍 —— H/M 预计算与稠密
 Φ/Γ 构造一致 (≤1e-12 相对), QP 解满足框约束 KKT 最优性, 闭环 600 拍
@@ -795,8 +804,74 @@ gins 桥接" 拆分, 同 `so3/` 模式; 纯核心无 RT-Thread 依赖, 主机可
 独立四元数 Log 一致 (≤2e-16), 零误差零输出 + 饱和抗积分成立; 双构建
 (scons/cmake) 0 告警。
 
-**现状与边界**: 增益为保守占位需现场调参; 控制任务/混控/电调接口未建;
-增益未持久化 (param_part 已预留 ctrl 分区); 未上板。
+**现状与边界**: 增益与机体参数为保守占位需现场整定; 控制任务线程未建
+(混控/电调输出已落地为 step 函数, 调用链: `mpc_pos_gins_step` →
+`att_pid_gins_step` → `mixer_cmd_step_att` → `dshot_out_write`);
+电调输出硬件 (TIM4/PB6-9/DMA1_S5) 为占位, 未上板; 参数未持久化
+(param_part 已预留 ctrl 分区)。
+
+## 调参清单
+
+`middleware/control` 两个控制器 (级联结构与任务清单见
+[飞行控制](#飞行控制) 章) 上板前需按机体整定的参数清单。缺省值为
+安全保守占位, 运行期经 FinSH 修改 (**仅 RAM, 不掉电保存** —— 持久化
+未接, W25Q64 ctrl 分区已预留); 缺省值源码位置:
+`middleware/control/position_mpc/mpc_pos.h` 的 `mpc_pos_cfg_default`
+与 `middleware/control/attitude_so3/att_pid.h` 的 `att_pid_cfg_default`
+(改源码缺省须重编译)。
+
+*外环 position_mpc (单位约定: NED, z 轴向下为正 —— 上升加速度是负值)*
+
+| 参数 | 含义 (缺省) | 修改方式 |
+| --- | --- | --- |
+| `N` / `dt` | 预测步数 10 / 外环周期 0.05s (20Hz, 视界 0.5s); dt 改后控制任务周期须同步 | `mpc set N 12` / `mpc set dt 0.02` |
+| `qpos x y z` | 位置跟踪权重 (2/2/4); 闭环带宽 ≈ (q_p/r)^(1/4), 缺省 ~1.6 rad/s | `mpc set qpos 2 2 4` |
+| `qvel x y z` | 速度阻尼权重 (1.2/1.2/1.5) | `mpc set qvel ...` |
+| `racc x y z` | 输入 (加速度) 惩罚 (0.3/0.3/0.5), 与 qpos 对偶调响应软硬 | `mpc set racc ...` |
+| `umin/umax x y z` | 逐轴加速度界 (水平 ±4/±4, z 向 -3~+2 = 上升 3 / 下降 2 m/s²); **z 向上界须按推重比核算** | `mpc set umin ...` / `umax` |
+| `sweeps` / `tol` | SCA 求解器 sweep 上限 60 / 收敛容差 1e-4 (数值项, 一般不动) | `mpc set sweeps/tol` |
+| 设定类 | 位置/速度设定、前馈、本地原点 (非调参, 任务接口) | `mpc pos/vel/aff ...`、`mpc ref` |
+
+*内环 attitude_so3 (角度环 P 消费 e_b, 单位 rad→rad/s; 角速度环输出
+alpha_b 角加速度指令 rad/s², 与惯量解耦)*
+
+| 参数 | 含义 (缺省) | 修改方式 |
+| --- | --- | --- |
+| `mass` | 整机质量 kg (1.0) —— 推力换算 f = m‖g−a‖, **必须实测** | `att set mass 0.85` |
+| `g0` | 重力加速度 (9.80665), 随纬度可精调 | `att set g0` |
+| `katt x y z` | 角度环 P, 1/s (5/5/3) ≈ 姿态跟踪带宽 | `att set katt 5 5 3` |
+| `kpr x y z` | 角速度环 P, 1/s (30/30/12), roll/pitch/yaw | `att set kpr ...` |
+| `kir x y z` | 角速度环 I, 1/s² (60/60/20) —— 消稳态偏差/风阻 | `att set kir ...` |
+| `kdr x y z` | 角速度环 D (0.05/0.05/0.03), 作用于测量微分 | `att set kdr ...` |
+| `dcut` | D 项低通截止 Hz (30), 姿态数据噪声大时降 | `att set dcut 30` |
+| `tilt` | 最大倾斜角 deg (30) —— 安全锥, 超界投影 | `att set tilt 35` |
+| `omax` / `amax x y z` | ω_des 限幅 4 rad/s / alpha_b 限幅 (20/20/12 rad/s²) | `att set omax` / `amax` |
+| `thrmin` / `thrmax` | 总推力界 N (0/25), 按电机+桨实测静推力定 | `att set thrmin/thrmax` |
+| `ihold` | 积分冻结阈值 rad/s (2): 角速度误差超限即停积分, 抗饱和 | `att set ihold 2` |
+| 航向 | 期望航向 (非调参) | `att yaw <deg>` / `att hold` |
+
+*末级 control_allocation (机体参数, **全部占位**, 见模块 README)*
+
+| 参数 | 含义 (占位缺省) | 修改方式 |
+| --- | --- | --- |
+| `l` | 力臂 m (0.11, 轴距 = l·√2), 按机架实测 | `mix set l 0.13` |
+| `cq` | 反扭矩系数 N·m/N (0.015), τ_z 每单位推力 | `mix set cq 0.012` |
+| `j x y z` | 机体转动惯量对角 kg·m² (2.0/2.0/3.5e-3), alpha→τ 换算 | `mix set j 2.1e-3 2.1e-3 3.8e-3` |
+| `fmin`/`fmax` | 单电机推力界 N (0.2/3.0), 按电机+桨静推力台架实测 | `mix set fmin/fmax <v>` |
+
+*电调输出 dshot_output (配置非调参; 硬件 TIM4/PB6-9/DMA1_S5 全占位,
+调整指引见 `middleware/control/dshot_output/dshot_hw.h` 头注与模块
+README)*: 协议经 `dshot init
+pwm|dshot600|dshot300|dshot150` 选定; PWM 400Hz/1000-2000µs 与 DShot
+位时序常量在 `middleware/control/dshot_output/dshot_hw.h`; 输出安全闸
+`dshot arm|disarm|w u0..u3|raw <v>`。
+
+调参顺序建议: ① `mass`/`thrmin/max`/`umin·umax` 的 z 向**与上表混控
+机体参数** (`l/cq/j/fmin/fmax`) 按机体实测 (质量/静推力/推重比/惯量)
+→ ② 角速度环 `kpr/kir/kdr` (手掰机体验证 alpha 方向与力度, 看
+`att step` 输出) → ③ 角度环 `katt` → ④ 外环 `qpos/qvel/racc` 由小到
+大; 每步用 `mpc`/`att`/`mix` 命令查看当前值与 `mpc step`/`att step`/
+`mix step` 单步输出。
 
 ## 构建与烧录
 

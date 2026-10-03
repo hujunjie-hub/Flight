@@ -35,6 +35,9 @@ N=10: 三轴各 10 维 QP, 每 sweep O(N²) 双精度乘加, 上限 60 sweeps
 
 ## FinSH `mpc`
 
+参数含义/缺省值/调参顺序的权威清单见根 README "调参清单" 章
+(缺省值源码: `mpc_pos.h` 的 `mpc_pos_cfg_default`)。
+
 ```
 mpc                      # 配置/设定点/最近一拍输出与统计
 mpc set N 12             # 改预测步数 (重预计算)

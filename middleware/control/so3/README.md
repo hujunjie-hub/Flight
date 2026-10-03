@@ -1,4 +1,4 @@
-# middleware/so3 — SO(3) 姿态误差
+# middleware/control/so3 — SO(3) 姿态误差
 
 对 KF-GINS 融合姿态计算 SO(3) 姿态误差：**当前姿态**实时读取
 `gins_bridge_get_solution()`（middleware/gins 的融合快照，roll/pitch/yaw，deg，
@@ -97,7 +97,8 @@ so3 clear                  清除目标
 
 ## 构建与验证
 
-固件：`middleware/SConscript` 自动扫描子目录，`so3/SConscript` 无需配置即编入；
+固件：`control/SConscript` 自动扫描子目录，`so3/SConscript` 无需配置即编入
+（so3 于 2026-10-03 由 middleware 顶层迁入 control/，构建路径随之变化）；
 `so3.c` 仅依赖 libc 的 math（同 um982_nmea.c 先例）。
 
 主机交叉验证（`build_host/so3_xcheck.py`, numpy）：独立参考实现（初等

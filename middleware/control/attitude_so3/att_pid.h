@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * 内环姿态控制器: SO(3) 姿态误差 + 串级 PID (纯 C, 仅依赖 middleware/so3,
+ * 内环姿态控制器: SO(3) 姿态误差 + 串级 PID (纯 C, 仅依赖同层 control/so3,
  * 无 RT-Thread 依赖, 可主机测试/复用)
  *
  * ---------------------------------------------------------------------------
@@ -16,7 +16,7 @@
  *     -> 期望姿态 R_des: 由 z_b_des 与期望航向 yaw_des 正交化构造
  *          y_b = unit(z_b_des x x_c),  x_c = [cos(yaw), sin(yaw), 0]
  *          x_b = y_b x z_b_des,  C_bd_n = [x_b | y_b | z_b_des]
- *     -> SO(3) 姿态误差 e_b (middleware/so3, 期望体轴系表达)
+ *     -> SO(3) 姿态误差 e_b (control/so3, 期望体轴系表达)
  *     -> 角度环 P:  omega_des = Kp_att * e_b  (e_b 单位 rad, P 增益 1/s)
  *     -> 角速度环 PID: alpha_b = Kp*e_w + Ki*int(e_w) - Kd*d(omega)/dt|filt
  *        (D 项作用于测量微分, 一阶低通; 条件积分抗饱和)

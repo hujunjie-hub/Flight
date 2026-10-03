@@ -1,0 +1,10 @@
+from building import *
+
+cwd = GetCurrentDir()
+src = Glob('*.c')
+# 依赖: HAL 驱动层 drv_dma.h (stm32_dma_setup)
+CPPPATH = [cwd, GetCurrentDir() + '/../../../../libraries/HAL_Drivers/drivers']
+
+group = DefineGroup('DshotOut', src, depend = [''], CPPPATH = CPPPATH)
+
+Return('group')

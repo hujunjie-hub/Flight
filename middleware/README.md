@@ -15,8 +15,7 @@
 | `param_calib/` | 飞控参数分区存储 (W25Q64): param_part 分区引擎 + calib/nav/sys 三参数域 |
 | `gins/` | KF-GINS 桥接 (gins 解算线程 1kHz + ginsaux 消费线程) + C++ 对齐 new 堆适配 (aligned_new.cpp) |
 | `KF-GINS/` | 上游组合导航算法内核 (C++, 21 状态 EKF, 最小嵌入) |
-| `so3/` | SO(3) 姿态误差解算 (姿态控制误差 + 验收测试) |
-| `control/` | 飞控控制律 (级联): `position_mpc` 外环位置 MPC (凝结 QP+SCA) + `attitude_so3` 内环 SO(3)/PID 姿态, 见根 README "飞行控制" 章 |
+| `control/` | 飞控控制律 (级联): `position_mpc` 外环位置 MPC (凝结 QP+SCA) + `attitude_so3` 内环 SO(3)/PID 姿态 + `so3` 姿态误差数学 (2026-10-03 自顶层迁入) + `control_allocation` 混控 + `dshot_output` 电调输出 (PWM/DShot, 硬件占位 dshot_hw.h), 见根 README "飞行控制" 章 |
 
 ## 数据流架构
 
@@ -221,6 +220,8 @@ imu_data:<n> gnss_data:<n> mag_calib_data:<n> baro_calib_data:<n> fused_data
 | `so3` | SO(3) 姿态误差 vs 期望姿态 (`so3 target r p y`/`clear`; 姿态控制同拍自动发布目标) |
 | `mpc` / `mpc set ...` | 位置 MPC 外环: 状态/调参/设定点 (`mpc pos x y z`)/参考点 (`mpc ref`)/单步 (`mpc step`) |
 | `att` / `att set ...` | SO(3)+PID 姿态内环: 状态/调参/航向 (`att yaw <deg>`/`att hold`)/单步 (`att step`) |
+| `mix` / `mix set ...` | 控制分配 (混控): 机体参数 (占位)/单步 (`mix step`, 取内环输出) |
+| `dshot ...` | 电调输出: `init pwm\|dshot600\|dshot300\|dshot150` / `arm`/`disarm`/`w u0..u3`/`raw <v>` (硬件占位, 上板先拆桨) |
 | `vofa [on\|off]] [log on\|off]` | KF-GINS JustFloat 50Hz 二进制流开关 (默认 off, 单写者约定) |
 | `gins_fused_data [on\|off]` | KF-GINS 带标记文本开关 (fused_data 后缀, 默认 off) |
 | `gnssout [on\|off]` | UM982 定位解文本开关 (开启时与 gins 分抢样本) |
