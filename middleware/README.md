@@ -34,7 +34,7 @@ UM982 10Hz ─ USART2 460800 (DMA_RX) → [gnssrx 接收线程] 只搬字节    
                      ├─ 整秒 UTC (定位有效) → timebase PPS 配对刷新滑窗        │ → KF-GINS EKF
                      └→ UTC→T_MCU 映射 → gnss_data 结构环 (T_event) ──────→ │   (gins 线程)
                                                                              │   统一时轴:
-BMM350 100Hz ─ I2C1 → mag_data 采集线程 (µT, 入环前: 校准→轴映射→            │   样本 T_event(T_MCU)
+BMM350 100Hz ─ I2C4 → mag_data 采集线程 (µT, 入环前: 校准→轴映射→            │   样本 T_event(T_MCU)
               干扰检查→低通; 环内样本 raw(传感器系)/cal(体系FRD)+quality)     │   经首个有效 GNSS 样本
               ├→ [ginsaux 线程] cal → 磁航向观测 (干扰位降权) ─────────→      │   锚定换算 GPST,
               └→ [magcal 采集线程] raw 字段椭球拟合 → 参数                    │   >50ms 丢弃计数)
@@ -78,7 +78,11 @@ USART1 调试输出 (applications/out_*.c, 460800, 与 console 同口):
 
 - `data/mag_data.c` / `data/baro_data.c` 各自的采集线程 100Hz 轮询传感器
   设备, 单位换算 (mGauss→µT / Pa) 后入环; `T_event` 在采样触发时刻打戳
-  (INT 引脚 PB5/PE13 硬件已预留, 迁移 EXTI 事件源后改为 ISR 捕获)。
+  (INT 引脚 PF12/PE13 硬件已预留, 迁移 EXTI 事件源后改为 ISR 捕获)。
+  **BMM350 2026-10-02 由 I2C1 (PB6/PB7, INT PB5) 重映射到
+  I2C4 (SCL=PF14/SDA=PF15, INT PF12)** —— 驱动头注释/rtconfig.h/
+  Kconfig/Flight.ioc 均已同步; 2026-09-29/10-01 修复记录中的
+  "I2C1/BMM350" 为当时状态的史实, 未改。
 - 磁链路的 量程守卫→校准→轴映射→干扰检查→低通 在 `data/mag_data.c` 采集线程
   **入环前**完成: 先做 **float→double 量程守卫** (`|body| < 1e6 µT`, 拒绝
   NaN/±inf/huge —— 驱动补偿链的除法在系数退化或 I2C 毛刺时产出非有限值,

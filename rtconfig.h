@@ -496,7 +496,9 @@
  * 时 init/IRQ 回调照常跑但 xfer 三个后端全不命中 -> 一切传输 (含写寄存器
  * 地址+读数据的两消息序列, seq 检查要求 TX+RX 异步后端) 直接失败, BMM350/
  * BMP585 探测恒超时。传感器读时序天然 repeated-start, POLL 不支持 seq,
- * 故按 B5 结论统一开 INT (TX+RX), I2C1/2 同配。 */
+ * 故按 B5 结论统一开 INT (TX+RX), I2C1/2 同配。
+ * 2026-10-02 BMM350 由 I2C1 重映射到 I2C4 (SCL=PF14/SDA=PF15):
+ * I2C1 宏删除, 现 I2C4/2 同配 (均 INT)。 */
 /* TIM2 空闲 (时间基座已移除) */
 /* end of On-chip Peripheral Drivers */
 

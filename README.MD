@@ -286,18 +286,18 @@ UART 字节到达) 与总线 (SPI/I2C/UART)。本节为四链统一的目标架�
 四条链路的事件源、总线、唤醒缓冲区、信号量、处理线程完全独立,
 任一传感器断线/总线卡死/缓冲拥塞只影响本链:
 
-| 传感器 | 事件源 (DR/INT) | 总线搬运 | 数据率 | 一级唤醒 (信号量) | 样本环 (信号量) | 消费线程 |
-| --- | --- | --- | --- | --- | --- | --- |
-| ADIS16505 | DR = PA4 (EXTI4) | SPI1 burst 22B (DMA) | 1kHz | 驱动帧队列×4 (`adispr`) | imu_data 环 512 样本 (`imutrig`/`imudat`) | gins (p9) |
-| UM982 | 字节到达 (UART 变体) | USART2 DMA_RX (460800, 空闲线批量指示) | 10Hz | gnss_raw_data 字节环 4KB (`gnssrsem`) | gnss_data 环 32 样本 (`gnssdat`) | gins (p9) |
-| BMM350 | INT = PB5 (EXTI9_5, 预留) | I2C1 | 100Hz | — | mag_data 环 128 样本 (`magdat`) | ginsaux (p10) |
-| BMP585 | INT = PE13 (EXTI15_10, 预留) | I2C2 (DMA2) | 100Hz | — | baro_data 环 128 样本 (`bardat`) | ginsaux (p10) |
+| 传感器 | 事件源 (DR/INT) | 总线搬运 | 数据率 | 一级唤醒 (信号量) | 样本环 (信号量) | 消费线程 | 环形缓冲区大小 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| ADIS16505 | DR = PA4 (EXTI4) | SPI1 burst 22B (DMA) | 1kHz | 驱动帧队列×4 (`adispr`) | imu_data 环 512 样本 (`imutrig`/`imudat`) | gins (p9) | 20KB (512×40B, `IMU_DATA_BUF_COUNT`) |
+| UM982 | 字节到达 (UART 变体) | USART2 DMA_RX (460800, 空闲线批量指示) | 10Hz | gnss_raw_data 字节环 4KB (`gnssrsem`) | gnss_data 环 32 样本 (`gnssdat`) | gins (p9) | 字节环 4KB + 样本环 2.2KB (32×72B) |
+| BMM350 | INT = PF12 (EXTI12/EXTI15_10, 预留) | I2C4 (SCL=PF14, SDA=PF15; 2026-10-02 由 I2C1/PB6/PB7 迁) | 100Hz | — | mag_data 环 128 样本 (`magdat`) | ginsaux (p10) | 5KB (128×40B, ≈1.28s) |
+| BMP585 | INT = PE13 (EXTI15_10, 预留) | I2C2 (DMA2) | 100Hz | — | baro_data 环 128 样本 (`bardat`) | ginsaux (p10) | 2KB (128×16B, ≈1.28s) |
 
 - **两级唤醒**: ADIS 与 UM982 各有两级"唤醒缓冲区+信号量"
   (驱动帧队列/字节环 → 采集/解析线程 → 样本环), BMM350/BMP585
   为单级 (处理线程直接 push 样本环)。
 - **I2C 是否走 DMA**: BMP585 (I2C2) 挂 DMA2, 完整走"EXTI→DMA"
-  模型; BMM350 (I2C1) 为中断读 —— 400kHz 下读 18B ≈ 0.45ms,
+  模型; BMM350 (I2C4) 为中断读 —— 400kHz 下读 18B ≈ 0.45ms,
   远小于 10ms 帧周期, DMA 非必需, 迁移到 EXTI 事件源时再按模型
   统一补 DMA 或保持中断读均可。
 - **故障降级**: 各链处理线程等待超时进入看门狗 (ADIS 驱动线程
@@ -764,22 +764,23 @@ gins 桥接" 拆分, 同 `so3/` 模式; 纯核心无 RT-Thread 依赖, 主机可
 
 *计划 (未建, 落地时在此表更新)*
 
-| 线程 | 所在位置 | 优先级 | 周期/唤醒 | 任务内容 |
-| --- | --- | --- | --- | --- |
-| ctl_att 内环 | `control/attitude_so3` (att_pid_gins.c 加线程入口) | 建议 **8** (低于 imudata 7, 高于 gins 9 —— 控制延迟须不受解算阻塞) | **500Hz**, `imu_data_wait` 事件驱动 (IMU DR 释放) | 读 KF-GINS 姿态 R̂ + IMU 陀螺 ω̂ (含 T_event 差算 dt) + 外环最新 a_des → `att_pid_gins_step()` → thrust/alpha_b → (混控落地后) 控制分配输出 |
-| ctl_mpc 外环 | `control/position_mpc` (mpc_pos_gins.c 加线程入口) | 建议 **12** (与 vofa 同层, 高于 FinSH 20) | **20Hz** (1/cfg.dt, mdelay 定时) | 读 gins 快照 → 经纬高换算本地 NED → `mpc_pos_gins_step()` → a_des 快照 (关中断发布供内环取用) |
+| 线程 | 所在位置 | 优先级 | 栈 | 周期/唤醒 | 任务内容 |
+| --- | --- | --- | --- | --- | --- |
+| ctl_att 内环 | `control/attitude_so3` (att_pid_gins.c 加线程入口) | 建议 **8** (低于 imudata 7, 高于 gins 9 —— 控制延迟须不受解算阻塞) | 建议 **2048** (纯 double 运算无格式化; 若加 LOG_x 按项目教训 ≥3072) | **500Hz**, `imu_data_wait` 事件驱动 (IMU DR 释放) | 读 KF-GINS 姿态 R̂ + IMU 陀螺 ω̂ (含 T_event 差算 dt) + 外环最新 a_des → `att_pid_gins_step()` → thrust/alpha_b → (混控落地后) 控制分配输出 |
+| ctl_mpc 外环 | `control/position_mpc` (mpc_pos_gins.c 加线程入口) | 建议 **12** (与 vofa 同层, 高于 FinSH 20) | 建议 **2048** (QP 求解为静态数组无堆; 同上 LOG_x 教训) | **20Hz** (1/cfg.dt, mdelay 定时) | 读 gins 快照 → 经纬高换算本地 NED → `mpc_pos_gins_step()` → a_des 快照 (关中断发布供内环取用) |
 
 *控制链上游既有线程 (已建, 控制器的数据供给)*
 
-| 线程 | 所在位置 | 优先级 | 周期/唤醒 | 任务内容 |
-| --- | --- | --- | --- | --- |
-| adis_dr | `middleware/sensor/sensor_adis16505.c` | **6** (DR EXTI 中断 NVIC=2) | 1kHz DR 事件 | ADIS 寄存器突发读出/校验 → 原始快照入 imu_data 环 |
-| imudata | `middleware/data/imu_data.c` | **7** (栈 1536) | 事件驱动 | 单位换算 + 轴映射 → imu_data 结构环 + 最新样本镜像 (**内环 ω̂ 与 dt 的来源**) |
-| gnssrx | `middleware/data/gnss_data.c` | **8** (栈 1024) | UART2 DMA 事件 | GNSS 原始字节搬运入字节环 |
-| gins | `middleware/gins/gins_bridge.cpp` | **9** (栈 8192, Eigen 局部对象大) | 1kHz 轮询 | KF-GINS 21 状态 EKF 融合 → `gins_solution` 快照 (**外环 p/v 与内环 R̂ 的来源**) |
-| ginsaux | `middleware/gins/gins_bridge.cpp` | **10** (栈 2048) | 事件驱动 | mag/baro 环消费 → 磁航向/气压观测喂引擎 |
-| barodata / magdata | `middleware/data/baro_data.c` / `middleware/data/mag_data.c` | **11** | 事件驱动 (100Hz) | BMP585/BMM350 I2C 采集入环 (气压/磁力原始量) |
-| gnssdata | `middleware/data/gnss_data.c` | **11** (栈 3072) | 事件驱动 | NMEA 解析 + PPS 配对 + UTC→T_MCU 换算 (GNSS 观测) |
+| 线程 | 所在位置 | 优先级 | 栈 | 周期/唤醒 | 任务内容 |
+| --- | --- | --- | --- | --- | --- |
+| adis_dr | `middleware/sensor/sensor_adis16505.c` | **6** (DR EXTI 中断 NVIC=2) | 1024 | 1kHz DR 事件 | ADIS 寄存器突发读出/校验 → 原始快照入 imu_data 环 |
+| imudata | `middleware/data/imu_data.c` | **7** | 1536 | 事件驱动 | 单位换算 + 轴映射 → imu_data 结构环 + 最新样本镜像 (**内环 ω̂ 与 dt 的来源**) |
+| gnssrx | `middleware/data/gnss_data.c` | **8** | 1024 | UART2 DMA 事件 | GNSS 原始字节搬运入字节环 |
+| gins | `middleware/gins/gins_bridge.cpp` | **9** | 8192 (Eigen 局部对象大) | 1kHz 轮询 | KF-GINS 21 状态 EKF 融合 → `gins_solution` 快照 (**外环 p/v 与内环 R̂ 的来源**) |
+| ginsaux | `middleware/gins/gins_bridge.cpp` | **10** | 2048 | 事件驱动 | mag/baro 环消费 → 磁航向/气压观测喂引擎 |
+| barodata | `middleware/data/baro_data.c` | **11** | 4096 (ulog 格式化尖峰, 见栈预算教训) | 事件驱动 (100Hz) | BMP585 I2C 采集入环 (气压原始量) |
+| magdata | `middleware/data/mag_data.c` | **11** | 1024 | 事件驱动 (100Hz) | BMM350 I2C 采集 + 校准/轴映射/低通入环 (磁力原始量) |
+| gnssdata | `middleware/data/gnss_data.c` | **11** | 3072 (ulog 格式化尖峰) | 事件驱动 | NMEA 解析 + PPS 配对 + UTC→T_MCU 换算 (GNSS 观测) |
 
 优先级链设计意图: 内环 (计划 8) 高于一切解算/输出线程, 保证 2ms 节拍;
 外环 (计划 12) 低于 gins(9)/ginsaux(10), 用上一拍导航解即可, 不与融合
@@ -796,62 +797,6 @@ gins 桥接" 拆分, 同 `so3/` 模式; 纯核心无 RT-Thread 依赖, 主机可
 
 **现状与边界**: 增益为保守占位需现场调参; 控制任务/混控/电调接口未建;
 增益未持久化 (param_part 已预留 ctrl 分区); 未上板。
-
-## 平台版本 (2026-09-30 起: RT-Thread 5.3.0)
-
-内核与驱动自 `dist/project` (RT-Thread 5.3.0 参考工程) 整体升级, 替换
-`rt-thread/` 全树与 `libraries/HAL_Drivers/`。升级时回植的本地定制
-(后续再升级驱动时必须重做):
-
-- **board_nvic_set_priority** (drv_common.h 弱定义 + board.c 强表):
-  所有驱动的 `HAL_NVIC_SetPriority` 改走板级表, 中断优先级以
-  Flight.ioc 为准。调用点: drv_dma (2) / drv_gpio / drv_usart_v2 (2) /
-  drv_spi / drv_hard_i2c (2) / drv_tim。
-- **B5 (serial v2 形态)**: dev_serial_v2.c 的 rx fifo 块 (头+消费环+ping 环)
-  改 `rt_malloc_align` 32B 对齐、各区长度按行补齐 (close 侧
-  `rt_free_align` 配对); drv_usart_v2 上游自带的 ping 环失效
-  (SCB_InvalidateDCache_by_Addr) 由此变安全 —— 上游用普通 rt_malloc,
-  ping 区不对齐时按行取整的失效会殃及邻接脏行。
-- **spixfer cache 安全** (drv_spi.c): DMA 一律走 32B 对齐+行倍数长度
-  弹射缓冲, 不直接失效用户缓冲 (上游写法有越界失效风险)。
-- **SPI 应用钩子**: `stm32_spi_txrx_cplt_hook` (ADIS 链消费完成事件,
-  阻止框架 completion) 原样保留; 新增 `stm32_spi_error_hook` —— 5.3.0
-  的 drv_spi.c 强定义了 `HAL_SPI_ErrorCallback`, 中间件
-  sensor_adis16505.c 的错误处理从同名 HAL 回调改为实现该弱钩子
-  (框架先唤醒等待者再调钩子, 双方职责不丢)。
-- **config/h7/dma_config.h**: 板级 DMA 流映射 (SPI1→DMA1_S0/S1,
-  USART2_RX→S2, USART1_RX/TX→S3/S4, I2C2→DMA2_S0/S1), 上游文件是
-  NUCLEO 默认值且缺 UART1 条目, 不可覆盖。
-- **hwtimer 框架已从 5.3.0 移除** (并入 clock_time): 本项目时基由
-  middleware/timebase 直用 HAL TIM, 不受影响; board/Kconfig 的
-  BSP_USING_TIM 菜单改 `select RT_USING_CLOCK_TIME`。
-- 新增编译单元 `drv_dma.c` (5.3.0 BSP 把 DMA 配置收拢到
-  stm32_dma_setup/deinit), CMakeLists 与 drivers/SConscript 均已含。
-
-### 串口驱动框架 V2 (2026-09-30 起)
-
-rtconfig.h 选 `RT_USING_SERIAL_V2` (dev_serial_v2.c + drv_usart_v2.c),
-环满策略 `RT_SERIAL_BUF_STRATEGY_OVERWRITE` (与 v1 DMA 直写环的物理
-回绕等价)。v2 数据路: DMA 循环直写 rx_fifo 块尾的 ping 环, IDLE/TC 事件
-里框架 ISR 搬入消费环 (rb), `rx_indicate` 通知链不变。适配点:
-
-- **打开语义**: v2 用 阻塞/非阻塞 位段 (0x1000~0x8000); 旧 INT_RX/DMA_RX
-  旗标自动落入"非阻塞 RX"默认分支, DMA vs INT 由驱动按注册能力自选
-  (uart2→DMA, uart1 控制台→RXNE 中断)。gnss_data.c 已显式改为
-  `OFLAG_RDWR | RT_DEVICE_FLAG_RX_NON_BLOCKING`。
-- **环尺寸**: v2 默认 rx 64B/ping 32B, 由 board/Kconfig 每串口菜单提供
-  `BSP_UARTn_RX/TX_BUFSIZE`、`BSP_UARTn_DMA_PING_BUFSIZE` (rtconfig.h 已
-  定义: uart1 256/0, uart2 4096/0/256); gnss_data.c 打开前仍显式
-  CTRL_CONFIG 一遍 (与 GNSS_RX_BUF_SZ 单一事实来源对齐)。ping 环长度
-  必须与 DMA 传输长度严格一致, 不能单独放大 (rb 写指针回绕会与 DMA
-  物理回绕失步)。
-- **波特率重配**: board.c 的 uart1 460800 钩子改用
-  `RT_SERIAL_CTRL_GET_CONFIG` 取当前配置再改波特率, 不再依赖
-  RT_SERIAL_CONFIG_DEFAULT 的字段布局 (v1/v2 结构不同)。
-- v1 的 `RT_SERIAL_RB_BUFSZ`/`BSP_STM32_UART_V1_TX_TIMEOUT` 已从
-  rtconfig.h/.config 移除; drv_usart.c (v1) 留在树内未编译。
-
-双构建 (CMake / SCons) 零警告通过; 上板回归 (B5 的 csum 监控) 待做。
 
 ## 构建与烧录
 
@@ -905,8 +850,9 @@ libstdc++ locale 链, 双端 ROM 曾高达 63%/97%, 详见"已闭环能力速查
 
 > 2026-09-29 ~ 09-30 的三轮全量代码审查修复、平台升级 (RT-Thread
 > 5.3.0 + 串口框架 V2 + ROM 瘦身) 均已构建级闭环, 修复史与细节见
-> `middleware/README.md` 与 [平台版本](#平台版本-2026-09-30-起-rt-thread-530)
-> 章节; 2026-10-03 起本表按时间升序重排 (新条目一律追加到表尾), 增设
+> `middleware/README.md` (5.3.0 升级与本地定制回植清单亦存于 git
+> 历史, 平台版本章 2026-10-03 验证全闭环后移除);
+> 2026-10-03 起本表按时间升序重排 (新条目一律追加到表尾), 增设
 > 完成状态 / 备注 / 时间 三列 —— 未完成项时间为提出日期, 已完成项为闭环
 > 日期; 编号已随排序重排, 旧编号作废 (正文引用已同步)。
 
@@ -978,5 +924,5 @@ csum/stale/rej/ts_zero/restart 与新防线计数增量全 0, INS-GNSS 高度差
   ROM 瘦身 (scons 97.5%→26.9%, CMake 63.2%→25.3%; utest 移除后当前值);
 - **精度**: 气压垂直通道修复 (高度 -242m 发散→±2.4m) / GNSS 速度观测
   融合 / RTK 定权 / 加计零偏持久化 / 测高温变补偿;
-- **平台**: RT-Thread 5.3.0 + 串口框架 V2 迁移 (本地定制回植
-  清单见 [平台版本](#平台版本-2026-09-30-起-rt-thread-530) 章节)。
+- **平台**: RT-Thread 5.3.0 + 串口框架 V2 迁移 (本地定制回植清单
+  存于 git 历史的平台版本章, 2026-10-03 验证全闭环后移除)。
