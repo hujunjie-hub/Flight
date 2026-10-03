@@ -4,19 +4,21 @@
 
 ## 定位
 
-**纯协议解析模块**：不开线程、不占串口。
-USART2 (PA3, 460800, 10Hz) 由 `middleware/sensor/gnss_time.c` 独占接收，
-那里把校验和通过的语句原样转发给 `um982_nmea_feed_line()`（见
-`gnss_time.h` 的 `GNSS_TIME_FEED_UM982_NAV` 开关）。
+**纯协议解析模块**：不开线程、不占串口。USART2 (PA3, 460800, 10Hz) 的
+接收链路在 `middleware/data`：**gnssrx 接收线程**只搬字节入
+`gnss_raw_data` 字节环，**gnssdata 解析线程**按 `'\n'` 组句后喂
+`um982_nmea_feed_line()`（协议层内部验校验和, 见 middleware/README.md
+"UM982" 节的完整链路说明）。
 
 ```
-UM982 ──460800──> USART2 ──> gnss_time.c (驱动/线程, 时间同步)
-                                │ 校验通过的完整语句 (只读转发)
-                                ▼
-                             um982_nmea.c ──解析──> struct gnss_data
-                                                        │
-                        组合导航应用 <──um982_nmea_get_data()─┘
-                        (对接 middleware/KF-GINS)
+UM982 ──460800──> USART2 (DMA_RX) ──> [gnssrx 线程] ──> gnss_raw_data 字节环
+                                                            │ '\n' 组句
+                                                            ▼
+                                     [gnssdata 解析线程] um982_nmea.c ──解析──> struct gnss_data
+                                                            │  (定位有效整秒句 → timebase PPS 配对;
+                                                            │   语句 UTC → T_MCU 映射打 T_event)
+                          组合导航应用 <──um982_nmea_get_data()─┘
+                          (对接 middleware/KF-GINS)
 ```
 
 ## 语句要求（UM982 上电配置）
@@ -83,25 +85,18 @@ if (d.pos_valid && d.update_cnt != last_cnt)
 ```
 
 时序上 GNSS 观测的精确时刻取报文 UTC（`um982_nmea_to_gpst`）；HDOP 粗估
-只做初值，精确观测方差建议在 `kf_gins.yaml` 里标定。
+只做初值，精确观测方差在 `middleware/gins/gins_config.h` /
+`gins_bridge.cpp`（固件侧参数）里标定。
 
 ## 构建与调试
 
 - `nmea/SConscript` 把本目录编入固件（经 `middleware/protocol/SConscript`
-  汇入），头文件路径全局可见，`middleware/sensor/gnss_time.c` 直接
+  汇入），头文件路径全局可见，`middleware/data/gnss_data.c` 解析线程直接
   `#include "um982_nmea.h"`（CMake 侧在根 CMakeLists 的 RT_USING_SENSOR
   源列表与 include 路径里）。
 - FinSH：`um982` 查看解析结果（lat/lon/alt/vn/ve/fix/rtk/sats/hdop）与统计
   （rmc/gga/zda 计数、校验错、字段错、更新次数）；链路问题先查 `gnss` 命令。
-
-## 单元测试（utest，板上运行）
-
-```bash
-msh> utest_run middleware.protocol.um982_nmea
-```
-
-注意：用例驱动固件内同一个解析器实例，建议 UM982 接收链路静止时运行。
-
-覆盖：RMC+GGA 全字段数值断言（武大样本）、南纬/西经符号、RMC 'V' 失锁、
-坏校验和拒绝、ZDA 供日期 + GGA 跨零点、RTK 浮点/单点/失锁降级。
-（SCons 只编译目录顶层 `*.c`，测试仅由 CMake 的 utest 列表编入。）
+- 回归：链路数据质量走 build_host SWD 流水线（`swd_10rounds.py` +
+  `eval_10rounds.py`, zda/rmc 速率与 csum/ts_zero 计数属 17 判据）。
+  （utest 框架已于 2026-09-30 移除, 原 `middleware.protocol.um982_nmea`
+  用例随之下线。）

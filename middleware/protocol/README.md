@@ -13,9 +13,12 @@ protocol/
 ## 目录约定
 
 - **接入方式**：串口驱动读到字节后喂各协议解析器的 feed 接口，解析结果
-  快照/回调分发；发方向经注入的 sender 写回链路。协议层对硬件一无所知。
-- **测试**：`<模块>/test/tc_*.c`（utest，板上运行），由根 `CMakeLists.txt`
-  的 `RT_USING_UTEST` 源列表编入；SCons 只编目录顶层 `*.c`，不编测试。
-- **新增协议**：新建子目录（.c/.h + SConscript + README + test/），根
+  快照/回调分发；发方向经注入的 sender 写回链路。协议层对硬件一无所知
+  （当前 nmea 的喂入方是 `middleware/data/gnss_data.c` 解线程,
+  mavlink 适配层待地面站链路接入）。
+- **测试**：解析器均为纯 C 可主机复用；链路正确性由 FinSH 统计命令
+  （`um982`）与 build_host SWD 回归流水线覆盖（utest 框架已于
+  2026-09-30 移除, 原 `test/tc_*.c` 已下线）。
+- **新增协议**：新建子目录（.c/.h + SConscript + README），根
   `CMakeLists.txt` 补对应源文件与 include 路径即可（双构建系统见仓库
   根目录说明）。

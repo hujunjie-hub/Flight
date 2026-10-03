@@ -18,7 +18,8 @@ BMM350 (磁力计, 100Hz) + BMP585 (气压计, 100Hz),融合算法为 KF-GINS
 9. [提升路线图](#提升路线图)
 
 > **阅读须知**: 本文档是全项目设计文档,"传感器数据流架构"与"时间同步
-> 框架"两章描述目标架构与实现约定; 各链路/时间框架的实现现状见
+> 框架"两章描述目标架构与实现约定, "飞行控制"章描述级联控制链与线程
+> 任务清单; 各链路/时间框架的实现现状见
 > [各传感器落地 → 现状与迁移](#各传感器落地) 与
 > [时间同步框架 → 现状](#现状)。传感器驱动细节与 FinSH 命令速查见
 > `middleware/README.md`。**当前待解决问题清单见
@@ -392,10 +393,10 @@ UM982
   (同步拟合 clock_map_t), 一路做样本时戳换算 (换算规则与未就绪时的
   降级见 [GPS 缺失与降级](#gps-缺失与降级-两态模型))。
 - **现状**: 接收线程 (gnssrx)、解析线程 (gnssdata) 与两级缓冲均已实现:
-  USART2 以 DMA_RX 打开 (460800 8N1, RX 环 2KB, 链路初始化时配置;
+  USART2 以 DMA_RX 打开 (460800 8N1, RX 环现为 4KB `GNSS_RAW_DATA_BUF_SIZE`;
   512B 在 ~4KB/s NMEA 流下仅 128ms 余量, 接收线程偶发调度延迟被 DMA
   套圈后未读区被硬件覆写, 读出"句子缝合+重复"流, 校验失败率 ~50%,
-  2026-09-29 扩到 2KB 把套圈余量提高到 ~500ms),
+  2026-09-29 扩到 2KB, 后随 DMA 链重整扩到 4KB, 套圈余量 ~1s),
   接收线程把原始字节镜像写入 `gnss_raw_data_push()`; FinSH 命令 `gnssraw`
   可查字节环状态。UM982 端需配置为只输出 RMC/GGA/ZDA @10Hz。
 
@@ -772,13 +773,13 @@ gins 桥接" 拆分, 同 `so3/` 模式; 纯核心无 RT-Thread 依赖, 主机可
 
 | 线程 | 所在位置 | 优先级 | 周期/唤醒 | 任务内容 |
 | --- | --- | --- | --- | --- |
-| adis_dr | `sensor/sensor_adis16505.c` | **6** (DR EXTI 中断 NVIC=2) | 1kHz DR 事件 | ADIS 寄存器突发读出/校验 → 原始快照入 imu_data 环 |
-| imudata | `data/imu_data.c` | **7** (栈 1536) | 事件驱动 | 单位换算 + 轴映射 → imu_data 结构环 + 最新样本镜像 (**内环 ω̂ 与 dt 的来源**) |
-| gnssrx | `data/gnss_data.c` | **8** (栈 1024) | UART2 DMA 事件 | GNSS 原始字节搬运入字节环 |
-| gins | `gins/gins_bridge.cpp` | **9** (栈 8192, Eigen 局部对象大) | 1kHz 轮询 | KF-GINS 21 状态 EKF 融合 → `gins_solution` 快照 (**外环 p/v 与内环 R̂ 的来源**) |
-| ginsaux | `gins/gins_bridge.cpp` | **10** (栈 2048) | 事件驱动 | mag/baro 环消费 → 磁航向/气压观测喂引擎 |
-| barodata / magdata | `data/baro_data.c` / `data/mag_data.c` | **11** | 事件驱动 (100Hz) | BMP585/BMM350 I2C 采集入环 (气压/磁力原始量) |
-| gnssdata | `data/gnss_data.c` | **11** (栈 3072) | 事件驱动 | NMEA 解析 + PPS 配对 + UTC→T_MCU 换算 (GNSS 观测) |
+| adis_dr | `middleware/sensor/sensor_adis16505.c` | **6** (DR EXTI 中断 NVIC=2) | 1kHz DR 事件 | ADIS 寄存器突发读出/校验 → 原始快照入 imu_data 环 |
+| imudata | `middleware/data/imu_data.c` | **7** (栈 1536) | 事件驱动 | 单位换算 + 轴映射 → imu_data 结构环 + 最新样本镜像 (**内环 ω̂ 与 dt 的来源**) |
+| gnssrx | `middleware/data/gnss_data.c` | **8** (栈 1024) | UART2 DMA 事件 | GNSS 原始字节搬运入字节环 |
+| gins | `middleware/gins/gins_bridge.cpp` | **9** (栈 8192, Eigen 局部对象大) | 1kHz 轮询 | KF-GINS 21 状态 EKF 融合 → `gins_solution` 快照 (**外环 p/v 与内环 R̂ 的来源**) |
+| ginsaux | `middleware/gins/gins_bridge.cpp` | **10** (栈 2048) | 事件驱动 | mag/baro 环消费 → 磁航向/气压观测喂引擎 |
+| barodata / magdata | `middleware/data/baro_data.c` / `middleware/data/mag_data.c` | **11** | 事件驱动 (100Hz) | BMP585/BMM350 I2C 采集入环 (气压/磁力原始量) |
+| gnssdata | `middleware/data/gnss_data.c` | **11** (栈 3072) | 事件驱动 | NMEA 解析 + PPS 配对 + UTC→T_MCU 换算 (GNSS 观测) |
 
 优先级链设计意图: 内环 (计划 8) 高于一切解算/输出线程, 保证 2ms 节拍;
 外环 (计划 12) 低于 gins(9)/ginsaux(10), 用上一拍导航解即可, 不与融合
@@ -855,7 +856,8 @@ rtconfig.h 选 `RT_USING_SERIAL_V2` (dev_serial_v2.c + drv_usart_v2.c),
 ## 构建与烧录
 
 两种构建方式产物等价 (交叉工具链统一按 `rtconfig.py`; 2026-09-30 审查后
-两端均为 -O2 + 调试符号, ROM ~25-27% (utest 移除后) —— 此前 scons 沿用模板默认
+两端均为 -O2 + 调试符号, 当前 ROM ~29.5% (2026-10-03 控制律加入后;
+utest 移除后曾为 25-27%) —— 此前 scons 沿用模板默认
 `BUILD='debug'`(-O0) 且 KF-GINS rotation.h 的 `<iostream>` 拖入整条
 libstdc++ locale 链, 双端 ROM 曾高达 63%/97%, 详见"已闭环能力速查"):
 

@@ -1,18 +1,22 @@
-# middleware/gins — 组合导航桥接层 (ADIS16505 + UM982 -> KF-GINS)
+# middleware/gins — 组合导航桥接层 (ADIS16505 + UM982 + BMM350 + BMP585 -> KF-GINS)
 
-把 `middleware/sensor`（ADIS16505 驱动）与 `middleware/protocol/nmea/um982_nmea`
-（GNSS PVT）实时接入 `middleware/KF-GINS` 的 GIEngine（21 状态 EKF，
-GNSS 位置观测的宽松耦合）。
+把 `middleware/sensor`（ADIS/BMM350/BMP585 驱动）与
+`middleware/protocol/nmea/um982_nmea`（GNSS PVT）实时接入
+`middleware/KF-GINS` 的 GIEngine（21 状态 EKF, GNSS 位置/磁航向/气压
+高度观测）。完整数据流与线程优先级见 `middleware/README.md` 与
+根 README "飞行控制" 章任务清单。
 
 ## 数据流
 
 ```
-ADIS16505 --1kHz DR--> adis16505_get_snapshot() --1kHz 轮询--\
-                                                              gins 线程
-UM982 ---10Hz USART2--> gnss_data.c --> um982_nmea_get_data -/   │
-                                                              GIEngine (EKF)
-                     timebase PPS 配对 (UTC/GPST 锚定)          │
-                                                               ▼
+ADIS16505 --1kHz DR--> imu_data 结构环 ----1kHz 排空----\
+UM982 ---10Hz USART2--> gnss_data 结构环 (T_event) -----+--> gins 线程 (1kHz 轮询)
+                                                        |     GIEngine (EKF)
+BMM350 --100Hz--> mag_data 环 (cal 字段) --wait--+
+BMP585 --100Hz--> baro_data 环 -----------------+----> ginsaux 线程: 磁航向/气压观测
+                                                        |
+              timebase PPS 配对 (UTC/GPST 锚定) ---------┘
+                                                         ▼
                               gins_bridge_get_solution() / FinSH `gins`
 ```
 
@@ -20,11 +24,13 @@ UM982 ---10Hz USART2--> gnss_data.c --> um982_nmea_get_data -/   │
 
 | 文件 | 说明 |
 |------|------|
-| `gins_config.h`   | 全部可调参数 (宏, 单位与 kf-gins.yaml 一致); 零依赖, 与主机测试共用 |
+| `gins_config.h`   | 全部可调参数 (宏, 单位与 kf-gins.yaml 一致); 零依赖, 与主机测试共用。磁偏角/轴向映射等部署参数已运行期化 (param_calib nav 分区, 宏作缺省) |
 | `gins_options.hpp`| GINSOptions 构造 (单位换算, 平台无关); 与上游 loadConfig 同款实现 |
-| `gins_bridge.h`   | C 接口: `gins_bridge_init()` / `gins_bridge_get_solution()` |
-| `gins_bridge.cpp` | 解算线程: 初始化状态机 + 1kHz 馈入 + GNSS 更新 + 结果发布 |
-| `test/tc_gins_engine.cpp` | utest 单元测试 (板上运行, 真实引擎 + 同一份选项代码) |
+| `gins_bridge.h`   | C 接口: `gins_bridge_init()` / `gins_bridge_get_solution()` / 暂停恢复 |
+| `gins_bridge.cpp` | 解算线程 (gins, 1kHz) + 辅助观测线程 (ginsaux) + 初始化状态机 + 结果发布 |
+| `kf_math.h` / `kf_math.cpp` | KF 工作矩阵 F/G 等的 DTCM 静态内核缓冲 + 装配 (Eigen::Map 绑定, 2026-10-02) |
+| `aligned_new.cpp` | C++17 对齐 new/delete 接管 (见下方堆分配节) |
+| `gins_wdt.h` / `gins_wdt.c` | IWDG 看门狗喂狗链 (15s, gins 线程 1kHz 喂) |
 
 ## 上电初始化流程
 
@@ -58,7 +64,9 @@ UM982 ---10Hz USART2--> gnss_data.c --> um982_nmea_get_data -/   │
 - IMU 噪声 (ARW/VRW/零偏/比例因子 std, 相关时间) 目前按 ADIS16505-2
   资料量级给定, **建议 Allan 方差标定后修改**;
 - `GINS_ANT_LEVER` 天线杆臂: 影响位置观测精度与 yaw 可观测性, 安装后实测;
-- `GINS_AXIS_SRC/SIGN`: 安装方向改变时修改;
+- `GINS_AXIS_SRC/SIGN`: 轴向映射缺省值 (IMU/磁共用语义); 部署现场经
+  FinSH `nav set iaxis|maxis` 运行期修改 + `nav save` 持久化
+  (W25Q64 nav 分区, 缺省 = 本文件宏);
 - **GNSS 数据质量三级防线** (2026-09-29, "质量合格才入滤"):
   1. 先验质量门 (绝对拒绝, `g_gq`): 观测 HDOP > `GINS_GNSS_HDOP_MAX`
      (几何崩坏) 或与上一入滤观测跳变 > `GINS_GNSS_JUMP_BASE_M +
@@ -82,37 +90,28 @@ UM982 ---10Hz USART2--> gnss_data.c --> um982_nmea_get_data -/   │
 
 ## 固件构建要点 (CMakeLists.txt)
 
-- C++14 + `-fno-exceptions -fno-rtti`, ELF 用 C++ 链接器 (自动带 libstdc++);
+- C++17 + `-fno-exceptions -fno-rtti`, ELF 用 C++ 链接器 (自动带 libstdc++);
+  GINS/Eigen 热路径组单独 `-O3 + ffp-contract` (覆盖全局 -O2);
 - `-DKF_GINS_EMBEDDED`; `-DM_PI=...`: 工程的 `-D_POSIX_C_SOURCE=1` 会让
   newlib 隐藏 M_PI (KF-GINS 依赖), 命令行直接补 (勿用 `_DEFAULT_SOURCE`,
   会与 RT-Thread sys/time.h 垫片冲突);
 - `rtconfig.h` 开 `RT_USING_CPLUSPLUS`: 跑全局构造 (link.lds 的
   `__ctors_start/end` 已就绪) 并把 `operator new` 接到 rt_malloc;
-- 当前 -O0 调试编译 ROM 约 73%; 发布可切 -O2/--gc-sections 显著缩小。
+- 2026-09-30 起双构建统一 -O2 + 调试符号, 当前 ROM ~29.5% (896KB 上限)。
 
 ## 验证
 
-单元测试 (utest, 板上运行, 与固件同一份选项代码 + 同一编译宏;
-耗时约 1~3 分钟; 运行中会暂停实时解算线程, 跑完建议复位):
+日常验证手段 (utest 框架已于 2026-09-30 随测试目录整体移除):
 
-```bash
-msh> utest_run middleware.gins.engine
-```
+- FinSH `gins` —— 解算结果/各观测计数 (含 stale/rej/新息门禁), 链路
+  健康度第一入口;
+- SWD 回归流水线 (build_host/): `swd_10rounds.py` + `eval_10rounds.py`
+  (10 轮 × 10min 硬复位冷启动, 17 判据, 证据目录 test10/)、
+  `swd_converge.py` (收敛性能)、`swd_stab_alt.py` (14 判据 + 高度专项);
+  固件改动后各跑一遍 (见根 README 提升路线图)。
 
-场景: 静止 60s (GNSS 10Hz) → 断观测惯性加速 10s → 恢复观测 10s
-→ 磁航向收敛 30s (倒装 roll=178°, 真值 yaw=137°, 回归 magUpdate 的
-倾角保护与去-yaw 倾角补偿公式; 2026-09 实测曾因完整 cbn 旋转使观测
-失效, 33424 个观测拒 33423 个)。
-
-上板串口数据质量分析 (USART1 抓包 → 速率/格式/计数器/静态噪声/双链
-路一致性):
-
-```bash
-python middleware/gins/test/analyze_gins_uart.py <capture.bin> --expect-sec 120
-```
-
-2026-09-16 实测 (台架静止 120s, 深圳室外天线): fused 文本 9.46Hz
-(mdelay 调度拉伸, 引擎 time 为真时标) / JustFloat 47.4Hz 帧完整
+历史静态实测 (2026-09-16, 台架静止 120s, 深圳室外天线): fused 文本
+9.46Hz (mdelay 调度拉伸, 引擎 time 为真时标) / JustFloat 47.4Hz 帧完整
 99.98% / IMU 984Hz GNSS 10Hz 磁 98Hz / yaw 漂移 -0.07°/min (磁锚定)
 / 水平游走 N0.61m E0.43m / 静态速度 |mean|<0.04m/s —— 全部通过。
 

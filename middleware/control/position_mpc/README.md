@@ -30,8 +30,8 @@ NED 位置/速度 → 期望加速度 `a_cmd` (m/s²), 作为内环
 ## 板上单拍预算
 
 N=10: 三轴各 10 维 QP, 每 sweep O(N²) 双精度乘加, 上限 60 sweeps
-(实测典型几 sweep 收敛)。全程无动态内存, `mpc_pos_ctx` 约 7KB
-(静态分配 N_MAX=16 上限)。
+(实测典型几 sweep 收敛)。全程无动态内存, `mpc_pos_ctx` 约 8.3KB
+(板上实例 g_mpc 实测, 按 N_MAX=16 静态上限; N_MAX 降到 10 可再省 ~4.5KB)。
 
 ## FinSH `mpc`
 

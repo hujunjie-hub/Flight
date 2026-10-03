@@ -16,9 +16,10 @@
 
 ## 官方库（库头文件部分）
 
-pymavlink 生成的头文件库，原样取自本仓库 `doc/IMUTest/doc/FMT-Firmware`
-的 `src/lib/mavlink/v2.0/`（common.xml 生成件，MAVLINK_BUILD_DATE
-2020-08-18），仅去掉 FMT 专用方言 `fmt/` 目录。**不要手工修改**；
+pymavlink 生成的头文件库，原样取自本仓库 `ref/FMT-Firmware` 的
+`src/lib/mavlink/v2.0/`（common.xml 生成件，MAVLINK_BUILD_DATE
+2020-08-18；历史来源为 doc/IMUTest 时代的 FMT 拷贝, 参考工程现已迁至
+`ref/`），仅去掉 FMT 专用方言 `fmt/` 目录。**不要手工修改**；
 需要其它方言（ardupilotmega 等）或新版报文时用 pymavlink 重新生成后
 整目录替换（保留 `common/` 与本目录的适配层 .c/.h）：
 
@@ -87,14 +88,6 @@ MAVLink 尚未绑定物理串口。绑定后在串口接收线程 `feed`、写�
   抑制了库生成代码固有的 `-Waddress-of-packed-member` 告警。
 - FinSH：`mavlink` 看统计（rx/tx/丢帧/最近报文），`mavlink sendhb` 发
   一帧心跳，`mavlink v1 on|off` 切帧格式。
-
-## 单元测试（utest，板上运行）
-
-```bash
-msh> utest_run middleware.protocol.mavlink_link
-```
-
-覆盖：心跳/姿态收发回环（组帧+CRC+解包+seq 递增）、坏 CRC 拒收与链路
-恢复、v1 帧收发兼容、按 msgid 过滤/通配/注销分发、逐字节断续喂入重组、
-sender 未注入丢包计数。用例把 `send_msg` 发出的真实帧喂回 `feed` 做
-回环断言，板上在线链路喂数不影响（解析对帧同步，垃圾只计 CRC 错）。
+- 验证：`mavlink sendhb` + 统计命令做环回冒烟；地面站链路接入（物理
+  串口绑定）后按 `../nmea` 同款方式回归。（utest 框架已于 2026-09-30
+  移除, 原 `middleware.protocol.mavlink_link` 用例下线。）

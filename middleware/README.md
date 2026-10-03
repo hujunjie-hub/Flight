@@ -59,10 +59,11 @@ USART1 调试输出 (applications/out_*.c, 460800, 与 console 同口):
 
 - USART2 460800 8N1 接收链路已接入: `data/gnss_data.c` 的 **gnssrx 接收线程**
   (只搬字节不解析, DMA_RX 空闲线批量指示) 把 USART2 原始字节镜像写入
-  `gnss_raw_data` 字节环; 波特率/RX 环 (2KB) 在链路初始化时配置
-  (512B 在 ~4KB/s NMEA 流下仅 128ms 余量, gnssrx 偶发调度延迟被 DMA
-  套圈后未读区被硬件覆写, 读出"句子缝合+重复"流, 校验失败率 ~50%;
-  2KB 把套圈余量提高到 ~500ms)。
+  `gnss_raw_data` 字节环; 波特率/RX 环 (4KB, `GNSS_RAW_DATA_BUF_SIZE`)
+  在链路初始化时配置 (512B 在 ~4KB/s NMEA 流下仅 128ms 余量, gnssrx
+  偶发调度延迟被 DMA 套圈后未读区被硬件覆写, 读出"句子缝合+重复"流,
+  校验失败率 ~50%; 2026-09-29 扩到 2KB, 后随 DMA 链重整扩到 4KB,
+  套圈余量 ~1s)。
 - `data/gnss_data.c` 的**解析线程** (gnssdata) 是字节环唯一常驻消费者:
   `wait` 等新字节 → `pop` 批量取 → `'\n'` 组句 → `um982_nmea_feed_line()`
   (协议层内部验校验和) → `update_cnt` 变化时 **UTC 双分流**:
@@ -194,7 +195,9 @@ imu_data:<n> gnss_data:<n> mag_calib_data:<n> baro_calib_data:<n> fused_data
    magout (15) > barout (17) > FinSH (20); 例外: gnssrx 接收线程 (8) 与
    imudata 采集线程 (7) 高于解算链 (字节搬运/时戳采集要先行)。
    I2C/UART 阻塞均隔离在 data 层与 ginsaux, 不占 1kHz 解算时间预算;
-   EKF 满负荷时低于 12 的线程会被饿死。
+   EKF 满负荷时低于 12 的线程会被饿死。**含控制链计划线程的全量线程表
+   (优先级/周期/职责) 见根 README "飞行控制" 章任务清单, 以那边为准**;
+   本条只列既有数据供给链的相对次序。
    **栈预算教训 (2026-09-29)**: gnssdata 1536 曾被 ulog 格式化尖峰击穿
    (溢出 → 调度器死循环), 输出线程 2048 曾被 NaN 的浮点格式化路径打穿
    (HardFault) —— 现 gnssdata=3072, vofa/gins_fused_data/gnssout=4096;
@@ -527,7 +530,7 @@ OpenOCD 4444 复位)。
 ## 2026-10-02 飞控参数分区存储落地 (middleware/param_calib, W25Q64)
 
 作为成熟飞控的参数持久化基础设施: 标定/导航/系统参数按分区存 W25Q64,
-原片内 Flash 方案 (`calibration/calib_store.c/.h`) 删除。设计见
+原片内 Flash 方案 (calibration 下的 calib_store.c/.h, 已删) 退出。设计见
 `param_calib/README.md`, 要点:
 
 - **分区** (编译期权威 `param_part.c`): ptbl 4KB (分区表自描述副本) /

@@ -12,8 +12,6 @@
 |------|------|
 | `so3.h` / `so3.c`       | 纯 SO(3) 数学：欧拉/DCM/四元数互转、Exp/Log、姿态误差（无 RT-Thread 依赖） |
 | `so3_gins.h` / `so3_gins.c` | 桥接：当前姿态<-KF-GINS、目标姿态设定（关中断快照）、一键误差 + FinSH `so3` |
-| `test/rtthread.h`       | 主机测试用 RT-Thread 头桩（同 protocol/test 做法） |
-| `test/tc_so3.c`        | utest 单元测试（板上运行）：独立参考实现交叉验证 + 解析用例 |
 
 ## 坐标系与姿态约定（与 KF-GINS 一致）
 
@@ -34,6 +32,9 @@
 
 `e_b` 与 Lee 几何控制的 `e_R`、PX4 的 `q_error` 同款（误差在期望体系表达，
 小误差时与当前体系二阶一致），控制律直接 `τ = -K·e_b`。
+实际串级实现（角度环 P 消费 `e_b` + 角速度环 PID）见
+`middleware/control/attitude_so3`（2026-10-03 落地, 该控制器每拍把期望
+姿态发布到 `so3_target`, `so3` 命令可直接观察误差）。
 
 两条常见错误，本模块已规避：
 
@@ -94,27 +95,28 @@ so3 clear                  清除目标
 上板验证：`so3 target 0 0 0` 后手动倾斜机体，`e_b` 三轴应按倾斜方向变化，
 `angle` 为总偏差角。
 
-## 构建与测试
+## 构建与验证
 
 固件：`middleware/SConscript` 自动扫描子目录，`so3/SConscript` 无需配置即编入；
 `so3.c` 仅依赖 libc 的 math（同 um982_nmea.c 先例）。
 
-单元测试（utest，板上运行，与固件同一份源码；当前姿态快照由
-`so3_test_inject()` 注入，代替主机版的假 `gins_bridge_get_solution`）：
+主机交叉验证（`build_host/so3_xcheck.py`, numpy）：独立参考实现（初等
+旋转阵显式构造、四元数三明治法旋转、轴角提取）与源码公式逐行转写对拍，
+覆盖互转往返、Exp/Log 全量程（含 >π 主值回绕、零姿态）、`e_b = R_dᵀ·e_n`
+精确关系、yaw 缠绕（±179°/连续 400°）、欧拉差 T 阵单轴严格一致 + 组合
+小角 O(Δ²)、俯仰 90° 奇点等 14 项。
 
-```bash
-msh> utest_run middleware.so3
-```
+上板验证（2026-10-02）：`so3 target 0 0 0` 后手动倾斜机体，`e_b` 三轴按
+倾斜方向变化；与 KF-GINS 融合姿态交叉对拍 ≤0.0008°（KF-GINS
+matrix2euler 在 87.13° 俯仰附近的带内固有损失除外, SO(3) 路径无此损失）。
 
-测试覆盖：互转往返、Exp/Log 全量程（含 >π 主值回绕、零姿态）、
-`e_b = R_dᵀ·e_n` 精确关系双路径交叉验证、yaw 缠绕（±179°/连续 400°）、
-欧拉差 T 阵单轴严格一致 + 组合小角偏差 O(Δ²)、俯仰 90° 奇点、
-gins 桥接 deg→rad / 未就绪 / 未设目标分支。当前 129 例全部通过。
+（utest 框架已于 2026-09-30 移除, 原 `middleware.so3` 板上用例下线;
+`so3_gins.h` 的 `so3_test_inject()` 注入口保留, 供板上注入测试。）
 
 ## 资源与精度
 
-- double 精度（与 KF-GINS 链路一致）；Cortex-M7 软浮点下单次
-  `so3_att_error()` 约 2 次四元数乘 + 2 次 Log，量级在百 µs 内，
-  1kHz 姿态环可承受，后续如紧张可整模块 float 化（结构已按此设计）；
+- double 精度（与 KF-GINS 链路一致）；Cortex-M7 双精度硬 FPU
+  （fpv5-d16）下单次 `so3_att_error()` 约 2 次四元数乘 + 2 次 Log,
+  微秒量级，500Hz 姿态内环可承受；
 - 固件 ROM 占用约 5KB（-O2，含 FinSH 命令）；
 - 目标姿态快照用关中断拷贝（同 gins_bridge 模式），任意线程/优先级安全。
