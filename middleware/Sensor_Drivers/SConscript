@@ -1,0 +1,13 @@
+from building import *
+
+cwd = GetCurrentDir()
+
+# 传感器驱动层: ADIS 驱动 DR EXTI ISR 内捕获 T_MCU 时戳 (同目录 timebase.h);
+# timebase (TIM2 时基 + PPS 输入捕获) 与驱动同目录但保持独立组 —— 它不依赖
+# sensor 框架且须早于驱动初始化, 关 RT_USING_SENSOR 时仍须编入
+src = Glob('sensor_*.c')
+group = DefineGroup('Sensors', src, depend = ['RT_USING_SENSOR'], CPPPATH = [cwd])
+
+group = group + DefineGroup('TimeBase', ['timebase.c'], depend = [''], CPPPATH = [cwd])
+
+Return('group')

@@ -11,7 +11,7 @@ patch('middleware/KF-GINS/src/common/angle.h',
       '    static float rad2deg(float rad) {\n        return rad * R2D;\n    }\n\n    static float deg2rad(float deg) {\n        return deg * D2R;\n    }',
       '    static float rad2deg(float rad) {\n        return rad * (float)R2D;   /* float 重载内用 float 常数, 避免逐次 double 提升 */\n    }\n\n    static float deg2rad(float deg) {\n        return deg * (float)D2R;\n    }')
 
-patch('middleware/calibration/mag_calib.c',
+patch('middleware/Sensor_Preprocessing/filter_calib/mag_calib.c',
       '    for (int i = 0; i < 3; i++)\n    {\n        double v = raw_ut[0] - bias[0];\n\n        out_ut[i] = m[i][0] * v\n                  + m[i][1] * (raw_ut[1] - bias[1])\n                  + m[i][2] * (raw_ut[2] - bias[2]);\n    }',
       '    /* 先整体升 double 再运算, 避免六个混合表达式逐次隐式提升 */\n    const double r0 = raw_ut[0], r1 = raw_ut[1], r2 = raw_ut[2];\n\n    for (int i = 0; i < 3; i++)\n    {\n        out_ut[i] = m[i][0] * (r0 - bias[0])\n                  + m[i][1] * (r1 - bias[1])\n                  + m[i][2] * (r2 - bias[2]);\n    }')
 
@@ -45,23 +45,23 @@ patch('middleware/data/gnss_data.c',
       'ctx.last.latitude_deg, ctx.last.longitude_deg,\n              ctx.last.altitude_m,\n              ctx.last.vn, ctx.last.ve, ctx.last.vu);',
       '(double)ctx.last.latitude_deg, (double)ctx.last.longitude_deg,\n              (double)ctx.last.altitude_m,\n              (double)ctx.last.vn, (double)ctx.last.ve, (double)ctx.last.vu);')
 
-patch('middleware/protocol/nmea/um982_nmea.c',
+patch('middleware/Protocol/nmea/um982_nmea.c',
       'LOG_I("position: lat=%.7f deg lon=%.7f deg",\n          d.position.latitude, d.position.longitude);',
       'LOG_I("position: lat=%.7f deg lon=%.7f deg",\n          (double)d.position.latitude, (double)d.position.longitude);')
 
-patch('middleware/protocol/nmea/um982_nmea.c',
+patch('middleware/Protocol/nmea/um982_nmea.c',
       'LOG_I("          alt=%.1f m (ellipsoid, geoid=%.1f) %s",\n          d.position.altitude, d.position.geoid_sep,',
       'LOG_I("          alt=%.1f m (ellipsoid, geoid=%.1f) %s",\n          (double)d.position.altitude, (double)d.position.geoid_sep,')
 
-patch('middleware/protocol/nmea/um982_nmea.c',
+patch('middleware/Protocol/nmea/um982_nmea.c',
       'LOG_I("velocity: vn=%.3f ve=%.3f vu=%.3f m/s valid=%d",\n          d.velocity.vn, d.velocity.ve, d.velocity.vu, d.vel_valid);',
       'LOG_I("velocity: vn=%.3f ve=%.3f vu=%.3f m/s valid=%d",\n          (double)d.velocity.vn, (double)d.velocity.ve, (double)d.velocity.vu, d.vel_valid);')
 
-patch('middleware/protocol/nmea/um982_nmea.c',
+patch('middleware/Protocol/nmea/um982_nmea.c',
       'd.status.fix_type, d.status.rtk_status, d.status.satellites,\n          d.status.hdop);',
       'd.status.fix_type, d.status.rtk_status, d.status.satellites,\n          (double)d.status.hdop);')
 
-patch('middleware/sensor/sensor_bmp585.c',
+patch('middleware/Sensor_Drivers/sensor_bmp585.c',
       'LOG_W("BMP585 pressure implausible (%.1f hPa) x%d, reconfiguring",\n                      pa / 100.0f, BMP585_FETCH_BAD_RECFG_N);',
       'LOG_W("BMP585 pressure implausible (%.1f hPa) x%d, reconfiguring",\n                      (double)(pa / 100.0f), BMP585_FETCH_BAD_RECFG_N);')
 

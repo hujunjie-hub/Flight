@@ -5,8 +5,8 @@
  *
  * BMP585 气压计数据 (含校准输出) -> 带标记文本打印 (USART1 调试口)
  *
- * 数据来源: middleware/data 的 baro_data 环形缓冲区 (100Hz, Pa/°C),
- *   baro_data_wait/pop 取数; 每个样本经 middleware/calibration 的
+ * 数据来源: middleware/Sensor_Preprocessing/process_data 的 baro_data 环形缓冲区 (100Hz, Pa/°C),
+ *   baro_data_wait/pop 取数; 每个样本经 middleware/Sensor_Preprocessing/filter_calib 的
  *   baro_calib_apply() 基准偏移校正 (无效/关闭时原样直通),
  *   原始/校准两组同行打印, 行尾 baro_calib_data 标记。
  *   采集链路未运行 (running=FALSE) 时, 本线程静默空转。

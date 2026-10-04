@@ -5,7 +5,7 @@
  *
  * ADIS16505 环形缓冲区原始数据 -> 带标记文本打印 (USART1 调试口)
  *
- * 数据来源: middleware/data 的 imu_data 环形缓冲区 (1kHz 未校准原始样本,
+ * 数据来源: middleware/Sensor_Preprocessing/process_data 的 imu_data 环形缓冲区 (1kHz 未校准原始样本,
  *   快照打 UTC 微秒时间标签并完成单位换算), imu_data_wait/pop 取数,
  *   与 gins 桥接消费同一个缓冲区。
  *

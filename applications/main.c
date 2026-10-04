@@ -12,7 +12,7 @@
  * 应用入口: LED 心跳 + 按键 + 调试输出链路装配。
  * 各 USART1 输出链路 (线程/初始化/FinSH 命令) 在 out_*.c, 公共设施 (共享
  * 写互斥/STREAM 兜底清除/定点格式化) 在 app_out.c, FinSH 辅助命令在
- * cmd_*.c; 组合导航解算线程由 middleware/gins 的 INIT_ENV_EXPORT 自启。
+ * cmd_*.c; 组合导航解算线程由 middleware/Navigation/gins 的 INIT_ENV_EXPORT 自启。
  */
 
 #include <rtthread.h>
@@ -79,7 +79,7 @@ int main(void)
     mavgcs_link_init();
 
     /* 四旋翼控制模型 (ctl 线程: MPC 外环+SO3/PID 内环+混控, 默认 DISARM
-     * + dry-run, FinSH `quad` 操作, 见 middleware/control/model) */
+     * + dry-run, FinSH `quad` 操作, 见 middleware/Vehicle_Model/model) */
     quad_model_init();
 
     /* 主线程只做 LED 心跳, 数据推送在 "vofa" 线程里按固定节拍进行 */

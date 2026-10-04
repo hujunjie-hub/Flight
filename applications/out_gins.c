@@ -5,7 +5,7 @@
  *
  * KF-GINS 融合解算结果 -> 带标记文本打印 (USART1 调试口)
  *
- * 数据来源: middleware/gins 的 gins_bridge_get_solution() 解算快照
+ * 数据来源: middleware/Navigation/gins 的 gins_bridge_get_solution() 解算快照
  *   (ADIS16505 1kHz + UM982 10Hz -> GIEngine EKF, 快照任意线程可读)。
  *   与 vofa JustFloat 二进制帧 (50Hz) 同源, 本链路输出可读文本便于调试。
  *
@@ -19,7 +19,7 @@
  *     roll/pitch/yaw 姿态 deg (yaw KF-GINS 输出 [0,360) 非连续)
  *     vn/ve/vd NED 速度 m/s (D 轴向下为正)  lat/lon deg (7 位 ≈1cm)  alt 椭球高 m
  *     imu_data/gnss_data 已喂入引擎的原始观测计数, mag_calib_data/
- *     baro_calib_data 为 middleware/calibration 校正后的观测计数
+ *     baro_calib_data 为 middleware/Sensor_Preprocessing/filter_calib 校正后的观测计数
  *     (imu=0 说明 ADIS16505 未出数)
  *   ready=1 时 10Hz (~1.75KB/s), ready=0 时降为 1Hz 心跳 (对齐/等定位
  *   期间不刷屏, 仍能看到 imu/gnss 计数判断卡在哪一环)。

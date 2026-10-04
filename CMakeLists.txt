@@ -37,23 +37,22 @@ INCLUDE_DIRECTORIES(
 	applications
 	board
 	board/CubeMX_Config/Inc
-	middleware/sensor
-	middleware/protocol/nmea
-	middleware/protocol/crsf
-	middleware/protocol/mavlink
-	middleware/data
-	middleware/gins
-	middleware/control/so3
-	middleware/calibration
-	middleware/control/position_mpc
-	middleware/control/attitude_so3
-	middleware/control/control_allocation
-	middleware/control/dshot_output
-	middleware/control/model
-	middleware/param_calib
-	middleware/timebase
-	middleware/KF-GINS/src
-	middleware/KF-GINS/ThirdParty/eigen-3.3.9
+	middleware/Sensor_Drivers
+	middleware/Protocol/nmea
+	middleware/Protocol/crsf
+	middleware/Protocol/mavlink
+	middleware/Sensor_Preprocessing/process_data
+	middleware/Navigation/gins
+	middleware/Control/so3
+	middleware/Sensor_Preprocessing/filter_calib
+	middleware/Control/position_mpc
+	middleware/Control/attitude_so3
+	middleware/Vehicle_Model/control_allocation
+	middleware/Vehicle_Model/dshot_output
+	middleware/Vehicle_Model/model
+	middleware/Sensor_Preprocessing/param_calib
+	middleware/Navigation/KF-GINS/src
+	middleware/Navigation/KF-GINS/ThirdParty/eigen-3.3.9
 	packages/CMSIS-Core-latest/Include
 	packages/stm32h7_cmsis_driver-latest/Include
 	packages/stm32h7_hal_driver-latest/Inc
@@ -89,8 +88,8 @@ ADD_DEFINITIONS(
 
 # Library source files
 # 应用层: main 入口 + USART1 调试输出层 (app_out 公共设施 + 六条 out_* 链路
-# + mavgcs QGC 链路 + cmd_* 辅助命令); 与 applications/SConscript 的
-# Glob('*.c') 保持一致
+# + mavgcs QGC 链路 + gcs_param QGC 参数协议 + cmd_* 辅助命令); 与
+# applications/SConscript 的 Glob('*.c') 保持一致
 SET(RT_APPLICATIONS_SOURCES
 	applications/main.c
 	applications/app_out.c
@@ -101,6 +100,7 @@ SET(RT_APPLICATIONS_SOURCES
 	applications/out_mag.c
 	applications/out_baro.c
 	applications/mavgcs.c
+	applications/gcs_param.c
 	applications/cmd_cpuload.c
 )
 
@@ -188,22 +188,22 @@ ENDIF()
 	IF(RTT_USING_SENSOR)
 		LIST(APPEND RT_DEVICEDRIVERS_SOURCES
 			rt-thread/components/drivers/sensor/v1/sensor.c
-			middleware/sensor/sensor_adis16505.c
-		middleware/sensor/sensor_bmm350.c
-		middleware/sensor/sensor_bmp585.c
-			middleware/sensor/sensor_w25q64.c
-			middleware/sensor/sensor_sdmmc.c
-			middleware/protocol/nmea/um982_nmea.c
-		middleware/protocol/mavlink/mavlink_link.c
-		middleware/protocol/mavlink/mavlink_helpers.c
-		middleware/protocol/crsf/crsf.c
-		middleware/data/record_ring.c
-		middleware/data/imu_data.c
-		middleware/data/mag_data.c
-		middleware/data/baro_data.c
-		middleware/data/gnss_raw_data.c
-		middleware/data/gnss_data.c
-		middleware/data/rc_data.c
+			middleware/Sensor_Drivers/sensor_adis16505.c
+		middleware/Sensor_Drivers/sensor_bmm350.c
+		middleware/Sensor_Drivers/sensor_bmp585.c
+			middleware/Sensor_Drivers/sensor_w25q64.c
+			middleware/Sensor_Drivers/sensor_sdmmc.c
+			middleware/Protocol/nmea/um982_nmea.c
+		middleware/Protocol/mavlink/mavlink_link.c
+		middleware/Protocol/mavlink/mavlink_helpers.c
+		middleware/Protocol/crsf/crsf.c
+		middleware/Sensor_Preprocessing/process_data/record_ring.c
+		middleware/Sensor_Preprocessing/process_data/imu_data.c
+		middleware/Sensor_Preprocessing/process_data/mag_data.c
+		middleware/Sensor_Preprocessing/process_data/baro_data.c
+		middleware/Sensor_Preprocessing/process_data/gnss_raw_data.c
+		middleware/Sensor_Preprocessing/process_data/gnss_data.c
+		middleware/Sensor_Preprocessing/process_data/rc_data.c
 	)
 	IF(RTT_USING_SENSOR_CMD)
 		LIST(APPEND RT_DEVICEDRIVERS_SOURCES
@@ -213,12 +213,12 @@ ENDIF()
 ENDIF()
 
 # 5.3.0 已移除 components/drivers/hwtimer (并入 clock_time 框架);
-# 本项目时基由 middleware/timebase 直用 HAL TIM, 不受影响。
+# 本项目时基由 middleware/Sensor_Drivers 直用 HAL TIM, 不受影响。
 
 SET(RT_DRIVERS_SOURCES
 	board/CubeMX_Config/Src/stm32h7xx_hal_msp.c
 	board/board.c
-	middleware/timebase/timebase.c
+	middleware/Sensor_Drivers/timebase.c
 	libraries/HAL_Drivers/drv_common.c
 	# 5.3.0 BSP: 串口/SPI/I2C 驱动的 DMA 配置统一在 drv_dma.c (stm32_dma_setup/deinit)
 	libraries/HAL_Drivers/drivers/drv_dma.c
@@ -355,10 +355,10 @@ SET(RT_STM32H7-HAL_SOURCES
 	packages/stm32h7_hal_driver-latest/Src/stm32h7xx_hal_cortex.c
 	packages/stm32h7_hal_driver-latest/Src/stm32h7xx_hal_crc_ex.c
 	packages/stm32h7_hal_driver-latest/Src/stm32h7xx_hal_ospi.c
-	# middleware/timebase (TIM2 时基 + PPS 输入捕获) 独占 HAL TIM
+	# middleware/Sensor_Drivers (TIM2 时基 + PPS 输入捕获) 独占 HAL TIM
 	packages/stm32h7_hal_driver-latest/Src/stm32h7xx_hal_tim.c
 	packages/stm32h7_hal_driver-latest/Src/stm32h7xx_hal_tim_ex.c
-	# middleware/sensor SD 驱动 (miniTF, SDMMC1 轮询) 直用 HAL SD,
+	# middleware/Sensor_Drivers SD 驱动 (miniTF, SDMMC1 轮询) 直用 HAL SD,
 	# 不经 RT SDIO 框架; delayblock 仅高速时钟调谐需要, 不编
 	packages/stm32h7_hal_driver-latest/Src/stm32h7xx_hal_sd.c
 	packages/stm32h7_hal_driver-latest/Src/stm32h7xx_ll_sdmmc.c
@@ -380,54 +380,61 @@ IF(RTT_USING_SPI)
 ENDIF()
 
 SET(RT_GINS_SOURCES
-	middleware/KF-GINS/src/kf-gins/gi_engine.cpp
-	middleware/KF-GINS/src/kf-gins/insmech.cpp
-	middleware/gins/gins_bridge.cpp
-	middleware/gins/aligned_new.cpp
-	middleware/gins/kf_math.cpp
-	middleware/gins/gins_wdt.c
+	middleware/Navigation/KF-GINS/src/kf-gins/gi_engine.cpp
+	middleware/Navigation/KF-GINS/src/kf-gins/insmech.cpp
+	middleware/Navigation/gins/gins_bridge.cpp
+	middleware/Navigation/gins/aligned_new.cpp
+	middleware/Navigation/gins/kf_math.cpp
+	middleware/Navigation/gins/gins_wdt.c
 )
 
 SET(RT_SO3_SOURCES
-	middleware/control/so3/so3.c
-	middleware/control/so3/so3_gins.c
+	middleware/Control/so3/so3.c
+	middleware/Control/so3/so3_gins.c
 )
 
-# 飞控控制层 (级联: 位置 MPC 外环 + SO3/PID 姿态内环 + 控制分配 + 电调输出
-# + model/quad_model 执行模型), 与各子目录 SConscript 的 Glob('*.c') 保持一致
+# 飞控控制律 (位置 MPC 外环 + SO3/PID 姿态内环), 与子目录 SConscript 的
+# Glob('*.c') 保持一致
 SET(RT_CONTROL_SOURCES
-	middleware/control/position_mpc/mpc_pos.c
-	middleware/control/position_mpc/mpc_pos_gins.c
-	middleware/control/attitude_so3/att_pid.c
-	middleware/control/attitude_so3/att_pid_gins.c
-	middleware/control/control_allocation/mixer.c
-	middleware/control/control_allocation/mixer_cmd.c
-	middleware/control/dshot_output/dshot_enc.c
-	middleware/control/dshot_output/dshot.c
-	middleware/control/model/quad_model.c
+	middleware/Control/position_mpc/mpc_pos.c
+	middleware/Control/position_mpc/mpc_pos_gins.c
+	middleware/Control/attitude_so3/att_pid.c
+	middleware/Control/attitude_so3/att_pid_gins.c
+)
+
+# 车辆模型层 (model/quad_model 执行模型 + control_allocation 混控
+# + dshot_output 电调输出), 与 middleware/Vehicle_Model 各子目录
+# SConscript 的 Glob('*.c') 保持一致
+SET(RT_VEHICLEMODEL_SOURCES
+	middleware/Vehicle_Model/control_allocation/mixer.c
+	middleware/Vehicle_Model/control_allocation/mixer_cmd.c
+	middleware/Vehicle_Model/dshot_output/dshot_enc.c
+	middleware/Vehicle_Model/dshot_output/dshot.c
+	middleware/Vehicle_Model/model/quad_model.c
 )
 
 SET(RT_CALIBRATION_SOURCES
-	middleware/calibration/ellipsoid_fit.c
-	middleware/calibration/mag_calib.c
-	middleware/calibration/baro_calib.c
+	middleware/Sensor_Preprocessing/filter_calib/ellipsoid_fit.c
+	middleware/Sensor_Preprocessing/filter_calib/mag_calib.c
+	middleware/Sensor_Preprocessing/filter_calib/baro_calib.c
 )
 
 # 飞控参数分区存储 (W25Q64): 分区引擎 + calib/nav/sys 三个参数域,
-# 与 middleware/param_calib/SConscript 的 Glob('*.c') 保持一致
+# 与 middleware/Sensor_Preprocessing/param_calib/SConscript 的 Glob('*.c') 保持一致
 SET(RT_PARAMCALIB_SOURCES
-	middleware/param_calib/param_part.c
-	middleware/param_calib/param_calib.c
-	middleware/param_calib/param_nav.c
-	middleware/param_calib/param_sys.c
+	middleware/Sensor_Preprocessing/param_calib/param_part.c
+	middleware/Sensor_Preprocessing/param_calib/param_calib.c
+	middleware/Sensor_Preprocessing/param_calib/param_nav.c
+	middleware/Sensor_Preprocessing/param_calib/param_sys.c
 )
 
 # MAVLink 官方生成代码: packed 结构 encode 函数触发已知告警, 按惯例
 # 仅对包含 mavlink_link.h 的编译单元抑制
 SET_SOURCE_FILES_PROPERTIES(
-	middleware/protocol/mavlink/mavlink_link.c
-	middleware/protocol/mavlink/mavlink_helpers.c
+	middleware/Protocol/mavlink/mavlink_link.c
+	middleware/Protocol/mavlink/mavlink_helpers.c
 	applications/mavgcs.c
+	applications/gcs_param.c
 	PROPERTIES COMPILE_OPTIONS "-Wno-address-of-packed-member")
 
 # Library search paths
@@ -471,6 +478,7 @@ ADD_LIBRARY(rtt_STM32H7-HAL OBJECT ${RT_STM32H7-HAL_SOURCES})
 ADD_LIBRARY(rtt_GINS OBJECT ${RT_GINS_SOURCES})
 ADD_LIBRARY(rtt_SO3 OBJECT ${RT_SO3_SOURCES})
 ADD_LIBRARY(rtt_Control OBJECT ${RT_CONTROL_SOURCES})
+ADD_LIBRARY(rtt_VehicleModel OBJECT ${RT_VEHICLEMODEL_SOURCES})
 ADD_LIBRARY(rtt_Calibration OBJECT ${RT_CALIBRATION_SOURCES})
 ADD_LIBRARY(rtt_ParamCalib OBJECT ${RT_PARAMCALIB_SOURCES})
 
@@ -509,6 +517,7 @@ TARGET_LINK_LIBRARIES(${FIRMWARE_TARGET}
 	rtt_POSIX
 	rtt_SO3
 	rtt_Control
+	rtt_VehicleModel
 )
 
 ADD_CUSTOM_COMMAND(TARGET ${FIRMWARE_TARGET} POST_BUILD

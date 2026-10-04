@@ -292,13 +292,13 @@ sensor_hub (uMCN, FMT 原生不动)
 1. **时序核心决策**: `ins_model_info.period = 1`。vehicle 线程每 1 ms tick 先跑 `sensor_collect_high_freq()` 再门控 ins_step, period=1 使 ins_step 与 `sensor_imu0` 发布 1:1 同拍——不丢拍、不加锁、不改 task_vehicle;period=2 会因 uMCN 只留最新值丢一半 IMU 样本。
 2. **step 流程**: poll `sensor_imu0` → `GIEngine::addImuData()` + `newImuProcess()` (机械化+观测更新同入口);poll gps/mag/baro → `addGnssData/addMagData/addBaroData` (+ZUPT 检测内建);`getNavState()` 快照 → 填 `INS_Out_Bus` → `mcn_publish(ins_output)`。GIEngine 喂入口全 public (`gi_engine.h:57-105`), `gnssUpdate/magUpdate/EKFUpdate` 等为 private (`:277-328`)——只能走 add* 队列, 无旁路。时间轴统一 systime 毫秒 (IMU/GNSS/磁/气压同源);GNSS "测量时刻 vs 到达时刻" 之差 (PVT 固有 ~百 ms 滞后) 的精度取舍见 §12.5 时基行。
 3. **INS_Out_Bus 填充** (字段全表 `cf_ins/lib/INS.h:173-203`): C_nb (DCM) 为主表示 → `phi/theta/psi` (wrap ±π, so3 DCM→euler) + `quat[4]` 兼容字段 (so3 DCM→quat, Shepperd 法);`p/q/r` 陀螺直通;`vn/ve/vd`;`lat/lon/alt` + `lat_0/lon_0/alt_0` + `dx_dlat/dy_dlon` (首帧记原点);`x_R/y_R/h_R` 本地 NED;`flag/status` 位图由引擎 ready + 对准状态 + 各观测计数合成 (位定义 `ins_interface.h:26-58`), 供 SYS_STATUS 上报与 pre-arm。
-4. **桥接层去线程化**: 本工程 `middleware/gins/gins_bridge.cpp` 的 gins/ginsaux 两线程 (prio 9/10) 取消, 其守卫与编排逻辑 (DR 丢拍/gnss stale/播种/posguard/NOGNSS 状态机) 抽成无 RT-Thread 依赖的 `gins_step_feed()` 纯函数由 ins_step 调用;`gins_bridge_get_solution()` 关中断快照改为模型内直接读引擎。
+4. **桥接层去线程化**: 本工程 `middleware/Navigation/gins/gins_bridge.cpp` 的 gins/ginsaux 两线程 (prio 9/10) 取消, 其守卫与编排逻辑 (DR 丢拍/gnss stale/播种/posguard/NOGNSS 状态机) 抽成无 RT-Thread 依赖的 `gins_step_feed()` 纯函数由 ins_step 调用;`gins_bridge_get_solution()` 关中断快照改为模型内直接读引擎。
 5. **GINS 参数组** `PARAM_GROUP_DEFINE(GINS,...)`: 对准时长/杆臂/NOGNSS/ZUPT/MAG_ENABLE;磁偏角与轴向映射沿用运行期 `gins nav` 命令方案 (§12.4), 不依赖 param_calib 分区。
 6. **栈与看门狗 (复查补)**: 本工程 gins 解算线程栈 8192, 注释明言 "Eigen 局部对象较大" (`gins_bridge.h:70`);vehicle 线程栈仅 6144 (task_vehicle.c TASK_EXPORT), 21 维 EKF 的 Eigen 栈临时装不下——需把 vehicle `stack_size` 提到 ≥16384, 这是 task 层唯一一行改动。gins_wdt 是 H7 IWDG1/DBGMCU 寄存器直写的板级代码, 而 FMT 全树无任何看门狗 (它是唯一安全兜底), 是否随迁随目标板定 (§12.8);迁则喂狗点从 gins 线程改为 ins_interface_step 末尾, 不新增 task 改动。
 
 ### 12.3 移植件 ②: `src/model/control/my_controller` — MPC 外环 + SO(3)/PID 内环
 
-新建, 手写 interface (template_controller 形态), 替换 `control/mc_controller` (model.py 同步改, 保留一行切回的回退路径)。复用本工程 `middleware/control` 纯 C 核心, **弃用 *_gins 胶水四件** (那是无 FMS 工程的取数权宜, FMT 下由本 interface 组装输入)。级联与拍频 (control 模型 2 ms 步内分频, MPC 按自身周期门控):
+新建, 手写 interface (template_controller 形态), 替换 `control/mc_controller` (model.py 同步改, 保留一行切回的回退路径)。复用本工程 `middleware/Control` 纯 C 核心, **弃用 *_gins 胶水四件** (那是无 FMS 工程的取数权宜, FMT 下由本 interface 组装输入)。级联与拍频 (control 模型 2 ms 步内分频, MPC 按自身周期门控):
 
 | 级 | 入口 (本工程源) | 周期 | 输入 → 输出 |
 |---|---|---|---|
@@ -331,8 +331,8 @@ sensor_hub (uMCN, FMT 原生不动)
 
 | FMT 新增 | 来源 (本工程) | 内容与注意点 |
 |---|---|---|
-| `src/module/gins/` | `middleware/KF-GINS/src/{kf-gins,common}` + `middleware/gins/{kf_math.*,aligned_new.cpp,gins_config.h,gins_options.hpp}` | 固件清单: gi_engine.cpp / insmech.cpp / kf_gins_types.h + common 四头 (angle/earth/rotation/types) + kf_math (double EKF 内核, P 传播 ~100 Hz 节流) + aligned_new (C++17 对齐 new/delete, Eigen 定长成员 alignas16——缺席则对齐性静默退化为 8 字节);**Eigen 3.3.9 头随迁** (KF-GINS/ThirdParty/eigen-3.3.9, FMT 树无 Eigen)。构建参数与本工程 gins/SConscript 同: `-O3 -ffp-contract=fast` 只给 C++ 组, `KF_GINS_EMBEDDED` + `M_PI` 宏;关异常/RTTI 与 -std=c++17 落在 target rtconfig.py (§12.7-13, FMT 现默认 c++14 且未关, rtconfig.py:61-63)。gins_wdt 不在此组 (板级条件项, §12.2-6) |
-| `src/module/math/so3/` | `middleware/control/so3/so3.{c,h}` | 纯数学库 (quat↔DCM↔euler、exp/log、`so3_att_error_dcm/quat`);gins_ins 与 my_controller 共用;与 KF-GINS 对拍已验证 (≤0.0008°)。**so3_gins.c 不迁** (取数点改到模型内部) |
+| `src/module/gins/` | `middleware/Navigation/KF-GINS/src/{kf-gins,common}` + `middleware/Navigation/gins/{kf_math.*,aligned_new.cpp,gins_config.h,gins_options.hpp}` | 固件清单: gi_engine.cpp / insmech.cpp / kf_gins_types.h + common 四头 (angle/earth/rotation/types) + kf_math (double EKF 内核, P 传播 ~100 Hz 节流) + aligned_new (C++17 对齐 new/delete, Eigen 定长成员 alignas16——缺席则对齐性静默退化为 8 字节);**Eigen 3.3.9 头随迁** (middleware/Navigation/KF-GINS/ThirdParty/eigen-3.3.9, FMT 树无 Eigen)。构建参数与本工程 Navigation/gins/SConscript 同:`-O3 -ffp-contract=fast` 只给 C++ 组, `KF_GINS_EMBEDDED` + `M_PI` 宏;关异常/RTTI 与 -std=c++17 落在 target rtconfig.py (§12.7-13, FMT 现默认 c++14 且未关, rtconfig.py:61-63)。gins_wdt 不在此组 (板级条件项, §12.2-6) |
+| `src/module/math/so3/` | `middleware/Control/so3/so3.{c,h}` | 纯数学库 (quat↔DCM↔euler、exp/log、`so3_att_error_dcm/quat`);gins_ins 与 my_controller 共用;与 KF-GINS 对拍已验证 (≤0.0008°)。**so3_gins.c 不迁** (取数点改到模型内部) |
 | `src/module/syscmd/gins_cmd.c` | 新写, 参照本工程各 FinSH 命令 | `gins status` (ready/观测计数/协方差)、`gins nav` (磁偏角/轴向映射);机体参数不走命令、走 PARAM 组 (§12.3 验收段);复用 syscmd/optparse |
 
 `module/math/quaternion.c` 保留但降级为纯 MAVLink 线上编码工具;其余 FMT 模块零改动。
@@ -342,11 +342,11 @@ sensor_hub (uMCN, FMT 原生不动)
 | 本工程件 | 不迁原因 / FMT 侧替代 |
 |---|---|
 | `*_gins` 胶水四件 (mpc_pos_gins / att_pid_gins / so3_gins / mixer_cmd) | 取数/发布逻辑由 gins_ins 与 my_controller 的 interface 层重组装, 纯核心直迁 |
-| `middleware/gins/gins_bridge.cpp` (线程+喂入编排) | 线程取消, 守卫逻辑抽 `gins_step_feed()` 进 gins_ins (§12.2 第 4 条);对外 API (init/get_solution/set_pause) 不再存在 |
-| `middleware/control/dshot_output/` | FMT actuator HAL 原生支持 DShot, TOML 配协议即可 |
-| `middleware/data/` (imu_data/gnss_data 环形缓冲) | sensor_hub uMCN 话题取代;ZUPT 所需 IMU 事件时间戳改从 imu_data_t.timestamp_ms 取 |
-| `middleware/timebase/` (TIM2/PPS) | 基线 (方案 A): 时间戳统一 systime 毫秒, IMU/GNSS 相对一致性成立即可跑通, 但 GNSS PVT 到达滞后 ~百 ms 在动态下化为观测滞后;精度 (方案 B, 可选): PPS 输入捕获以**新增**驱动接入 gins_ins 恢复测量时刻, 不触碰既有驱动 (复查修订, 原文 "systime 即满足" 过于乐观) |
-| `middleware/param_calib/` (W25Q64 分区) | 磁偏角/轴向映射运行期化改走 `gins nav` 命令 + GINS 参数组 |
+| `middleware/Navigation/gins/gins_bridge.cpp` (线程+喂入编排) | 线程取消, 守卫逻辑抽 `gins_step_feed()` 进 gins_ins (§12.2 第 4 条);对外 API (init/get_solution/set_pause) 不再存在 |
+| `middleware/Vehicle_Model/dshot_output/` | FMT actuator HAL 原生支持 DShot, TOML 配协议即可 |
+| `middleware/Sensor_Preprocessing/process_data/` (imu_data/gnss_data 环形缓冲) | sensor_hub uMCN 话题取代;ZUPT 所需 IMU 事件时间戳改从 imu_data_t.timestamp_ms 取 |
+| `middleware/Sensor_Drivers/` (TIM2/PPS) | 基线 (方案 A): 时间戳统一 systime 毫秒, IMU/GNSS 相对一致性成立即可跑通, 但 GNSS PVT 到达滞后 ~百 ms 在动态下化为观测滞后;精度 (方案 B, 可选): PPS 输入捕获以**新增**驱动接入 gins_ins 恢复测量时刻, 不触碰既有驱动 (复查修订, 原文 "systime 即满足" 过于乐观) |
+| `middleware/Sensor_Preprocessing/param_calib/` (W25Q64 分区) | 磁偏角/轴向映射运行期化改走 `gins nav` 命令 + GINS 参数组 |
 | 规划中的 ctl_att/ctl_mpc 独立线程 (README 线程表) | 并入 FMT vehicle 线程分频执行, 不新增线程 |
 
 ### 12.6 TASK 层改动边界与 quat 兼容
@@ -357,27 +357,27 @@ task 层除 vehicle 线程栈常量一行 (§12.2-6, 6144→16384) 外 0 行: �
 
 | # | 本工程源 | FMT 目标 | 形态 |
 |---|---|---|---|
-| 1 | `KF-GINS/src/kf-gins/{gi_engine.cpp, insmech.cpp, kf_gins_types.h}` + `src/common/{angle,earth,rotation,types}.h` | `src/module/gins/` | 直拷 (KF_GINS_EMBEDDED) |
-| 2 | `KF-GINS/ThirdParty/eigen-3.3.9/` (纯头) | `src/module/gins/eigen-3.3.9/` | 直拷, CPPPATH 引入 |
-| 3 | `middleware/gins/{kf_math.*, aligned_new.cpp, gins_config.h, gins_options.hpp}` | `src/module/gins/` | 直拷 (gins_options 已无 RT-Thread 依赖) |
-| 4 | `middleware/gins/gins_bridge.cpp` 守卫/编排段 | `src/model/ins/gins_ins/` (抽 `gins_step_feed()`) | **重构**: 去线程化、去关中断快照 |
-| 5 | `middleware/control/so3/so3.{c,h}` | `src/module/math/so3/` | 直拷 |
-| 6 | `middleware/control/position_mpc/mpc_pos.{c,h}` | `src/model/control/my_controller/lib/` | 直拷 (纯 C 核心) |
-| 7 | `middleware/control/attitude_so3/att_pid.{c,h}` | `src/model/control/my_controller/lib/` | 直拷 (CPPPATH 加 module/math/so3) |
-| 8 | `middleware/control/control_allocation/mixer.{c,h}` | `src/model/control/my_controller/lib/` | 直拷 |
+| 1 | `Navigation/KF-GINS/src/kf-gins/{gi_engine.cpp, insmech.cpp, kf_gins_types.h}` + `Navigation/KF-GINS/src/common/{angle,earth,rotation,types}.h` | `src/module/gins/` | 直拷 (KF_GINS_EMBEDDED) |
+| 2 | `Navigation/KF-GINS/ThirdParty/eigen-3.3.9/` (纯头) | `src/module/gins/eigen-3.3.9/` | 直拷, CPPPATH 引入 |
+| 3 | `middleware/Navigation/gins/{kf_math.*, aligned_new.cpp, gins_config.h, gins_options.hpp}` | `src/module/gins/` | 直拷 (gins_options 已无 RT-Thread 依赖) |
+| 4 | `middleware/Navigation/gins/gins_bridge.cpp` 守卫/编排段 | `src/model/ins/gins_ins/` (抽 `gins_step_feed()`) | **重构**: 去线程化、去关中断快照 |
+| 5 | `middleware/Control/so3/so3.{c,h}` | `src/module/math/so3/` | 直拷 |
+| 6 | `middleware/Control/position_mpc/mpc_pos.{c,h}` | `src/model/control/my_controller/lib/` | 直拷 (纯 C 核心) |
+| 7 | `middleware/Control/attitude_so3/att_pid.{c,h}` | `src/model/control/my_controller/lib/` | 直拷 (CPPPATH 加 module/math/so3) |
+| 8 | `middleware/Vehicle_Model/control_allocation/mixer.{c,h}` | `src/model/control/my_controller/lib/` | 直拷 |
 | 9 | — (新写) | `src/model/ins/gins_ins/{ins_interface.c, SConscript}` | 手写, template_ins 形态, period=1 (CPPPATH 挂 module/gins + Eigen) |
 | 10 | — (新写) | `src/model/control/my_controller/{control_interface.c, SConscript}` | 手写, template_controller 形态, period=2, 步内分频 |
 | 11 | — (新写) | `src/module/syscmd/gins_cmd.c` | 手写 FinSH 命令 |
 | 12 | — (编辑) | `target/*/config/model.py` | 改 2 行: `ins/cf_ins`→`ins/gins_ins`、`control/mc_controller`→`control/my_controller` |
 | 13 | — (编辑) | `target/*/rtconfig.py` | CXXFLAGS `-std=c++14`→`-std=c++17` + 补 `-fno-exceptions -fno-rtti` (rtconfig.py:61-63;aligned_new 的 align_val_t 是 C++17 语义, c++14 编不过——复查补) |
-| 14 | `middleware/gins/gins_wdt.c` | 条件迁 (仅路线 B) | H7 IWDG1 寄存器直写板级代码, FMT 全树无看门狗;喂狗点改 ins_interface_step (§12.2-6) |
+| 14 | `middleware/Navigation/gins/gins_wdt.c` | 条件迁 (仅路线 B) | H7 IWDG1 寄存器直写板级代码, FMT 全树无看门狗;喂狗点改 ins_interface_step (§12.2-6) |
 | 15 | — (新写, 可选) | gins_ins / my_controller 的 `MLOG_BUS_DEFINE` 调参总线 | mlog 宏表机制, `cf_ins/ins_interface.c:99-107` 同型;录 P 对角/新息/u_pred 供整定 |
 
 ### 12.8 板级落地与硬件路线 (复查补, 原清单遗漏的整个维度)
 
 **路线 A — SIH 仿真验证 (零板级工作, 第一步就做)**: `--sim=SIH` 构建 (`SConstruct:53-55` 注入 FMT_USING_SIH), `plant/multicopter` 的 plant_interface 把仿真的 imu/mag/baro/gps 直接发布进 sensor_hub (`plant_interface.c:145-214`), gins_ins/my_controller 对此无感——整条控制链闭环可在任何 FMT 支持的板子 (甚至 `target/qemu` 纯软件) 上先行验证, 不依赖真传感器、不冒系留风险。
 
-**路线 B — 本工程 H7 板真机落地**: FMT `target/` 现有 amov/cuav/infineon/minimum/pixhawk/qemu/sieon/yundrone, 无本板。需**新增** target/<board> 板级包 + 四个传感器驱动: ADIS16505 (SPI)、BMM350 (I2C)、BMP585、UM982 (UART+PPS)。全部是新增文件、不触碰既有驱动, 但属"驱动层新增"工作包, 与本章 model/module 清单分开管理;本工程 `middleware/sensor` + `libraries/HAL_Drivers` 的驱动逻辑可作蓝本, 注册面从自有 data 缓冲改为 sensor_hub (`register_sensor_*`)。磁力计标定 (硬磁 25µT 等) 落点在驱动层或 gins_ins 内二选一, 实施时定。
+**路线 B — 本工程 H7 板真机落地**: FMT `target/` 现有 amov/cuav/infineon/minimum/pixhawk/qemu/sieon/yundrone, 无本板。需**新增** target/<board> 板级包 + 四个传感器驱动: ADIS16505 (SPI)、BMM350 (I2C)、BMP585、UM982 (UART+PPS)。全部是新增文件、不触碰既有驱动, 但属"驱动层新增"工作包, 与本章 model/module 清单分开管理;本工程 `middleware/Sensor_Drivers` + `libraries/HAL_Drivers` 的驱动逻辑可作蓝本, 注册面从自有 data 缓冲改为 sensor_hub (`register_sensor_*`)。磁力计标定 (硬磁 25µT 等) 落点在驱动层或 gins_ins 内二选一, 实施时定。
 
 **路线 C — Pixhawk 等现成板 (中期算法验证)**: 传感器全换, `gins_config` 先验 (ADIS 零偏 ~1900 deg/h、噪声参数) 必须按新 IMU 重整定;仅作算法验证, 不作长期路线。
 
@@ -388,7 +388,7 @@ task 层除 vehicle 线程栈常量一行 (§12.2-6, 6144→16384) 外 0 行: �
 1. `module/gins` + Eigen 迁入, rtconfig.py C++17/关异常 RTTI 改妥 (§12.7-13), SCons 构建打通 (主机 gcc 先编过) → `so3` 拷入
 2. **SIH 闭环** (§12.8 路线 A): gins_ins + my_controller 进 SIH 构建, 仿真闭环先验证控制链与 MPC 收敛——对拍锚点前移, 不依赖真机传感器 (复查新增步骤)
 3. gins_ins 真机骨架: 只接 sensor_imu0 跑机械化, `mcn echo ins_output` 看姿态积分 (period=1, 丢拍应为 0)
-4. 接 GNSS/磁/气压观测 → 对准 ready → **对拍锚点**: FMT gins_ins 与本工程 middleware/gins 喂同一份录制数据 (build_host 工具), 输出逐位一致 (角度 wrap 表示除外)
+4. 接 GNSS/磁/气压观测 → 对准 ready → **对拍锚点**: FMT gins_ins 与本工程 middleware/Navigation/gins 喂同一份录制数据 (build_host 工具), 输出逐位一致 (角度 wrap 表示除外)
 5. my_controller 上线 (mc_controller 回退路径保留: model.py 一行切回) → mlog 录 `u_norm`/`u_pred` 整链对拍 → QGC 全消息回归
 6. flag/status 填全 → SYS_STATUS / ATTITUDE_QUATERNION / GLOBAL_POSITION_INT → CPU 余量与栈水位 (§12.2-6 的 16384 预算) 确认
 7. 上板: actuator TOML 配 DShot/PWM → 系留测试
@@ -438,10 +438,12 @@ task 层除 vehicle 线程栈常量一行 (§12.2-6, 6144→16384) 外 0 行: �
 
 | 件 | 状态 |
 |---|---|
-| MAVLink 库 | ✅ `middleware/protocol/mavlink` = 官方 v2.0 common 库, 与 FMT 同源同版 (均为 2020-08-18 vendored, 零漂移;仅去掉 fmt 方言)——FMT 的 GCS 消息全在 common.xml, **无方言缺口** |
+| MAVLink 库 | ✅ `middleware/Protocol/mavlink` = 官方 v2.0 common 库, 与 FMT 同源同版 (均为 2020-08-18 vendored, 零漂移;仅去掉 fmt 方言)——FMT 的 GCS 消息全在 common.xml, **无方言缺口** |
 | 协议适配层 | ✅ `mavlink_link.c/h`: feed 逐字节收 / attach handler (容量 8) / send_msg / 心跳 / v1 兼容 / 统计 / FinSH `mavlink`;单通道缓冲 ~0.8KB;sysid=1 / compid=AUTOPILOT1 |
 | 业务消息 | ✅ `applications/mavgcs.c` (2026-10-03): 8 类消息 (见 §13.4 装配表), `gcs on` 会话启动 |
 | 握手 | ✅ 同上: COMMAND_LONG(519/520) 应答 AUTOPILOT_VERSION (伪装 PX4 v1.10.0) + PROTOCOL_VERSION(200) + COMMAND_ACK |
+| 参数协议 | ✅ 阶段 2 已落地 (2026-10-04): `applications/gcs_param.c` —— PARAM_REQUEST_LIST/READ + PARAM_SET → 44 项参数表 (SYS 2 只读 / NAV 5 可写+12 只读 / CALIB 9 可写+16 只读), 类型按 mavlink_param_union_t 重解释; PARAM_SET 改 RAM 镜像, 3s 防抖 (mavgcs 线程 poll) 统一落 W25Q64; lat 用 1e-7 deg 整型口径 (NAV_NOGNSS_LAT7) 避 float 精度损失; 轴映射只读 (逐参 SET 会产生非法中间排列, 改走 `nav set iaxis`) |
+| 标识 | ✅ sysid/compid 运行期化 (2026-10-04): `mavlink_link_set_ids()` + 持久化于 W25Q64 sys 分区保留槽 (`param_sys`), FinSH `gcs id <sysid> <compid>` |
 | 串口 | ✅ 阶段 1 已落地 (2026-10-04) = USART2 独占数传电台 (PD5 TX/PD6 RX @115200, mavgcs 显式下发波特率, RX 从设备接管/恢复逻辑不变);USART1 仍为 console/数据链路;USART3 = ELRS CRSF (PD8/PD9 @420000, RC 遥控) |
 | 数据源 | ✅ `gins_bridge_get_solution()` 关中断快照 (线程安全): latitude/longitude/altitude、vn/ve/vd、roll/pitch/yaw(deg)、ready/degraded/nognss + 各观测计数;`gnss_data_peek_latest()` 原始 UM982;`cpuload` CPU 遥测 |
 
@@ -451,14 +453,14 @@ task 层除 vehicle 线程栈常量一行 (§12.2-6, 6144→16384) 外 0 行: �
 
 **阶段 1 (正式数传口)**: ✅ 已落地 (2026-10-04)——定案 USART2 PD5/PD6 @115200 (数传电台, 波特率经 mavgcs 显式下发, 电台侧改参数时同步 `GCS_UART_BAUD`);CubeMX 重生成按回植清单走。带宽预算: 下行满配 ~1.4 KB/s ≈ 11 kbps, 富余一倍以上。
 
-**阶段 2 (参数 + 控制)**: 上行控制指令**已先行落地 (2026-10-03)**——COMMAND_LONG 400 解锁/上锁 (走 quad_model 预检, 拒绝回 DENIED)、COMMAND_INT DO_REPOSITION 点地图定点 (LLA→NED, 相对当前位置钳位 h50/v10 m, `mpc_pos_gins_set_sp_lla`)、SET_MODE 接受 POSCTL、心跳如实上报 armed/POSCTL (见 mavgcs.c 头注"上行指令"节);剩余: PARAM_* 接 param_calib sys/nav 域 + MANUAL_CONTROL 虚拟摇杆 + Mission 航线。
+**阶段 2 (参数 + 控制)**: 上行控制指令**已先行落地 (2026-10-03)**——COMMAND_LONG 400 解锁/上锁 (走 quad_model 预检, 拒绝回 DENIED)、COMMAND_INT DO_REPOSITION 点地图定点 (LLA→NED, 相对当前位置钳位 h50/v10 m, `mpc_pos_gins_set_sp_lla`)、SET_MODE 接受 POSCTL、心跳如实上报 armed/POSCTL (见 mavgcs.c 头注"上行指令"节);MANUAL_CONTROL 虚拟摇杆已随 RC 软件链落地 (2026-10-03);**参数协议已落地 (2026-10-04)**——PARAM_* 接 param_calib sys/nav/calib 三域 (见 §13.3 参数协议行, 新文件 `applications/gcs_param.c`);剩余: Mission 航线。
 
-**新增代码只有一个文件**: `applications/mavgcs.c` (本工程惯例: 协议层不占串口不开线程, 装配在 applications 层):
+**新增代码只有两个文件**: `applications/mavgcs.c` + `applications/gcs_param.c` (阶段 2 增, 本工程惯例: 协议层不占串口不开线程, 装配在 applications 层; gcs_param 的收发复用 mavgcs 注入的 sender/线程):
 - 线程 "mavgcs", prio 12 (与 vofa 同级), 栈 4096 (FMT 5120, 我们消息少一档);
 - 收: 串口 rx_indicate→信号量唤醒 (100ms 超时兜底) → 排空读 → `mavlink_link_feed()`;
 - 发: 周期 timetag 门控 pack → `mavlink_link_send_msg` (sender 注入串口写; 阶段 0 走 app_out 共享互斥);
 - attach: REQUEST_AUTOPILOT_CAPABILITIES / REQUEST_PROTOCOL_VERSION / GCS 心跳记录 (链路监控);
-- 拷 FMT `px4_custom_mode.h` (纯枚举头) 供 custom_mode 编码;sysid/compid 后续参数化。
+- 拷 FMT `px4_custom_mode.h` (纯枚举头) 供 custom_mode 编码;sysid/compid 已运行期参数化 (2026-10-04, `gcs id` 命令 + sys 分区持久化)。
 
 **消息装配表 (数据源 = gins 快照 + 原始 GNSS)**:
 
@@ -466,7 +468,7 @@ task 层除 vehicle 线程栈常量一行 (§12.2-6, 6144→16384) 外 0 行: �
 |---|---|---|
 | HEARTBEAT | 1 Hz | QUADROTOR + 伪装 PX4 + custom_mode=POSCTL;armed/ACTIVE 如实反映 quad_model 状态机 (2026-10-03 升级) |
 | SYS_STATUS | 1 Hz | imu/gnss/mag/baro_cnt>0 → 传感器在位/健康位;cpuload;无电池→0 (QGC 电池区显示 0, 台架可接受) |
-| ATTITUDE_QUATERNION | 10 Hz | roll/pitch/yaw (deg→rad) → `so3_euler_to_quat` (复用 control/so3 纯 C) |
+| ATTITUDE_QUATERNION | 10 Hz | roll/pitch/yaw (deg→rad) → `so3_euler_to_quat` (复用 Control/so3 纯 C) |
 | LOCAL_POSITION_NED | 5 Hz | latlon→NED 球面近似 (逻辑同 `mpc_pos_gins.c:71-79`, 抽公共) + vn/ve/vd |
 | GLOBAL_POSITION_INT | 5 Hz | latitude/longitude/altitude + vn/ve/vd + yaw |
 | GPS_RAW_INT | 5 Hz | `gnss_data_peek_latest`: lat/lon/alt/hAcc/sAcc/numSV;fix 映射 NMEA quality→GPS_FIX_TYPE (3D=3, RTK float=5, RTK fixed=6) |
@@ -478,28 +480,28 @@ task 层除 vehicle 线程栈常量一行 (§12.2-6, 6144→16384) 外 0 行: �
 ### 13.5 实施顺序
 
 1. ~~阶段 0: mavgcs.c 上 USART1 (COM9)~~ **已落地 (2026-10-03)**: `applications/mavgcs.c` 单文件——"mavgcs" 线程 (prio 12, 栈 4096) + RX 从 finsh 接管/恢复 (`gcs on/off`, 保存并归还 `dev->rx_indicate`) + 心跳/握手 (伪装 PX4 v1.10.0) + 全部 8 类消息 (HEARTBEAT+SYS_STATUS 1Hz / ATTITUDE_QUATERNION 10Hz / LOCAL+GLOBAL+VFR_HUD+GPS_RAW_INT 5Hz / STATUSTEXT 边沿事件);双构建 0 告警。剩余: 上板接 QGC 实测 (COM9@460800, 先 `vofa log off`)
-2. ~~补全消息表~~ 已随 1 一起交付;latlon→NED 抽公共 (现随 mavgcs 内联, 球面公式同 mpc_pos_gins) 与 FinSH 丢帧率核对留待上板
+2. ~~补全消息表~~ 已随 1 一起交付;~~latlon→NED 抽公共~~ 已归一 (2026-10-04, `mpc_pos_gins_lla_to_ned()` 公共入口, mavgcs/mpc 两处内联公式删除);FinSH 丢帧率核对留待上板
 3. ~~阶段 1 数传 UART 板级启用~~ **板级已落地 (2026-10-04, USART2 PD5/PD6)**: 剩余数传电台硬件实测
-4. 阶段 2 参数协议 (param_calib sys/nav 域) + 控制链上线后补 SET_MODE/arm
+4. ~~阶段 2 参数协议~~ **已落地 (2026-10-04, `applications/gcs_param.c` 44 项 → param_calib sys/nav/calib 域, 3s 防抖落盘)**;arm/disarm/SET_MODE 已先行 (2026-10-03);剩余 Mission 航线
 5. (远期) FMT 基座路线成行后本章装配层退役, 由 task_comm 白拿 (§12.6)
 
 **QGC 点地图→定点飞行 打通任务清单** (2026-10-03 备注于此; 状态随进度更新, 未完成项的落地步骤附表后):
 
 | # | 事项 | 依赖 | 状态 |
 |---|---|---|---|
-| 1 | 电机输出硬件落地 (dshot 引脚/TIM/DMA 从占位变实际) | 无 | **未完成** (占位 TIM4+PB6-9+DMA1_S5, 见 dshot_hw.h) |
+| 1 | 电机输出硬件落地 (dshot 引脚/TIM/DMA 从占位变实际) | 无 | **硬件定义已定案 (2026-10-04, doc/Flight.xlsx 接口配置页)**: TIM1 四通道 = PE9 (m0 FR)/PE11 (m1 FL)/PE13 (m2 RR, 原 BMP585 INT)/PE14 (m3 RL) + DMA1_S5 (TIM1_UP→DMAMUX req15), `dshot_hw.h` 已改真硬件定义, Flight.ioc 已收录 TIM1; **剩余**: CubeMX 重生成后核对 MspPostInit 引脚 + 拆桨台架 `dshot` 逐通道验帧 + u_norm→电机桨向对表 |
 | 2 | 机体参数辨识与整定 (质量/惯量/静推力界/姿态增益) | #1 | **未完成** (500g 级占位值, 从未上机) |
 | 3 | QGC 上行指令: DO_REPOSITION 定点 (LLA→NED, h50/v10 m 钳位) + 400 arm/disarm (预检拒 DENIED) + SET_MODE (POSCTL) + 心跳如实回显 armed/模式 | 无 | **已完成** (2026-10-03, 双构建 0 告警): QGC 地图 Go-To → MPC 定点全链, dry-run 可验 |
 | 4 | RC 遥控 (手动接管安全底线): CRSF 硬件接收 + QGC 虚拟摇杆源 + 摇杆叠加/kill 开关/失联保护 | 无 (软件) / #1#2 (真飞) | **已完成 (软件链, 2026-10-03, 双构建 0 告警)**: crsf 协议层 + rc_data 双源快照 + 叠加/kill/失联保护全链; 残留: CRSF 硬件已启用 (2026-10-04, USART3 PD8/PD9 @420000, BSP_USING_UART3 + RX DMA ping 环), 剩余接收机接线实测 |
 | 5 | RTK 前提: UM982 RTK 固定解 → KF-GINS cm 级位置 (NOGNSS 位置开环不可定点) | QGC 侧 NTRIP + UM982 口配置 | **已完成 (转发链 + 状态引脚, 2026-10-03, 双构建 0 告警)**: GPS_RTCM_DATA 重组 → UART4 回注 + `gcs rtcm` 开关/计数; **RTK 状态引脚 PC0** (GPIO 输入, 固定解=高; `gnss_data_rtk_pin_high()` + `gnssdata` 命令显示, 与 NMEA quality 交叉校验; .ioc/xlsx 已同步); 残留: UM982 口配置 RTCM3 (步骤 3) 与 NTRIP 实测 (步骤 4) |
 
-**#1 输出硬件 — 未完成, 落地步骤**: ① xlsx 引脚表给 4 路电机输出分配 TIM 通道 (占位 TIM4 CH1-4@PB6-9 须按实际空闲复核); ② dshot_hw.h 头注四步清单改硬件定义 (引脚/AF/TIM/DMA/DMAMUX); ③ 拆桨台架 `quad power on` 后 `dshot` 命令逐通道验帧 (示波器/单电机); ④ u_norm→电机映射与实际桨向对表 (m0 FR CW/m1 FL CCW/m2 RR CCW/m3 RL CW)。
+**#1 输出硬件 — 硬件定义已定案 (2026-10-04), 落地步骤**: ~~① xlsx 引脚表分配 TIM 通道~~ (已定 TIM1 CH1-4@PE9/11/13/14 + DMA1_S5); ~~② dshot_hw.h 改硬件定义~~ (引脚/AF/TIM/DMA/DMAMUX 已写入, ioc 已收录); ③ 拆桨台架 `quad power on` 后 `dshot` 命令逐通道验帧 (示波器/单电机; CubeMX 重生成后先核对 MspPostInit 引脚); ④ u_norm→电机映射与实际桨向对表 (m0 FR CW/m1 FL CCW/m2 RR CCW/m3 RL CW)。
 
 **#2 机体参数 — 未完成, 落地步骤**: ① 称重 + 摆法/天平法测 m/J, 静推力台架测单电机 f(u) 得 f_min/f_max; ② `mix set l|cq|j|fmin|fmax` 现场整定 (占位 l=0.11/cq=0.015); ③ att 增益保守起步悬停整定 (`att set`, 权威清单见根 README 调参清单章); ④ 增益持久化接 param_part ctrl 分区 (已预留)。
 
 **#4 RC 遥控 — 已完成 (软件链 2026-10-03), 落地步骤** (步骤 1-4 已交付, 步骤 5 硬件后置):
-1. `middleware/protocol/crsf/`: 纯 CRSF 解析层 (帧 sync 0xC8/len/type/CRC8 poly 0xD5; RC_CHANNELS_PACKED 0x16 = 16ch×11bit, 值域 172..1811 中点 992 → 归一化 [-1,1]), 仿 nmea/mavlink 约定不占串口不开线程;
-2. `middleware/data/rc_data.c/h`: 源无关遥控快照 (4 摇杆 + ch5-8 开关 + 源标签 + 时间戳), publish/get/age 关中断快照 (双发布者并发安全); CRSF UART 接收线程 "rcrx" (占位 RC_CRSF_DEV="uart3"@420k 8N1, 设备不存在则告警不启动); FinSH `rc`;
+1. `middleware/Protocol/crsf/`: 纯 CRSF 解析层 (帧 sync 0xC8/len/type/CRC8 poly 0xD5; RC_CHANNELS_PACKED 0x16 = 16ch×11bit, 值域 172..1811 中点 992 → 归一化 [-1,1]), 仿 nmea/mavlink 约定不占串口不开线程;
+2. `middleware/Sensor_Preprocessing/process_data/rc_data.c/h`: 源无关遥控快照 (4 摇杆 + ch5-8 开关 + 源标签 + 时间戳), publish/get/age 关中断快照 (双发布者并发安全); CRSF UART 接收线程 "rcrx" (占位 RC_CRSF_DEV="uart3"@420k 8N1, 设备不存在则告警不启动); FinSH `rc`;
 3. mavgcs: MANUAL_CONTROL (QGC 虚拟摇杆) → rc_data 发布 (双源并存以最新到达为准); RC_CHANNELS 5Hz 下行 (QGC 摇杆页回显);
 4. quad_model ARM 期 20Hz 摇杆叠加 (POSCTL 语义): 死区 0.08 外杆量 → v_ref (水平 5 m/s / 爬升 2 m/s NED) + 滑设定点 (p_ref = 当前位姿 + v_ref×0.5s 视界, 复用 h50/v10 钳位), yaw 杆 → 航向速率 90°/s; 全中位 → 复捕当前位置保持; **ch5 kill → 立即 disarm**; RC 曾在线后失联 >3s 且 ARM → 失效保护自动 disarm;
 5. 硬件落地 (后置): xlsx 给接收机分 UART (USART2 不可用, PA2=PPS), CubeMX 重生成 + .config BSP_USING_UARTx。

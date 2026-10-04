@@ -5,7 +5,7 @@
  *
  * KF-GINS 融合解算 (ADIS16505 + UM982) -> VOFA+ JustFloat (USART1)
  *
- * 数据来源: middleware/gins 组合导航桥接 (ADIS16505 1kHz DR + UM982 10Hz ->
+ * 数据来源: middleware/Navigation/gins 组合导航桥接 (ADIS16505 1kHz DR + UM982 10Hz ->
  * GIEngine EKF), 该模块由 INIT_ENV_EXPORT 自启解算线程并发布解算快照, 本链路
  * 只按固定节拍取最新快照转发, 不再做姿态解算。
  *

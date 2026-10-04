@@ -15,13 +15,13 @@ import re
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 READMES = [
-    "README.MD", "build_host/README.md", "middleware/README.md",
-    "middleware/calibration/README.md",
-    "middleware/control/attitude_so3/README.md",
-    "middleware/control/position_mpc/README.md",
-    "middleware/gins/README.md", "middleware/param_calib/README.md",
-    "middleware/protocol/README.md", "middleware/protocol/mavlink/README.md",
-    "middleware/protocol/nmea/README.md", "middleware/control/so3/README.md",
+    "README.MD", "build_host/README.md", "middleware/README.MD",
+    "middleware/Sensor_Preprocessing/filter_calib/README.md",
+    "middleware/Control/attitude_so3/README.md",
+    "middleware/Control/position_mpc/README.md",
+    "middleware/Navigation/gins/README.md", "middleware/Sensor_Preprocessing/param_calib/README.md",
+    "middleware/Protocol/README.md", "middleware/Protocol/mavlink/README.md",
+    "middleware/Protocol/nmea/README.md", "middleware/Control/so3/README.md",
 ]
 EXT = (".c", ".h", ".cpp", ".hpp", ".py", ".md", ".bat", ".ps1", ".exe",
        ".gdb", ".ocd", ".json", ".xml", ".ioc", ".lds", ".icf", ".sct",
@@ -29,7 +29,13 @@ EXT = (".c", ".h", ".cpp", ".hpp", ".py", ".md", ".bat", ".ps1", ".exe",
 SEARCH = [ROOT, os.path.join(ROOT, "middleware"), os.path.join(ROOT, "build_host"),
           os.path.join(ROOT, "libraries", "HAL_Drivers", "drivers"),
           os.path.join(ROOT, "applications"), os.path.join(ROOT, "build_host", "data"),
-          os.path.join(ROOT, "doc")]
+          os.path.join(ROOT, "doc"),
+          # 重组后的二级目录组: 裸文件名速记只扫 SEARCH 根一层子目录,
+          # 故凡再嵌一层的组目录须在此登记 (Sensor_Drivers、
+          # Navigation/gins、Sensor_Preprocessing 各组目录)
+          os.path.join(ROOT, "middleware", "Sensor_Preprocessing"),
+          os.path.join(ROOT, "middleware", "Sensor_Drivers"),
+          os.path.join(ROOT, "middleware", "Navigation")]
 
 
 def main():

@@ -1,0 +1,14 @@
+import os
+from building import *
+
+cwd = GetCurrentDir()
+
+# 传感器预处理层: filter_calib (磁椭球/气压标定) + param_calib (W25Q64 参数分区)。
+# middleware 顶层 SConscript 只扫描一层目录, 本文件转发子目录 SConscript。
+objs = []
+list = os.listdir(cwd)
+for item in list:
+    if os.path.isfile(os.path.join(cwd, item, 'SConscript')):
+        objs = objs + SConscript(os.path.join(item, 'SConscript'))
+
+Return('objs')

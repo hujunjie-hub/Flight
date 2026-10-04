@@ -221,7 +221,7 @@ menu "On-chip Peripheral Drivers"
         bool "Enable hardware timer"
         default n
         # RT-Thread 5.3.0: hwtimer 框架已移除, drv_tim 改注册 clock_timer
-        # (rt_clock_timer_register)。注意 TIM2 由 middleware/timebase 独占
+        # (rt_clock_timer_register)。注意 TIM2 由 middleware/Sensor_Drivers 独占
         # (HAL TIM 直驱), 除非明确知道用途否则保持关闭。
         select RT_USING_CLOCK_TIME
         if BSP_USING_TIM

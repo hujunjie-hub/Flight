@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict-warning rescan of project-owned C++ code (middleware/gins etc.).
+"""Strict-warning rescan of project-owned C++ code (middleware/Navigation/gins etc.).
 
 Kf-GINS upstream sources are excluded; only local bridge/wrapper units.
 Host-side tool only; not part of firmware build.
@@ -11,7 +11,7 @@ import subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(HERE, '..', 'cmake-build-debug', 'compile_commands.json')
 
-OWN = ('/middleware/gins/',)
+OWN = ('/middleware/Navigation/gins/',)
 
 
 def main():

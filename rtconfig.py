@@ -66,7 +66,7 @@ if PLATFORM == 'gcc':
 
     # 与 CMakeLists.txt 的 CXX 旗标对齐: C++17 (aligned_new.cpp 的
     # std::align_val_t 需要) + 无异常/无 RTTI (KF-GINS/Eigen 嵌入式最小配置)
-    # + FMA 融合放行 (GINS 热路径 -O3 在 middleware/gins/SConscript 组内)
+    # + FMA 融合放行 (GINS 热路径 -O3 在 middleware/Navigation/gins/SConscript 组内)
     CXXFLAGS = CFLAGS + ' -std=gnu++17 -fno-exceptions -fno-rtti -ffp-contract=fast'
     CFLAGS += ' -std=c99'
 

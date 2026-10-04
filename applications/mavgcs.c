@@ -8,7 +8,7 @@
  * ---------------------------------------------------------------------------
  * 定位与数据流
  * ---------------------------------------------------------------------------
- * 纯装配层: 协议 (帧同步/CRC/pack) 在 middleware/protocol/mavlink (官方库
+ * 纯装配层: 协议 (帧同步/CRC/pack) 在 middleware/Protocol/mavlink (官方库
  * + mavlink_link 适配层), 数据在 gins 桥接快照 / gnss_data 镜像, 本文件只
  * 做三件事 —— 串口收发、周期消息装配、握手应答:
  *
@@ -53,10 +53,16 @@
  *     忽略, 双源真实优先); RC_CHANNELS 5Hz 回显摇杆量。
  *   - GPS_RTCM_DATA (QGC NTRIP 改正数) -> 分片重组后整包回注 UART4
  *     (UM982 同口, RTK 链; `gcs rtcm off` 可关)。
+ *   - PARAM_REQUEST_LIST/READ + PARAM_SET (阶段 2): W25Q64 参数域映射
+ *     成 44 项 MAVLink 参数表, 实现在 gcs_param.c (本文件只负责拉起
+ *     gcs_param_init 与节拍驱动 gcs_param_poll 落盘防抖)。
  *   心跳同步升级: armed/ACTIVE 直接反映 quad_model 状态机。
- *   参数/任务协议 (param_calib/Mission) 仍为后续项。
+ *   Mission 航线协议仍为后续项。
  *
- * FinSH 命令: gcs [on | off]   查看状态 / 启停会话
+ * sysid/compid: 编译期缺省 (mavlink_link.h), `gcs id <sysid> <compid>`
+ * 运行期覆盖并持久化到 W25Q64 sys 分区 (param_sys), 上电自动恢复。
+ *
+ * FinSH 命令: gcs [on | off | rtcm on|off | id <sysid> <compid>]
  */
 
 #include <rtthread.h>
@@ -75,6 +81,8 @@
 #include "mpc_pos_gins.h"           /* mpc_pos_gins_set_sp_lla(): DO_REPOSITION 定点 */
 #include "att_pid_gins.h"           /* att_pid_gins_set_yaw_deg(): 期望航向 */
 #include "rc_data.h"                /* rc_data_publish(): MANUAL_CONTROL 虚拟摇杆 */
+#include "param_sys.h"              /* param_sys_gcs_ids(): sysid/compid 持久化 */
+#include "gcs_param.h"              /* gcs_param_init/poll(): QGC 参数协议 */
 
 /* ulog 日志: LOG_E/LOG_W/LOG_I/LOG_D, 行尾自动补 \r\n */
 #define LOG_TAG "gcs"
@@ -96,8 +104,7 @@
 #define GCS_PERIOD_ATT_MS       100         /* ATTITUDE_QUATERNION 10Hz */
 #define GCS_PERIOD_NAV_MS       200         /* LOCAL/GLOBAL/VFR/GPS 5Hz */
 
-/* 本地 NED 原点球面换算 (同 mpc_pos_gins.c 的 latlon_to_ned 公式) */
-#define GCS_EARTH_RE_M          6378137.0
+/* 本地 NED 换算: 走 mpc_pos_gins_lla_to_ned 公共入口 (原内联公式已删) */
 #define GCS_D2R                 0.017453292519943295
 
 /* QGC 握手伪装参数 (照抄 FMT mavgcs.c: QGC 机架识别依赖 PX4 版本号) */
@@ -545,7 +552,8 @@ static void gcs_send_attitude(const struct gins_solution *sol)
     gcs_send(&msg);
 }
 
-/* 捕获本地 NED 原点 (首个 ready 解算快照), 输出北/东/下 (m) */
+/* 捕获本地 NED 原点 (首个 ready 解算快照), 输出北/东/下 (m)。
+ * 换算走 mpc_pos_gins_lla_to_ned 公共入口 (原内联公式已归一到 mpc_pos_gins) */
 static void gcs_local_ned(const struct gins_solution *sol,
                           double pos_ned[3], double *rel_alt)
 {
@@ -563,10 +571,10 @@ static void gcs_local_ned(const struct gins_solution *sol,
 
     if (ctx.origin_valid)
     {
-        pos_ned[0] = (sol->latitude - ctx.lat0_deg) * GCS_D2R * GCS_EARTH_RE_M;
-        pos_ned[1] = (sol->longitude - ctx.lon0_deg) * GCS_D2R
-                     * GCS_EARTH_RE_M * cos(ctx.lat0_deg * GCS_D2R);
-        pos_ned[2] = -(sol->altitude - ctx.alt0_m);
+        const double ref[3] = { ctx.lat0_deg, ctx.lon0_deg, ctx.alt0_m };
+        const double lla[3] = { sol->latitude, sol->longitude, sol->altitude };
+
+        mpc_pos_gins_lla_to_ned(ref, lla, pos_ned);
         *rel_alt = sol->altitude - ctx.alt0_m;
     }
     else
@@ -775,6 +783,9 @@ static void gcs_thread_entry(void *parameter)
         while ((n = rt_device_read(ctx.uart, 0, rxb, sizeof(rxb))) > 0)
             mavlink_link_feed(rxb, n);
 
+        /* 参数落盘防抖到点检查 (PARAM_SET 3s 后统一写 W25Q64) */
+        gcs_param_poll();
+
         /* 发向: 周期节拍 (tick 回绕安全: 无符号减法) */
         {
             struct gins_solution sol;
@@ -889,6 +900,21 @@ int mavgcs_link_init(void)
     mavlink_link_set_sender(gcs_tx);          /* 发送通道注入 */
     mavlink_link_attach(gcs_on_msg, 0);       /* 通配: 按 msgid 分派 */
 
+    /* 恢复持久化的 GCS 标识 (sys 分区; `gcs id` 覆盖编译期缺省) */
+    {
+        rt_uint8_t sid, cid;
+
+        if (param_sys_gcs_ids(&sid, &cid))
+        {
+            mavlink_link_set_ids(sid, cid);
+            LOG_I("gcs: restored ids from sys partition: %u/%u",
+                  (unsigned)sid, (unsigned)cid);
+        }
+    }
+
+    /* QGC 参数协议 (阶段 2): PARAM_* -> W25Q64 参数域, 落盘由本线程 poll */
+    gcs_param_init();
+
     ctx.thread = rt_thread_create("mavgcs", gcs_thread_entry, RT_NULL,
                                    GCS_THREAD_STACK, GCS_THREAD_PRIO,
                                    GCS_THREAD_TICK);
@@ -937,29 +963,65 @@ static void gcs(int argc, char **argv)
                   ctx.rtcm_on ? "on" : "off", GCS_RTCM_DEV);
             return;
         }
+        if (!rt_strcmp(argv[1], "id") && argc >= 4)
+        {
+            /* 运行期覆盖本机 MAVLink 标识并持久化 (多机同链路避让 sysid;
+             * 生效于后续收发, QGC 侧表现为"新机", 需重连) */
+            long sid = 0, cid = 0;
+
+            for (const char *s = argv[2]; *s >= '0' && *s <= '9'; s++)
+                sid = sid * 10 + (*s - '0');
+            for (const char *s = argv[3]; *s >= '0' && *s <= '9'; s++)
+                cid = cid * 10 + (*s - '0');
+
+            if (sid < 1 || sid > 255 || cid < 1 || cid > 255)
+            {
+                LOG_W("usage: gcs id <sysid 1..255> <compid 1..255>");
+                return;
+            }
+            mavlink_link_set_ids((rt_uint8_t)sid, (rt_uint8_t)cid);
+            if (param_sys_set_gcs_ids((rt_uint8_t)sid,
+                                      (rt_uint8_t)cid) != RT_EOK)
+                LOG_W("gcs id: RAM applied, sys partition save failed");
+            else
+                LOG_I("gcs id: %u/%u (persisted, effective immediately)",
+                      (unsigned)sid, (unsigned)cid);
+            return;
+        }
     }
 
-    mavlink_link_get_stats(&st);
+    {
+        struct gcs_param_status pstat;
 
-    LOG_I("=== QGC GCS link (FMT_README ch13, 阶段1 数传电台) ===");
-    LOG_I("session : %s, uart %s @ %s 8N1, rx_taken=%d",
-          ctx.on ? "ON" : "off", GCS_UART_DEV, GCS_UART_BAUD_TEXT,
-          (int)ctx.rx_taken);
-    LOG_I("tx      : %u frames this boot", ctx.tx_cnt);
-    LOG_I("rx      : bytes=%u pkts=%u crc_err=%u handled=%u lastmsgid=%u",
-          st.rx_bytes, st.rx_packets, st.rx_crc_err, st.rx_handled,
-          st.last_msgid);
-    LOG_I("gcs hb  : %s", (ctx.last_gcs_hb == 0) ? "never" :
-          ((rt_tick_get() - ctx.last_gcs_hb <
-            rt_tick_from_millisecond(5000)) ? "recent (<5s)" : "stale"));
-    LOG_I("origin  : %s", ctx.origin_valid ? "captured" : "waiting first ready fix");
-    LOG_I("uplink  : arm/disarm (400) + reposition (192, 钳位 h%d/v%d m) "
-          "+ set_mode (POSCTL) + virtual stick + rtcm", (int)GCS_REPO_HORIZ_MAX_M,
-          (int)GCS_REPO_VERT_MAX_M);
-    LOG_I("rtcm    : %s, %u bytes / %u pkts fwd -> %s (drop %u)",
-          ctx.rtcm_on ? "on" : "off", ctx.rtcm_bytes, ctx.rtcm_pkts,
-          GCS_RTCM_DEV, ctx.rtcm_drop);
-    LOG_I("hint    : QGC serial link -> 数传电台 @ %s, MAVLink2", GCS_UART_BAUD_TEXT);
+        gcs_param_status(&pstat);
+
+        mavlink_link_get_stats(&st);
+
+        LOG_I("=== QGC GCS link (FMT_README ch13, 阶段2 参数协议) ===");
+        LOG_I("session : %s, uart %s @ %s 8N1, rx_taken=%d",
+              ctx.on ? "ON" : "off", GCS_UART_DEV, GCS_UART_BAUD_TEXT,
+              (int)ctx.rx_taken);
+        LOG_I("ids     : sysid=%u compid=%u (`gcs id <s> <c>` to change)",
+              (unsigned)mavlink_link_sysid(),
+              (unsigned)mavlink_link_compid());
+        LOG_I("tx      : %u frames this boot", ctx.tx_cnt);
+        LOG_I("rx      : bytes=%u pkts=%u crc_err=%u handled=%u lastmsgid=%u",
+              st.rx_bytes, st.rx_packets, st.rx_crc_err, st.rx_handled,
+              st.last_msgid);
+        LOG_I("gcs hb  : %s", (ctx.last_gcs_hb == 0) ? "never" :
+              ((rt_tick_get() - ctx.last_gcs_hb <
+                rt_tick_from_millisecond(5000)) ? "recent (<5s)" : "stale"));
+        LOG_I("origin  : %s", ctx.origin_valid ? "captured" : "waiting first ready fix");
+        LOG_I("param   : %u entries, save_pending=%d (QGC 参数页, 3s 防抖落盘)",
+              (unsigned)pstat.count, (int)pstat.save_pending);
+        LOG_I("uplink  : arm/disarm (400) + reposition (192, 钳位 h%d/v%d m) "
+              "+ set_mode (POSCTL) + virtual stick + rtcm", (int)GCS_REPO_HORIZ_MAX_M,
+              (int)GCS_REPO_VERT_MAX_M);
+        LOG_I("rtcm    : %s, %u bytes / %u pkts fwd -> %s (drop %u)",
+              ctx.rtcm_on ? "on" : "off", ctx.rtcm_bytes, ctx.rtcm_pkts,
+              GCS_RTCM_DEV, ctx.rtcm_drop);
+        LOG_I("hint    : QGC serial link -> 数传电台 @ %s, MAVLink2", GCS_UART_BAUD_TEXT);
+    }
 }
 MSH_CMD_EXPORT(gcs, QGC GCS link: gcs [on|off]);
 

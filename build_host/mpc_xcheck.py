@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-middleware/control 纯 C 核心 (mpc_pos.c / att_pid.c, 含 so3.c) 主机交叉验证
+middleware/Control 纯 C 核心 (mpc_pos.c / att_pid.c, 含 so3.c) 主机交叉验证
 
 与 so3_xcheck.py 不同, 本脚本用主机 gcc (CLion 自带 MinGW) 直接编译**固件
 源文件本体**, 跑确定性数值用例并打印结果; Python 侧用独立构造的参考对拍:

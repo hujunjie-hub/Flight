@@ -28,7 +28,7 @@ os.path.join(src_path, 'stm32h7xx_hal_rng.c'),
 os.path.join(src_path, 'stm32h7xx_hal_sram.c'),
 os.path.join(src_path, 'stm32h7xx_hal_gpio.c'),
 os.path.join(src_path, 'stm32h7xx_hal_ospi.c'),
-# middleware/timebase (TIM2 时基 + PPS 输入捕获) 独占 HAL TIM,
+# middleware/Sensor_Drivers (TIM2 时基 + PPS 输入捕获) 独占 HAL TIM,
 # 不经 hwtimer 框架 (RT_USING_HWTIMER 已关闭), 源文件常编
 os.path.join(src_path, 'stm32h7xx_hal_tim.c'),
 os.path.join(src_path, 'stm32h7xx_hal_tim_ex.c'),

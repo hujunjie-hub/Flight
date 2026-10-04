@@ -8,7 +8,7 @@
 | 脚本 | 用途 |
 |---|---|
 | `strict_scan.py` / `strict_scan_cpp.py` | C / C++ 严格告警扫描 (读 `cmake-build-debug/compile_commands.json`), 基线 0 报警 |
-| `mpc_xcheck.py` | 控制律数值交叉验证: 主机 gcc 直接编译 `middleware/control` + `so3` 纯 C 源码, numpy 独立构造对拍 (QP KKT / 姿态构造 / 串级 PID) |
+| `mpc_xcheck.py` | 控制律数值交叉验证: 主机 gcc 直接编译 `middleware/Control` + `so3` 纯 C 源码, numpy 独立构造对拍 (QP KKT / 姿态构造 / 串级 PID) |
 | `so3_xcheck.py` | SO(3)↔KF-GINS 旋转数学对拍 (numpy 独立参考实现, 14 项) |
 | `fanalyzer_scan.py` | GCC `-fanalyzer` 静态分析扫描 |
 | `warningscan.py` / `warnfix.py` / `warnfix2.py` | 告警清点 / 半自动修复 (历史一次性, 留作参考) |
@@ -48,4 +48,4 @@ run_capture/analyze_* 等)。
 - `test10/` — 2026-09-30 SWD 10 轮回归 17 判据证据日志 (根 README
   "已知问题与遗留项"的 10 轮回归段引用, 勿删; 注: 该表 2026-10-03
   起按时间重编号, 引用以段名定位)
-- `ell_test.exe` — 主机端椭球拟合单元测试 (源: `middleware/calibration/ellipsoid_fit.c`)
+- `ell_test.exe` — 主机端椭球拟合单元测试 (源: `middleware/Sensor_Preprocessing/filter_calib/ellipsoid_fit.c`)

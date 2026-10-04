@@ -5,10 +5,10 @@ def patch(path, old, new, count=1):
     edits.append((path, old, new, count))
 
 # mag_calib: bias 也是 float, 一并提升
-patch('middleware/calibration/mag_calib.c',
+patch('middleware/Sensor_Preprocessing/filter_calib/mag_calib.c',
       '    /* 先整体升 double 再运算, 避免混合表达式逐次隐式提升 (m 为 float 阵) */\n    const double r0 = raw_ut[0], r1 = raw_ut[1], r2 = raw_ut[2];',
       '    /* 先整体升 double 再运算, 避免混合表达式逐次隐式提升 (m/bias 均为 float) */\n    const double r0 = raw_ut[0], r1 = raw_ut[1], r2 = raw_ut[2];\n    const double b0 = bias[0], b1 = bias[1], b2 = bias[2];')
-patch('middleware/calibration/mag_calib.c',
+patch('middleware/Sensor_Preprocessing/filter_calib/mag_calib.c',
       '        out_ut[i] = m0 * (r0 - bias[0])\n                  + m1 * (r1 - bias[1])\n                  + m2 * (r2 - bias[2]);',
       '        out_ut[i] = m0 * (r0 - b0)\n                  + m1 * (r1 - b1)\n                  + m2 * (r2 - b2);')
 

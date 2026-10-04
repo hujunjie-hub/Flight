@@ -1,0 +1,15 @@
+import os
+from building import *
+
+cwd = GetCurrentDir()
+
+# 车辆模型层: 凡含 SConscript 的子目录自动编入 —— model (四旋翼执行模型,
+# ctl 线程宿主) / control_allocation (混控) / dshot_output (电调输出)。
+# middleware 顶层 SConscript 只扫描一层目录, 本文件转发子目录 SConscript。
+objs = []
+list = os.listdir(cwd)
+for item in list:
+    if os.path.isfile(os.path.join(cwd, item, 'SConscript')):
+        objs = objs + SConscript(os.path.join(item, 'SConscript'))
+
+Return('objs')

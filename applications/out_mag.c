@@ -5,10 +5,10 @@
  *
  * BMM350 磁力计数据 (原始 + 入环前处理结果) -> 带标记文本打印 (USART1 调试口)
  *
- * 数据来源: middleware/data 的 mag_data 最新样本镜像 (100Hz, 非消费读),
+ * 数据来源: middleware/Sensor_Preprocessing/process_data 的 mag_data 最新样本镜像 (100Hz, 非消费读),
  *   seq 变化才打印 —— 不弹 FIFO, 与 ginsaux 融合消费方共存; 每个样本同时携带:
  *     mag[]  原始磁强 µT (传感器坐标系, 仅单位换算)
- *     cal[]  校准 -> 轴映射(前右下) -> 低通 后的磁强 µT (data 层采集线程
+ *     cal[]  校准 -> 轴映射(前右下) -> 低通 后的磁强 µT (process_data 层采集线程
  *            入环前完成, 喂 KF-GINS 的同一份数据)
  *   原始/处理两组同行打印, 便于检验校准与滤波效果。
  *
@@ -86,7 +86,7 @@ static void magout_line(const struct mag_sample *m)
                   (float)sqrt(m->cal[0] * m->cal[0] + m->cal[1] * m->cal[1] +
                               m->cal[2] * m->cal[2]));
 
-    /* 行尾标记: 本行含 middleware/calibration 校正输出 (cx..cz/cmag) */
+    /* 行尾标记: 本行含 middleware/Sensor_Preprocessing/filter_calib 校正输出 (cx..cz/cmag) */
     {
         int n2 = rt_snprintf(buf + off, sizeof(buf) - off, " mag_calib_data");
 
