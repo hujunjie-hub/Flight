@@ -153,12 +153,22 @@ rt_bool_t timebase_utc_to_mcu(rt_uint64_t t_utc_us, rt_uint64_t *t_mcu_us)
         return RT_FALSE;
     }
 
-    /* T_MCU = base_m + (T_UTC - base_u) * scale; 待换算时标不早于基准点,
-     * 属 <=1 个 PPS 周期的外推 (误差 ~ 斜率误差 x 1s = us 量级) */
+    /* T_MCU = base_m + (T_UTC - base_u) * scale; 设计上待换算时标不早于
+     * 基准点 (<=1 个 PPS 周期的外推, 误差 ~ 斜率误差 x 1s = us 量级)。
+     * 迟到样本对上一 PPS 窗时偏移为负 —— 负 double 转无符号是 UB,
+     * 按有符号域换算后向前饱和钳 0。 */
     {
-        double d = (double)t_utc_us - (double)m.t_utc_base;
+        double off = ((double)t_utc_us - (double)m.t_utc_base) * m.scale + 0.5;
 
-        *t_mcu_us = m.t_mcu_base + (rt_uint64_t)(d * m.scale + 0.5);
+        if (off >= 0.0)
+            *t_mcu_us = m.t_mcu_base + (rt_uint64_t)off;
+        else
+        {
+            double back = -off;
+
+            *t_mcu_us = (back < (double)m.t_mcu_base)
+                        ? m.t_mcu_base - (rt_uint64_t)back : 0;
+        }
     }
     return RT_TRUE;
 }
@@ -183,10 +193,19 @@ rt_bool_t timebase_mcu_to_utc(rt_uint64_t t_mcu_us, rt_uint64_t *t_utc_us)
         return RT_FALSE;
     }
 
+    /* 同 utc_to_mcu: 早于基准点的负偏移按有符号域换算, 向前饱和钳 0 */
     {
-        double d = (double)t_mcu_us - (double)m.t_mcu_base;
+        double off = ((double)t_mcu_us - (double)m.t_mcu_base) / m.scale + 0.5;
 
-        *t_utc_us = m.t_utc_base + (rt_uint64_t)(d / m.scale + 0.5);
+        if (off >= 0.0)
+            *t_utc_us = m.t_utc_base + (rt_uint64_t)off;
+        else
+        {
+            double back = -off;
+
+            *t_utc_us = (back < (double)m.t_utc_base)
+                        ? m.t_utc_base - (rt_uint64_t)back : 0;
+        }
     }
     return RT_TRUE;
 }

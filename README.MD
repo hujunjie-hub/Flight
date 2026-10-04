@@ -56,13 +56,9 @@ Flight/
 │   ├── Kconfig                #   板级配置菜单
 │   ├── linker_scripts/        #   链接脚本 (GCC link.lds / Keil link.sct / IAR link.icf)
 │   └── SConscript
-├── middleware/                # 传感器数据处理与组合导航中间件 (详见 middleware/README.MD)
+├── middleware/                # 传感器数据处理与组合导航中间件 (七模块, 详见 middleware/README.MD)
 │   ├── Sensor_Drivers/        #   传感器驱动层: ADIS16505 / BMM350 / BMP585 / W25Q64 / miniTF SD (SDMMC1)
 │   │                          #   + timebase.c/h 时间同步基座 (TIM2 @1MHz T_MCU + PA2 PPS 捕获)
-│   ├── Protocol/              #   纯协议解析 (不含硬件访问)
-│   │   ├── nmea/              #     um982_nmea: NMEA RMC/GGA/ZDA → GNSS PVT
-│   │   ├── crsf/              #     CRSF 遥控帧解析 (ELRS, CRC8/11bit 通道)
-│   │   └── mavlink/           #     MAVLink 库 + 链路层封装
 │   ├── Sensor_Preprocessing/  #   传感器预处理层 (转发 SConscript 供 middleware 单层扫描)
 │   │   ├── process_data/      #     原始数据环形缓冲区层 (imu / gnss / gnss_raw / mag / baro
 │   │   │                      #     + record_ring 定长记录环公共层, 四模块共用
@@ -70,9 +66,9 @@ Flight/
 │   │   ├── filter_calib/      #     磁力计椭球校准 + 气压计基准校准 (参数经 param_calib 持久化)
 │   │   └── param_calib/       #     飞控参数分区存储 (W25Q64): 分区引擎 + calib/nav/sys 三参数域,
 │   │                          #     追加式记录 + CRC32 + 磨损均衡, 掉电原子
-│   ├── gins/                  #   KF-GINS 桥接: gins 解算线程 (1kHz) + ginsaux 消费线程
-│   │                          #   + C++ 对齐 new 堆适配 (aligned_new.cpp)
-│   ├── KF-GINS/               #   上游组合导航算法内核 (C++, 21 状态 EKF, 最小嵌入)
+│   ├── Navigation/            #   组合导航: gins/ 桥接 (gins 解算线程 1kHz + ginsaux 消费线程
+│   │   │                      #     + C++ 对齐 new 堆适配 aligned_new.cpp)
+│   │   └── KF-GINS/           #     上游组合导航算法内核 (C++, 21 状态 EKF, 最小嵌入)
 │   ├── Control/               #   飞控控制律 (级联): position_mpc 外环位置 MPC
 │   │                          #   + attitude_so3 内环 SO(3)/PID 姿态 + so3
 │   │                          #   姿态误差数学 (2026-10-03, so3 自 middleware
@@ -82,8 +78,16 @@ Flight/
 │   │                          #   FMT 式状态门控+分频调度, 默认 DISARM+dry-run)
 │   │                          #   + control_allocation 混控
 │   │                          #   + dshot_output 电调输出 (PWM/DShot, 硬件占位)
+│   ├── GCS_RC_MIX/            #   数传+遥控混合指令输入 (规划落位; 现实现分散在
+│   │                          #   Protocol/crsf + process_data/rc_data + applications/mavgcs)
+│   ├── System_Management/     #   模式/解锁/安全保护 (规划模块, 空占位; FMT 式状态
+│   │                          #   门控暂在 quad_model ctl 线程)
+│   ├── Protocol/              #   纯协议解析 (不含硬件访问)
+│   │   ├── nmea/              #     um982_nmea: NMEA RMC/GGA/ZDA → GNSS PVT
+│   │   ├── crsf/              #     CRSF 遥控帧解析 (ELRS, CRC8/11bit 通道)
+│   │   └── mavlink/           #     MAVLink 库 + 链路层封装
 │   ├── SConscript             #   注: sensor(驱动)/protocol(协议) 等子模块构建入口
-│   └── README.md              #   数据流架构 + FinSH 命令速查 (必读)
+│   └── README.MD              #   数据流架构 + FinSH 命令速查 (必读)
 ├── rt-thread/                 # RT-Thread 内核源码 (5.3.0): src / components / libcpu / include
 ├── libraries/                 # ST 芯片级支持
 │   └── HAL_Drivers/           #   RT-Thread STM32 驱动层 (drv_common, uart/i2c/spi 等) + CMSIS

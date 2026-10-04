@@ -4,9 +4,10 @@ from building import *
 cwd = GetCurrentDir()
 
 # 中间件层: 凡含 SConscript 的子目录自动编入 —— Sensor_Drivers
-# (sensor 驱动 + timebase 时基) / Sensor_Preprocessing
-# / protocol / Navigation (gins 含 KF-GINS 内核, 见 Navigation/SConscript)
-# / control (position_mpc + attitude_so3 + so3)
+# (sensor 驱动 + timebase 时基) / Sensor_Data / Sensor_Preprocessing
+# / Protocol / Navigation (gins 含 KF-GINS 内核, 见 Navigation/SConscript)
+# / Control (position_mpc + attitude_so3 + so3) / Vehicle_Model (model +
+# control_allocation + dshot_output)
 objs = []
 list = os.listdir(cwd)
 for item in list:

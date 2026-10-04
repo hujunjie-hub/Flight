@@ -341,21 +341,21 @@ def build_driver(workdir):
         fh.write(DRIVER)
     gcc = find_gcc()
     inc = [
-        os.path.join(ROOT, "middleware", "control", "position_mpc"),
-        os.path.join(ROOT, "middleware", "control", "attitude_so3"),
-        os.path.join(ROOT, "middleware", "control", "so3"),
-        os.path.join(ROOT, "middleware", "control", "control_allocation"),
-        os.path.join(ROOT, "middleware", "control", "dshot_output"),
+        os.path.join(ROOT, "middleware", "Control", "position_mpc"),
+        os.path.join(ROOT, "middleware", "Control", "attitude_so3"),
+        os.path.join(ROOT, "middleware", "Control", "so3"),
+        os.path.join(ROOT, "middleware", "Vehicle_Model", "control_allocation"),
+        os.path.join(ROOT, "middleware", "Vehicle_Model", "dshot_output"),
     ]
     exe = os.path.join(workdir, "_xcheck_driver.exe")
     cmd = [gcc, "-std=c99", "-O2", "-Wall", "-Wextra", "-Wno-unused-parameter"]
     cmd += ["-I" + p for p in inc]
     cmd += [src,
-            os.path.join(ROOT, "middleware", "control", "position_mpc", "mpc_pos.c"),
-            os.path.join(ROOT, "middleware", "control", "attitude_so3", "att_pid.c"),
-            os.path.join(ROOT, "middleware", "control", "so3", "so3.c"),
-            os.path.join(ROOT, "middleware", "control", "control_allocation", "mixer.c"),
-            os.path.join(ROOT, "middleware", "control", "dshot_output", "dshot_enc.c"),
+            os.path.join(ROOT, "middleware", "Control", "position_mpc", "mpc_pos.c"),
+            os.path.join(ROOT, "middleware", "Control", "attitude_so3", "att_pid.c"),
+            os.path.join(ROOT, "middleware", "Control", "so3", "so3.c"),
+            os.path.join(ROOT, "middleware", "Vehicle_Model", "control_allocation", "mixer.c"),
+            os.path.join(ROOT, "middleware", "Vehicle_Model", "dshot_output", "dshot_enc.c"),
             "-lm", "-o", exe]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if r.returncode != 0:

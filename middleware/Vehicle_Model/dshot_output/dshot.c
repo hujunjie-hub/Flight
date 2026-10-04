@@ -242,11 +242,19 @@ static int frame_dma_send(const unsigned short fr[DSHOT_CH_NUM])
 
     SCB_CleanDCache_by_Addr((rt_uint32_t *)s_frame, sizeof(s_frame));
 
-    /* 上一帧未完成: 丢弃旧帧重发 (输出周期须大于帧时长) */
-    if (HAL_DMA_GetState(&g_out.dma) == HAL_DMA_STATE_BUSY)
+    /* 上一帧未完成: 丢弃旧帧重发 (输出周期须大于帧时长)。
+     * 轮询模式无中断回位 State, HAL_DMA_GetState 恒为 BUSY, 不能作在途
+     * 判据 (否则每帧误 Abort 且 busy_cnt 500Hz 虚增) —— 以流使能位为准
+     * (传输完成硬件自动清 EN); Abort 兼任把 HAL State 归位 READY,
+     * 后续 HAL_DMA_Start 才会受理。H7 HAL 的 Instance 为 void*, 显式转型。 */
     {
-        HAL_DMA_Abort(&g_out.dma);
-        g_out.busy_cnt++;
+        DMA_Stream_TypeDef *dma_stream = (DMA_Stream_TypeDef *)g_out.dma.Instance;
+
+        if ((dma_stream->CR & DMA_SxCR_EN) != 0U)
+        {
+            HAL_DMA_Abort(&g_out.dma);
+            g_out.busy_cnt++;
+        }
     }
 
     if (HAL_DMA_Start(&g_out.dma, (rt_uint32_t)s_frame,

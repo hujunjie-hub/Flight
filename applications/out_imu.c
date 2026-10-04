@@ -58,7 +58,8 @@ static struct
     rt_uint32_t dec;            /* 当前块均值窗口 (样本数) */
     rt_uint32_t lines;          /* 累计打印行数 */
     rt_uint32_t samples;        /* 累计消费样本数 */
-} imuout_ctx;
+} imuout_ctx = { .dec = IMUOUT_DECIMATE };  /* 赋值在裁剪区内, 而 FinSH 状态
+                                             * 打印在区外读 dec, 必须有初值防除零 */
 
 #if IMUOUT_ENABLE
 /* 整行一次写出: 串口框架发送路径有锁, 行不会被日志插断 */

@@ -104,7 +104,7 @@ rt_bool_t mpc_pos_gins_ref_valid(void)
     return g_run.ref.valid;
 }
 
-void mpc_pos_gins_set_sp(const double p_ned[3], const double v_ned[3])
+void mpc_pos_gins_set_sp_soft(const double p_ned[3], const double v_ned[3])
 {
     ensure_setup();
     if (!g_run.ref.valid)
@@ -115,6 +115,11 @@ void mpc_pos_gins_set_sp(const double p_ned[3], const double v_ned[3])
         g_run.v_ref[i] = v_ned ? v_ned[i] : 0.0;
     }
     g_run.sp_valid = RT_TRUE;
+}
+
+void mpc_pos_gins_set_sp(const double p_ned[3], const double v_ned[3])
+{
+    mpc_pos_gins_set_sp_soft(p_ned, v_ned);
     mpc_pos_reset(&g_mpc);
 }
 
@@ -314,13 +319,14 @@ static void mpc_show(void)
 static void mpc_set_vec(const char *key, struct mpc_pos_cfg *cfg,
                          double v[3], int argc, char **argv)
 {
-    if (argc < 5)
+    /* `mpc set qpos x y z`: argv[0]=mpc argv[1]=set argv[2]=key argv[3..5]=值 */
+    if (argc < 6)
     {
         LOG_W("usage: mpc set %s <x> <y> <z>", key);
         return;
     }
     for (int i = 0; i < 3; i++)
-        v[i] = calib_parse_num(argv[2 + i]);
+        v[i] = calib_parse_num(argv[3 + i]);
     if (mpc_pos_setup(&g_mpc, cfg) != MPC_POS_OK)
         LOG_W("invalid cfg, setup rejected (values not applied)");
     else
@@ -401,13 +407,13 @@ static void mpc(int argc, char **argv)
                       !rt_strcmp(key, "qvel") ? cfg.q_vel :
                       !rt_strcmp(key, "racc") ? cfg.r_acc :
                       !rt_strcmp(key, "umin") ? cfg.u_min : cfg.u_max;
-        if (argc < 4)
+        if (argc < 5)   /* argv[1]=key, argv[2..4]=值 */
         {
             LOG_W("usage: mpc %s <x> <y> <z>", key);
             return;
         }
         for (int i = 0; i < 3; i++)
-            dst[i] = calib_parse_num(argv[1 + i]);
+            dst[i] = calib_parse_num(argv[2 + i]);
         if (mpc_pos_setup(&g_mpc, &cfg) != MPC_POS_OK)
             LOG_W("invalid cfg, setup rejected");
         else
@@ -433,13 +439,13 @@ static void mpc(int argc, char **argv)
     {
         double v[3] = {0, 0, 0};
         double sp[3];
-        if (argc < 4)
+        if (argc < 5)   /* argv[1]=pos/vel, argv[2..4]=值 */
         {
             LOG_W("usage: mpc %s <x> <y> <z> (NED m / m/s)", argv[1]);
             return;
         }
         for (int i = 0; i < 3; i++)
-            v[i] = calib_parse_num(argv[1 + i]);
+            v[i] = calib_parse_num(argv[2 + i]);
         if (!rt_strcmp(argv[1], "pos"))
         {
             mpc_pos_gins_get_sp(sp, RT_NULL);
@@ -457,13 +463,13 @@ static void mpc(int argc, char **argv)
 
     if (!rt_strcmp(argv[1], "aff"))
     {
-        if (argc < 4)
+        if (argc < 5)   /* argv[1]=aff, argv[2..4]=值 */
         {
             LOG_W("usage: mpc aff <x> <y> <z> (m/s^2)");
             return;
         }
         for (int i = 0; i < 3; i++)
-            g_run.a_ff[i] = calib_parse_num(argv[1 + i]);
+            g_run.a_ff[i] = calib_parse_num(argv[2 + i]);
         LOG_I("a_ff = (%.2f %.2f %.2f)",
               g_run.a_ff[0], g_run.a_ff[1], g_run.a_ff[2]);
         return;

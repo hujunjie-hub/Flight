@@ -87,7 +87,11 @@ static rt_uint8_t imu_pool[IMU_DATA_BUF_COUNT * sizeof(struct imu_sample)];
  * DATA_CNTR 16bit -> 32bit 单调扩展: 芯片计数 1kHz 下 65.5s 回绕,
  * 正常差分/回绕表现为小正增量; 大幅倒退视为芯片复位重新基线。
  * 扩展后 data_cnt 在 2^32/1kHz ≈ 49.7 天内单调, 消费侧差分即得丢拍。
+ * 复位检出拍仍推进 +1: 保证 data_cnt 严格单调, 消费侧 dt 差分永不为 0
+ * (复位间隔按 1ms 计虽失真, 但好于 dt=0 的除零/零间隔积分)。
  */
+static rt_uint32_t s_cntr_resets;
+
 static rt_uint32_t imu_extend_cntr(rt_uint16_t raw)
 {
     static rt_bool_t init = RT_FALSE;
@@ -100,7 +104,11 @@ static rt_uint32_t imu_extend_cntr(rt_uint16_t raw)
 
         if (d <= 0x8000u)
             acc += d;                     /* 正常/回绕/丢拍增量 */
-        /* 大幅倒退: 芯片复位, 不推进 */
+        else
+        {
+            acc += 1;                     /* 芯片复位: +1 保持严格单调 */
+            s_cntr_resets++;
+        }
     }
     init = RT_TRUE;
     last_raw = raw;
@@ -243,6 +251,7 @@ void imu_data_get_status(struct imu_data_status *st)
         return;
 
     ctx.st.lost = ctx.ring.lost;      /* 挤掉计数在公共层维护 */
+    ctx.st.resets = s_cntr_resets;
     *st = ctx.st;
 }
 
@@ -319,8 +328,8 @@ static void imudata(void)
     LOG_I("=== IMU data buffer (calibrated body-frame, 1kHz) ===");
     LOG_I("running : %s, count=%u/%d",
           st.running ? "yes" : "no", imu_data_count(), IMU_DATA_BUF_COUNT);
-    LOG_I("stats   : pushed=%u popped=%u lost=%u errors=%u",
-          st.pushed, st.popped, st.lost, st.errors);
+    LOG_I("stats   : pushed=%u popped=%u lost=%u errors=%u resets=%u",
+          st.pushed, st.popped, st.lost, st.errors, st.resets);
     LOG_I("dr chain: miss=%u drop=%u chk_err=%u diag_err=%u dma_err=%u "
           "overrun=%u recover=%u",
           dr.miss, dr.drop, dr.chk_err, dr.diag_err, dr.dma_err,

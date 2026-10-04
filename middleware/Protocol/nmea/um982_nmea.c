@@ -337,8 +337,12 @@ static void nav_rmc(char **f, rt_uint8_t nf)
         nav_set_date(yy, mo, dd);
     nav_set_utc(h, mi, sec, frac);
 
-    /* RMC 也带经纬度: 仅在可解析时刷新数值, pos_valid 由 GGA 定位质量决定 */
-    if (nav_latlon(f[3], f[4], &lat) && nav_latlon(f[5], f[6], &lon))
+    /* RMC 也带经纬度: 仅在 GGA 尚未给出有效定位 (pos_valid=0) 时兜底填充。
+     * pos_valid=TRUE 期间不得让 RMC (1Hz) 覆写 GGA (10Hz) 坐标 —— 两语句
+     * 隐含"同历元同解算"假设, UM982 解算源配置不一致时坐标会回跳;
+     * pos_valid 标志仍由 GGA 定位质量决定 */
+    if (!nav.data.pos_valid &&
+        nav_latlon(f[3], f[4], &lat) && nav_latlon(f[5], f[6], &lon))
     {
         nav.data.position.latitude  = lat;
         nav.data.position.longitude = lon;

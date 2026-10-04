@@ -39,6 +39,7 @@ struct imu_data_status
     rt_uint32_t popped;         /* 累计读出样本数 */
     rt_uint32_t lost;           /* 缓冲区满被挤掉的样本数 */
     rt_uint32_t errors;         /* 驱动读取失败次数 */
+    rt_uint32_t resets;         /* 芯片复位检出次数 (DATA_CNTR 大幅倒退) */
 };
 
 /* ------------------------- 接口 ------------------------- */

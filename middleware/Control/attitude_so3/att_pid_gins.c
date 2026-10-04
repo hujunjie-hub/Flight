@@ -169,13 +169,14 @@ struct att_pid_ctx *att_pid_gins_ctx(void)
 
 static void att_set_vec(const char *key, double v[3], int argc, char **argv)
 {
-    if (argc < 5)
+    /* `att set katt x y z`: argv[0]=att argv[1]=set argv[2]=key argv[3..5]=值 */
+    if (argc < 6)
     {
         LOG_W("usage: att set %s <x> <y> <z>", key);
         return;
     }
     for (int i = 0; i < 3; i++)
-        v[i] = calib_parse_num(argv[2 + i]);
+        v[i] = calib_parse_num(argv[3 + i]);
     LOG_I("%s = (%.3f %.3f %.3f)", key, v[0], v[1], v[2]);
 }
 

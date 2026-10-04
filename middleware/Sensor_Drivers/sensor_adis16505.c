@@ -1071,6 +1071,20 @@ int rt_hw_adis16505_init(void)
 
     if (adis_prepare_bus() != RT_EOK)
         return -RT_ERROR;
+
+    /* 幂等门禁: DR 链路已运行时严禁重入 —— adis_dr_start 会重初始化
+     * proc_sem/xfer_lock (dr_thread 可能正挂起其上, rt_sem_init 破坏挂起
+     * 链表) 并再建一个处理线程形成双消费。重入场景: dr_start 成功后
+     * register_sensors 失败进入的 10s 重试线程。链路在运时的芯片异常
+     * (自复位/DEC_RATE 丢失) 由 adis_watchdog -> reconfig_req 机制自愈。 */
+    if (adis_dev.dr_mode)
+    {
+        if (adis_register_sensors() != RT_EOK)
+            return -RT_ERROR;       /* 补注册失败交重试线程再来 */
+        LOG_I("ADIS16505 DR chain already running, init reentry skipped");
+        return RT_EOK;
+    }
+
     adis_hw_reset_pulse();
 
     /* PROD_ID 校验 (0x72, 期望 16505 = 0x4079)。区分两种失败: 框架传输

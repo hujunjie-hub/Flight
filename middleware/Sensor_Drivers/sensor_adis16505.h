@@ -64,9 +64,11 @@ extern "C" {
 /* DR 中断抢占优先级 (Excel 清单: 2; 高于 DMA1_Stream0/1 完成中断的 3) */
 #define ADIS16505_DR_IRQ_PRIO       2
 
-/* 采样处理线程: 优先级高于使用者线程 (main=10), 栈 1KB */
+/* 采样处理线程: 优先级高于使用者线程 (main=10)。栈 2KB: 线程内走 ulog
+ * (芯片自复位重写 DEC_RATE 等 LOG_I/W), 1024B 有同型击穿先例
+ * (barodata/gnss 死于日志格式化) */
 #define ADIS16505_DR_THREAD_PRIO    6
-#define ADIS16505_DR_THREAD_STACK   1024
+#define ADIS16505_DR_THREAD_STACK   2048
 #define ADIS16505_DR_THREAD_TICK    10
 
 /* 处理线程等待超时 ms: 超时进入看门狗 (DMA 卡死复位 / DR 停止轮询重同步) */

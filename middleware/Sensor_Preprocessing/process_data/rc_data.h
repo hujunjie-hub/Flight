@@ -51,6 +51,10 @@ extern "C" {
 #define RC_CRSF_DEV             "uart3"
 #define RC_CRSF_BAUD_TEXT       "420000"
 #define RC_CRSF_BAUD            420000u
+/* RX 消费环 (serial v2 默认 64B): 420000baud≈42kB/s 下 64B 仅 ~1.5ms 余量,
+ * 调度抖动即环满丢字节 -> CRC 错帧, 与 gnss_data 460800 链同型失效 */
+#define RC_CRSF_RX_BUF_SZ       1024
+#define RC_CRSF_DMA_PING_BUF_SZ 256
 
 /* ---------------------------- 快照 ---------------------------- */
 

@@ -8,7 +8,8 @@
 目录按七模块分层组织 (2026-10-04 定稿): 传感器驱动 → 预处理 (校准 +
 环形缓冲) → KF-GINS 组合导航 → 控制律 → 车辆模型/控制分配/电调输出;
 另有 GCS_RC_MIX (数传 + 遥控混合指令输入) 与 System_Management
-(模式/解锁/安全) 两个规划模块。各子目录只依赖下一层的头文件, 可独立替换。
+(模式/解锁/安全) 两个规划模块, 以及横切的 Protocol/ 纯协议解析层
+(不占模块编号)。各子目录只依赖下一层的头文件, 可独立替换。
 
 ## 模块结构
 
@@ -39,11 +40,11 @@ UM982 10Hz ─ UART4 460800 (DMA_RX) → [gnssrx 接收线程] 只搬字节     
                      ├─ 整秒 UTC (定位有效) → timebase PPS 配对刷新滑窗        │ → KF-GINS EKF
                      └→ UTC→T_MCU 映射 → gnss_data 结构环 (T_event) ──────→ │   (gins 线程)
                                                                              │   统一时轴:
-BMM350 100Hz ─ I2C4 → mag_data 采集线程 (µT, 入环前: 校准→轴映射→            │   样本 T_event(T_MCU)
+BMM350 100Hz ─ I2C1 → mag_data 采集线程 (µT, 入环前: 校准→轴映射→            │   样本 T_event(T_MCU)
               干扰检查→低通; 环内样本 raw(传感器系)/cal(体系FRD)+quality)     │   经首个有效 GNSS 样本
               ├→ [ginsaux 线程] cal → 磁航向观测 (干扰位降权) ─────────→      │   锚定换算 GPST,
               └→ [magcal 采集线程] raw 字段椭球拟合 → 参数                    │   >50ms 丢弃计数)
-BMP585 100Hz ─ I2C2 → baro_data 环 (process_data/, Pa + 芯片温度)              │
+BMP585 100Hz ─ I2C4 → baro_data 环 (process_data/, Pa + 芯片温度)              │
               ├→ [ginsaux 线程] baro_calib 偏移 → 气压观测(Pa) ────────────→  │ (Pa→高度换算在引擎内)
               └→ [barocal 采集线程] 基准偏移 → 参数                          │
 
@@ -390,7 +391,8 @@ repeated-start 序列 HAL 只有 Seq_IT/Seq_DMA 两族 API, POLL 无法承接。
    事故的入口。
 
 闭环链路: INT 宏 → `BSP_I2C_USING_IRQ` → `stm32_i2c_init` 使能
-I2Cx_EV/ER 中断 (优先级走 board_nvic 表 =2) → 传输走
+I2Cx_EV/ER 中断 (优先级走 board_nvic 表, 2026-10-04 重排后
+I2C1/I2C4_EV=5、I2C2_EV=6、I2C ER=7) → 传输走
 `HAL_I2C_Master_Seq_{Transmit,Receive}_IT` → 完成回调
 `rt_completion_done` → 线程唤醒 (阻塞语义与 DMA/POLL 等价, 100kHz
 12B 传输 ~1ms, 100Hz 轮询无压力)。
@@ -465,7 +467,7 @@ MISO 线电平 CS 有效全期恒 0** —— 主机端 (外设+引脚) 硬件级
 deferred retry`)。
 
 **2026-10-01 深夜翻案 (上述"物理层"结论错误, 特此记录完整教训)**:
-应用户指正重审时间线 (README #8: 平台升级从未上板回归, 09-30 十轮
+应用户指正重审时间线 (README #5: 平台升级从未上板回归, 09-30 十轮
 测试跑的是升级**前**固件 —— "昨天还好"的推理支柱不成立) 后, 新增
 `adisdbg reg` 裸寄存器取证 (固件内 CPU 直接操作 SPI1 寄存器, 微秒级
 时序, 完全剥离框架/HAL), 并在新固件烧录后 **ADIS 首次探测即成功**
@@ -591,7 +593,7 @@ OpenOCD 4444 复位)。
   `GINS_NOGNSS_LAT/LON/ALT` / `GINS_AXIS_*` / `GINS_MAG_ENABLE` 改由
   param_nav 镜像提供 (缺省仍来自宏, 无记录行为不变); 消费点 gins_bridge
   (播种/磁初始化/位置守卫) 与 process_data 层 (imu/mag 轴映射热路径) 直读镜像。
-  台架核对轴向映射 (遗留问题 #1) 现可用 `nav set maxis ...` + `nav save`
+  台架核对轴向映射 (遗留问题 #2) 现可用 `nav set maxis ...` + `nav save`
   现场修正, 不再重编译。
 - **降级**: W25Q64 缺失时告警一次, 参数仅本次上电有效, 其余不受影响。
 - **构建接线**: SCons 经 middleware/SConscript 自动收录 (DefineGroup

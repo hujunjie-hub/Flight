@@ -776,15 +776,17 @@ static void gcs_thread_entry(void *parameter)
                     rt_tick_from_millisecond(ctx.on ? GCS_POLL_TICKS_MS
                                                     : GCS_IDLE_TICKS_MS));
 
+        /* 参数落盘防抖到点检查 (PARAM_SET 3s 后统一写 W25Q64)。
+         * 须在会话判 off 之前: `gcs off` 后防抖到期仍要落盘,
+         * 否则 PARAM_SET 改动悬置 RAM, 掉电即丢。 */
+        gcs_param_poll();
+
         if (!ctx.on)
             continue;
 
         /* 收向: 排空 uart2 接收缓冲 (电台链路本模块独占) */
         while ((n = rt_device_read(ctx.uart, 0, rxb, sizeof(rxb))) > 0)
             mavlink_link_feed(rxb, n);
-
-        /* 参数落盘防抖到点检查 (PARAM_SET 3s 后统一写 W25Q64) */
-        gcs_param_poll();
 
         /* 发向: 周期节拍 (tick 回绕安全: 无符号减法) */
         {
@@ -913,13 +915,18 @@ int mavgcs_link_init(void)
     }
 
     /* QGC 参数协议 (阶段 2): PARAM_* -> W25Q64 参数域, 落盘由本线程 poll */
-    gcs_param_init();
+    if (gcs_param_init() != RT_EOK)
+        LOG_W("gcs: param protocol init failed (QGC PARAM_* unavailable)");
 
     ctx.thread = rt_thread_create("mavgcs", gcs_thread_entry, RT_NULL,
                                    GCS_THREAD_STACK, GCS_THREAD_PRIO,
                                    GCS_THREAD_TICK);
     if (ctx.thread == RT_NULL)
+    {
+        rt_sem_delete(ctx.rx_sem);
+        ctx.rx_sem = RT_NULL;
         return -RT_ENOMEM;
+    }
     rt_thread_startup(ctx.thread);
 
     LOG_I("gcs: QGC link on %s @%s 8N1 (sysid %u, default off, `gcs on` to start)",

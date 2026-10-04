@@ -259,7 +259,7 @@ static rt_err_t bmp_read_raw(rt_int32_t *temp_raw, rt_int32_t *press_raw)
 /* ------------------------- 传感器框架回调 ------------------------- */
 
 /* 同芯片同拍合并读缓存: baro/temp 两个框架设备各 fetch 一次, 同一测量
- * 周期内 (baro_data.c 先读气压再读温度) 第二次直接取缓存, I2C2 事务
+ * 周期内 (baro_data.c 先读气压再读温度) 第二次直接取缓存, I2C 事务
  * 减半。窗口 2ms << ODR 周期 10ms, 不会合并两个不同测量拍 */
 #define BMP585_RAW_CACHE_WIN_MS  2
 static rt_int32_t s_cache_temp_raw, s_cache_press_raw;
@@ -572,7 +572,7 @@ static rt_err_t bmp_try_init(rt_bool_t allow_reset)
     /* 地址探测 (SDO=0 -> 0x46, SDO=1 -> 0x47) */
     if (!bmp_probe(BMP585_I2C_ADDR_DEFAULT) && !bmp_probe(BMP585_I2C_ADDR_ALT))
     {
-        LOG_E("BMP585 not found, check I2C2 wiring PB10=SCL PB11=SDA");
+        LOG_E("BMP585 not found, check I2C4 wiring PB6=SCL PB9=SDA (2026-10-04 迁自 I2C2)");
         return -RT_ERROR;
     }
 

@@ -11,6 +11,7 @@
  *   调度同型 (PERIOD_EXECUTE3 门控的 ms 时间门控版)。
  */
 #include <string.h>
+#include <math.h>
 
 #include <rtthread.h>
 
@@ -169,18 +170,27 @@ static void pilot_overlay(rt_uint32_t now)
     }
     s.ovl_active = RT_TRUE;
 
-    /* 滑设定点: 水平速度指令 + 前视; NED D 轴向下 -> 上升 = 负 */
+    /* 滑设定点: 水平速度指令 + 前视; NED D 轴向下 -> 上升 = 负。
+     * 杆量是机体系意图 (dp 前 / dr 右), 按当前航向 psi 旋到 NED 再交外环,
+     * 否则航向非 0 时前推杆飞向正北而非机头方向。 */
     {
-        double v[3] = { (double)dp * QUAD_STICK_VXY_MPS,
-                        (double)dr * QUAD_STICK_VXY_MPS,
-                        -(double)du * QUAD_STICK_VZ_MPS };
+        struct gins_solution sol;
+        double v[3];
         double p[3];
         double p_sp[3];
+        double ps, cp;
+
+        gins_bridge_get_solution(&sol);
+        ps = sin(sol.yaw * (M_PI / 180.0));
+        cp = cos(sol.yaw * (M_PI / 180.0));
+        v[0] = ((double)dp * cp - (double)dr * ps) * QUAD_STICK_VXY_MPS;
+        v[1] = ((double)dp * ps + (double)dr * cp) * QUAD_STICK_VXY_MPS;
+        v[2] = -(double)du * QUAD_STICK_VZ_MPS;
 
         mpc_pos_gins_get_p_ned(p);
         for (int i = 0; i < 3; i++)
             p_sp[i] = p[i] + v[i] * QUAD_STICK_LOOKAHEAD_S;
-        mpc_pos_gins_set_sp(p_sp, v);
+        mpc_pos_gins_set_sp_soft(p_sp, v);      /* 连续重定向, 不清热启动 */
     }
 
     /* 航向速率积分; 回中后由下一次 hold/当前积分值保持 */

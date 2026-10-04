@@ -11,11 +11,11 @@
  *                             -> gnss_data 解析线程 (组句 + PPS 配对 +
  *                             UTC->T_MCU 换算) -> gnss_data 结构环
  *                             -> 本模块消费 (GNSS 位置观测)
- *   BMM350     100Hz I2C4   -> mag_data 环形缓冲区 (middleware/Sensor_Preprocessing/process_data,
+ *   BMM350     100Hz I2C1   -> mag_data 环形缓冲区 (middleware/Sensor_Preprocessing/process_data,
  *                             入环前完成 校准->轴映射->干扰检查->低通,
  *                             cal 字段 + quality 干扰位)
  *                             -> ginsaux 线程消费 -> 磁航向观测 (干扰降权)
- *   BMP585     100Hz I2C2   -> baro_data 环形缓冲区 (middleware/Sensor_Preprocessing/process_data)
+ *   BMP585     100Hz I2C4   -> baro_data 环形缓冲区 (middleware/Sensor_Preprocessing/process_data)
  *                             -> ginsaux 线程消费 + baro_calib 校准 -> 气压观测(Pa)
  *                                (Pa->高度换算在 GIEngine::baroUpdate 内压差式测高)
  *   本模块     1kHz 轮询快照 -> GIEngine (EKF) -> gins_bridge_get_solution()

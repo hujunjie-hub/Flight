@@ -91,9 +91,14 @@ void baro_calib_get_status(struct baro_calib_status *st)
 static void baro_calib_load_from_store(void)
 {
     struct calib_data *d = calib_store_ram();
+    rt_base_t level;
 
+    /* 写序对齐 mag_calib_load_from_store: 关中断成对提交, 防并发 apply
+     * (ginsaux 气压观测) 读到 valid=TRUE + 旧偏移的撕裂快照 */
+    level = rt_hw_interrupt_disable();
     s_par.valid     = d->baro_valid;
     s_par.offset_pa = d->baro_offset_pa;
+    rt_hw_interrupt_enable(level);
 }
 
 int baro_calib_init(void)

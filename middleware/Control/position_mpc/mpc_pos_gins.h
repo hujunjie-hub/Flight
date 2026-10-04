@@ -26,6 +26,13 @@ rt_bool_t mpc_pos_gins_ref_valid(void);
  */
 void mpc_pos_gins_set_sp(const double p_ned[3], const double v_ned[3]);
 
+/*
+ * 同 set_sp, 但不清 MPC 热启动: 供摇杆滑设定点 20Hz 连续重定向复用,
+ * 让 SCA 从上一拍解 warm-start (每拍 reset 会使 sweeps/stall 持续走高)。
+ * 离散跳点 (FinSH mpc pos / DO_REPOSITION) 仍走 set_sp 带复位。
+ */
+void mpc_pos_gins_set_sp_soft(const double p_ned[3], const double v_ned[3]);
+
 void mpc_pos_gins_get_sp(double p_ned[3], double v_ned[3]);
 
 /*

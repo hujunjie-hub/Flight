@@ -495,9 +495,11 @@ static void save_flush(void)
     if (s_calib_dirty)
     {
         err_cal = calib_store_save();
-        s_calib_dirty = RT_FALSE;
-        if (err_cal != RT_EOK)
-            LOG_W("calib save failed: %d", (int)err_cal);
+        if (err_cal == RT_EOK)
+            s_calib_dirty = RT_FALSE;
+        else
+            LOG_W("calib save failed: %d (keep dirty, next PARAM_SET retries)",
+                  (int)err_cal);
     }
 
     if (err_nav == RT_EOK && err_cal == RT_EOK)

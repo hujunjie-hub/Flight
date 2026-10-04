@@ -135,25 +135,29 @@ int rc_data_crsf_start(void)
     }
     if (!(s.dev->open_flag & RT_DEVICE_OFLAG_OPEN))
     {
+        /* 打开前配置 (ref_count==0 才允许改缓冲尺寸): 420000 (ELRS 标准)
+         * + 加大 RX 环 —— serial v2 默认 64B/32B, 42kB/s 下消费环仅 ~1.5ms
+         * 余量, 调度抖动即环满丢字节 -> CRC 错帧 (gnss_data 460800 链已踩过,
+         * 扩 4KB/256B 后消除)。ping 环长度须 32 倍数 (B5 对齐布局,
+         * 见 dev_serial_v2.c)。 */
+        struct serial_configure cfg;
+
+        if (rt_device_control(s.dev, RT_SERIAL_CTRL_GET_CONFIG, &cfg) == RT_EOK)
+        {
+            cfg.baud_rate      = RC_CRSF_BAUD;
+            cfg.rx_bufsz       = RC_CRSF_RX_BUF_SZ;
+            cfg.dma_ping_bufsz = RC_CRSF_DMA_PING_BUF_SZ;
+            if (rt_device_control(s.dev, RT_DEVICE_CTRL_CONFIG, &cfg) != RT_EOK)
+                LOG_W("crsf config %s failed (check wiring/ELRS cfg)",
+                      RC_CRSF_BAUD_TEXT);
+        }
+
         if (rt_device_open(s.dev, RT_DEVICE_OFLAG_RDWR |
                                  RT_DEVICE_FLAG_RX_NON_BLOCKING) != RT_EOK)
         {
             LOG_E("crsf open \"%s\" failed", RC_CRSF_DEV);
             s.dev = RT_NULL;
             return -RT_ERROR;
-        }
-        /* 驱动注册默认 115200, 显式改 420000 (ELRS 标准): 与 board.c
-         * board_uart1_baud_init 同套路, 取当前配置仅改波特率 (v2 框架
-         * 缓冲尺寸不变时只重写 BRR, 已使能的 RX DMA/中断不受影响)。 */
-        {
-            struct serial_configure cfg;
-            if (rt_device_control(s.dev, RT_SERIAL_CTRL_GET_CONFIG, &cfg) == RT_EOK)
-            {
-                cfg.baud_rate = RC_CRSF_BAUD;
-                if (rt_device_control(s.dev, RT_DEVICE_CTRL_CONFIG, &cfg) != RT_EOK)
-                    LOG_W("crsf set baud %s failed (check wiring/ELRS cfg)",
-                          RC_CRSF_BAUD_TEXT);
-            }
         }
     }
     rt_device_set_rx_indicate(s.dev, rcrx_indicate);

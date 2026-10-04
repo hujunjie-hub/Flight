@@ -433,7 +433,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
     /* Peripheral clock enable */
     __HAL_RCC_TIM1_CLK_ENABLE();
     /* TIM1 (电调 PWM/DShot) 无中断: 引擎寄存器直驱 + 轮询 DMA 完成态,
-     * 见 middleware/Control/dshot_output; 引脚配置在下方 MspPostInit。 */
+     * 见 middleware/Vehicle_Model/dshot_output; 引脚配置在下方 MspPostInit。 */
     /* USER CODE BEGIN TIM1_MspInit 1 */
 
     /* USER CODE END TIM1_MspInit 1 */

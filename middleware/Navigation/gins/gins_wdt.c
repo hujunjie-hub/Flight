@@ -10,6 +10,7 @@
 #include <rtthread.h>
 #include "stm32h7xx.h"
 #include "gins_config.h"
+#include "gins_bridge.h"        /* GINS_BRIDGE_ENABLE: 唯一喂狗点与之绑定 */
 #include "gins_wdt.h"
 
 volatile rt_uint32_t g_wdt_test_hold;
@@ -82,7 +83,13 @@ rt_uint32_t gins_wdt_boot_rst_flags(void)
  * gins_bridge_init, 挂点更早, 看门狗未启动只能人工断电) */
 static int gins_wdt_early_init(void)
 {
+#if !GINS_BRIDGE_ENABLE
+    /* 组合导航桥接关闭时唯一喂狗点 (gins 解算线程) 不编入固件, 启动 IWDG
+     * 会陷入 15s 复位循环 —— 不启动 (代价: 此调试配置下无启动期卡死保护) */
+    rt_kprintf("wdt: GINS_BRIDGE_ENABLE=0, IWDG not started (no feeder)\n");
+#else
     gins_wdt_start();
+#endif
     return 0;
 }
 INIT_BOARD_EXPORT(gins_wdt_early_init);

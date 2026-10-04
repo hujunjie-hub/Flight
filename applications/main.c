@@ -57,26 +57,23 @@ int main(void)
     /* USART1 共享写互斥 + STREAM 标志清除 (各输出链路整行/整帧写保护) */
     app_out_init();
 
-    /* 启动融合数据推送链路: 失败时仅打印原因, LED 心跳继续 */
-    vofa_link_init();
+    /* 启动各输出/地面站链路, 返回值汇总告警: 各 init 的 -RT_ENOMEM 分支
+     * 不打日志 (uart 缺失有 LOG_E), 线程创建失败时不能静默降级无痕迹 */
+    {
+        int n_fail = 0;
 
-    /* IMU 原始数据链路 (IMUOUT_ENABLE=0 时为空操作) */
-    imuout_link_init();
-
-    /* UM982 定位解打印链路 (无数据时线程静默等待) */
-    gnssout_link_init();
-
-    /* 启动磁力计原始+校准打印链路 (mag_data -> mag_calib_apply -> USART1) */
-    magout_link_init();
-
-    /* KF-GINS 解算结果文本打印链路 */
-    gins_fused_data_link_init();
-
-    /* 气压计原始+校准打印链路 (无数据时静默等待, baro_calib_data 后缀) */
-    barout_link_init();
-
-    /* QGC 地面站 MAVLink 链路 (USART1 阶段 0, 默认 off, `gcs on` 启动会话) */
-    mavgcs_link_init();
+        /* USART1 输出链路 (失败仅降级打印, 不影响控制链) */
+        n_fail += (vofa_link_init() != RT_EOK);
+        n_fail += (imuout_link_init() != RT_EOK);
+        n_fail += (gnssout_link_init() != RT_EOK);
+        n_fail += (gins_fused_data_link_init() != RT_EOK);
+        n_fail += (magout_link_init() != RT_EOK);
+        n_fail += (barout_link_init() != RT_EOK);
+        n_fail += (mavgcs_link_init() != RT_EOK);
+        if (n_fail)
+            LOG_W("%d output link(s) failed to init (see logs above)",
+                  n_fail);
+    }
 
     /* 四旋翼控制模型 (ctl 线程: MPC 外环+SO3/PID 内环+混控, 默认 DISARM
      * + dry-run, FinSH `quad` 操作, 见 middleware/Vehicle_Model/model) */

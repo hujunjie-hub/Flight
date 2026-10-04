@@ -226,7 +226,10 @@ rt_err_t sdmmc_read_blocks(rt_uint8_t *buf, rt_uint32_t sector, rt_uint32_t coun
     err = sdmmc_check_ready();
     if (err == RT_EOK)
     {
-        if (sector + count > hsd1.SdCard.LogBlockNbr)
+        /* 越界检查须防 sector+count 32 位回绕 (大 sector 绕过检查直读写
+         * 卡外区块), 与 sensor_w25q64 同款写法 */
+        if (sector >= hsd1.SdCard.LogBlockNbr ||
+            count > hsd1.SdCard.LogBlockNbr - sector)
         {
             err = -RT_EINVAL;
         }
@@ -259,7 +262,9 @@ rt_err_t sdmmc_write_blocks(const rt_uint8_t *buf, rt_uint32_t sector,
     err = sdmmc_check_ready();
     if (err == RT_EOK)
     {
-        if (sector + count > hsd1.SdCard.LogBlockNbr)
+        /* 越界检查须防 sector+count 32 位回绕, 与 read 侧同款 */
+        if (sector >= hsd1.SdCard.LogBlockNbr ||
+            count > hsd1.SdCard.LogBlockNbr - sector)
         {
             err = -RT_EINVAL;
         }
