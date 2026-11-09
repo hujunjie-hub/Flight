@@ -2599,6 +2599,97 @@ static void test_m5_safety_navigation_missing_required_validity_rejected(void)
   CHECK(fx.result.passed == 0u);
 }
 
+static void test_m5_safety_navigation_state_epoch_mismatch_rejected(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 40100000u);
+  fx.base.nav.state_epoch++;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_navigation_origin_mismatch_rejected(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 40200000u);
+  fx.base.nav.origin_id++;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_navigation_frame_mismatch_rejected(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 40300000u);
+  fx.base.nav.header.frame_id = (uint8_t)(FRAME_LOCAL_NED ^ 0x01u);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_geofence_origin_mismatch_rejected(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 40400000u);
+  fill_header(&fx.fence.header, MSG_PRODUCT_GEOFENCE_SNAPSHOT,
+              SOURCE_M4, fx.base.now);
+  fx.fence.fence_id = 4u;
+  fx.fence.frame_id = FRAME_LOCAL_NED;
+  fx.fence.origin_id = T_ORIGIN + 1u;
+  fx.fence.state_epoch = T_STATE_EPOCH;
+  fx.fence.validity = PRODUCT_GEOFENCE_VALID;
+  fx.fence.kind = PRODUCT_GEOFENCE_KEEP_IN;
+  fx.fence.vertex_count = 4u;
+  fx.fence.vertices_ne_m[0][0] = -1.0f;
+  fx.fence.vertices_ne_m[0][1] = -1.0f;
+  fx.fence.vertices_ne_m[1][0] = 1.0f;
+  fx.fence.vertices_ne_m[1][1] = -1.0f;
+  fx.fence.vertices_ne_m[2][0] = 1.0f;
+  fx.fence.vertices_ne_m[2][1] = 1.0f;
+  fx.fence.vertices_ne_m[3][0] = -1.0f;
+  fx.fence.vertices_ne_m[3][1] = 1.0f;
+  fx.fence.min_height_above_home_m = 0.0f;
+  fx.fence.max_height_above_home_m = 50.0f;
+  fx.input.geofences = &fx.fence;
+  fx.input.geofence_count = 1u;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_geofence_duplicate_vertex_rejected(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 40500000u);
+  fill_header(&fx.fence.header, MSG_PRODUCT_GEOFENCE_SNAPSHOT,
+              SOURCE_M4, fx.base.now);
+  fx.fence.fence_id = 5u;
+  fx.fence.frame_id = FRAME_LOCAL_NED;
+  fx.fence.origin_id = T_ORIGIN;
+  fx.fence.state_epoch = T_STATE_EPOCH;
+  fx.fence.validity = PRODUCT_GEOFENCE_VALID;
+  fx.fence.kind = PRODUCT_GEOFENCE_KEEP_IN;
+  fx.fence.vertex_count = 4u;
+  fx.fence.vertices_ne_m[0][0] = -1.0f;
+  fx.fence.vertices_ne_m[0][1] = -1.0f;
+  fx.fence.vertices_ne_m[1][0] = 1.0f;
+  fx.fence.vertices_ne_m[1][1] = -1.0f;
+  fx.fence.vertices_ne_m[2][0] = 1.0f;
+  fx.fence.vertices_ne_m[2][1] = -1.0f;
+  fx.fence.vertices_ne_m[3][0] = -1.0f;
+  fx.fence.vertices_ne_m[3][1] = 1.0f;
+  fx.fence.min_height_above_home_m = 0.0f;
+  fx.fence.max_height_above_home_m = 50.0f;
+  fx.input.geofences = &fx.fence;
+  fx.input.geofence_count = 1u;
+  CHECK(!fence_geometry_valid(&fx.fence));
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
 static void test_m5_safety_map_revision_mismatch_rejected(void)
 {
   SafetyFx fx;
@@ -2745,6 +2836,11 @@ int main(void)
     {"m5_safety_offset_reject", test_m5_safety_preview_offset_mismatch_rejected},
     {"m5_safety_dynamic_accel_bound", test_m5_safety_dynamic_acceleration_bound_is_inflated},
     {"m5_safety_nav_validity", test_m5_safety_navigation_missing_required_validity_rejected},
+    {"m5_safety_nav_state_epoch", test_m5_safety_navigation_state_epoch_mismatch_rejected},
+    {"m5_safety_nav_origin", test_m5_safety_navigation_origin_mismatch_rejected},
+    {"m5_safety_nav_frame", test_m5_safety_navigation_frame_mismatch_rejected},
+    {"m5_safety_fence_origin", test_m5_safety_geofence_origin_mismatch_rejected},
+    {"m5_safety_fence_duplicate_vertex", test_m5_safety_geofence_duplicate_vertex_rejected},
     {"m5_safety_map_revision", test_m5_safety_map_revision_mismatch_rejected},
     {"m5_safety_geofence_self_intersection", test_m5_safety_self_intersecting_geofence_rejected},
     {"m5_safety_cell_budget", test_m5_safety_cell_check_budget_exhaustion},
