@@ -1,8 +1,9 @@
 /*
- * M5-04 bounded Host/SIL path smoother.
+ * M5-05 bounded Host/SIL minimum-jerk path smoother.
  *
- * This creates a candidate only. It never publishes a MotionReference and it
- * does not replace the independent M5-06 continuous collision validator.
+ * Consumes the exact M5-04 timed quintic candidate. It changes only position
+ * quintics; yaw and segment timing remain those produced by M5-04. Any result,
+ * including fallback, remains a candidate for independent M5-06 validation.
  */
 #if defined(FLIGHT_M5_HOST_PLANNER)
 #include <math.h>
@@ -10,6 +11,10 @@
 #include "trajectory_planning/m5_path_smoother.h"
 
 #define M5_SMOOTHER_TWO_PI 6.28318530717958647692f
+#define M5_SMOOTHER_POSITION_TOL 1e-3f
+#define M5_SMOOTHER_VELOCITY_TOL 1e-3f
+#define M5_SMOOTHER_ACCELERATION_TOL 1e-2f
+#define M5_SMOOTHER_YAW_TOL 1e-3f
 
 static uint8_t finite3(const float value[3])
 {
@@ -25,30 +30,43 @@ static uint8_t quintic_finite(const GuidanceQuintic *q)
   return 1u;
 }
 
-static M5SmootherResult validate_path(const M5TimeScaledPath *timed_path,
+static uint8_t near_value(float actual, float expected, float tolerance)
+{
+  return (uint8_t)(isfinite(actual) && isfinite(expected) &&
+                   fabsf(actual - expected) <= tolerance);
+}
+
+static M5SmootherResult validate_path(const M5AstarPath *path,
+                                      const M5TimedTrajectory *timed,
                                       const M5LocalMap *map,
                                       const NavigationSnapshot *navigation,
                                       uint64_t now_us,
                                       uint32_t *total_duration_us)
 {
-  const M5AstarPath *path;
   uint8_t primitive_count = 0u;
   const M5KinodynamicPrimitive *primitives;
-  uint32_t total = 0u;
-  unsigned i;
-  if (timed_path == NULL || map == NULL || navigation == NULL ||
+  uint32_t source_total = 0u, timed_total = 0u;
+  float yaw_start;
+  unsigned i, axis;
+
+  if (path == NULL || timed == NULL || map == NULL || navigation == NULL ||
       total_duration_us == NULL || now_us == 0u)
     return M5_SMOOTHER_INVALID_INPUT;
-  path = &timed_path->path;
-  if (path->segment_count == 0u) return M5_SMOOTHER_INVALID_INPUT;
-  if (path->segment_count > M5_SMOOTHER_MAX_SEGMENTS)
+  if (path->segment_count == 0u || timed->segment_count == 0u)
+    return M5_SMOOTHER_INVALID_INPUT;
+  if (path->segment_count > M5_SMOOTHER_MAX_SEGMENTS ||
+      timed->segment_count > M5_SMOOTHER_MAX_SEGMENTS)
     return M5_SMOOTHER_CAPACITY_EXCEEDED;
-  if (path->map_revision == 0u || path->map_revision != map->map_revision ||
+  if (path->segment_count != timed->segment_count ||
+      path->map_revision == 0u || path->map_revision != timed->map_revision ||
+      path->map_revision != map->map_revision ||
       !m5_local_map_is_ready(map, navigation, now_us))
     return M5_SMOOTHER_INPUT_STALE;
   if (path->offset_us[0] != 0u || !isfinite(path->total_cost_s) ||
-      path->total_cost_s <= 0.0f)
+      path->total_cost_s <= 0.0f || timed->total_duration_us == 0u ||
+      timed->total_duration_us > GUIDANCE_MAX_DURATION_US)
     return M5_SMOOTHER_INVALID_INPUT;
+
   primitives = m5_kinodynamic_primitive_table(&primitive_count);
   if (primitives == NULL || primitive_count != 60u ||
       !m5_kinodynamic_primitive_table_validate())
@@ -67,76 +85,80 @@ static M5SmootherResult validate_path(const M5TimeScaledPath *timed_path,
         cell_state != M5_MAP_CELL_FREE_CONFIRMED)
       return M5_SMOOTHER_INPUT_STALE;
   }
+
   for (i = 0u; i < path->segment_count; ++i) {
-    uint32_t duration;
+    uint32_t source_duration, duration_us;
+    float duration_s, yaw_end;
     if (path->offset_us[i + 1u] <= path->offset_us[i])
       return M5_SMOOTHER_INVALID_INPUT;
-    duration = path->offset_us[i + 1u] - path->offset_us[i];
-    if (duration < GUIDANCE_TIME_BIN_US ||
-        duration % GUIDANCE_TIME_BIN_US != 0u ||
-        duration > GUIDANCE_MAX_DURATION_US ||
-        total > GUIDANCE_MAX_DURATION_US - duration)
+    source_duration = path->offset_us[i + 1u] - path->offset_us[i];
+    if (source_duration < GUIDANCE_TIME_BIN_US ||
+        source_duration % GUIDANCE_TIME_BIN_US != 0u ||
+        source_duration > GUIDANCE_MAX_DURATION_US ||
+        source_total > GUIDANCE_MAX_DURATION_US - source_duration ||
+        path->primitive_index[i] >= primitive_count)
       return M5_SMOOTHER_CAPACITY_EXCEEDED;
-    if (path->primitive_index[i] >= primitive_count ||
-        timed_path->attempts[i] == 0u ||
-        timed_path->attempts[i] > M5_TIME_SCALER_MAX_ATTEMPTS)
+    if (primitives[path->primitive_index[i]].duration_us != source_duration)
       return M5_SMOOTHER_INVALID_INPUT;
-    total += duration;
+    source_total += source_duration;
+
+    duration_us = timed->segment_duration_us[i];
+    if (duration_us < GUIDANCE_TIME_BIN_US ||
+        duration_us % GUIDANCE_TIME_BIN_US != 0u ||
+        duration_us > GUIDANCE_MAX_DURATION_US ||
+        timed_total > GUIDANCE_MAX_DURATION_US - duration_us)
+      return M5_SMOOTHER_CAPACITY_EXCEEDED;
+    duration_s = (float)duration_us * 1e-6f;
+    for (axis = 0u; axis < 3u; ++axis) {
+      const GuidanceQuintic *q = &timed->position[i][axis];
+      if (!quintic_finite(q) ||
+          !near_value(guidance_quintic_eval(q, 0.0f, 0u),
+                      path->position_ned_m[i][axis], M5_SMOOTHER_POSITION_TOL) ||
+          !near_value(guidance_quintic_eval(q, 0.0f, 1u),
+                      path->velocity_ned_mps[i][axis], M5_SMOOTHER_VELOCITY_TOL) ||
+          !near_value(guidance_quintic_eval(q, 0.0f, 2u),
+                      path->acceleration_ned_mps2[i][axis], M5_SMOOTHER_ACCELERATION_TOL) ||
+          !near_value(guidance_quintic_eval(q, duration_s, 0u),
+                      path->position_ned_m[i + 1u][axis], M5_SMOOTHER_POSITION_TOL) ||
+          !near_value(guidance_quintic_eval(q, duration_s, 1u),
+                      path->velocity_ned_mps[i + 1u][axis], M5_SMOOTHER_VELOCITY_TOL) ||
+          !near_value(guidance_quintic_eval(q, duration_s, 2u),
+                      path->acceleration_ned_mps2[i + 1u][axis],
+                      M5_SMOOTHER_ACCELERATION_TOL))
+        return M5_SMOOTHER_INVALID_INPUT;
+    }
+
+    yaw_end = yaw_start + remainderf(path->yaw_rad[i + 1u] -
+                                     path->yaw_rad[i], M5_SMOOTHER_TWO_PI);
+    if (!quintic_finite(&timed->yaw[i]) ||
+        !near_value(guidance_quintic_eval(&timed->yaw[i], 0.0f, 0u),
+                    yaw_start, M5_SMOOTHER_YAW_TOL) ||
+        !near_value(guidance_quintic_eval(&timed->yaw[i], 0.0f, 1u),
+                    path->yaw_rate_radps[i], M5_SMOOTHER_YAW_TOL) ||
+        !near_value(guidance_quintic_eval(&timed->yaw[i], duration_s, 0u),
+                    yaw_end, M5_SMOOTHER_YAW_TOL) ||
+        !near_value(guidance_quintic_eval(&timed->yaw[i], duration_s, 1u),
+                    path->yaw_rate_radps[i + 1u], M5_SMOOTHER_YAW_TOL))
+      return M5_SMOOTHER_INVALID_INPUT;
+    yaw_start = yaw_end;
+    timed_total += duration_us;
   }
-  if (path->offset_us[path->segment_count] != total ||
-      total > GUIDANCE_MAX_DURATION_US ||
-      fabsf(path->total_cost_s - (float)total * 1e-6f) > 1e-4f)
+
+  if (path->offset_us[path->segment_count] != source_total ||
+      source_total > GUIDANCE_MAX_DURATION_US ||
+      fabsf(path->total_cost_s - (float)source_total * 1e-6f) > 1e-4f ||
+      timed_total != timed->total_duration_us)
     return M5_SMOOTHER_INVALID_INPUT;
-  *total_duration_us = total;
+  *total_duration_us = timed_total;
   return M5_SMOOTHER_OK;
 }
 
-static uint8_t build_initial_position_quintics(const M5AstarPath *path,
-                                                const float duration_s[M5_SMOOTHER_MAX_SEGMENTS],
-                                                M5SmoothedTrajectory *candidate)
-{
-  unsigned segment, axis;
-  for (segment = 0u; segment < path->segment_count; ++segment) {
-    for (axis = 0u; axis < 3u; ++axis) {
-      guidance_quintic_boundary(
-          path->position_ned_m[segment][axis],
-          path->velocity_ned_mps[segment][axis],
-          path->acceleration_ned_mps2[segment][axis],
-          path->position_ned_m[segment + 1u][axis],
-          path->velocity_ned_mps[segment + 1u][axis],
-          path->acceleration_ned_mps2[segment + 1u][axis],
-          duration_s[segment], &candidate->position[segment][axis]);
-      if (!quintic_finite(&candidate->position[segment][axis])) return 0u;
-    }
-  }
-  return 1u;
-}
-
-static uint8_t build_yaw_quintics(const M5AstarPath *path,
-                                  const float duration_s[M5_SMOOTHER_MAX_SEGMENTS],
-                                  M5SmoothedTrajectory *candidate)
-{
-  float yaw_start = path->yaw_rad[0];
-  unsigned segment;
-  for (segment = 0u; segment < path->segment_count; ++segment) {
-    float delta = remainderf(path->yaw_rad[segment + 1u] -
-                             path->yaw_rad[segment], M5_SMOOTHER_TWO_PI);
-    float yaw_end = yaw_start + delta;
-    guidance_quintic_boundary(yaw_start, path->yaw_rate_radps[segment], 0.0f,
-        yaw_end, path->yaw_rate_radps[segment + 1u], 0.0f,
-        duration_s[segment], &candidate->yaw[segment]);
-    if (!quintic_finite(&candidate->yaw[segment])) return 0u;
-    yaw_start = yaw_end;
-  }
-  return 1u;
-}
-
 M5SmootherResult m5_path_smoother_build(
-    const M5TimeScaledPath *timed_path, const M5LocalMap *map,
-    const NavigationSnapshot *navigation, uint64_t now_us,
-    GuidanceMinimumJerkWorkspace *workspace, M5SmoothedTrajectory *output)
+    const M5AstarPath *path, const M5TimedTrajectory *timed,
+    const M5LocalMap *map, const NavigationSnapshot *navigation,
+    uint64_t now_us, GuidanceMinimumJerkWorkspace *workspace,
+    M5SmoothedTrajectory *output)
 {
-  const M5AstarPath *path;
   M5SmoothedTrajectory candidate;
   float duration_s[M5_SMOOTHER_MAX_SEGMENTS] = {0.0f};
   double initial_cost = 0.0, optimized_cost = 0.0;
@@ -146,20 +168,20 @@ M5SmootherResult m5_path_smoother_build(
   unsigned segment;
 
   if (output != NULL) memset(output, 0, sizeof(*output));
-  if (workspace == NULL || output == NULL || timed_path == NULL)
+  if (workspace == NULL || output == NULL)
     return M5_SMOOTHER_INVALID_INPUT;
-  path = &timed_path->path;
-  validation = validate_path(timed_path, map, navigation, now_us, &total_duration_us);
+  validation = validate_path(path, timed, map, navigation, now_us,
+                             &total_duration_us);
   if (validation != M5_SMOOTHER_OK) return validation;
 
   memset(&candidate, 0, sizeof(candidate));
   candidate.segment_count = path->segment_count;
-  candidate.map_revision = path->map_revision;
+  candidate.map_revision = timed->map_revision;
   candidate.total_duration_us = total_duration_us;
   for (segment = 0u; segment < path->segment_count; ++segment) {
-    candidate.segment_duration_us[segment] =
-        path->offset_us[segment + 1u] - path->offset_us[segment];
-    duration_s[segment] = (float)candidate.segment_duration_us[segment] * 1e-6f;
+    candidate.segment_duration_us[segment] = timed->segment_duration_us[segment];
+    duration_s[segment] = (float)timed->segment_duration_us[segment] * 1e-6f;
+    candidate.yaw[segment] = timed->yaw[segment];
   }
 
   optimized = guidance_minimum_jerk_optimize(
@@ -174,13 +196,17 @@ M5SmootherResult m5_path_smoother_build(
     candidate.initial_cost = initial_cost;
     candidate.optimized_cost = optimized_cost;
   } else {
-    if (!build_initial_position_quintics(path, duration_s, &candidate))
-      return M5_SMOOTHER_INVALID_INPUT;
+    memcpy(candidate.position, timed->position, sizeof(candidate.position));
     candidate.fallback_used = 1u;
   }
-  if (!build_yaw_quintics(path, duration_s, &candidate))
-    return M5_SMOOTHER_INVALID_INPUT;
 
+  for (segment = 0u; segment < candidate.segment_count; ++segment) {
+    unsigned axis;
+    if (!quintic_finite(&candidate.yaw[segment])) return M5_SMOOTHER_INVALID_INPUT;
+    for (axis = 0u; axis < 3u; ++axis)
+      if (!quintic_finite(&candidate.position[segment][axis]))
+        return M5_SMOOTHER_INVALID_INPUT;
+  }
   *output = candidate;
   return (candidate.fallback_used != 0u) ? M5_SMOOTHER_FALLBACK : M5_SMOOTHER_OK;
 }
