@@ -566,12 +566,12 @@ static int edge_map_clear(const M5AstarRequest *r, const GuidanceQuintic q[4],
       }
     }
     {
-      int x0 = (int)floorf((low[0] + 4.0f) / 0.5f);
-      int x1 = (int)floorf((high[0] + 4.0f) / 0.5f);
-      int y0 = (int)floorf((low[1] + 4.0f) / 0.5f);
-      int y1 = (int)floorf((high[1] + 4.0f) / 0.5f);
-      int z0 = (int)floorf((low[2] + 4.0f) / 0.5f);
-      int z1 = (int)floorf((high[2] + 4.0f) / 0.5f);
+      int x0 = (int)floorf((low[0] - r->map->center_ned_m[0] + 4.0f) / 0.5f);
+      int x1 = (int)floorf((high[0] - r->map->center_ned_m[0] + 4.0f) / 0.5f);
+      int y0 = (int)floorf((low[1] - r->map->center_ned_m[1] + 4.0f) / 0.5f);
+      int y1 = (int)floorf((high[1] - r->map->center_ned_m[1] + 4.0f) / 0.5f);
+      int z0 = (int)floorf((low[2] - r->map->center_ned_m[2] + 4.0f) / 0.5f);
+      int z1 = (int)floorf((high[2] - r->map->center_ned_m[2] + 4.0f) / 0.5f);
       for (iz = (unsigned)z0; iz <= (unsigned)z1; ++iz)
         for (iy = (unsigned)y0; iy <= (unsigned)y1; ++iy)
           for (ix = (unsigned)x0; ix <= (unsigned)x1; ++ix) {
