@@ -1525,6 +1525,40 @@ static void test_m5_time_scaler_capacity_and_envelope_fail_closed(void)
       &fx.navigation, now, &timed) == M5_TIME_SCALER_INVALID_INPUT);
 }
 
+static void test_m5_time_scaler_enforces_global_vector_limits(void)
+{
+  PlannerFx fx;
+  M5TimeScaledPath timed;
+  const uint64_t now = 9470000u;
+  planner_fx_init(&fx, now);
+  memset(&fx.path, 0, sizeof(fx.path));
+  fx.path.segment_count = 1u;
+  fx.path.map_revision = fx.map.map_revision;
+  fx.path.total_cost_s = 0.4f;
+  fx.path.offset_us[0] = 0u;
+  fx.path.offset_us[1] = 400000u;
+  fx.path.position_ned_m[0][0] = -1.75f;
+  fx.path.position_ned_m[0][1] = -1.75f;
+  fx.path.position_ned_m[0][2] = -1.75f;
+  fx.path.position_ned_m[1][0] = -1.35f;
+  fx.path.position_ned_m[1][1] = -1.35f;
+  fx.path.position_ned_m[1][2] = -1.75f;
+  fx.path.primitive_index[0] = 3u;
+
+  /* Each axis is individually below 4 m/s, but the 3-D norm is not. */
+  fx.envelope.max_linear_speed_mps = 1.5f;
+  CHECK(m5_time_scaler_build(&fx.path, &fx.config, &fx.envelope,
+      &fx.navigation, now, &timed) == M5_TIME_SCALER_OK);
+  CHECK(timed.path.offset_us[1] >= 800000u);
+
+  /* Repeat with speed relaxed and the global acceleration norm binding. */
+  fx.envelope.max_linear_speed_mps = 4.0f;
+  fx.envelope.max_linear_accel_mps2 = 5.0f;
+  CHECK(m5_time_scaler_build(&fx.path, &fx.config, &fx.envelope,
+      &fx.navigation, now, &timed) == M5_TIME_SCALER_OK);
+  CHECK(timed.path.offset_us[1] >= 1000000u);
+}
+
 static void test_m5_smoother_minimum_jerk_continuity(void)
 {
   PlannerFx fx;
@@ -1853,6 +1887,7 @@ int main(void)
     {"m5_astar_key_primitives", test_m5_kinodynamic_key_and_primitive_manifest},
     {"m5_time_scaler_bounded_growth", test_m5_time_scaler_bounded_growth},
     {"m5_time_scaler_capacity_envelope", test_m5_time_scaler_capacity_and_envelope_fail_closed},
+    {"m5_time_scaler_global_vector_limits", test_m5_time_scaler_enforces_global_vector_limits},
     {"m5_smoother_minimum_jerk_continuity", test_m5_smoother_minimum_jerk_continuity},
     {"m5_smoother_stale_invalid", test_m5_smoother_rejects_stale_and_invalid_path},
     {"m5_astar_one_edge_deterministic", test_m5_astar_finds_deterministic_one_edge_path},
