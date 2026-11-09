@@ -2315,6 +2315,92 @@ static void test_m5_safety_preview_count_mismatch_rejected(void)
 }
 
 
+static void test_m5_safety_navigation_map_epoch_origin_frame_mismatch_rejected(void)
+{
+  SafetyFx fx;
+
+  safety_fx_init(&fx, 45000000u);
+  fx.base.nav.state_epoch++;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+
+  safety_fx_init(&fx, 46000000u);
+  fx.base.nav.origin_id++;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+
+  safety_fx_init(&fx, 47000000u);
+  fx.map.state_epoch++;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+
+  safety_fx_init(&fx, 48000000u);
+  fx.map.origin_id++;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+
+  safety_fx_init(&fx, 49000000u);
+  fx.base.nav.header.frame_id = 0u;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+
+  safety_fx_init(&fx, 50000000u);
+  fx.reference.header.frame_id = 0u;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_map_edge_fails_closed(void)
+{
+  SafetyFx fx;
+  unsigned i;
+  M5TrajectorySafetyStatus status;
+
+  safety_fx_init(&fx, 51000000u);
+  fx.base.nav.core.velocity_ned_mps[0] = 8.5f;
+  fx.base.env.max_linear_speed_mps = 10.0f;
+  fx.base.env.max_linear_accel_mps2 = 100.0f;
+  fx.base.env.vehicle_extension.max_velocity_ned_mps[0] = 10.0f;
+  fx.base.env.vehicle_extension.max_acceleration_ned_mps2[0] = 100.0f;
+  safety_map_reset(&fx);
+  safety_point_set(&fx.reference.anchor, 0.0f, 0.0f, 0.0f,
+                   8.5f, 0.0f, 0.0f);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    fx.reference.points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+    safety_point_set(&fx.reference.points[i], (float)(i + 1u) * 0.17f,
+                     0.0f, 0.0f, 8.5f, 0.0f, 0.0f);
+  }
+  status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+  CHECK(status == M5_SAFETY_UNKNOWN);
+  CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_MAP_UNKNOWN);
+
+  safety_fx_init(&fx, 52000000u);
+  fx.base.nav.core.velocity_ned_mps[0] = -8.5f;
+  fx.base.env.max_linear_speed_mps = 10.0f;
+  fx.base.env.max_linear_accel_mps2 = 100.0f;
+  fx.base.env.vehicle_extension.max_velocity_ned_mps[0] = 10.0f;
+  fx.base.env.vehicle_extension.max_acceleration_ned_mps2[0] = 100.0f;
+  safety_map_reset(&fx);
+  safety_point_set(&fx.reference.anchor, 0.0f, 0.0f, 0.0f,
+                   -8.5f, 0.0f, 0.0f);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    fx.reference.points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+    safety_point_set(&fx.reference.points[i], -(float)(i + 1u) * 0.17f,
+                     0.0f, 0.0f, -8.5f, 0.0f, 0.0f);
+  }
+  status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+  CHECK(status == M5_SAFETY_UNKNOWN);
+  CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_MAP_UNKNOWN);
+}
+
 static void test_m5_safety_dfs_max_depth_stack_guard(void)
 {
   SafetyFx fx;
@@ -2620,6 +2706,8 @@ int main(void)
     {"m5_safety_map_revision", test_m5_safety_map_revision_mismatch_rejected},
     {"m5_safety_geofence_self_intersection", test_m5_safety_self_intersecting_geofence_rejected},
     {"m5_safety_cell_budget", test_m5_safety_cell_check_budget_exhaustion},
+    {"m5_safety_epoch_origin_frame_mismatch", test_m5_safety_navigation_map_epoch_origin_frame_mismatch_rejected},
+    {"m5_safety_map_edge", test_m5_safety_map_edge_fails_closed},
     {"m5_safety_dfs_max_depth_stack_guard", test_m5_safety_dfs_max_depth_stack_guard},
     {"m5_safety_dfs_work_budget", test_m5_safety_dfs_work_unit_budget_exhaustion},
   };
