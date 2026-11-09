@@ -1,0 +1,92 @@
+{
+  "owner": "C",
+  "generated_at": "2026-11-05T00:27:59+08:00",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010903",
+  "purpose": "C's consolidated status submissions to close the C part of D-REV-04 (HANDOFF vs worktree).",
+  "d_rev_04_c_part": {
+    "status": "SUBMITTED_FOR_MERGE",
+    "tasks": [
+      "T191-C-FMS",
+      "T191-C-M5",
+      "T191-C-M6",
+      "T191-C-M7"
+    ],
+    "closure_instruction": "D merges these four submissions (or records BLOCKED where requested) and updates AGENT_HANDOFF. C does not edit HANDOFF or 09."
+  },
+  "submissions": [
+    {
+      "task_id": "T191-C-FMS",
+      "revision": 4,
+      "state": "REVIEW_PENDING_GATE_D",
+      "path": "applications/core/m4/status_request_T191-C-FMS.json",
+      "sha256": "6c38aade141df612340a7eb4b342a65d12173e7506d711b9a74026b308fdce30",
+      "handoff": "REVIEW/seq5",
+      "note": "CR-C01 CLOSED; CR-C02 SPECIFIED pending Gate D; waiting D review/acceptance."
+    },
+    {
+      "task_id": "T191-C-M5",
+      "revision": 3,
+      "state": "WAITING_FOR_C_FMS",
+      "path": "applications/core/m5/status_request_T191-C-M5.json",
+      "sha256": "77a63e18586ceda2524b365f71a1a4a2148d2950bd5e6d94fb382981a59a166c",
+      "handoff": "READY_FOR_ASSIGNMENT/seq4",
+      "note": "baseline synced to 0x00010904; no scope change"
+    },
+    {
+      "task_id": "T191-C-M6",
+      "revision": 1,
+      "state": "NOT_STARTED_BLOCKED",
+      "path": "applications/core/m6/status_request_T191-C-M6.json",
+      "sha256": "46cecac9ea5127de7b5aa4944158177ed6997e3332341be288909f3242d4683b",
+      "handoff": "READY_FOR_ASSIGNMENT/seq3",
+      "blockers": [
+        "MPC solver selection/package",
+        "ControlModelPort ABI",
+        "C-M5 acceptance",
+        "B-REPLAY acceptance"
+      ]
+    },
+    {
+      "task_id": "T191-C-M7",
+      "revision": 1,
+      "state": "NOT_STARTED_BLOCKED",
+      "path": "applications/core/m7/status_request_T191-C-M7.json",
+      "sha256": "04286a1b93daa63c7a8a63017a51795500323079d4255a652567126e548c720d",
+      "handoff": "READY_FOR_ASSIGNMENT/seq3",
+      "blockers": [
+        "T191-C-M6",
+        "A DShot/actuator submit contract (OUT-DSHOT missing)"
+      ]
+    }
+  ],
+  "review_opinion": {
+    "task": "T191-D-REVIEW",
+    "revision": 2,
+    "path": "applications/core/m4/reviews/C_REVIEW_T191-D-REVIEW.md",
+    "submission": "applications/core/m4/reviews/C_REVIEW_SUBMISSION.json",
+    "sha256": "3b4360b26812618e46e562b5433270dfdac054fbf1f27720f7cc6c8244b458ee",
+    "conclusion": "ACCEPT_WITH_CONDITIONS",
+    "summary": {
+      "checks": 22,
+      "pass": 15,
+      "fail": 1,
+      "obs": 6
+    },
+    "status": "SUBMITTED_FOR_MERGE",
+    "note": "Use revision 2 (post-fix review_checks_post.json). Not an ACCEPTED state or Gate A approval."
+  },
+  "open_c_items": [
+    "T191-C-FMS: CR-C01/C02 implemented; A must review the contract diff and regenerate abi_lock.h; D merge/REVIEW",
+    "T191-C-M5: waiting for C-FMS acceptance (NONE-source slice prepared)",
+    "T191-C-M6: blocked by MPC solver decision, ControlModelPort ABI, C-M5/B-REPLAY acceptance",
+    "T191-C-M7: blocked by C-M6 and A's DShot/actuator submit contract"
+  ],
+  "review_submission": {
+    "path": "applications/core/m4/reviews/C_REVIEW_SUBMISSION.json",
+    "sha256": "605ab28bf0e3c6ab11ee3e4a1d8b2e1724aa7c7b23db19a9a95f0df05657ddf6"
+  },
+  "status_notice": {
+    "path": "applications/core/status_requests/status_update_20261105_C.json",
+    "sha256": "2d1c45f7efea10dac8f2bd0a24e4f65ffb1b228b65060138d8f8cfbf21c2f8cc"
+  }
+}

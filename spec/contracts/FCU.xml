@@ -1,0 +1,192 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mavlink>
+  <include>common.xml</include>
+  <version>3</version>
+  <dialect>191</dialect>
+  <messages>
+    <message id="43000" name="FCU_OPERATION_STATUS">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t" name="arm_state">arm_state; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t" name="flight_mode">flight_mode; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t" name="authority">authority; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t" name="failsafe_level">failsafe_level; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t" name="mission_state">mission_state; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="authority_epoch">authority_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="directive_epoch">directive_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="permit_epoch">permit_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="request_id">request_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="request_session_id">request_session_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="request_source_id">request_source_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="reason_code">reason_code; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+    <message id="43001" name="FCU_NAV_STATUS">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="state_epoch">state_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="origin_id">origin_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="capability_mask">capability_mask; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="float" name="position_std_m" units="m">position_std_m; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="float" name="velocity_std_mps" units="m/s">velocity_std_mps; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="float" name="heading_std_rad" units="rad">heading_std_rad; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="age_us" units="us">age_us; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="reason_code">reason_code; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+    <message id="43002" name="FCU_SENSOR_HEALTH">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="sensor_instance_id">sensor_instance_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="policy_epoch">policy_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="health_state">health_state; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="action">action; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="reason_code">reason_code; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="gap_count">gap_count; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="reject_count">reject_count; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+    <message id="43003" name="FCU_CONTROL_STATUS">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="control_sequence">control_sequence; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="reference_id">reference_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="reference_epoch">reference_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="controllable_dof_mask">controllable_dof_mask; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="degraded_dof_mask">degraded_dof_mask; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="solver_status">solver_status; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="solve_time_us" units="us">solve_time_us; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="reason_code">reason_code; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+    <message id="43004" name="FCU_ACTUATOR_STATUS">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="control_sequence">control_sequence; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="permit_epoch">permit_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="available_mask">available_mask; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="saturated_mask">saturated_mask; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="output_policy_id">output_policy_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="feedback_capability">feedback_capability; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="reason_code">reason_code; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+    <message id="43005" name="FCU_LINK_STATUS">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="link_instance_id">link_instance_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="link_kind">link_kind; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="link_state">link_state; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="validity_mask">validity_mask; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="packet_loss_ppm">packet_loss_ppm; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="int16_t" name="rssi_dbm" units="dBm">rssi_dbm; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="link_quality_permille">link_quality_permille; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="age_us" units="us">age_us; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="reason_code">reason_code; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+    <message id="43006" name="FCU_STORAGE_STATUS">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="validity_mask">validity_mask; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="settings_generation">settings_generation; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="critical_event_drops">critical_event_drops; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="log_drops">log_drops; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="free_kib">free_kib; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="sd_state">sd_state; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="nor_state">nor_state; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="reason_code">reason_code; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+    <message id="43007" name="FCU_RESOURCE_STATUS">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="validity_mask">validity_mask; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="task_id">task_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="wcet_us" units="us">wcet_us; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="stack_free_bytes">stack_free_bytes; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="deadline_miss_count">deadline_miss_count; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="cpu_load_permille">cpu_load_permille; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="axi_free_bytes">axi_free_bytes; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+    <message id="43008" name="FCU_TIME_STATUS">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="time_epoch">time_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="source_mapping_epoch">source_mapping_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="time_quality">time_quality; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="discipline_state">discipline_state; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="event_uncertainty_us" units="us">event_uncertainty_us; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="utc_uncertainty_us" units="us">utc_uncertainty_us; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t" name="utc_valid">utc_valid; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint64_t" name="unix_time_us" units="us">unix_time_us; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+    <message id="43009" name="FCU_EVENT">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="event_id">event_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="source_id">source_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="reason_namespace">reason_namespace; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="reason_code">reason_code; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="authority_epoch">authority_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="directive_epoch">directive_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="permit_epoch">permit_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t" name="severity">severity; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+    <message id="43010" name="FCU_PREARM_STATUS">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="check_epoch">check_epoch; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint64_t" name="evidence_time_us" units="us">evidence_time_us; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="check_id">check_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t" name="check_state">check_state; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="mode_mask">mode_mask; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="reason_namespace">reason_namespace; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="reason_code">reason_code; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="recovery_condition">recovery_condition; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+    <message id="43011" name="FCU_RC_INPUT_STATUS">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="valid_axes_mask">valid_axes_mask; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="float" name="roll_norm">roll_norm; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="float" name="pitch_norm">pitch_norm; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="float" name="yaw_norm">yaw_norm; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="float" name="throttle_norm">throttle_norm; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="age_us" units="us">age_us; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t" name="receiver_failsafe">receiver_failsafe; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t" name="link_state">link_state; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+    <message id="43012" name="FCU_BUILD_INFO">
+      <description>FCU spec Schema6; typed telemetry, authoritative internal meanings in spec 02/06. No control authority is granted by this message.</description>
+      <field type="uint64_t" name="time_boot_us" units="us">time_boot_us; FCU monotonic publication time</field>
+      <field type="uint64_t" name="boot_id">boot_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="profile_id">profile_id; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="schema_major">schema_major; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint16_t" name="schema_minor">schema_minor; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="product_revision">product_revision; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint32_t" name="port_revision">port_revision; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t" name="digest_kind">digest_kind; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t[32]" name="sha256">sha256; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t[20]" name="source_commit">source_commit; definitions and validity follow spec 02/06 semantic registry</field>
+      <field type="uint8_t" name="source_commit_valid">source_commit_valid; definitions and validity follow spec 02/06 semantic registry</field>
+    </message>
+  </messages>
+</mavlink>

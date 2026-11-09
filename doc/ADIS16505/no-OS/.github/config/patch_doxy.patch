@@ -1,0 +1,15 @@
+281,286d280
+<      warn_doc_error(context.memberDef->getDefFileName(),
+<                     context.memberDef->getDefLine(),
+<                     "%s",
+<                     qPrint("return value '" + name + "' of " +
+<                     QCString(context.memberDef->qualifiedName()) +
+<                     " has multiple documentation sections"));
+332,338d325
+<             warn_doc_error(context.memberDef->docFile(),
+<                            context.memberDef->docLine(),
+<                            "%s",
+<                            qPrint("argument '" + aName +
+<                            "' from the argument list of " +
+<                            QCString(context.memberDef->qualifiedName()) +
+<                            " has multiple @param documentation sections"));

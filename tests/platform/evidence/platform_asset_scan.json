@@ -1,0 +1,461 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "scope": "DOCUMENT_STATIC + PLATFORM_ASSET_INVENTORY",
+  "production_validation": "NOT_RUN",
+  "config_enabled_highlights": {
+    "CONFIG_RT_USING_CACHE": "y",
+    "CONFIG_RT_USING_SERIAL": "y",
+    "CONFIG_BSP_USING_UART": "y",
+    "CONFIG_BSP_USING_UART1": "y"
+  },
+  "drivers": [
+    {
+      "path": "libraries/HAL_Drivers/drivers/drv_spi.c",
+      "exists": true,
+      "size": 45481
+    },
+    {
+      "path": "libraries/HAL_Drivers/drivers/drv_hard_i2c.c",
+      "exists": true,
+      "size": 39878
+    },
+    {
+      "path": "libraries/HAL_Drivers/drivers/drv_tim.c",
+      "exists": true,
+      "size": 38570
+    },
+    {
+      "path": "libraries/HAL_Drivers/drivers/drv_pwm.c",
+      "exists": true,
+      "size": 16572
+    },
+    {
+      "path": "libraries/HAL_Drivers/drivers/drv_usart.c",
+      "exists": true,
+      "size": 36192
+    },
+    {
+      "path": "libraries/HAL_Drivers/drivers/drv_sdmmc.c",
+      "exists": true,
+      "size": 19704
+    },
+    {
+      "path": "libraries/HAL_Drivers/drivers/drv_qspi.c",
+      "exists": true,
+      "size": 10717
+    },
+    {
+      "path": "libraries/HAL_Drivers/drivers/drv_dma.c",
+      "exists": true,
+      "size": 12642
+    },
+    {
+      "path": "libraries/HAL_Drivers/drivers/drv_flash/drv_flash_h7.c",
+      "exists": true,
+      "size": null
+    }
+  ],
+  "irq_handlers": [
+    "DMA1_Stream0_IRQHandler",
+    "DMA1_Stream1_IRQHandler",
+    "DMA1_Stream2_IRQHandler",
+    "DMA1_Stream3_IRQHandler",
+    "DMA1_Stream4_IRQHandler",
+    "DMA1_Stream5_IRQHandler",
+    "DMA1_Stream6_IRQHandler",
+    "DMA1_Stream7_IRQHandler",
+    "DMA2_Stream0_IRQHandler",
+    "DMA2_Stream1_IRQHandler",
+    "DMA2_Stream2_IRQHandler",
+    "EXTI1_IRQHandler",
+    "EXTI9_5_IRQHandler",
+    "I2C1_ER_IRQHandler",
+    "I2C1_EV_IRQHandler",
+    "I2C2_ER_IRQHandler",
+    "I2C2_EV_IRQHandler",
+    "I2C4_ER_IRQHandler",
+    "I2C4_EV_IRQHandler",
+    "OCTOSPI1_IRQHandler",
+    "SDMMC1_IRQHandler",
+    "SPI1_IRQHandler",
+    "TIM1_UP_IRQHandler",
+    "TIM2_IRQHandler",
+    "UART4_IRQHandler",
+    "USART1_IRQHandler",
+    "USART2_IRQHandler",
+    "USART3_IRQHandler"
+  ],
+  "ioc": {
+    "peripherals_declared": [
+      "I2C1",
+      "I2C2",
+      "I2C4",
+      "OCTOSPI1",
+      "SDMMC1",
+      "SPI1",
+      "TIM1",
+      "TIM2",
+      "UART4",
+      "USART1",
+      "USART2",
+      "USART3"
+    ],
+    "dma_bindings": [
+      {
+        "request": "I2C2_RX",
+        "stream": "DMA2_Stream0"
+      },
+      {
+        "request": "I2C2_TX",
+        "stream": "DMA2_Stream1"
+      },
+      {
+        "request": "SPI1_RX",
+        "stream": "DMA1_Stream0"
+      },
+      {
+        "request": "SPI1_TX",
+        "stream": "DMA1_Stream1"
+      },
+      {
+        "request": "TIM1_UP",
+        "stream": "DMA2_Stream2"
+      },
+      {
+        "request": "UART4_RX",
+        "stream": "DMA1_Stream2"
+      },
+      {
+        "request": "USART1_RX",
+        "stream": "DMA1_Stream3"
+      },
+      {
+        "request": "USART1_TX",
+        "stream": "DMA1_Stream4"
+      },
+      {
+        "request": "USART2_RX",
+        "stream": "DMA1_Stream5"
+      },
+      {
+        "request": "USART2_TX",
+        "stream": "DMA1_Stream7"
+      },
+      {
+        "request": "USART3_RX",
+        "stream": "DMA1_Stream6"
+      }
+    ],
+    "pin_signals": [
+      {
+        "pin": "PA0",
+        "signal": "UART4_TX"
+      },
+      {
+        "pin": "PA1",
+        "signal": "UART4_RX"
+      },
+      {
+        "pin": "PA10",
+        "signal": "USART1_RX"
+      },
+      {
+        "pin": "PA2",
+        "signal": "S_TIM2_CH3"
+      },
+      {
+        "pin": "PA3",
+        "signal": "S_TIM2_CH4"
+      },
+      {
+        "pin": "PA5",
+        "signal": "SPI1_SCK"
+      },
+      {
+        "pin": "PA6",
+        "signal": "SPI1_MISO"
+      },
+      {
+        "pin": "PA7",
+        "signal": "SPI1_MOSI"
+      },
+      {
+        "pin": "PA9",
+        "signal": "USART1_TX"
+      },
+      {
+        "pin": "PB10",
+        "signal": "I2C2_SCL"
+      },
+      {
+        "pin": "PB11",
+        "signal": "I2C2_SDA"
+      },
+      {
+        "pin": "PB5",
+        "signal": "GPXTI5"
+      },
+      {
+        "pin": "PB6",
+        "signal": "I2C4_SCL"
+      },
+      {
+        "pin": "PB7",
+        "signal": "I2C1_SDA"
+      },
+      {
+        "pin": "PB8",
+        "signal": "I2C1_SCL"
+      },
+      {
+        "pin": "PB9",
+        "signal": "I2C4_SDA"
+      },
+      {
+        "pin": "PC0",
+        "signal": "GPIO_Input"
+      },
+      {
+        "pin": "PC0",
+        "signal": "UM982_RTK"
+      },
+      {
+        "pin": "PC1",
+        "signal": "GPIO_Output"
+      },
+      {
+        "pin": "PC10",
+        "signal": "SDMMC1_D2"
+      },
+      {
+        "pin": "PC11",
+        "signal": "SDMMC1_D3"
+      },
+      {
+        "pin": "PC12",
+        "signal": "SDMMC1_CK"
+      },
+      {
+        "pin": "PC4",
+        "signal": "GPIO_Output"
+      },
+      {
+        "pin": "PC5",
+        "signal": "GPIO_Output"
+      },
+      {
+        "pin": "PC8",
+        "signal": "SDMMC1_D0"
+      },
+      {
+        "pin": "PC9",
+        "signal": "SDMMC1_D1"
+      },
+      {
+        "pin": "PD2",
+        "signal": "SDMMC1_CMD"
+      },
+      {
+        "pin": "PD5",
+        "signal": "USART2_TX"
+      },
+      {
+        "pin": "PD6",
+        "signal": "USART2_RX"
+      },
+      {
+        "pin": "PD8",
+        "signal": "USART3_TX"
+      },
+      {
+        "pin": "PD9",
+        "signal": "USART3_RX"
+      },
+      {
+        "pin": "PE1",
+        "signal": "GPXTI1"
+      },
+      {
+        "pin": "PE11",
+        "signal": "S_TIM1_CH2"
+      },
+      {
+        "pin": "PE13",
+        "signal": "S_TIM1_CH3"
+      },
+      {
+        "pin": "PE14",
+        "signal": "S_TIM1_CH4"
+      },
+      {
+        "pin": "PE9",
+        "signal": "S_TIM1_CH1"
+      },
+      {
+        "pin": "PF10",
+        "signal": "OCTOSPIM_P1_CLK"
+      },
+      {
+        "pin": "PF6",
+        "signal": "OCTOSPIM_P1_IO3"
+      },
+      {
+        "pin": "PF7",
+        "signal": "OCTOSPIM_P1_IO2"
+      },
+      {
+        "pin": "PF8",
+        "signal": "OCTOSPIM_P1_IO0"
+      },
+      {
+        "pin": "PF9",
+        "signal": "OCTOSPIM_P1_IO1"
+      },
+      {
+        "pin": "PG6",
+        "signal": "OCTOSPIM_P1_NCS"
+      },
+      {
+        "pin": "PG7",
+        "signal": "GPIO_Output"
+      },
+      {
+        "pin": "PG7",
+        "signal": "LED"
+      }
+    ]
+  },
+  "checks": {
+    "system_clock_config": true,
+    "cache_enable_macro": false,
+    "mpu_config": true,
+    "tim2_init": true,
+    "tim2_capture": true,
+    "dshot_driver": true,
+    "rtos_adapter_fc_os": false,
+    "time_service_core": true,
+    "raw_ingress_core": true,
+    "snapshot_channel": false
+  },
+  "requirements": [
+    {
+      "id": "SYS-CLOCK",
+      "requirement": "System clock tree / HSE / PLL",
+      "evidence": "board/board.c",
+      "status": "REUSE",
+      "next": "reuse SystemClock_Config; target clock evidence NOT_RUN"
+    },
+    {
+      "id": "SYS-MPU",
+      "requirement": "MPU regions (DMA non-cacheable/executable attrs)",
+      "evidence": "board/fc_board_platform.c, 03 section 6/7",
+      "status": "REUSE",
+      "next": "static regions added; target MPU/cache stress NOT_RUN"
+    },
+    {
+      "id": "SYS-CACHE",
+      "requirement": "D-Cache enable + maintenance",
+      "evidence": "board/fc_board_platform.c",
+      "status": "REUSE",
+      "next": "cache enabled after MPU; target stress NOT_RUN"
+    },
+    {
+      "id": "TIME-TICK",
+      "requirement": "TIM2 32-bit free-running 10 MHz + UIF 64-bit extension",
+      "evidence": "board/fc_board_platform.c",
+      "status": "REUSE",
+      "next": "source implemented; target waveform NOT_RUN"
+    },
+    {
+      "id": "TIME-CAP",
+      "requirement": "TIM2 CH4 DRDY / CH3 PPS capture",
+      "evidence": "board/fc_board_platform.c",
+      "status": "REUSE",
+      "next": "capture implemented; DRDY pre-armed SPI DMA still NOT_RUN"
+    },
+    {
+      "id": "TIME-SVC",
+      "requirement": "Monotonic/PPS/UTC TimeService core",
+      "evidence": "applications/services/time",
+      "status": "REUSE",
+      "next": "host-tested; board tick source binding pending"
+    },
+    {
+      "id": "RAW-SVC",
+      "requirement": "Raw ingress lease ring (160B slots)",
+      "evidence": "applications/services/raw_ingress",
+      "status": "REUSE",
+      "next": "host-tested; DMA publish binding pending"
+    },
+    {
+      "id": "SNAP-SVC",
+      "requirement": "Double-slot latest-value snapshot protocol",
+      "evidence": "03 cross-task snapshot",
+      "status": "MISSING",
+      "next": "not delivered in this slice"
+    },
+    {
+      "id": "OS-ADP",
+      "requirement": "RTOS adapter fc_os_* static task/IPC API",
+      "evidence": "03 section 5.2",
+      "status": "MISSING",
+      "next": "not delivered in this slice"
+    },
+    {
+      "id": "BUS-SPI",
+      "requirement": "SPI1 IMU bus + async DMA fast path",
+      "evidence": "drv_spi.c / .ioc",
+      "status": "ENABLE_NEEDED",
+      "next": "driver exists; Kconfig/board binding not enabled"
+    },
+    {
+      "id": "BUS-I2C",
+      "requirement": "I2C1/I2C2 baro/mag",
+      "evidence": "drv_hard_i2c.c",
+      "status": "ENABLE_NEEDED",
+      "next": "driver exists; Kconfig/board binding not enabled"
+    },
+    {
+      "id": "LINK-UART",
+      "requirement": "USART2/3/4 RC/GCS/GNSS + DMA rings",
+      "evidence": "drv_usart.c / .ioc",
+      "status": "ENABLE_NEEDED",
+      "next": "only UART1 console enabled; other links are design inputs"
+    },
+    {
+      "id": "OUT-DSHOT",
+      "requirement": "TIM1 UP DMA burst + DShot TC->Update",
+      "evidence": "board/fc_board_platform.c",
+      "status": "REUSE",
+      "next": "source implemented; target waveform NOT_RUN"
+    },
+    {
+      "id": "OUT-PWM",
+      "requirement": "PWM output fallback",
+      "evidence": "drv_pwm.c",
+      "status": "ENABLE_NEEDED",
+      "next": "driver exists; not enabled"
+    },
+    {
+      "id": "STO-SD",
+      "requirement": "SDMMC1 IDMA storage",
+      "evidence": "drv_sdmmc.c",
+      "status": "ENABLE_NEEDED",
+      "next": "driver exists; not enabled"
+    },
+    {
+      "id": "STO-NOR",
+      "requirement": "OCTOSPI1 W25Q64",
+      "evidence": "drv_qspi.c",
+      "status": "ENABLE_NEEDED",
+      "next": "driver exists; not enabled"
+    },
+    {
+      "id": "IRQ-TABLE",
+      "requirement": "NVIC vector/priority ownership",
+      "evidence": "stm32h7xx_it.c",
+      "status": "STUB",
+      "next": "handlers call HAL with CubeMX handles; peripheral init/priority ownership not verified"
+    }
+  ]
+}

@@ -1,0 +1,211 @@
+menu "Hardware Drivers Config"
+
+menu "Onboard Peripheral Drivers"
+
+    config BSP_USING_FLIGHT_DRIVERS
+        bool "Flight sensors, actuator, timebase and storage devices"
+        default y
+        select BSP_USING_UART
+        select BSP_USING_SPI
+        select BSP_USING_SPI1
+        select BSP_SPI1_RX_USING_DMA
+        select BSP_SPI1_TX_USING_DMA
+        select RT_USING_I2C
+        select BSP_USING_HARD_I2C1
+        select BSP_USING_HARD_I2C2
+        select BSP_USING_HARD_I2C4
+        select BSP_I2C1_RX_USING_INT
+        select BSP_I2C1_TX_USING_INT
+        select BSP_I2C2_RX_USING_DMA
+        select BSP_I2C2_TX_USING_DMA
+        select BSP_I2C2_RX_USING_INT
+        select BSP_I2C2_TX_USING_INT
+        select BSP_I2C4_RX_USING_INT
+        select BSP_I2C4_TX_USING_INT
+        select BSP_USING_UART2
+        select BSP_UART2_RX_USING_DMA
+        select BSP_UART2_TX_USING_DMA
+        select BSP_USING_UART3
+        select BSP_UART3_RX_USING_DMA
+        select BSP_USING_UART4
+        select BSP_UART4_RX_USING_DMA
+        select RT_USING_MTD_NOR
+        select BSP_USING_SDIO
+        select BSP_USING_SDIO1
+        select BSP_USING_WDT
+        select BSP_USING_RNG
+
+endmenu
+
+menu "On-chip Peripheral Drivers"
+
+    config BSP_USING_USBD
+        bool "Enable USB CDC device on PA11/PA12"
+        default y
+        depends on BSP_USING_FLIGHT_DRIVERS && RT_USING_HEAP
+        select RT_USING_USB_DEVICE
+        select BSP_USBD_TYPE_HS
+        select BSP_USBD_PHY_EMBEDDED
+
+    config BSP_USING_SPI
+        bool "Enable SPI bus framework"
+        select RT_USING_SPI
+    config BSP_USING_SPI1
+        bool "Enable SPI1 (ADIS)"
+        depends on BSP_USING_SPI
+    config BSP_SPI1_RX_USING_DMA
+        bool "SPI1 receive DMA"
+        depends on BSP_USING_SPI1
+    config BSP_SPI1_TX_USING_DMA
+        bool "SPI1 transmit DMA"
+        depends on BSP_USING_SPI1
+    config BSP_USING_HARD_I2C1
+        bool "Enable I2C1 (BMM350)"
+        select RT_USING_I2C
+    config BSP_USING_HARD_I2C2
+        bool "Enable I2C2 (current monitor bus)"
+        select RT_USING_I2C
+    config BSP_USING_HARD_I2C4
+        bool "Enable I2C4 (BMP585)"
+        select RT_USING_I2C
+    config BSP_I2C1_RX_USING_INT
+        bool
+        depends on BSP_USING_HARD_I2C1
+    config BSP_I2C1_TX_USING_INT
+        bool
+        depends on BSP_USING_HARD_I2C1
+    config BSP_I2C2_RX_USING_DMA
+        bool
+        depends on BSP_USING_HARD_I2C2
+    config BSP_I2C2_TX_USING_DMA
+        bool
+        depends on BSP_USING_HARD_I2C2
+    config BSP_I2C2_RX_USING_INT
+        bool
+        depends on BSP_USING_HARD_I2C2
+    config BSP_I2C2_TX_USING_INT
+        bool
+        depends on BSP_USING_HARD_I2C2
+    config BSP_I2C4_RX_USING_INT
+        bool
+        depends on BSP_USING_HARD_I2C4
+    config BSP_I2C4_TX_USING_INT
+        bool
+        depends on BSP_USING_HARD_I2C4
+    config BSP_USING_UART2
+        bool "Enable USART2 data radio"
+        depends on BSP_USING_UART
+    config BSP_USING_UART3
+        bool "Enable USART3 RC byte stream"
+        depends on BSP_USING_UART
+    config BSP_USING_UART4
+        bool "Enable UART4 GNSS"
+        depends on BSP_USING_UART
+    config BSP_UART2_RX_USING_DMA
+        bool
+        depends on BSP_USING_UART2
+        select RT_SERIAL_USING_DMA
+    config BSP_UART2_TX_USING_DMA
+        bool
+        depends on BSP_USING_UART2
+        select RT_SERIAL_USING_DMA
+    config BSP_UART2_RX_BUFSIZE
+        int
+        depends on BSP_USING_UART2 && RT_USING_SERIAL_V2
+        default 2048
+    config BSP_UART2_TX_BUFSIZE
+        int
+        depends on BSP_USING_UART2 && RT_USING_SERIAL_V2
+        default 2048
+    config BSP_UART2_DMA_PING_BUFSIZE
+        int
+        depends on BSP_UART2_RX_USING_DMA && RT_USING_SERIAL_V2
+        default BSP_UART2_RX_BUFSIZE
+    config BSP_UART3_RX_USING_DMA
+        bool
+        depends on BSP_USING_UART3
+        select RT_SERIAL_USING_DMA
+    config BSP_UART3_RX_BUFSIZE
+        int
+        depends on BSP_USING_UART3 && RT_USING_SERIAL_V2
+        default 512
+    config BSP_UART3_TX_BUFSIZE
+        int
+        depends on BSP_USING_UART3 && RT_USING_SERIAL_V2
+        default 0
+    config BSP_UART3_DMA_PING_BUFSIZE
+        int
+        depends on BSP_UART3_RX_USING_DMA && RT_USING_SERIAL_V2
+        default BSP_UART3_RX_BUFSIZE
+    config BSP_UART4_RX_USING_DMA
+        bool
+        depends on BSP_USING_UART4
+        select RT_SERIAL_USING_DMA
+    config BSP_UART4_RX_BUFSIZE
+        int
+        depends on BSP_USING_UART4 && RT_USING_SERIAL_V2
+        default 2048
+    config BSP_UART4_TX_BUFSIZE
+        int
+        depends on BSP_USING_UART4 && RT_USING_SERIAL_V2
+        default 0
+    config BSP_UART4_DMA_PING_BUFSIZE
+        int
+        depends on BSP_UART4_RX_USING_DMA && RT_USING_SERIAL_V2
+        default BSP_UART4_RX_BUFSIZE
+    config BSP_USING_SDIO
+        bool "Enable SDMMC storage"
+        select RT_USING_SDIO
+    config BSP_USING_SDMMC
+        def_bool BSP_USING_SDIO && (SOC_SERIES_STM32H7RS || SOC_SERIES_STM32H7 || \
+                                    SOC_SERIES_STM32F7 || SOC_SERIES_STM32L4 || SOC_SERIES_STM32L5)
+    config BSP_USING_SDIO1
+        bool
+        depends on BSP_USING_SDIO
+    config BSP_USING_WDT
+        bool "Register independent watchdog (supervisor starts/feeds it)"
+        select RT_USING_WDT
+
+    config BSP_USING_GPIO
+        bool "Enable GPIO"
+        select RT_USING_PIN
+        default y
+
+    menuconfig BSP_USING_UART
+        bool "Enable UART"
+        default y
+        select RT_USING_SERIAL
+        if BSP_USING_UART
+            config BSP_STM32_UART_V1_TX_TIMEOUT
+                int "UART TX timeout"
+                default 6000
+                depends on RT_USING_SERIAL_V1
+                
+            menuconfig BSP_USING_UART1
+                bool "Enable UART1"
+                default y
+                if BSP_USING_UART1
+                    config BSP_UART1_RX_BUFSIZE
+                        int "Set UART1 RX buffer size"
+                        range 64 65535
+                        depends on RT_USING_SERIAL_V2
+                        default 512
+
+                    config BSP_UART1_TX_BUFSIZE
+                        int "Set UART1 TX buffer size"
+                        range 0 65535
+                        depends on RT_USING_SERIAL_V2
+                        default 0
+                endif
+
+        endif
+
+    source "$(BSP_DIR)/libraries/HAL_Drivers/drivers/Kconfig"
+
+endmenu
+
+menu "Board extended module Drivers"
+
+endmenu
+
+endmenu

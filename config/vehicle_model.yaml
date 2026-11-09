@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "profile": "QUAD_X4",
+  "status": "SIM_ONLY",
+  "source": "Synthetic X4 fixture; motor numbering and yaw signs have no hardware evidence",
+  "mass_kg": 1.5,
+  "inertia_frd_kgm2": [0.025, 0, 0, 0, 0.025, 0, 0, 0, 0.04],
+  "motor_position_frd_m": [[0.18, -0.18, 0], [0.18, 0.18, 0], [-0.18, 0.18, 0], [-0.18, -0.18, 0]],
+  "motor_yaw_torque_ratio_m": [-0.02, 0.02, -0.02, 0.02],
+  "motor_min_thrust_n": [0, 0, 0, 0],
+  "motor_max_thrust_n": [15, 15, 15, 15],
+  "motor_time_constant_s": [0.03, 0.03, 0.03, 0.03],
+  "hardware_thrust_curve": "TBD: no hardware output calibration is supplied"
+}

@@ -1,0 +1,133 @@
+{
+  "task_id": "T191-C-M5",
+  "task_type": "IMPLEMENTATION",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010904",
+  "update_sequence": 2,
+  "requested_transition": "NO_CHANGE",
+  "transition_note": "T191-C-M5 remains READY_FOR_ASSIGNMENT. Start after T191-C-FMS leaves REVIEW/CR finalization; the prepared slice is NONE-obstacle-source only (A*/map/collision remain NOT_RUN).",
+  "assignee": "C",
+  "acknowledgement": {
+    "prompt_received": true,
+    "baseline_confirmed": true,
+    "received_at": "2026-11-04T23:05+08:00",
+    "prerequisites": [
+      {
+        "task_id": "T191-C-FMS",
+        "task_status_seen": "READY_FOR_ASSIGNMENT",
+        "delivered_by": "C",
+        "verification_status_seen": "NOT_RUN"
+      },
+      {
+        "task_id": "T191-B-REPLAY",
+        "task_status_seen": "READY_FOR_ASSIGNMENT",
+        "acknowledgement_seen": null,
+        "verification_status_seen": "NOT_RUN"
+      }
+    ]
+  },
+  "deliverable_refs": [
+    "applications/core/m5/src/m5_internal.h",
+    "applications/core/m5/src/m5_math.c",
+    "applications/core/m5/src/m5_update.c",
+    "applications/core/m5/Kconfig",
+    "applications/core/m5/SConscript",
+    "applications/plugins/guidance/SConscript",
+    "applications/plugins/guidance/quad_x4/quad_x4_guidance.h",
+    "applications/plugins/guidance/quad_x4/quad_x4_guidance.c",
+    "applications/plugins/guidance/quad_x4/SConscript",
+    "applications/core/m5/hosttest/test_m5_main.c",
+    "applications/core/m5/hosttest/run_host_tests.sh",
+    "applications/core/m5/hosttest/arm_build_check.ps1",
+    "applications/core/m5/hosttest/evidence/host_tests.log",
+    "applications/core/m5/hosttest/evidence/arm_build.log",
+    "applications/core/m5/hosttest/evidence/commands.json",
+    "applications/core/m5/hosttest/evidence/environment.txt",
+    "applications/core/m5/hosttest/evidence/artifact_sha256.json",
+    "applications/core/m5/T191-C-M5_DELIVERY.md"
+  ],
+  "actual_commands": [
+    {
+      "command": "wsl.exe -d Ubuntu-26.04 -- bash applications/core/m5/hosttest/run_host_tests.sh",
+      "exit_code": 0,
+      "result": "10 tests, 72 checks, 0 failures (production headers)"
+    },
+    {
+      "command": "pwsh -NoProfile -File applications/core/m5/hosttest/arm_build_check.ps1",
+      "exit_code": 0,
+      "result": "Cortex-M7 compile PASS; text 13320 B; bss 304 B"
+    }
+  ],
+  "verification": {
+    "scope": "IMPLEMENTATION_HOST",
+    "status": "PASS (executor-run Host evidence only; not a 09 ledger PASS, not independently reviewed)",
+    "tests": {
+      "count": 10,
+      "assertions": 72,
+      "failures": 0
+    },
+    "arm_compile": {
+      "compiler": "arm-none-eabi-gcc 14.3.1",
+      "text_bytes": 13320,
+      "bss_bytes": 304
+    },
+    "independent_review": "NOT_RUN"
+  },
+  "scope_limits": [
+    "NONE obstacle source only; missions requiring avoidance are rejected with 0x0605",
+    "no local map manager, no Kinodynamic A*, no swept-volume/dynamic collision validation",
+    "no M5-05 optimizer; direct quintic with duration extension retries",
+    "no tilt/thrust feasibility (requires control model)"
+  ],
+  "not_run": [
+    "A*/map/collision/avoidance path",
+    "target build/WCET/stack, SIL/HIL, M4/M6/M7 closed-loop",
+    "D review and 09 registration"
+  ],
+  "reviewer": "D",
+  "blocked_by": [
+    "T191-C-FMS",
+    "T191-B-REPLAY"
+  ],
+  "resume_state": "READY_FOR_ASSIGNMENT (C side); after D accepts prerequisites and M6/M7 bind the same baseline, C re-runs integration",
+  "next_owner": "D",
+  "next_action": "D: accept T191-C-FMS at Gate D and close CR-V191-C02; then route C-M5 to C. C will implement the remaining M5 scope only if D requires obstacle-capable guidance; otherwise the NONE-source slice is the declared boundary.",
+  "commit": null,
+  "commit_note": "No Git metadata; snapshot in evidence/artifact_sha256.json.",
+  "rollback": "Delete applications/core/m5/, applications/plugins/guidance/, build/m5_*; revert the single source line appended to applications/core/Kconfig.",
+  "submission": {
+    "revision": 3,
+    "submitted_at": "2026-11-05T00:29:51+08:00",
+    "supersedes_sha256": "2312b7c61bcf2702f425ad56d55385e80594a601c9b0afed6c4f2e814f325859",
+    "reason": "Baseline sync to 0x00010904 after CR-V191-C01 (mission_epoch) changed the product contract; the NONE-source M5 slice was recompiled against the new production headers (10 tests/72 checks). No scope change; C-M5 still waits for T191-C-FMS acceptance.",
+    "dedup_key": "T191-C-M5:3"
+  },
+  "d_rev_04_c_part": {
+    "role": "C",
+    "status": "SUBMITTED_FOR_MERGE",
+    "tasks": [
+      "T191-C-FMS",
+      "T191-C-M5",
+      "T191-C-M6",
+      "T191-C-M7"
+    ],
+    "index": "applications/core/status_requests/index.json",
+    "note": "C submits all four status requests so D can close the C part of D-REV-04. C does not edit AGENT_HANDOFF; closure remains a D action."
+  },
+  "review_opinion": {
+    "task": "T191-D-REVIEW",
+    "revision": 2,
+    "path": "applications/core/m4/reviews/C_REVIEW_T191-D-REVIEW.md",
+    "submission": "applications/core/m4/reviews/C_REVIEW_SUBMISSION.json",
+    "sha256": "3b4360b26812618e46e562b5433270dfdac054fbf1f27720f7cc6c8244b458ee",
+    "conclusion": "ACCEPT_WITH_CONDITIONS",
+    "summary": {
+      "checks": 22,
+      "pass": 15,
+      "fail": 1,
+      "obs": 6
+    },
+    "status": "SUBMITTED_FOR_MERGE",
+    "note": "Use revision 2 (post-fix review_checks_post.json). Not an ACCEPTED state or Gate A approval."
+  },
+  "state": "WAITING_FOR_C_FMS"
+}

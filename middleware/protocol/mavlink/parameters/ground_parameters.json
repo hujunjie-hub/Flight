@@ -1,0 +1,4458 @@
+{
+  "schema": 2,
+  "profile": "QUAD_X4",
+  "generator": "tools/generate_ground_config.py",
+  "sha256": "63547de6956d277f6557300c93e0ff6673542e619515ca5f26983f38fc1e3e8e",
+  "sources": {
+    "vehicle_model": "72e0fc56dcde59207442314b9d91265ef6f61fc8e8bf0b0316f9c13e60398edb",
+    "sensor_alignment": "b72c9640bbbed1f527b7fcce911e9adadd7b0ca52a4bc7735e87437e5061a2d2",
+    "estimator_tuning": "7a7814a8c8ab95b8e3d0a3d95862cec89ed5a695b78201eec08c6697b368055c",
+    "controller_tuning": "96d79b9275fa491835e8421fe3be988ffdb47152cc7b9be07dcf83bc7ca21cec",
+    "calibration": "d5e4f74516b29b50d5e8fe4e9ef4c4415a376b6395a83ea7e923b5febce2d17d"
+  },
+  "parameters": [
+    {
+      "name": "VEH_MASS",
+      "title": "整机质量",
+      "group": "机体模型",
+      "units": "kg",
+      "value": 1.5,
+      "minimum": 0.1,
+      "maximum": 50.0,
+      "writable": true,
+      "kind": "scalar",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "mass_kg"
+      ],
+      "description": "控制器推力分配和制导模型使用的整机质量；与实际起飞重量不一致会造成高度偏差。"
+    },
+    {
+      "name": "CTL_ACT_DLY",
+      "title": "执行预览延迟",
+      "group": "MPC 权重",
+      "units": "s",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 0.04,
+      "writable": true,
+      "kind": "scalar",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "actuation_preview_delay_s"
+      ],
+      "description": "把执行器响应延迟前馈到参考中的时间，允许 0 到 0.04 s。"
+    },
+    {
+      "name": "CTL_FB_KD_X",
+      "title": "位置环回退 D（北）",
+      "group": "位置环回退",
+      "units": "1/s",
+      "value": 2.0,
+      "minimum": 0.0,
+      "maximum": 50.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "fallback_kd_per_s",
+        0
+      ],
+      "description": "MPC 不可用时位置环回退控制的阻尼增益，允许 0。"
+    },
+    {
+      "name": "CTL_FB_KD_Y",
+      "title": "位置环回退 D（东）",
+      "group": "位置环回退",
+      "units": "1/s",
+      "value": 2.0,
+      "minimum": 0.0,
+      "maximum": 50.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "fallback_kd_per_s",
+        1
+      ],
+      "description": "MPC 不可用时位置环回退控制的阻尼增益，允许 0。"
+    },
+    {
+      "name": "CTL_FB_KD_Z",
+      "title": "位置环回退 D（地）",
+      "group": "位置环回退",
+      "units": "1/s",
+      "value": 2.0,
+      "minimum": 0.0,
+      "maximum": 50.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "fallback_kd_per_s",
+        2
+      ],
+      "description": "MPC 不可用时位置环回退控制的阻尼增益，允许 0。"
+    },
+    {
+      "name": "CTL_FB_KP_X",
+      "title": "位置环回退 P（北）",
+      "group": "位置环回退",
+      "units": "1/s²",
+      "value": 2.0,
+      "minimum": 0.0,
+      "maximum": 50.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "fallback_kp_per_s2",
+        0
+      ],
+      "description": "MPC 不可用时位置环回退控制的比例增益，允许 0。"
+    },
+    {
+      "name": "CTL_FB_KP_Y",
+      "title": "位置环回退 P（东）",
+      "group": "位置环回退",
+      "units": "1/s²",
+      "value": 2.0,
+      "minimum": 0.0,
+      "maximum": 50.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "fallback_kp_per_s2",
+        1
+      ],
+      "description": "MPC 不可用时位置环回退控制的比例增益，允许 0。"
+    },
+    {
+      "name": "CTL_FB_KP_Z",
+      "title": "位置环回退 P（地）",
+      "group": "位置环回退",
+      "units": "1/s²",
+      "value": 2.0,
+      "minimum": 0.0,
+      "maximum": 50.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "fallback_kp_per_s2",
+        2
+      ],
+      "description": "MPC 不可用时位置环回退控制的比例增益，允许 0。"
+    },
+    {
+      "name": "CTL_HOVER_THR",
+      "title": "手动悬停油门",
+      "group": "姿态角速度环",
+      "units": "norm",
+      "value": 0.5,
+      "minimum": 0.05,
+      "maximum": 0.95,
+      "writable": true,
+      "kind": "scalar",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "manual_hover_throttle_norm"
+      ],
+      "description": "手动模式下维持悬停的归一化油门，必须在 0 与 1 之间。"
+    },
+    {
+      "name": "CTL_MPC_Q0",
+      "title": "MPC 状态权重 Q0",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 8.0,
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_q_diag",
+        0
+      ],
+      "description": "MPC 运行代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_Q1",
+      "title": "MPC 状态权重 Q1",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 8.0,
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_q_diag",
+        1
+      ],
+      "description": "MPC 运行代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_Q2",
+      "title": "MPC 状态权重 Q2",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 12.0,
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_q_diag",
+        2
+      ],
+      "description": "MPC 运行代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_Q3",
+      "title": "MPC 状态权重 Q3",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 3.0,
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_q_diag",
+        3
+      ],
+      "description": "MPC 运行代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_Q4",
+      "title": "MPC 状态权重 Q4",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 3.0,
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_q_diag",
+        4
+      ],
+      "description": "MPC 运行代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_Q5",
+      "title": "MPC 状态权重 Q5",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 4.0,
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_q_diag",
+        5
+      ],
+      "description": "MPC 运行代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_QF0",
+      "title": "MPC 终端权重 Qf0",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 8.0,
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_qf_diag",
+        0
+      ],
+      "description": "MPC 终端代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_QF1",
+      "title": "MPC 终端权重 Qf1",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 8.0,
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_qf_diag",
+        1
+      ],
+      "description": "MPC 终端代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_QF2",
+      "title": "MPC 终端权重 Qf2",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 12.0,
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_qf_diag",
+        2
+      ],
+      "description": "MPC 终端代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_QF3",
+      "title": "MPC 终端权重 Qf3",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 3.0,
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_qf_diag",
+        3
+      ],
+      "description": "MPC 终端代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_QF4",
+      "title": "MPC 终端权重 Qf4",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 3.0,
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_qf_diag",
+        4
+      ],
+      "description": "MPC 终端代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_QF5",
+      "title": "MPC 终端权重 Qf5",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 4.0,
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_qf_diag",
+        5
+      ],
+      "description": "MPC 终端代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_R0",
+      "title": "MPC 控制权重 R0",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 0.8,
+      "minimum": 0.0,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_r_diag",
+        0
+      ],
+      "description": "MPC 控制量代价的对角权重，允许 0。"
+    },
+    {
+      "name": "CTL_MPC_R1",
+      "title": "MPC 控制权重 R1",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 0.8,
+      "minimum": 0.0,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_r_diag",
+        1
+      ],
+      "description": "MPC 控制量代价的对角权重，允许 0。"
+    },
+    {
+      "name": "CTL_MPC_R2",
+      "title": "MPC 控制权重 R2",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 1.0,
+      "minimum": 0.0,
+      "maximum": 1000.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_r_diag",
+        2
+      ],
+      "description": "MPC 控制量代价的对角权重，允许 0。"
+    },
+    {
+      "name": "CTL_MPC_S0",
+      "title": "MPC 控制增量权重 S0",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 0.2,
+      "minimum": 0.001,
+      "maximum": 100.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_s_diag",
+        0
+      ],
+      "description": "MPC 控制增量代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_S1",
+      "title": "MPC 控制增量权重 S1",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 0.2,
+      "minimum": 0.001,
+      "maximum": 100.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_s_diag",
+        1
+      ],
+      "description": "MPC 控制增量代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_MPC_S2",
+      "title": "MPC 控制增量权重 S2",
+      "group": "MPC 权重",
+      "units": "-",
+      "value": 0.25,
+      "minimum": 0.001,
+      "maximum": 100.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_s_diag",
+        2
+      ],
+      "description": "MPC 控制增量代价的对角权重，必须大于 0。"
+    },
+    {
+      "name": "CTL_SEED_POS",
+      "title": "MPC 种子位置误差限",
+      "group": "MPC 权重",
+      "units": "m",
+      "value": 0.5,
+      "minimum": 0.01,
+      "maximum": 100.0,
+      "writable": true,
+      "kind": "scalar",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_seed_position_error_limit_m"
+      ],
+      "description": "MPC 热启动允许的位置误差上限，必须大于 0。"
+    },
+    {
+      "name": "CTL_SEED_VEL",
+      "title": "MPC 种子速度误差限",
+      "group": "MPC 权重",
+      "units": "m/s",
+      "value": 1.0,
+      "minimum": 0.01,
+      "maximum": 100.0,
+      "writable": true,
+      "kind": "scalar",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_seed_velocity_error_limit_mps"
+      ],
+      "description": "MPC 热启动允许的速度误差上限，必须大于 0。"
+    },
+    {
+      "name": "CTL_RATE_DCUT",
+      "title": "角速度环 D 项截止频率",
+      "group": "姿态角速度环",
+      "units": "Hz",
+      "value": 40.0,
+      "minimum": 1.0,
+      "maximum": 449.0,
+      "writable": true,
+      "kind": "scalar",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_d_cutoff_hz"
+      ],
+      "description": "角速度误差微分的低通截止频率，必须大于 0 且小于 450 Hz。"
+    },
+    {
+      "name": "CTL_RATE_ILIM_X",
+      "title": "角速度积分限幅（滚转）",
+      "group": "姿态角速度环",
+      "units": "N·m",
+      "value": 0.2,
+      "minimum": 0.001,
+      "maximum": 10.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_integral_limit_nm",
+        0
+      ],
+      "description": "积分项力矩限幅，必须大于 0。"
+    },
+    {
+      "name": "CTL_RATE_ILIM_Y",
+      "title": "角速度积分限幅（俯仰）",
+      "group": "姿态角速度环",
+      "units": "N·m",
+      "value": 0.2,
+      "minimum": 0.001,
+      "maximum": 10.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_integral_limit_nm",
+        1
+      ],
+      "description": "积分项力矩限幅，必须大于 0。"
+    },
+    {
+      "name": "CTL_RATE_ILIM_Z",
+      "title": "角速度积分限幅（偏航）",
+      "group": "姿态角速度环",
+      "units": "N·m",
+      "value": 0.2,
+      "minimum": 0.001,
+      "maximum": 10.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_integral_limit_nm",
+        2
+      ],
+      "description": "积分项力矩限幅，必须大于 0。"
+    },
+    {
+      "name": "CTL_RATE_KAW_X",
+      "title": "角速度环抗饱和（滚转）",
+      "group": "姿态角速度环",
+      "units": "1/s",
+      "value": 5.0,
+      "minimum": 0.01,
+      "maximum": 100.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kaw_per_s",
+        0
+      ],
+      "description": "积分抗饱和反馈增益，必须大于 0。"
+    },
+    {
+      "name": "CTL_RATE_KAW_Y",
+      "title": "角速度环抗饱和（俯仰）",
+      "group": "姿态角速度环",
+      "units": "1/s",
+      "value": 5.0,
+      "minimum": 0.01,
+      "maximum": 100.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kaw_per_s",
+        1
+      ],
+      "description": "积分抗饱和反馈增益，必须大于 0。"
+    },
+    {
+      "name": "CTL_RATE_KAW_Z",
+      "title": "角速度环抗饱和（偏航）",
+      "group": "姿态角速度环",
+      "units": "1/s",
+      "value": 5.0,
+      "minimum": 0.01,
+      "maximum": 100.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kaw_per_s",
+        2
+      ],
+      "description": "积分抗饱和反馈增益，必须大于 0。"
+    },
+    {
+      "name": "CTL_RATE_KD_X",
+      "title": "角速度环 D（滚转）",
+      "group": "姿态角速度环",
+      "units": "N·m/(rad/s²)",
+      "value": 0.002,
+      "minimum": 0.0,
+      "maximum": 20.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kd_nm_per_radps2",
+        0
+      ],
+      "description": "角速度误差微分增益，允许 0；D 项再经过 CTL_RATE_DCUT 低通。"
+    },
+    {
+      "name": "CTL_RATE_KD_Y",
+      "title": "角速度环 D（俯仰）",
+      "group": "姿态角速度环",
+      "units": "N·m/(rad/s²)",
+      "value": 0.002,
+      "minimum": 0.0,
+      "maximum": 20.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kd_nm_per_radps2",
+        1
+      ],
+      "description": "角速度误差微分增益，允许 0；D 项再经过 CTL_RATE_DCUT 低通。"
+    },
+    {
+      "name": "CTL_RATE_KD_Z",
+      "title": "角速度环 D（偏航）",
+      "group": "姿态角速度环",
+      "units": "N·m/(rad/s²)",
+      "value": 0.002,
+      "minimum": 0.0,
+      "maximum": 20.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kd_nm_per_radps2",
+        2
+      ],
+      "description": "角速度误差微分增益，允许 0；D 项再经过 CTL_RATE_DCUT 低通。"
+    },
+    {
+      "name": "CTL_RATE_KI_X",
+      "title": "角速度环 I（滚转）",
+      "group": "姿态角速度环",
+      "units": "N·m/rad",
+      "value": 0.05,
+      "minimum": 0.0,
+      "maximum": 20.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_ki_nm_per_rad",
+        0
+      ],
+      "description": "角速度误差积分增益，允许 0。"
+    },
+    {
+      "name": "CTL_RATE_KI_Y",
+      "title": "角速度环 I（俯仰）",
+      "group": "姿态角速度环",
+      "units": "N·m/rad",
+      "value": 0.05,
+      "minimum": 0.0,
+      "maximum": 20.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_ki_nm_per_rad",
+        1
+      ],
+      "description": "角速度误差积分增益，允许 0。"
+    },
+    {
+      "name": "CTL_RATE_KI_Z",
+      "title": "角速度环 I（偏航）",
+      "group": "姿态角速度环",
+      "units": "N·m/rad",
+      "value": 0.05,
+      "minimum": 0.0,
+      "maximum": 20.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_ki_nm_per_rad",
+        2
+      ],
+      "description": "角速度误差积分增益，允许 0。"
+    },
+    {
+      "name": "CTL_RATE_KP_X",
+      "title": "角速度环 P（滚转）",
+      "group": "姿态角速度环",
+      "units": "N·m/(rad/s)",
+      "value": 0.12,
+      "minimum": 0.0,
+      "maximum": 20.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kp_nm_per_radps",
+        0
+      ],
+      "description": "角速度误差比例增益，允许 0。"
+    },
+    {
+      "name": "CTL_RATE_KP_Y",
+      "title": "角速度环 P（俯仰）",
+      "group": "姿态角速度环",
+      "units": "N·m/(rad/s)",
+      "value": 0.12,
+      "minimum": 0.0,
+      "maximum": 20.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kp_nm_per_radps",
+        1
+      ],
+      "description": "角速度误差比例增益，允许 0。"
+    },
+    {
+      "name": "CTL_RATE_KP_Z",
+      "title": "角速度环 P（偏航）",
+      "group": "姿态角速度环",
+      "units": "N·m/(rad/s)",
+      "value": 0.12,
+      "minimum": 0.0,
+      "maximum": 20.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kp_nm_per_radps",
+        2
+      ],
+      "description": "角速度误差比例增益，允许 0。"
+    },
+    {
+      "name": "CTL_SO3_X",
+      "title": "SO(3) 姿态增益（滚转）",
+      "group": "SO3 姿态增益",
+      "units": "1/s",
+      "value": 6.0,
+      "minimum": 0.1,
+      "maximum": 50.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "so3_gain_per_s",
+        0
+      ],
+      "description": "SO(3) 姿态误差到期望角速度的增益，必须大于 0。"
+    },
+    {
+      "name": "CTL_SO3_Y",
+      "title": "SO(3) 姿态增益（俯仰）",
+      "group": "SO3 姿态增益",
+      "units": "1/s",
+      "value": 6.0,
+      "minimum": 0.1,
+      "maximum": 50.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "so3_gain_per_s",
+        1
+      ],
+      "description": "SO(3) 姿态误差到期望角速度的增益，必须大于 0。"
+    },
+    {
+      "name": "CTL_SO3_Z",
+      "title": "SO(3) 姿态增益（偏航）",
+      "group": "SO3 姿态增益",
+      "units": "1/s",
+      "value": 6.0,
+      "minimum": 0.1,
+      "maximum": 50.0,
+      "writable": true,
+      "kind": "vector",
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "so3_gain_per_s",
+        2
+      ],
+      "description": "SO(3) 姿态误差到期望角速度的增益，必须大于 0。"
+    },
+    {
+      "name": "VEH_IXX",
+      "title": "转动惯量 IXX",
+      "group": "机体模型",
+      "units": "kg·m²",
+      "value": 0.025,
+      "minimum": 0.001,
+      "maximum": 5.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        0,
+        0
+      ],
+      "description": "机体惯性张量的上三角元素（行优先，FRD 机体系）；必须保持对称正定，否则参数写入会被拒绝。"
+    },
+    {
+      "name": "VEH_IXY",
+      "title": "转动惯量 IXY",
+      "group": "机体模型",
+      "units": "kg·m²",
+      "value": 0.0,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        0,
+        1
+      ],
+      "description": "机体惯性张量的上三角元素（行优先，FRD 机体系）；必须保持对称正定，否则参数写入会被拒绝。"
+    },
+    {
+      "name": "VEH_IXZ",
+      "title": "转动惯量 IXZ",
+      "group": "机体模型",
+      "units": "kg·m²",
+      "value": 0.0,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        0,
+        2
+      ],
+      "description": "机体惯性张量的上三角元素（行优先，FRD 机体系）；必须保持对称正定，否则参数写入会被拒绝。"
+    },
+    {
+      "name": "VEH_IYY",
+      "title": "转动惯量 IYY",
+      "group": "机体模型",
+      "units": "kg·m²",
+      "value": 0.025,
+      "minimum": 0.001,
+      "maximum": 5.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        1,
+        1
+      ],
+      "description": "机体惯性张量的上三角元素（行优先，FRD 机体系）；必须保持对称正定，否则参数写入会被拒绝。"
+    },
+    {
+      "name": "VEH_IYZ",
+      "title": "转动惯量 IYZ",
+      "group": "机体模型",
+      "units": "kg·m²",
+      "value": 0.0,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        1,
+        2
+      ],
+      "description": "机体惯性张量的上三角元素（行优先，FRD 机体系）；必须保持对称正定，否则参数写入会被拒绝。"
+    },
+    {
+      "name": "VEH_IZZ",
+      "title": "转动惯量 IZZ",
+      "group": "机体模型",
+      "units": "kg·m²",
+      "value": 0.04,
+      "minimum": 0.001,
+      "maximum": 5.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        2,
+        2
+      ],
+      "description": "机体惯性张量的上三角元素（行优先，FRD 机体系）；必须保持对称正定，否则参数写入会被拒绝。"
+    },
+    {
+      "name": "VEH_M0_X",
+      "title": "电机 1 位置 X（前）",
+      "group": "机体模型",
+      "units": "m",
+      "value": 0.18,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        0,
+        0
+      ],
+      "description": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。"
+    },
+    {
+      "name": "VEH_M0_Y",
+      "title": "电机 1 位置 Y（右）",
+      "group": "机体模型",
+      "units": "m",
+      "value": -0.18,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        0,
+        1
+      ],
+      "description": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。"
+    },
+    {
+      "name": "VEH_M0_Z",
+      "title": "电机 1 位置 Z（下）",
+      "group": "机体模型",
+      "units": "m",
+      "value": 0.0,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        0,
+        2
+      ],
+      "description": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。"
+    },
+    {
+      "name": "VEH_M1_X",
+      "title": "电机 2 位置 X（前）",
+      "group": "机体模型",
+      "units": "m",
+      "value": 0.18,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        1,
+        0
+      ],
+      "description": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。"
+    },
+    {
+      "name": "VEH_M1_Y",
+      "title": "电机 2 位置 Y（右）",
+      "group": "机体模型",
+      "units": "m",
+      "value": 0.18,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        1,
+        1
+      ],
+      "description": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。"
+    },
+    {
+      "name": "VEH_M1_Z",
+      "title": "电机 2 位置 Z（下）",
+      "group": "机体模型",
+      "units": "m",
+      "value": 0.0,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        1,
+        2
+      ],
+      "description": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。"
+    },
+    {
+      "name": "VEH_M2_X",
+      "title": "电机 3 位置 X（前）",
+      "group": "机体模型",
+      "units": "m",
+      "value": -0.18,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        2,
+        0
+      ],
+      "description": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。"
+    },
+    {
+      "name": "VEH_M2_Y",
+      "title": "电机 3 位置 Y（右）",
+      "group": "机体模型",
+      "units": "m",
+      "value": 0.18,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        2,
+        1
+      ],
+      "description": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。"
+    },
+    {
+      "name": "VEH_M2_Z",
+      "title": "电机 3 位置 Z（下）",
+      "group": "机体模型",
+      "units": "m",
+      "value": 0.0,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        2,
+        2
+      ],
+      "description": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。"
+    },
+    {
+      "name": "VEH_M3_X",
+      "title": "电机 4 位置 X（前）",
+      "group": "机体模型",
+      "units": "m",
+      "value": -0.18,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        3,
+        0
+      ],
+      "description": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。"
+    },
+    {
+      "name": "VEH_M3_Y",
+      "title": "电机 4 位置 Y（右）",
+      "group": "机体模型",
+      "units": "m",
+      "value": -0.18,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        3,
+        1
+      ],
+      "description": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。"
+    },
+    {
+      "name": "VEH_M3_Z",
+      "title": "电机 4 位置 Z（下）",
+      "group": "机体模型",
+      "units": "m",
+      "value": 0.0,
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "matrix",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        3,
+        2
+      ],
+      "description": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。"
+    },
+    {
+      "name": "VEH_M0_YAW",
+      "title": "电机 1 反扭矩系数",
+      "group": "机体模型",
+      "units": "m",
+      "value": -0.02,
+      "minimum": -0.2,
+      "maximum": 0.2,
+      "writable": true,
+      "kind": "vector",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_yaw_torque_ratio_m",
+        0
+      ],
+      "description": "螺旋桨反扭矩与推力的比值，符号表示旋向；参与偏航控制分配。"
+    },
+    {
+      "name": "VEH_M1_YAW",
+      "title": "电机 2 反扭矩系数",
+      "group": "机体模型",
+      "units": "m",
+      "value": 0.02,
+      "minimum": -0.2,
+      "maximum": 0.2,
+      "writable": true,
+      "kind": "vector",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_yaw_torque_ratio_m",
+        1
+      ],
+      "description": "螺旋桨反扭矩与推力的比值，符号表示旋向；参与偏航控制分配。"
+    },
+    {
+      "name": "VEH_M2_YAW",
+      "title": "电机 3 反扭矩系数",
+      "group": "机体模型",
+      "units": "m",
+      "value": -0.02,
+      "minimum": -0.2,
+      "maximum": 0.2,
+      "writable": true,
+      "kind": "vector",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_yaw_torque_ratio_m",
+        2
+      ],
+      "description": "螺旋桨反扭矩与推力的比值，符号表示旋向；参与偏航控制分配。"
+    },
+    {
+      "name": "VEH_M3_YAW",
+      "title": "电机 4 反扭矩系数",
+      "group": "机体模型",
+      "units": "m",
+      "value": 0.02,
+      "minimum": -0.2,
+      "maximum": 0.2,
+      "writable": true,
+      "kind": "vector",
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_yaw_torque_ratio_m",
+        3
+      ],
+      "description": "螺旋桨反扭矩与推力的比值，符号表示旋向；参与偏航控制分配。"
+    },
+    {
+      "name": "CAL_GYRO_X",
+      "title": "陀螺零偏 X",
+      "group": "传感器校准",
+      "units": "dps",
+      "value": 0.0,
+      "minimum": -20.0,
+      "maximum": 20.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        0,
+        "value"
+      ],
+      "description": "静止时角速度零偏，绕机体 X 轴。由陀螺校准写入。"
+    },
+    {
+      "name": "CAL_GYRO_Y",
+      "title": "陀螺零偏 Y",
+      "group": "传感器校准",
+      "units": "dps",
+      "value": 0.0,
+      "minimum": -20.0,
+      "maximum": 20.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        1,
+        "value"
+      ],
+      "description": "静止时角速度零偏，绕机体 Y 轴。由陀螺校准写入。"
+    },
+    {
+      "name": "CAL_GYRO_Z",
+      "title": "陀螺零偏 Z",
+      "group": "传感器校准",
+      "units": "dps",
+      "value": 0.0,
+      "minimum": -20.0,
+      "maximum": 20.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        2,
+        "value"
+      ],
+      "description": "静止时角速度零偏，绕机体 Z 轴。由陀螺校准写入。"
+    },
+    {
+      "name": "CAL_GYRO_OK",
+      "title": "陀螺校准有效",
+      "group": "传感器校准",
+      "units": "flag",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        3,
+        "value"
+      ],
+      "description": "1 表示本次上电已完成陀螺零偏校准。"
+    },
+    {
+      "name": "CAL_ACC_X",
+      "title": "加速度零偏 X",
+      "group": "传感器校准",
+      "units": "m/s²",
+      "value": 0.0,
+      "minimum": -5.0,
+      "maximum": 5.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        4,
+        "value"
+      ],
+      "description": "加速度计零偏，机体 X 轴。六面校准写入。"
+    },
+    {
+      "name": "CAL_ACC_Y",
+      "title": "加速度零偏 Y",
+      "group": "传感器校准",
+      "units": "m/s²",
+      "value": 0.0,
+      "minimum": -5.0,
+      "maximum": 5.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        5,
+        "value"
+      ],
+      "description": "加速度计零偏，机体 Y 轴。六面校准写入。"
+    },
+    {
+      "name": "CAL_ACC_Z",
+      "title": "加速度零偏 Z",
+      "group": "传感器校准",
+      "units": "m/s²",
+      "value": 0.0,
+      "minimum": -5.0,
+      "maximum": 5.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        6,
+        "value"
+      ],
+      "description": "加速度计零偏，机体 Z 轴。六面校准写入。"
+    },
+    {
+      "name": "CAL_ACC_SX",
+      "title": "加速度比例 X",
+      "group": "传感器校准",
+      "units": "scale",
+      "value": 1.0,
+      "minimum": 0.8,
+      "maximum": 1.2,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        7,
+        "value"
+      ],
+      "description": "加速度计 X 轴比例修正。1.0 表示不修正。"
+    },
+    {
+      "name": "CAL_ACC_SY",
+      "title": "加速度比例 Y",
+      "group": "传感器校准",
+      "units": "scale",
+      "value": 1.0,
+      "minimum": 0.8,
+      "maximum": 1.2,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        8,
+        "value"
+      ],
+      "description": "加速度计 Y 轴比例修正。1.0 表示不修正。"
+    },
+    {
+      "name": "CAL_ACC_SZ",
+      "title": "加速度比例 Z",
+      "group": "传感器校准",
+      "units": "scale",
+      "value": 1.0,
+      "minimum": 0.8,
+      "maximum": 1.2,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        9,
+        "value"
+      ],
+      "description": "加速度计 Z 轴比例修正。1.0 表示不修正。"
+    },
+    {
+      "name": "CAL_ACC_OK",
+      "title": "加速度校准有效",
+      "group": "传感器校准",
+      "units": "flag",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        10,
+        "value"
+      ],
+      "description": "1 表示本次上电已完成加速度六面校准。"
+    },
+    {
+      "name": "CAL_MAG_X",
+      "title": "磁力计硬铁 X",
+      "group": "传感器校准",
+      "units": "µT",
+      "value": 0.0,
+      "minimum": -500.0,
+      "maximum": 500.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        11,
+        "value"
+      ],
+      "description": "磁力计硬铁偏移，机体 X 轴。磁罗盘校准写入。"
+    },
+    {
+      "name": "CAL_MAG_Y",
+      "title": "磁力计硬铁 Y",
+      "group": "传感器校准",
+      "units": "µT",
+      "value": 0.0,
+      "minimum": -500.0,
+      "maximum": 500.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        12,
+        "value"
+      ],
+      "description": "磁力计硬铁偏移，机体 Y 轴。磁罗盘校准写入。"
+    },
+    {
+      "name": "CAL_MAG_Z",
+      "title": "磁力计硬铁 Z",
+      "group": "传感器校准",
+      "units": "µT",
+      "value": 0.0,
+      "minimum": -500.0,
+      "maximum": 500.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        13,
+        "value"
+      ],
+      "description": "磁力计硬铁偏移，机体 Z 轴。磁罗盘校准写入。"
+    },
+    {
+      "name": "CAL_MAG_SX",
+      "title": "磁力计软铁 X",
+      "group": "传感器校准",
+      "units": "scale",
+      "value": 1.0,
+      "minimum": 0.5,
+      "maximum": 2.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        14,
+        "value"
+      ],
+      "description": "磁力计 X 轴软铁比例。1.0 表示不修正。"
+    },
+    {
+      "name": "CAL_MAG_SY",
+      "title": "磁力计软铁 Y",
+      "group": "传感器校准",
+      "units": "scale",
+      "value": 1.0,
+      "minimum": 0.5,
+      "maximum": 2.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        15,
+        "value"
+      ],
+      "description": "磁力计 Y 轴软铁比例。1.0 表示不修正。"
+    },
+    {
+      "name": "CAL_MAG_SZ",
+      "title": "磁力计软铁 Z",
+      "group": "传感器校准",
+      "units": "scale",
+      "value": 1.0,
+      "minimum": 0.5,
+      "maximum": 2.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        16,
+        "value"
+      ],
+      "description": "磁力计 Z 轴软铁比例。1.0 表示不修正。"
+    },
+    {
+      "name": "CAL_MAG_OK",
+      "title": "磁罗盘校准有效",
+      "group": "传感器校准",
+      "units": "flag",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        17,
+        "value"
+      ],
+      "description": "1 表示本次上电已完成磁罗盘校准。"
+    },
+    {
+      "name": "CAL_LVL_ROLL",
+      "title": "水平校准滚转",
+      "group": "传感器校准",
+      "units": "deg",
+      "value": 0.0,
+      "minimum": -10.0,
+      "maximum": 10.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        18,
+        "value"
+      ],
+      "description": "载体水平放置时姿态应显示的滚转角修正量。"
+    },
+    {
+      "name": "CAL_LVL_PITCH",
+      "title": "水平校准俯仰",
+      "group": "传感器校准",
+      "units": "deg",
+      "value": 0.0,
+      "minimum": -10.0,
+      "maximum": 10.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        19,
+        "value"
+      ],
+      "description": "载体水平放置时姿态应显示的俯仰角修正量。"
+    },
+    {
+      "name": "CAL_LVL_OK",
+      "title": "水平校准有效",
+      "group": "传感器校准",
+      "units": "flag",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        20,
+        "value"
+      ],
+      "description": "1 表示本次上电已完成水平校准。"
+    },
+    {
+      "name": "CAL_BARO_P0",
+      "title": "气压基准压力",
+      "group": "传感器校准",
+      "units": "Pa",
+      "value": 101325.0,
+      "minimum": 80000.0,
+      "maximum": 110000.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        21,
+        "value"
+      ],
+      "description": "气压高度零点使用的海平面压力。地面气压校准写入。"
+    },
+    {
+      "name": "RC_MIN_1",
+      "title": "遥控通道 1 最小值",
+      "group": "遥控校准",
+      "units": "raw",
+      "value": 172.0,
+      "minimum": 0.0,
+      "maximum": 2047.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        22,
+        "value"
+      ],
+      "description": "横滚通道行程最小值（CRSF 原始计数）。"
+    },
+    {
+      "name": "RC_MAX_1",
+      "title": "遥控通道 1 最大值",
+      "group": "遥控校准",
+      "units": "raw",
+      "value": 1811.0,
+      "minimum": 0.0,
+      "maximum": 2047.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        23,
+        "value"
+      ],
+      "description": "横滚通道行程最大值（CRSF 原始计数）。"
+    },
+    {
+      "name": "RC_TRIM_1",
+      "title": "遥控通道 1 中位",
+      "group": "遥控校准",
+      "units": "raw",
+      "value": 992.0,
+      "minimum": 0.0,
+      "maximum": 2047.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        24,
+        "value"
+      ],
+      "description": "横滚通道回中值（CRSF 原始计数）。"
+    },
+    {
+      "name": "RC_MIN_2",
+      "title": "遥控通道 2 最小值",
+      "group": "遥控校准",
+      "units": "raw",
+      "value": 172.0,
+      "minimum": 0.0,
+      "maximum": 2047.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        25,
+        "value"
+      ],
+      "description": "俯仰通道行程最小值（CRSF 原始计数）。"
+    },
+    {
+      "name": "RC_MAX_2",
+      "title": "遥控通道 2 最大值",
+      "group": "遥控校准",
+      "units": "raw",
+      "value": 1811.0,
+      "minimum": 0.0,
+      "maximum": 2047.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        26,
+        "value"
+      ],
+      "description": "俯仰通道行程最大值（CRSF 原始计数）。"
+    },
+    {
+      "name": "RC_TRIM_2",
+      "title": "遥控通道 2 中位",
+      "group": "遥控校准",
+      "units": "raw",
+      "value": 992.0,
+      "minimum": 0.0,
+      "maximum": 2047.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        27,
+        "value"
+      ],
+      "description": "俯仰通道回中值（CRSF 原始计数）。"
+    },
+    {
+      "name": "RC_MIN_3",
+      "title": "遥控通道 3 最小值",
+      "group": "遥控校准",
+      "units": "raw",
+      "value": 172.0,
+      "minimum": 0.0,
+      "maximum": 2047.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        28,
+        "value"
+      ],
+      "description": "油门通道行程最小值（CRSF 原始计数）。"
+    },
+    {
+      "name": "RC_MAX_3",
+      "title": "遥控通道 3 最大值",
+      "group": "遥控校准",
+      "units": "raw",
+      "value": 1811.0,
+      "minimum": 0.0,
+      "maximum": 2047.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        29,
+        "value"
+      ],
+      "description": "油门通道行程最大值（CRSF 原始计数）。"
+    },
+    {
+      "name": "RC_TRIM_3",
+      "title": "遥控通道 3 中位",
+      "group": "遥控校准",
+      "units": "raw",
+      "value": 172.0,
+      "minimum": 0.0,
+      "maximum": 2047.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        30,
+        "value"
+      ],
+      "description": "油门通道低位值（CRSF 原始计数）。"
+    },
+    {
+      "name": "RC_MIN_4",
+      "title": "遥控通道 4 最小值",
+      "group": "遥控校准",
+      "units": "raw",
+      "value": 172.0,
+      "minimum": 0.0,
+      "maximum": 2047.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        31,
+        "value"
+      ],
+      "description": "偏航通道行程最小值（CRSF 原始计数）。"
+    },
+    {
+      "name": "RC_MAX_4",
+      "title": "遥控通道 4 最大值",
+      "group": "遥控校准",
+      "units": "raw",
+      "value": 1811.0,
+      "minimum": 0.0,
+      "maximum": 2047.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        32,
+        "value"
+      ],
+      "description": "偏航通道行程最大值（CRSF 原始计数）。"
+    },
+    {
+      "name": "RC_TRIM_4",
+      "title": "遥控通道 4 中位",
+      "group": "遥控校准",
+      "units": "raw",
+      "value": 992.0,
+      "minimum": 0.0,
+      "maximum": 2047.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        33,
+        "value"
+      ],
+      "description": "偏航通道回中值（CRSF 原始计数）。"
+    },
+    {
+      "name": "RC_REV_1",
+      "title": "遥控通道 1 反向",
+      "group": "遥控校准",
+      "units": "flag",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        34,
+        "value"
+      ],
+      "description": "1 表示横滚通道反向。"
+    },
+    {
+      "name": "RC_REV_2",
+      "title": "遥控通道 2 反向",
+      "group": "遥控校准",
+      "units": "flag",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        35,
+        "value"
+      ],
+      "description": "1 表示俯仰通道反向。"
+    },
+    {
+      "name": "RC_REV_3",
+      "title": "遥控通道 3 反向",
+      "group": "遥控校准",
+      "units": "flag",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        36,
+        "value"
+      ],
+      "description": "1 表示油门通道反向。"
+    },
+    {
+      "name": "RC_REV_4",
+      "title": "遥控通道 4 反向",
+      "group": "遥控校准",
+      "units": "flag",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        37,
+        "value"
+      ],
+      "description": "1 表示偏航通道反向。"
+    },
+    {
+      "name": "RC_CAL_OK",
+      "title": "遥控校准有效",
+      "group": "遥控校准",
+      "units": "flag",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        38,
+        "value"
+      ],
+      "description": "1 表示本次上电已完成遥控行程校准。"
+    },
+    {
+      "name": "RC_MODE_CH",
+      "title": "飞行模式开关通道",
+      "group": "遥控飞行模式",
+      "units": "channel",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 16.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        39,
+        "value"
+      ],
+      "description": "0 停用，5 到 16 选择辅助通道。"
+    },
+    {
+      "name": "RC_MODE_1",
+      "title": "飞行模式档位 1",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        40,
+        "value"
+      ],
+      "description": "0 保持当前模式，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_MODE_2",
+      "title": "飞行模式档位 2",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        41,
+        "value"
+      ],
+      "description": "0 保持当前模式，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_MODE_3",
+      "title": "飞行模式档位 3",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        42,
+        "value"
+      ],
+      "description": "0 保持当前模式，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_MODE_4",
+      "title": "飞行模式档位 4",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        43,
+        "value"
+      ],
+      "description": "0 保持当前模式，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_MODE_5",
+      "title": "飞行模式档位 5",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        44,
+        "value"
+      ],
+      "description": "0 保持当前模式，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_MODE_6",
+      "title": "飞行模式档位 6",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        45,
+        "value"
+      ],
+      "description": "0 保持当前模式，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_AUX_6",
+      "title": "辅助开关 6",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        46,
+        "value"
+      ],
+      "description": "高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_AUX_7",
+      "title": "辅助开关 7",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        47,
+        "value"
+      ],
+      "description": "高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_AUX_8",
+      "title": "辅助开关 8",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        48,
+        "value"
+      ],
+      "description": "高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_AUX_9",
+      "title": "辅助开关 9",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        49,
+        "value"
+      ],
+      "description": "高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_AUX_10",
+      "title": "辅助开关 10",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        50,
+        "value"
+      ],
+      "description": "高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_AUX_11",
+      "title": "辅助开关 11",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        51,
+        "value"
+      ],
+      "description": "高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_AUX_12",
+      "title": "辅助开关 12",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        52,
+        "value"
+      ],
+      "description": "高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_AUX_13",
+      "title": "辅助开关 13",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        53,
+        "value"
+      ],
+      "description": "高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_AUX_14",
+      "title": "辅助开关 14",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        54,
+        "value"
+      ],
+      "description": "高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_AUX_15",
+      "title": "辅助开关 15",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        55,
+        "value"
+      ],
+      "description": "高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。"
+    },
+    {
+      "name": "RC_AUX_16",
+      "title": "辅助开关 16",
+      "group": "遥控飞行模式",
+      "units": "-",
+      "value": 0.0,
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "writable": true,
+      "kind": "stored",
+      "file": "calibration.yaml",
+      "path": [
+        "parameters",
+        56,
+        "value"
+      ],
+      "description": "高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。"
+    }
+  ],
+  "fields": [
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "schema_version"
+      ],
+      "value": 1,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "profile"
+      ],
+      "value": "QUAD_X4",
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "status"
+      ],
+      "value": "SIM_ONLY",
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "source"
+      ],
+      "value": "Synthetic X4 fixture; motor numbering and yaw signs have no hardware evidence",
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "mass_kg"
+      ],
+      "value": 1.5,
+      "mavlink_id": "VEH_MASS"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        0
+      ],
+      "value": 0.025,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        1
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        2
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        3
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        4
+      ],
+      "value": 0.025,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        5
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        6
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        7
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "inertia_frd_kgm2",
+        8
+      ],
+      "value": 0.04,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        0,
+        0
+      ],
+      "value": 0.18,
+      "mavlink_id": "VEH_M0_X"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        0,
+        1
+      ],
+      "value": -0.18,
+      "mavlink_id": "VEH_M0_Y"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        0,
+        2
+      ],
+      "value": 0,
+      "mavlink_id": "VEH_M0_Z"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        1,
+        0
+      ],
+      "value": 0.18,
+      "mavlink_id": "VEH_M1_X"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        1,
+        1
+      ],
+      "value": 0.18,
+      "mavlink_id": "VEH_M1_Y"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        1,
+        2
+      ],
+      "value": 0,
+      "mavlink_id": "VEH_M1_Z"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        2,
+        0
+      ],
+      "value": -0.18,
+      "mavlink_id": "VEH_M2_X"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        2,
+        1
+      ],
+      "value": 0.18,
+      "mavlink_id": "VEH_M2_Y"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        2,
+        2
+      ],
+      "value": 0,
+      "mavlink_id": "VEH_M2_Z"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        3,
+        0
+      ],
+      "value": -0.18,
+      "mavlink_id": "VEH_M3_X"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        3,
+        1
+      ],
+      "value": -0.18,
+      "mavlink_id": "VEH_M3_Y"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_position_frd_m",
+        3,
+        2
+      ],
+      "value": 0,
+      "mavlink_id": "VEH_M3_Z"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_yaw_torque_ratio_m",
+        0
+      ],
+      "value": -0.02,
+      "mavlink_id": "VEH_M0_YAW"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_yaw_torque_ratio_m",
+        1
+      ],
+      "value": 0.02,
+      "mavlink_id": "VEH_M1_YAW"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_yaw_torque_ratio_m",
+        2
+      ],
+      "value": -0.02,
+      "mavlink_id": "VEH_M2_YAW"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_yaw_torque_ratio_m",
+        3
+      ],
+      "value": 0.02,
+      "mavlink_id": "VEH_M3_YAW"
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_min_thrust_n",
+        0
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_min_thrust_n",
+        1
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_min_thrust_n",
+        2
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_min_thrust_n",
+        3
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_max_thrust_n",
+        0
+      ],
+      "value": 15,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_max_thrust_n",
+        1
+      ],
+      "value": 15,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_max_thrust_n",
+        2
+      ],
+      "value": 15,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_max_thrust_n",
+        3
+      ],
+      "value": 15,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_time_constant_s",
+        0
+      ],
+      "value": 0.03,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_time_constant_s",
+        1
+      ],
+      "value": 0.03,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_time_constant_s",
+        2
+      ],
+      "value": 0.03,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "motor_time_constant_s",
+        3
+      ],
+      "value": 0.03,
+      "mavlink_id": null
+    },
+    {
+      "file": "vehicle_model.yaml",
+      "path": [
+        "hardware_thrust_curve"
+      ],
+      "value": "TBD: no hardware output calibration is supplied",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "schema_version"
+      ],
+      "value": 1,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "profile_id"
+      ],
+      "value": 65537,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "profile"
+      ],
+      "value": "QUAD_X4",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "baseline"
+      ],
+      "value": "V1.9.1-GLOBAL-AUDIT-R3",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "status"
+      ],
+      "value": "DRAFT_PENDING_CALIBRATION",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "generated_by"
+      ],
+      "value": "manual",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "calibration_dataset_hash"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "units",
+        "translation"
+      ],
+      "value": "m",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "units",
+        "rotation"
+      ],
+      "value": "quaternion_wxyz",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "units",
+        "time"
+      ],
+      "value": "s",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "imu",
+        "part"
+      ],
+      "value": "ADIS16505-2",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "imu",
+        "bus"
+      ],
+      "value": "SPI1",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "imu",
+        "odr_hz"
+      ],
+      "value": 1000,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "imu",
+        "data_ready"
+      ],
+      "value": "PA3 / TIM2_CH4",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "imu",
+        "installation_rotation_wxyz",
+        0
+      ],
+      "value": 1.0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "imu",
+        "installation_rotation_wxyz",
+        1
+      ],
+      "value": 0.0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "imu",
+        "installation_rotation_wxyz",
+        2
+      ],
+      "value": 0.0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "imu",
+        "installation_rotation_wxyz",
+        3
+      ],
+      "value": 0.0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "imu",
+        "installation_status"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "imu",
+        "pipeline_delay_s"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "imu",
+        "pipeline_delay_uncertainty_s"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "imu",
+        "calibration_version"
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "gnss",
+        "part"
+      ],
+      "value": "UM982",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "gnss",
+        "bus"
+      ],
+      "value": "UART4",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "gnss",
+        "baud"
+      ],
+      "value": 460800,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "gnss",
+        "rate_hz"
+      ],
+      "value": 10,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "gnss",
+        "pps"
+      ],
+      "value": "PA2 / TIM2_CH3",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "gnss",
+        "antenna_lever_m",
+        0
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "gnss",
+        "antenna_lever_m",
+        1
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "gnss",
+        "antenna_lever_m",
+        2
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "gnss",
+        "epoch_offset_s"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "gnss",
+        "epoch_offset_uncertainty_s"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "gnss",
+        "native_backend"
+      ],
+      "value": "DISABLED",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "gnss",
+        "calibration_version"
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "baro",
+        "part"
+      ],
+      "value": "BMP585",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "baro",
+        "bus"
+      ],
+      "value": "I2C4",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "baro",
+        "rate_hz"
+      ],
+      "value": 100,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "baro",
+        "data_ready"
+      ],
+      "value": "PE1 / EXTI1",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "baro",
+        "mounting_position_m",
+        0
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "baro",
+        "mounting_position_m",
+        1
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "baro",
+        "mounting_position_m",
+        2
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "baro",
+        "reference_pressure_pa"
+      ],
+      "value": 101325.0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "baro",
+        "calibration_version"
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "part"
+      ],
+      "value": "BMM350",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "bus"
+      ],
+      "value": "I2C1",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "rate_hz"
+      ],
+      "value": 100,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "data_ready"
+      ],
+      "value": "PB5 / EXTI5",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "installation_rotation_wxyz",
+        0
+      ],
+      "value": 1.0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "installation_rotation_wxyz",
+        1
+      ],
+      "value": 0.0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "installation_rotation_wxyz",
+        2
+      ],
+      "value": 0.0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "installation_rotation_wxyz",
+        3
+      ],
+      "value": 0.0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "installation_status"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "hard_iron_ut",
+        0
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "hard_iron_ut",
+        1
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "hard_iron_ut",
+        2
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "soft_iron_matrix",
+        0,
+        0
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "soft_iron_matrix",
+        0,
+        1
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "soft_iron_matrix",
+        0,
+        2
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "soft_iron_matrix",
+        1,
+        0
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "soft_iron_matrix",
+        1,
+        1
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "soft_iron_matrix",
+        1,
+        2
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "soft_iron_matrix",
+        2,
+        0
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "soft_iron_matrix",
+        2,
+        1
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "soft_iron_matrix",
+        2,
+        2
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "calibration_version"
+      ],
+      "value": 0,
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "sensors",
+        "mag",
+        "aiding"
+      ],
+      "value": "DISABLED",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "references",
+        "body_frame"
+      ],
+      "value": "FRD (x forward, y right, z down), origin at CG",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "references",
+        "nav_frame"
+      ],
+      "value": "NED at the M3 local origin",
+      "mavlink_id": null
+    },
+    {
+      "file": "sensor_alignment.yaml",
+      "path": [
+        "references",
+        "contract"
+      ],
+      "value": "middleware/contracts/base_types/common_base.h (Schema 6.0)",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "schema_version"
+      ],
+      "value": 1,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "profile_id"
+      ],
+      "value": 65537,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "profile"
+      ],
+      "value": "QUAD_X4",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "baseline"
+      ],
+      "value": "V1.9.1-GLOBAL-AUDIT-R3",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "status"
+      ],
+      "value": "DRAFT_PENDING_DATASET",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "applies_to"
+      ],
+      "value": "KF-GINS_QUAD (21 core + baro bias = 22 states)",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "part"
+      ],
+      "value": "ADIS16505-2",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "gyro_arw_radps_sqrthz"
+      ],
+      "value": 3.784e-05,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "gyro_arw_source"
+      ],
+      "value": "ADIS16505 datasheet Rev. C, angular random walk 0.13 deg/sqrt(hr)",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "accel_vrw_mps2_sqrthz",
+        0
+      ],
+      "value": 0.00015,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "accel_vrw_mps2_sqrthz",
+        1
+      ],
+      "value": 0.00015,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "accel_vrw_mps2_sqrthz",
+        2
+      ],
+      "value": 0.0002,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "accel_vrw_source"
+      ],
+      "value": "ADIS16505 datasheet Rev. C, velocity random walk 0.009/0.012 m/s/sqrt(hr)",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "gyro_bias_std_radps",
+        0
+      ],
+      "value": 0.00244,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "gyro_bias_std_radps",
+        1
+      ],
+      "value": 0.0244,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "gyro_bias_std_radps",
+        2
+      ],
+      "value": 0.00244,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "gyro_bias_source"
+      ],
+      "value": "ADIS16505 datasheet Rev. C, bias repeatability 0.14/1.4 deg/s",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "accel_bias_std_mps2",
+        0
+      ],
+      "value": 0.0196,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "accel_bias_std_mps2",
+        1
+      ],
+      "value": 0.0196,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "accel_bias_std_mps2",
+        2
+      ],
+      "value": 0.0196,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "accel_bias_source"
+      ],
+      "value": "ADIS16505 datasheet Rev. C, bias repeatability 19.6e-3 m/s^2",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "gyro_scale_std"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "accel_scale_std"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "imu_noise",
+        "corr_time_s"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "position_std_m",
+        0
+      ],
+      "value": 2.0,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "position_std_m",
+        1
+      ],
+      "value": 2.0,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "position_std_m",
+        2
+      ],
+      "value": 3.0,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "velocity_std_mps",
+        0
+      ],
+      "value": 0.2,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "velocity_std_mps",
+        1
+      ],
+      "value": 0.2,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "velocity_std_mps",
+        2
+      ],
+      "value": 0.2,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "attitude_std_rad",
+        0
+      ],
+      "value": 0.0087,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "attitude_std_rad",
+        1
+      ],
+      "value": 0.0087,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "attitude_std_rad",
+        2
+      ],
+      "value": 0.0524,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "gyro_bias_std_radps",
+        0
+      ],
+      "value": 0.00244,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "gyro_bias_std_radps",
+        1
+      ],
+      "value": 0.0244,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "gyro_bias_std_radps",
+        2
+      ],
+      "value": 0.00244,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "accel_bias_std_mps2",
+        0
+      ],
+      "value": 0.0196,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "accel_bias_std_mps2",
+        1
+      ],
+      "value": 0.0196,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "accel_bias_std_mps2",
+        2
+      ],
+      "value": 0.0196,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "gyro_scale_std"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "accel_scale_std"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "baro_bias_std_m"
+      ],
+      "value": 1.5,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "initial_covariance",
+        "baro_bias_std_source"
+      ],
+      "value": "engineering estimate pending barometer calibration",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "baro",
+        "part"
+      ],
+      "value": "BMP585",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "baro",
+        "pressure_noise_pa"
+      ],
+      "value": 0.21,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "baro",
+        "pressure_noise_source"
+      ],
+      "value": "BMP585 datasheet BST-BMP585-DS003, pressure noise 0.21 Pa RMS",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "baro",
+        "measurement_variance_m2"
+      ],
+      "value": 0.25,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "baro",
+        "bias_random_walk_m2ps"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "gnss",
+        "part"
+      ],
+      "value": "UM982",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "gnss",
+        "position_std_m"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "gnss",
+        "velocity_std_mps"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "gnss",
+        "max_fusion_age_us"
+      ],
+      "value": 20000,
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "magnetometer",
+        "aiding"
+      ],
+      "value": "DISABLED",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "magnetometer",
+        "heading_noise_rad"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "magnetometer",
+        "field_magnitude_bounds_ut"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "magnetometer",
+        "dip_angle_bounds_deg"
+      ],
+      "value": "TBD",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "notes",
+        0
+      ],
+      "value": "NIS thresholds are fixed by confidence level in the estimator, never here.",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "notes",
+        1
+      ],
+      "value": "FMS capability thresholds belong to the C-owned QUAD_X4 Safety Policy.",
+      "mavlink_id": null
+    },
+    {
+      "file": "estimator_tuning.yaml",
+      "path": [
+        "notes",
+        2
+      ],
+      "value": "History depths, replay budgets and matrix layout are implementation structure.",
+      "mavlink_id": null
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "schema_version"
+      ],
+      "value": 1,
+      "mavlink_id": null
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "profile"
+      ],
+      "value": "QUAD_X4",
+      "mavlink_id": null
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "status"
+      ],
+      "value": "SIM_ONLY",
+      "mavlink_id": null
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "so3_gain_per_s",
+        0
+      ],
+      "value": 6,
+      "mavlink_id": "CTL_SO3_X"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "so3_gain_per_s",
+        1
+      ],
+      "value": 6,
+      "mavlink_id": "CTL_SO3_Y"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "so3_gain_per_s",
+        2
+      ],
+      "value": 6,
+      "mavlink_id": "CTL_SO3_Z"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kp_nm_per_radps",
+        0
+      ],
+      "value": 0.12,
+      "mavlink_id": "CTL_RATE_KP_X"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kp_nm_per_radps",
+        1
+      ],
+      "value": 0.12,
+      "mavlink_id": "CTL_RATE_KP_Y"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kp_nm_per_radps",
+        2
+      ],
+      "value": 0.12,
+      "mavlink_id": "CTL_RATE_KP_Z"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_ki_nm_per_rad",
+        0
+      ],
+      "value": 0.05,
+      "mavlink_id": "CTL_RATE_KI_X"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_ki_nm_per_rad",
+        1
+      ],
+      "value": 0.05,
+      "mavlink_id": "CTL_RATE_KI_Y"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_ki_nm_per_rad",
+        2
+      ],
+      "value": 0.05,
+      "mavlink_id": "CTL_RATE_KI_Z"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kd_nm_per_radps2",
+        0
+      ],
+      "value": 0.002,
+      "mavlink_id": "CTL_RATE_KD_X"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kd_nm_per_radps2",
+        1
+      ],
+      "value": 0.002,
+      "mavlink_id": "CTL_RATE_KD_Y"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kd_nm_per_radps2",
+        2
+      ],
+      "value": 0.002,
+      "mavlink_id": "CTL_RATE_KD_Z"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kaw_per_s",
+        0
+      ],
+      "value": 5,
+      "mavlink_id": "CTL_RATE_KAW_X"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kaw_per_s",
+        1
+      ],
+      "value": 5,
+      "mavlink_id": "CTL_RATE_KAW_Y"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_kaw_per_s",
+        2
+      ],
+      "value": 5,
+      "mavlink_id": "CTL_RATE_KAW_Z"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_d_cutoff_hz"
+      ],
+      "value": 40,
+      "mavlink_id": "CTL_RATE_DCUT"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_integral_limit_nm",
+        0
+      ],
+      "value": 0.2,
+      "mavlink_id": "CTL_RATE_ILIM_X"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_integral_limit_nm",
+        1
+      ],
+      "value": 0.2,
+      "mavlink_id": "CTL_RATE_ILIM_Y"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "rate_integral_limit_nm",
+        2
+      ],
+      "value": 0.2,
+      "mavlink_id": "CTL_RATE_ILIM_Z"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "inner_loop",
+        "manual_hover_throttle_norm"
+      ],
+      "value": 0.5,
+      "mavlink_id": "CTL_HOVER_THR"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_structure",
+        "sample_time_s"
+      ],
+      "value": 0.02,
+      "mavlink_id": null
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_structure",
+        "prediction_horizon"
+      ],
+      "value": 20,
+      "mavlink_id": null
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_structure",
+        "control_horizon"
+      ],
+      "value": 5,
+      "mavlink_id": null
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "fallback_kp_per_s2",
+        0
+      ],
+      "value": 2,
+      "mavlink_id": "CTL_FB_KP_X"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "fallback_kp_per_s2",
+        1
+      ],
+      "value": 2,
+      "mavlink_id": "CTL_FB_KP_Y"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "fallback_kp_per_s2",
+        2
+      ],
+      "value": 2,
+      "mavlink_id": "CTL_FB_KP_Z"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "fallback_kd_per_s",
+        0
+      ],
+      "value": 2,
+      "mavlink_id": "CTL_FB_KD_X"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "fallback_kd_per_s",
+        1
+      ],
+      "value": 2,
+      "mavlink_id": "CTL_FB_KD_Y"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "fallback_kd_per_s",
+        2
+      ],
+      "value": 2,
+      "mavlink_id": "CTL_FB_KD_Z"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_q_diag",
+        0
+      ],
+      "value": 8,
+      "mavlink_id": "CTL_MPC_Q0"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_q_diag",
+        1
+      ],
+      "value": 8,
+      "mavlink_id": "CTL_MPC_Q1"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_q_diag",
+        2
+      ],
+      "value": 12,
+      "mavlink_id": "CTL_MPC_Q2"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_q_diag",
+        3
+      ],
+      "value": 3,
+      "mavlink_id": "CTL_MPC_Q3"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_q_diag",
+        4
+      ],
+      "value": 3,
+      "mavlink_id": "CTL_MPC_Q4"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_q_diag",
+        5
+      ],
+      "value": 4,
+      "mavlink_id": "CTL_MPC_Q5"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_qf_diag",
+        0
+      ],
+      "value": 8,
+      "mavlink_id": "CTL_MPC_QF0"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_qf_diag",
+        1
+      ],
+      "value": 8,
+      "mavlink_id": "CTL_MPC_QF1"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_qf_diag",
+        2
+      ],
+      "value": 12,
+      "mavlink_id": "CTL_MPC_QF2"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_qf_diag",
+        3
+      ],
+      "value": 3,
+      "mavlink_id": "CTL_MPC_QF3"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_qf_diag",
+        4
+      ],
+      "value": 3,
+      "mavlink_id": "CTL_MPC_QF4"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_qf_diag",
+        5
+      ],
+      "value": 4,
+      "mavlink_id": "CTL_MPC_QF5"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_r_diag",
+        0
+      ],
+      "value": 0.8,
+      "mavlink_id": "CTL_MPC_R0"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_r_diag",
+        1
+      ],
+      "value": 0.8,
+      "mavlink_id": "CTL_MPC_R1"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_r_diag",
+        2
+      ],
+      "value": 1.0,
+      "mavlink_id": "CTL_MPC_R2"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_s_diag",
+        0
+      ],
+      "value": 0.2,
+      "mavlink_id": "CTL_MPC_S0"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_s_diag",
+        1
+      ],
+      "value": 0.2,
+      "mavlink_id": "CTL_MPC_S1"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_s_diag",
+        2
+      ],
+      "value": 0.25,
+      "mavlink_id": "CTL_MPC_S2"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "actuation_preview_delay_s"
+      ],
+      "value": 0,
+      "mavlink_id": "CTL_ACT_DLY"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_seed_position_error_limit_m"
+      ],
+      "value": 0.5,
+      "mavlink_id": "CTL_SEED_POS"
+    },
+    {
+      "file": "controller_tuning.yaml",
+      "path": [
+        "outer_loop",
+        "mpc_seed_velocity_error_limit_mps"
+      ],
+      "value": 1,
+      "mavlink_id": "CTL_SEED_VEL"
+    }
+  ]
+}

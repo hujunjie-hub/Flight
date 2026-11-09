@@ -1,0 +1,5 @@
+baseline: V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010903
+workspace: D:/STM32Project/FMT-Firmware-1.2.0/Flight (no Git metadata; SHA256 manifest used)
+host: Linux 6.18.54.1-microsoft-standard-WSL2 gcc (Ubuntu 16-20260322-1ubuntu1) 16.0.1 20260322 (experimental) [trunk r16-8246-g569ace1fa50]
+arm: arm-none-eabi-gcc.exe (GNU Tools for STM32 14.3.rel1.20251027-0700) 14.3.1 20250623
+date: 2026-11-04T22:51:16.9067595+08:00

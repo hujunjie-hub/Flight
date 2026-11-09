@@ -1,0 +1,18 @@
+{
+    "linux": {
+      "basic_example": {
+        "flags" : "EXAMPLE=basic"
+      },
+      "iio_example": {
+        "flags" : "EXAMPLE=iio_example"
+      }
+    },
+    "mac": {
+      "basic_example": {
+        "flags" : "EXAMPLE=basic"
+      },
+      "iio_example": {
+        "flags" : "EXAMPLE=iio_example"
+      }
+    }
+  }

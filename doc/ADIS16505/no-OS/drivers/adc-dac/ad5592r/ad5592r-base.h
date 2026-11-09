@@ -1,0 +1,189 @@
+/***************************************************************************//**
+ *   @file   ad5592r-base.h
+ *   @brief  Header file of AD5592R Base Driver.
+ *   @author Mircea Caprioru (mircea.caprioru@analog.com)
+ *   @author Niel Acuna (niel.acuna@analog.com)
+********************************************************************************
+ * Copyright 2018, 2020, 2025, 2026 (c) Analog Devices, Inc.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of Analog Devices, Inc. nor the names of its
+ *    contributors may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY ANALOG DEVICES, INC. “AS IS” AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+ * EVENT SHALL ANALOG DEVICES, INC. BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+ * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*******************************************************************************/
+#ifndef AD5592R_BASE_H_
+#define AD5592R_BASE_H_
+
+#include "stdint.h"
+#include "no_os_delay.h"
+#include "no_os_spi.h"
+#include "no_os_i2c.h"
+#include "no_os_gpio.h"
+#include "no_os_util.h"
+#include "no_os_alloc.h"
+#include <stdbool.h>
+
+#define CH_MODE_UNUSED			0
+#define CH_MODE_ADC			1
+#define CH_MODE_DAC			2
+#define CH_MODE_DAC_AND_ADC		3
+#define CH_MODE_GPI			4
+#define CH_MODE_GPO			5
+
+#define CH_OFFSTATE_PULLDOWN		0
+#define CH_OFFSTATE_OUT_LOW		1
+#define CH_OFFSTATE_OUT_HIGH		2
+#define CH_OFFSTATE_OUT_TRISTATE	3
+
+enum ad5592r_registers {
+	AD5592R_REG_NOOP		= 0x0,
+	AD5592R_REG_DAC_READBACK	= 0x1,
+	AD5592R_REG_ADC_SEQ		= 0x2,
+	AD5592R_REG_CTRL		= 0x3,
+	AD5592R_REG_ADC_EN		= 0x4,
+	AD5592R_REG_DAC_EN		= 0x5,
+	AD5592R_REG_PULLDOWN		= 0x6,
+	AD5592R_REG_LDAC		= 0x7,
+	AD5592R_REG_GPIO_OUT_EN		= 0x8,
+	AD5592R_REG_GPIO_SET		= 0x9,
+	AD5592R_REG_GPIO_IN_EN		= 0xA,
+	AD5592R_REG_PD			= 0xB,
+	AD5592R_REG_OPEN_DRAIN		= 0xC,
+	AD5592R_REG_TRISTATE		= 0xD,
+	AD5592R_REG_RESET		= 0xF,
+};
+
+#define AD5592R_REG_PD_PD_ALL			    NO_OS_BIT(10)
+#define AD5592R_REG_PD_EN_REF			    NO_OS_BIT(9)
+
+#define AD5592R_REG_CTRL_ADC_PC_BUFF		    NO_OS_BIT(9)
+#define AD5592R_REG_CTRL_ADC_BUFF_EN		    NO_OS_BIT(8)
+#define AD5592R_REG_CTRL_CONFIG_LOCK		    NO_OS_BIT(7)
+#define AD5592R_REG_CTRL_W_ALL_DACS		    NO_OS_BIT(6)
+#define AD5592R_REG_CTRL_ADC_RANGE		    NO_OS_BIT(5)
+#define AD5592R_REG_CTRL_DAC_RANGE		    NO_OS_BIT(4)
+
+#define AD5592R_REG_ADC_SEQ_REP			    NO_OS_BIT(9)
+#define AD5592R_REG_ADC_SEQ_TEMP_READBACK	    NO_OS_BIT(8)
+#define AD5592R_REG_ADC_SEQ_CODE_MSK(x)		    ((x) & 0x0FFF)
+
+#define AD5592R_REG_GPIO_OUT_EN_ADC_NOT_BUSY	    NO_OS_BIT(8)
+
+#define AD5592R_REG_LDAC_IMMEDIATE_OUT		    0x00
+#define AD5592R_REG_LDAC_INPUT_REG_ONLY		    0x01
+#define AD5592R_REG_LDAC_INPUT_REG_OUT		    0x02
+
+#define INTERNAL_VREF_VOLTAGE			    2.5
+#define AD5592R_MIN_VREF_MV 		1000
+#define AD5592R_MAX_VREF_MV 		5500
+#define AD5592R_TEMPERATURE_CHANNEL 	8
+
+#define NUM_OF_CHANNELS 8
+
+
+struct ad5592r_dev;
+
+struct ad5592r_rw_ops {
+	int32_t (*write_dac)(struct ad5592r_dev *dev, uint8_t chan,
+			     uint16_t value);
+	int32_t (*read_adc)(struct ad5592r_dev *dev, uint8_t chan,
+			    uint16_t *value);
+	int32_t(*multi_read_adc)(struct ad5592r_dev *dev,
+				 uint16_t chans, uint16_t *value);
+	int32_t (*reg_write)(struct ad5592r_dev *dev, uint8_t reg,
+			     uint16_t value);
+	int32_t (*reg_read)(struct ad5592r_dev *dev, uint8_t reg,
+			    uint16_t *value);
+	int32_t (*gpio_read)(struct ad5592r_dev *dev, uint8_t *value);
+};
+
+enum ad559xr_range {
+	ZERO_TO_VREF,
+	ZERO_TO_2VREF
+};
+
+struct ad5592r_init_param {
+	bool int_ref;
+	uint32_t external_vref; /* valid only if int_ref = true */
+	struct no_os_spi_init_param *spi_init;
+	struct no_os_i2c_init_param *i2c_init;
+	struct no_os_gpio_init_param *ss_init;
+	uint8_t channel_modes[8];
+	uint8_t channel_offstate[8];
+	enum ad559xr_range adc_range;
+	enum ad559xr_range dac_range;
+	bool adc_buf;
+	uint8_t power_down[8];
+};
+
+struct ad5592r_dev {
+	const struct ad5592r_rw_ops *ops;
+	struct no_os_i2c_desc *i2c;
+	struct no_os_spi_desc *spi;
+	struct no_os_gpio_desc *ss;
+	uint16_t spi_msg;
+	uint8_t num_channels;
+	uint16_t cached_dac[8];
+	uint8_t cached_gpo[8];
+	uint16_t cached_gp_ctrl;
+	uint8_t channel_modes[8];
+	uint8_t channel_offstate[8];
+	uint8_t gpio_out;
+	uint8_t gpio_in;
+	uint8_t gpio_val;
+	uint8_t ldac_mode;
+	enum ad559xr_range adc_range;
+	enum ad559xr_range dac_range;
+	bool int_ref;
+	uint32_t external_vref; /* valid only if int_ref = true */
+	uint8_t power_down[8];
+	bool adc_buf;
+};
+
+int32_t ad5592r_base_reg_write(struct ad5592r_dev *dev, uint8_t reg,
+			       uint16_t value);
+int32_t ad5592r_base_reg_read(struct ad5592r_dev *dev, uint8_t reg,
+			      uint16_t *value);
+int32_t ad5592r_gpio_get(struct ad5592r_dev *dev, uint8_t offset);
+int32_t ad5592r_gpio_set(struct ad5592r_dev *dev, uint8_t offset,
+			 int32_t value);
+int32_t ad5592r_gpio_direction_input(struct ad5592r_dev *dev, uint8_t offset);
+int32_t ad5592r_gpio_direction_output(struct ad5592r_dev *dev,
+				      uint8_t offset, int32_t value);
+int32_t ad5592r_software_reset(struct ad5592r_dev *dev);
+int32_t ad5592r_set_channel_modes(struct ad5592r_dev *dev);
+int32_t ad5592r_reset_channel_modes(struct ad5592r_dev *dev);
+int32_t ad5592r_set_adc_range(struct ad5592r_dev *dev,
+			      enum ad559xr_range adc_range);
+int32_t ad5592r_set_dac_range(struct ad5592r_dev *dev,
+			      enum ad559xr_range dac_range);
+int32_t ad5592r_power_down(struct ad5592r_dev *dev, uint8_t chan, bool enable);
+int32_t ad5592r_set_int_ref(struct ad5592r_dev *dev, bool enable);
+int32_t ad5592r_set_ext_ref(struct ad5592r_dev *dev, uint32_t vref_mv);
+int32_t ad5592r_get_ref(struct ad5592r_dev *dev, uint32_t *vref_mv);
+int32_t ad5592r_set_adc_buffer(struct ad5592r_dev *dev, bool enable);
+int32_t ad5592r_base_reg_update(struct ad5592r_dev* dev, uint16_t reg_addr,
+				uint16_t data, uint16_t mask);
+int32_t ad5592r_set_repetition(struct ad5592r_dev *dev, bool repeat);
+
+#endif /* AD5592R_BASE_H_ */

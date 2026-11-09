@@ -1,0 +1,87 @@
+# QUAD_X4 KF-GINS_QUAD noise model and initial uncertainty
+#
+# Owner: Agent B (spec 08 section 3.1; spec 05 section 7.2).
+# Only tuning quantities live here.  NIS confidence levels, state dimension,
+# matrix layout, replay budgets and safety thresholds are NOT tunable here
+# (spec 05 §5.3, §7.2; FMS thresholds belong to the C-owned Safety Policy).
+#
+# Status: DRAFT_PENDING_DATASET.  Datasheet-derived numbers are marked with
+# their source and are an initial estimate only; every "TBD" blocks a Release
+# build and must come from a data-set identification (spec 05 §10, §7.2).
+
+schema_version: 1
+profile_id: 0x00010001
+profile: QUAD_X4
+baseline: V1.9.1-GLOBAL-AUDIT-R3
+status: DRAFT_PENDING_DATASET
+applies_to: KF-GINS_QUAD (21 core + baro bias = 22 states)
+
+imu_noise:
+  part: ADIS16505-2
+  # Angular random walk.  Datasheet: 0.13 deg/sqrt(hr), x/y (Rev. C, gyro
+  # noise table).  0.13 deg/sqrt(hr) = 3.784e-5 rad/s/sqrt(Hz).
+  gyro_arw_radps_sqrthz: 3.784e-5
+  gyro_arw_source: "ADIS16505 datasheet Rev. C, angular random walk 0.13 deg/sqrt(hr)"
+  # Velocity random walk: 0.009 m/s/sqrt(hr) x/y, 0.012 z -> 1.5e-4 / 2.0e-4
+  # m/s/sqrt(Hz).
+  accel_vrw_mps2_sqrthz: [1.5e-4, 1.5e-4, 2.0e-4]
+  accel_vrw_source: "ADIS16505 datasheet Rev. C, velocity random walk 0.009/0.012 m/s/sqrt(hr)"
+  # Bias prior BEFORE static alignment.  Datasheet bias repeatability is
+  # 0.14 deg/s (x/z) and 1.4 deg/s (y); the alignment step is expected to
+  # reduce this, so the value is a conservative prior, not a calibrated fact.
+  gyro_bias_std_radps: [2.44e-3, 2.44e-2, 2.44e-3]
+  gyro_bias_source: "ADIS16505 datasheet Rev. C, bias repeatability 0.14/1.4 deg/s"
+  accel_bias_std_mps2: [1.96e-2, 1.96e-2, 1.96e-2]
+  accel_bias_source: "ADIS16505 datasheet Rev. C, bias repeatability 19.6e-3 m/s^2"
+  # Scale-factor priors: the datasheet gives temperature error, not a
+  # scale-factor distribution; do not invent one.
+  gyro_scale_std: TBD
+  accel_scale_std: TBD
+  # First-order Gauss-Markov correlation time.  No identification data yet.
+  corr_time_s: TBD
+
+initial_covariance:
+  # Diagonal of the 22-state covariance at initialization.  Cross terms are
+  # produced by the filter and must not be forced to zero afterwards
+  # (spec 05 §2.3); they are not configured here.
+  position_std_m: [2.0, 2.0, 3.0]      # GNSS RTK position prior, TBD by data set
+  velocity_std_mps: [0.2, 0.2, 0.2]    # TBD by data set
+  attitude_std_rad: [0.0087, 0.0087, 0.0524] # 0.5 deg roll/pitch, 3 deg yaw
+  gyro_bias_std_radps: [2.44e-3, 2.44e-2, 2.44e-3]
+  accel_bias_std_mps2: [1.96e-2, 1.96e-2, 1.96e-2]
+  gyro_scale_std: TBD
+  accel_scale_std: TBD
+  baro_bias_std_m: 1.5                 # pressure-baseline confidence at origin
+  baro_bias_std_source: "engineering estimate pending barometer calibration"
+
+baro:
+  part: BMP585
+  # Datasheet pressure noise 0.21 Pa RMS (highest resolution).  0.21 Pa is
+  # ~0.018 m at sea level; the R floor includes environment/prop-wash and is
+  # therefore larger.
+  pressure_noise_pa: 0.21
+  pressure_noise_source: "BMP585 datasheet BST-BMP585-DS003, pressure noise 0.21 Pa RMS"
+  measurement_variance_m2: 0.25        # 0.5 m sigma floor, TBD by data set
+  bias_random_walk_m2ps: TBD           # q_bh, needs a static/thermal data set
+
+gnss:
+  part: UM982
+  # Receiver noise floors are not documented in this workspace; they must be
+  # measured from the actual receiver configuration before release.
+  position_std_m: TBD
+  velocity_std_mps: TBD
+  max_fusion_age_us: 20000            # spec 05 §5.2/§9, not a tuning value
+  # Antenna lever arm is in sensor_alignment.yaml and must not be duplicated.
+
+magnetometer:
+  # Optional aiding; disabled until the calibration and motor-disturbance
+  # evidence of spec 05 §3.4 exists.
+  aiding: DISABLED
+  heading_noise_rad: TBD
+  field_magnitude_bounds_ut: TBD
+  dip_angle_bounds_deg: TBD
+
+notes:
+  - "NIS thresholds are fixed by confidence level in the estimator, never here."
+  - "FMS capability thresholds belong to the C-owned QUAD_X4 Safety Policy."
+  - "History depths, replay budgets and matrix layout are implementation structure."

@@ -1,0 +1,89 @@
+{
+  "task_id": "T191-C-M7",
+  "task_type": "IMPLEMENTATION",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010903",
+  "update_sequence": 2,
+  "submission": {
+    "revision": 1,
+    "submitted_at": "2026-11-04T23:26:32+08:00",
+    "supersedes_sha256": null,
+    "reason": "Status notice for the C part of D-REV-04: no implementation has been started. C does not claim M7 code or the DShot waveform.",
+    "dedup_key": "T191-C-M7:1"
+  },
+  "state": "NOT_STARTED",
+  "requested_transition": "NO_CHANGE",
+  "transition_note": "T191-C-M7 remains READY_FOR_ASSIGNMENT. M7 needs A's DShot/actuator submit contract before it can be implemented without inventing TIM/DMA access.",
+  "assignee": "C",
+  "d_rev_04_c_part": {
+    "role": "C",
+    "status": "SUBMITTED_FOR_MERGE",
+    "tasks": [
+      "T191-C-FMS",
+      "T191-C-M5",
+      "T191-C-M6",
+      "T191-C-M7"
+    ],
+    "index": "applications/core/status_requests/index.json",
+    "note": "C submits all four status requests so D can close the C part of D-REV-04. C does not edit AGENT_HANDOFF; closure remains a D action."
+  },
+  "review_opinion": {
+    "task": "T191-D-REVIEW",
+    "path": "applications/core/m4/reviews/C_REVIEW_T191-D-REVIEW.md",
+    "machine_evidence": [
+      "applications/core/m4/reviews/c_review_checks.json",
+      "applications/core/m4/reviews/c_review_checks.py"
+    ],
+    "conclusion": "ACCEPT_WITH_CONDITIONS",
+    "summary": {
+      "checks": 21,
+      "pass": 14,
+      "fail": 1,
+      "obs": 6
+    },
+    "status": "SUBMITTED_ON_FILE",
+    "note": "C's non-author opinion is on file; D merges it when T191-D-REVIEW proceeds to closure. It is not an ACCEPTED state and does not replace B's opinion or user Gate A approval."
+  },
+  "blocked_by": [
+    "T191-C-M6",
+    "T191-A-PLATFORM",
+    "DSHOT_DRIVER_CONTRACT"
+  ],
+  "blockers": [
+    {
+      "id": "C-M7-B1",
+      "item": "T191-C-M6",
+      "fact": "M6 is NOT_STARTED; M7 consumes its ActuatorDemand and anti-windup context."
+    },
+    {
+      "id": "C-M7-B2",
+      "item": "T191-A-PLATFORM / DShot driver",
+      "fact": "A's platform evidence records OUT-DSHOT as MISSING: 'TIM1 UP DMA burst + DShot TC->Update' (applications/platform/rtthread53/evidence/platform_gap.md). M7 must not touch TIM1/DMA2 registers itself (10 §1).",
+      "evidence": "applications/platform/rtthread53/evidence/platform_gap.md line OUT-DSHOT"
+    },
+    {
+      "id": "C-M7-B3",
+      "item": "DShot submit contract",
+      "fact": "07 §3.0.1 fixes the frame buffer semantics (CNDTR=68, active zero/preload bit0, buffer bit1-15 + 2 zero-tail, absolute raw deadline) but no driver header/API or double-buffer submission contract has been delivered; M7 cannot encode/submit a frame without inventing it."
+    }
+  ],
+  "deliverable_refs": [],
+  "actual_commands": [],
+  "verification": {
+    "scope": "IMPLEMENTATION",
+    "status": "NOT_RUN",
+    "note": "Nothing implemented; no packet, guard, receipt or waveform evidence is claimed."
+  },
+  "not_run": [
+    "M7 permit/demand/epoch/TTL guard",
+    "thrust-curve calibration and DShot packet encoding",
+    "ActuatorCommitReceipt and independent poll guard",
+    "target waveform / logic analyzer / HIL"
+  ],
+  "reviewer": "D",
+  "resume_state": "READY_FOR_ASSIGNMENT",
+  "next_owner": "D",
+  "next_action": "A: deliver the DShot/actuator submit contract and driver evidence; D: accept C-M6 and route M7; then C implements M7 against that contract.",
+  "commit": null,
+  "commit_note": "No code changed; workspace has no Git metadata.",
+  "rollback": "No files added by this notice; nothing to roll back."
+}

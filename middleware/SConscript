@@ -1,0 +1,46 @@
+"""Build the middleware services and the model layer."""
+import os
+from building import *
+import rtconfig
+
+cwd = GetCurrentDir()
+if (GetDepend('FLIGHT_RUNTIME_ENABLE') or GetDepend('INS_BACKEND_ENABLE')) and rtconfig.PLATFORM != 'gcc':
+    raise RuntimeError('Flight runtime/navigation requires the GNU Arm C++14 toolchain')
+
+paths = [os.path.join(cwd, module) for module in (
+    'contracts', 'communication', 'protocol', 'param',
+    'guidance', 'actuator', 'sensor', 'storage')]
+paths.extend(os.path.join(cwd, directory) for directory in ('../board', '../sensor_device', 'model/fms'))
+
+modules = [
+    ('Communication', 'FLIGHT_RUNTIME_ENABLE', 'communication/telemetry_link', ['telemetry_link.c']),
+    ('ParameterStore', 'FLIGHT_RUNTIME_ENABLE', 'param', ['parameter_store.c']),
+    ('EventJournal', 'FLIGHT_NOR_LOG_ENABLE', 'storage/event_journal', ['event_journal.c']),
+    ('SimulationLink', 'FLIGHT_SIM_LINK', 'communication/sim', ['hil_link.c']),
+    ('MavlinkProtocol', 'FLIGHT_RUNTIME_ENABLE', 'protocol/mavlink', ['mavlink_frame.c', 'mavlink_action.c', 'mavlink_rtcm.c']),
+    ('MavlinkHilProtocol', 'FLIGHT_SIM_LINK', 'protocol/mavlink', ['mavlink_hil.c']),
+    ('GnssProtocols', 'SENSOR_PROCESSING_ENABLE', 'protocol', ['nmea/nmea.c', 'unicore_ascii/unicore_ascii.c']),
+    ('SensorProcessing', 'SENSOR_PROCESSING_ENABLE', 'sensor',
+     ['sample_normalization/sensor_sample.c', 'calibration/sensor_calibration.c',
+      'calibration/sensor_calibration_service.c', 'measurement_filter/sensor_filter.c']),
+    ('SensorAcquisition', 'FLIGHT_RUNTIME_ENABLE', 'sensor',
+     ['sample_acquisition/sensor_baro_mag.c', 'sample_acquisition/sensor_gnss.c', 'sample_acquisition/sensor_imu.c']),
+    ('SensorIntegrity', 'SENSOR_INTEGRITY_ENABLE', 'sensor/source_health', ['sensor_integrity.c']),
+    ('Guidance', 'GUIDANCE_ENABLE', 'guidance',
+     ['guidance_update/guidance.c', 'guidance_update/guidance_config.c', 'guidance_update/guidance_input_checks.c',
+      'trajectory_planning/mission_trajectory.c',
+      'trajectory_planning/trajectory_math.c', 'trajectory_planning/trajectory_validation.c',
+      'pilot_and_landing/pilot_and_landing.c']),
+    ('ActuatorOutput', 'FLIGHT_RUNTIME_ENABLE', 'actuator',
+     ['device_adapter/actuator_device.c', 'output_guard/actuator_guard.c']),
+]
+
+group = []
+for name, dependency, directory, filenames in modules:
+    sources = [os.path.join(directory, filename) for filename in filenames]
+    group.extend(DefineGroup(name, sources, depend=[dependency], CPPPATH=paths,
+        LOCAL_CFLAGS=' -std=c99 -fno-short-enums',
+        LIBS=['m']))
+
+group.extend(SConscript('model/SConscript'))
+Return('group')

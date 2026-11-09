@@ -1,0 +1,1627 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 8276419..c274bda 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -308,6 +308,18 @@ set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES
+     ADDITIONAL_CLEAN_FILES "${CMAKE_BINARY_DIR}/ccache-launcher"
+ )
+ 
++# Flight custom build: the static Qt entrypoint cannot resolve __argc with this
++# MinGW runtime, so link as a console executable and keep the normal main().
++if(WIN32)
++    set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE FALSE)
++endif()
++target_sources(${CMAKE_PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/qgc_winmain.cpp")
++set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/qgc_winmain.cpp"
++    PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE COMPILE_OPTIONS "-fno-lto")
++if(MINGW)
++    target_link_options(${CMAKE_PROJECT_NAME} PRIVATE "-Wl,--stack,16777216")
++endif()
++
+ qgc_add_moccache_stats(${CMAKE_PROJECT_NAME})
+ 
+ include(Sanitizers)
+diff --git a/cmake/Helpers.cmake b/cmake/Helpers.cmake
+index 2db8caa..636e0c6 100644
+--- a/cmake/Helpers.cmake
++++ b/cmake/Helpers.cmake
+@@ -296,6 +296,10 @@ function(qgc_enable_ipo)
+     if(LINUX)
+         return()
+     endif()
++    if(QGC_DISABLE_IPO)
++        message(STATUS "QGC: IPO/LTO disabled by QGC_DISABLE_IPO")
++        return()
++    endif()
+ 
+     if(CMAKE_CONFIGURATION_TYPES OR CMAKE_BUILD_TYPE STREQUAL "Release")
+         include(CheckIPOSupported)
+diff --git a/qgc_winmain.cpp b/qgc_winmain.cpp
+new file mode 100644
+index 0000000..7d68401
+--- /dev/null
++++ b/qgc_winmain.cpp
+@@ -0,0 +1,38 @@
++/* Flight custom build: MinGW selected the GUI startup object for the QGC
++ * executable, so provide the WinMain shim that forwards to the normal main().
++ * The command line is rebuilt explicitly because the GUI CRT does not populate
++ * __argc/__argv for this static MinGW build.
++ */
++#include <windows.h>
++#include <shellapi.h>
++#include <stdlib.h>
++
++extern "C" int main(int argc, char **argv);
++
++extern "C" int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous,
++                             LPSTR command_line, int show)
++{
++    (void)instance;
++    (void)previous;
++    (void)command_line;
++    (void)show;
++
++    int argc = 0;
++    wchar_t **wide = CommandLineToArgvW(GetCommandLineW(), &argc);
++    if (!wide || argc < 1) {
++        char *fallback[1] = {nullptr};
++        return main(0, fallback);
++    }
++    char **argv = static_cast<char **>(calloc(static_cast<size_t>(argc) + 1, sizeof(char *)));
++    if (!argv)
++        return 1;
++    for (int i = 0; i < argc; ++i) {
++        const int length = WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, nullptr, 0, nullptr, nullptr);
++        argv[i] = static_cast<char *>(malloc(static_cast<size_t>(length > 0 ? length : 1)));
++        if (argv[i])
++            WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, argv[i], length, nullptr, nullptr);
++    }
++    const int result = main(argc, argv);
++    LocalFree(wide);
++    return result;
++}
+diff --git a/src/FirmwarePlugin/CMakeLists.txt b/src/FirmwarePlugin/CMakeLists.txt
+index 7f706e5..10e8f96 100644
+--- a/src/FirmwarePlugin/CMakeLists.txt
++++ b/src/FirmwarePlugin/CMakeLists.txt
+@@ -20,5 +20,6 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_
+ # ----------------------------------------------------------------------------
+ # Firmware-Specific Plugins
+ # ----------------------------------------------------------------------------
++add_subdirectory(Flight)
+ add_subdirectory(APM)
+ add_subdirectory(PX4)
+diff --git a/src/FirmwarePlugin/Flight/CMakeLists.txt b/src/FirmwarePlugin/Flight/CMakeLists.txt
+new file mode 100644
+index 0000000..2649429
+--- /dev/null
++++ b/src/FirmwarePlugin/Flight/CMakeLists.txt
+@@ -0,0 +1,17 @@
++target_sources(${CMAKE_PROJECT_NAME}
++    PRIVATE
++        FlightFirmwarePlugin.cc
++        FlightFirmwarePlugin.h
++        FlightFirmwarePluginFactory.cc
++        FlightFirmwarePluginFactory.h
++        FlightParameterMetaData.cc
++        FlightParameterMetaData.h
++)
++
++qt_add_resources(${CMAKE_PROJECT_NAME} flight_parameter_metadata
++    PREFIX "/FirmwarePlugin/Flight"
++    FILES
++        FlightParameterFactMetaData.json
++)
++
++target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+diff --git a/src/FirmwarePlugin/Flight/FlightFirmwarePlugin.cc b/src/FirmwarePlugin/Flight/FlightFirmwarePlugin.cc
+new file mode 100644
+index 0000000..fee364f
+--- /dev/null
++++ b/src/FirmwarePlugin/Flight/FlightFirmwarePlugin.cc
+@@ -0,0 +1,140 @@
++#include "FlightFirmwarePlugin.h"
++#include "FlightParameterMetaData.h"
++
++#include "Vehicle.h"
++
++#include <QtCore/QStringList>
++
++namespace {
++
++const QStringList &flightModeNames()
++{
++    static const QStringList names = {
++        QStringLiteral("未就绪"),
++        QStringLiteral("角速度"),
++        QStringLiteral("姿态"),
++        QStringLiteral("定高"),
++        QStringLiteral("定点"),
++        QStringLiteral("任务"),
++        QStringLiteral("返航"),
++        QStringLiteral("降落"),
++        QStringLiteral("紧急降落"),
++        QStringLiteral("起飞"),
++    };
++    return names;
++}
++
++} // namespace
++
++FlightFirmwarePlugin::FlightFirmwarePlugin()
++{
++}
++
++FlightFirmwarePlugin::~FlightFirmwarePlugin()
++{
++}
++
++bool FlightFirmwarePlugin::isCapable(const Vehicle *, FirmwareCapabilities capabilities) const
++{
++    if (capabilities & SetFlightModeCapability) {
++        return true;
++    }
++    return false;
++}
++
++QStringList FlightFirmwarePlugin::flightModes(Vehicle *vehicle) const
++{
++    Q_UNUSED(vehicle);
++    return flightModeNames();
++}
++
++QString FlightFirmwarePlugin::flightMode(uint8_t base_mode, uint32_t custom_mode) const
++{
++    Q_UNUSED(base_mode);
++    if (custom_mode < static_cast<uint32_t>(flightModeNames().count())) {
++        return flightModeNames().at(static_cast<int>(custom_mode));
++    }
++    return tr("模式 %1").arg(custom_mode);
++}
++
++bool FlightFirmwarePlugin::setFlightMode(const QString &flightMode, uint8_t *base_mode,
++                                         uint32_t *custom_mode) const
++{
++    const int index = flightModeNames().indexOf(flightMode);
++    if (index < 0) {
++        return false;
++    }
++    *base_mode = MAV_MODE_FLAG_CUSTOM_MODE_ENABLED;
++    *custom_mode = static_cast<uint32_t>(index);
++    return true;
++}
++
++bool FlightFirmwarePlugin::isGuidedMode(const Vehicle *vehicle) const
++{
++    if (!vehicle) {
++        return false;
++    }
++    const QString mode = vehicle->flightMode();
++    return (mode == QStringLiteral("定点")) || (mode == QStringLiteral("起飞"));
++}
++
++void FlightFirmwarePlugin::pauseVehicle(Vehicle *vehicle) const
++{
++    if (vehicle) {
++        vehicle->sendMavCommand(MAV_COMP_ID_AUTOPILOT1, MAV_CMD_DO_PAUSE_CONTINUE, true, 0.0f);
++    }
++}
++
++void FlightFirmwarePlugin::guidedModeRTL(Vehicle *vehicle, bool smartRTL) const
++{
++    Q_UNUSED(smartRTL);
++    if (vehicle) {
++        vehicle->sendMavCommand(MAV_COMP_ID_AUTOPILOT1, MAV_CMD_NAV_RETURN_TO_LAUNCH, true);
++    }
++}
++
++void FlightFirmwarePlugin::guidedModeLand(Vehicle *vehicle) const
++{
++    if (vehicle) {
++        vehicle->sendMavCommand(MAV_COMP_ID_AUTOPILOT1, MAV_CMD_NAV_LAND, true);
++    }
++}
++
++void FlightFirmwarePlugin::guidedModeTakeoff(Vehicle *vehicle, double takeoffAltRel) const
++{
++    const double altitude = qMax(takeoffAltRel, minimumTakeoffAltitudeMeters(vehicle));
++    if (vehicle) {
++        vehicle->sendMavCommand(MAV_COMP_ID_AUTOPILOT1, MAV_CMD_NAV_TAKEOFF, true,
++                                0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
++                                static_cast<float>(altitude));
++    }
++}
++
++void FlightFirmwarePlugin::startTakeoff(Vehicle *vehicle) const
++{
++    guidedModeTakeoff(vehicle, minimumTakeoffAltitudeMeters(vehicle));
++}
++
++void FlightFirmwarePlugin::startMission(Vehicle *vehicle) const
++{
++    if (vehicle) {
++        vehicle->sendMavCommand(MAV_COMP_ID_AUTOPILOT1, MAV_CMD_MISSION_START, true);
++    }
++}
++
++double FlightFirmwarePlugin::minimumTakeoffAltitudeMeters(Vehicle *vehicle) const
++{
++    Q_UNUSED(vehicle);
++    return 2.0;
++}
++
++QString FlightFirmwarePlugin::_internalParameterMetaDataFile(const Vehicle *vehicle) const
++{
++    Q_UNUSED(vehicle);
++    return QStringLiteral(":/FirmwarePlugin/Flight/FlightParameterFactMetaData.json");
++}
++
++ParameterMetaData *FlightFirmwarePlugin::_createParameterMetaData()
++{
++    return new FlightParameterMetaData(this);
++}
+diff --git a/src/FirmwarePlugin/Flight/FlightFirmwarePlugin.h b/src/FirmwarePlugin/Flight/FlightFirmwarePlugin.h
+new file mode 100644
+index 0000000..38befbe
+--- /dev/null
++++ b/src/FirmwarePlugin/Flight/FlightFirmwarePlugin.h
+@@ -0,0 +1,52 @@
++#pragma once
++
++#include "FirmwarePlugin.h"
++#include "QGCMAVLink.h"
++
++/// Flight (FMT QUAD_X4) firmware plugin.
++///
++/// The vehicle reports MAV_AUTOPILOT_GENERIC, but its custom_mode follows the
++/// FlightMode enum in middleware/model/fms/fms_contract/fms_contract.h:
++/// 0 NONE, 1 RATE, 2 ATTITUDE, 3 ALT_HOLD, 4 POS_HOLD, 5 AUTO_MISSION,
++/// 6 AUTO_RETURN, 7 AUTO_LAND, 8 EMERGENCY_LAND, 9 TAKEOFF (SIL only).
++class FlightFirmwarePlugin : public FirmwarePlugin
++{
++    Q_OBJECT
++
++public:
++    FlightFirmwarePlugin();
++    ~FlightFirmwarePlugin() override;
++
++    bool isCapable(const Vehicle *vehicle, FirmwareCapabilities capabilities) const override;
++    QStringList flightModes(Vehicle *vehicle) const override;
++    QString flightMode(uint8_t base_mode, uint32_t custom_mode) const override;
++    bool setFlightMode(const QString &flightMode, uint8_t *base_mode, uint32_t *custom_mode) const override;
++    bool MAV_CMD_DO_SET_MODE_is_supported() const override { return true; }
++
++    QString pauseFlightMode() const override { return QStringLiteral("定点"); }
++    QString missionFlightMode() const override { return QStringLiteral("任务"); }
++    QString rtlFlightMode() const override { return QStringLiteral("返航"); }
++    QString landFlightMode() const override { return QStringLiteral("降落"); }
++    QString takeOffFlightMode() const override { return QStringLiteral("起飞"); }
++    QString stabilizedFlightMode() const override { return QStringLiteral("姿态"); }
++    QString takeControlFlightMode() const override { return QStringLiteral("定点"); }
++    QString gotoFlightMode() const override { return QStringLiteral("定点"); }
++    QString followFlightMode() const override { return QString(); }
++
++    bool isGuidedMode(const Vehicle *vehicle) const override;
++    void pauseVehicle(Vehicle *vehicle) const override;
++    void guidedModeRTL(Vehicle *vehicle, bool smartRTL) const override;
++    void guidedModeLand(Vehicle *vehicle) const override;
++    void guidedModeTakeoff(Vehicle *vehicle, double takeoffAltRel) const override;
++    void startTakeoff(Vehicle *vehicle) const override;
++    void startMission(Vehicle *vehicle) const override;
++    double minimumTakeoffAltitudeMeters(Vehicle *vehicle) const override;
++
++    bool supportsRadio() const override { return false; }
++    bool supportsJSButton() const override { return false; }
++
++protected:
++    QString _internalParameterMetaDataFile(const Vehicle *vehicle) const override;
++    MAV_AUTOPILOT _autopilotType() const override { return MAV_AUTOPILOT_GENERIC; }
++    ParameterMetaData *_createParameterMetaData() override;
++};
+diff --git a/src/FirmwarePlugin/Flight/FlightFirmwarePluginFactory.cc b/src/FirmwarePlugin/Flight/FlightFirmwarePluginFactory.cc
+new file mode 100644
+index 0000000..bcc195b
+--- /dev/null
++++ b/src/FirmwarePlugin/Flight/FlightFirmwarePluginFactory.cc
+@@ -0,0 +1,29 @@
++#include "FlightFirmwarePluginFactory.h"
++#include "FlightFirmwarePlugin.h"
++
++FlightFirmwarePluginFactory FlightFirmwarePluginFactory;
++
++FlightFirmwarePluginFactory::FlightFirmwarePluginFactory()
++    : _pluginInstance(nullptr)
++{
++}
++
++QList<QGCMAVLink::FirmwareClass_t> FlightFirmwarePluginFactory::supportedFirmwareClasses() const
++{
++    QList<QGCMAVLink::FirmwareClass_t> list;
++    list.append(QGCMAVLink::FirmwareClassGeneric);
++    return list;
++}
++
++FirmwarePlugin *FlightFirmwarePluginFactory::firmwarePluginForAutopilot(MAV_AUTOPILOT autopilotType,
++                                                                       MAV_TYPE vehicleType)
++{
++    Q_UNUSED(vehicleType);
++    if (autopilotType == MAV_AUTOPILOT_GENERIC) {
++        if (!_pluginInstance) {
++            _pluginInstance = new FlightFirmwarePlugin();
++        }
++        return _pluginInstance;
++    }
++    return nullptr;
++}
+diff --git a/src/FirmwarePlugin/Flight/FlightFirmwarePluginFactory.h b/src/FirmwarePlugin/Flight/FlightFirmwarePluginFactory.h
+new file mode 100644
+index 0000000..c7a53b3
+--- /dev/null
++++ b/src/FirmwarePlugin/Flight/FlightFirmwarePluginFactory.h
+@@ -0,0 +1,22 @@
++#pragma once
++
++#include "FirmwarePluginFactory.h"
++#include "QGCMAVLink.h"
++
++class FlightFirmwarePlugin;
++
++/// Registers the Flight plugin for MAV_AUTOPILOT_GENERIC vehicles in this
++/// custom QGroundControl build.
++class FlightFirmwarePluginFactory : public FirmwarePluginFactory
++{
++    Q_OBJECT
++
++public:
++    FlightFirmwarePluginFactory();
++
++    QList<QGCMAVLink::FirmwareClass_t> supportedFirmwareClasses() const final;
++    FirmwarePlugin *firmwarePluginForAutopilot(MAV_AUTOPILOT autopilotType, MAV_TYPE vehicleType) final;
++
++private:
++    FlightFirmwarePlugin *_pluginInstance;
++};
+diff --git a/src/FirmwarePlugin/Flight/FlightParameterFactMetaData.json b/src/FirmwarePlugin/Flight/FlightParameterFactMetaData.json
+new file mode 100644
+index 0000000..51061a1
+--- /dev/null
++++ b/src/FirmwarePlugin/Flight/FlightParameterFactMetaData.json
+@@ -0,0 +1,917 @@
++{
++  "version": 1,
++  "source": "middleware/protocol/mavlink/parameters/ground_parameters.json",
++  "sha256": "403c8d2dd1a6238f2a1798a414eed1caafcaaa0afa76fbfe93e3ac3217ddd82d",
++  "parameters": [
++    {
++      "name": "VEH_MASS",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "整机质量",
++      "longDescription": "控制器推力分配和制导模型使用的整机质量；与实际起飞重量不一致会造成高度偏差。",
++      "units": "kg",
++      "min": 0.1,
++      "max": 50.0,
++      "default": 1.5,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_ACT_DLY",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "执行预览延迟",
++      "longDescription": "把执行器响应延迟前馈到参考中的时间，允许 0 到 0.04 s。",
++      "units": "s",
++      "min": 0.0,
++      "max": 0.04,
++      "default": 0.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_FB_KD_X",
++      "type": "float",
++      "group": "位置环回退",
++      "shortDescription": "位置环回退 D（北）",
++      "longDescription": "MPC 不可用时位置环回退控制的阻尼增益，允许 0。",
++      "units": "1/s",
++      "min": 0.0,
++      "max": 50.0,
++      "default": 2.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_FB_KD_Y",
++      "type": "float",
++      "group": "位置环回退",
++      "shortDescription": "位置环回退 D（东）",
++      "longDescription": "MPC 不可用时位置环回退控制的阻尼增益，允许 0。",
++      "units": "1/s",
++      "min": 0.0,
++      "max": 50.0,
++      "default": 2.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_FB_KD_Z",
++      "type": "float",
++      "group": "位置环回退",
++      "shortDescription": "位置环回退 D（地）",
++      "longDescription": "MPC 不可用时位置环回退控制的阻尼增益，允许 0。",
++      "units": "1/s",
++      "min": 0.0,
++      "max": 50.0,
++      "default": 2.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_FB_KP_X",
++      "type": "float",
++      "group": "位置环回退",
++      "shortDescription": "位置环回退 P（北）",
++      "longDescription": "MPC 不可用时位置环回退控制的比例增益，允许 0。",
++      "units": "1/s²",
++      "min": 0.0,
++      "max": 50.0,
++      "default": 2.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_FB_KP_Y",
++      "type": "float",
++      "group": "位置环回退",
++      "shortDescription": "位置环回退 P（东）",
++      "longDescription": "MPC 不可用时位置环回退控制的比例增益，允许 0。",
++      "units": "1/s²",
++      "min": 0.0,
++      "max": 50.0,
++      "default": 2.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_FB_KP_Z",
++      "type": "float",
++      "group": "位置环回退",
++      "shortDescription": "位置环回退 P（地）",
++      "longDescription": "MPC 不可用时位置环回退控制的比例增益，允许 0。",
++      "units": "1/s²",
++      "min": 0.0,
++      "max": 50.0,
++      "default": 2.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_HOVER_THR",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "手动悬停油门",
++      "longDescription": "手动模式下维持悬停的归一化油门，必须在 0 与 1 之间。",
++      "units": "norm",
++      "min": 0.05,
++      "max": 0.95,
++      "default": 0.5,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_Q0",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 状态权重 Q0",
++      "longDescription": "MPC 运行代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 1000.0,
++      "default": 8.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_Q1",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 状态权重 Q1",
++      "longDescription": "MPC 运行代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 1000.0,
++      "default": 8.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_Q2",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 状态权重 Q2",
++      "longDescription": "MPC 运行代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 1000.0,
++      "default": 12.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_Q3",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 状态权重 Q3",
++      "longDescription": "MPC 运行代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 1000.0,
++      "default": 3.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_Q4",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 状态权重 Q4",
++      "longDescription": "MPC 运行代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 1000.0,
++      "default": 3.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_Q5",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 状态权重 Q5",
++      "longDescription": "MPC 运行代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 1000.0,
++      "default": 4.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_QF0",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 终端权重 Qf0",
++      "longDescription": "MPC 终端代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 1000.0,
++      "default": 8.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_QF1",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 终端权重 Qf1",
++      "longDescription": "MPC 终端代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 1000.0,
++      "default": 8.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_QF2",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 终端权重 Qf2",
++      "longDescription": "MPC 终端代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 1000.0,
++      "default": 12.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_QF3",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 终端权重 Qf3",
++      "longDescription": "MPC 终端代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 1000.0,
++      "default": 3.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_QF4",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 终端权重 Qf4",
++      "longDescription": "MPC 终端代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 1000.0,
++      "default": 3.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_QF5",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 终端权重 Qf5",
++      "longDescription": "MPC 终端代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 1000.0,
++      "default": 4.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_R0",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 控制权重 R0",
++      "longDescription": "MPC 控制量代价的对角权重，允许 0。",
++      "units": "-",
++      "min": 0.0,
++      "max": 1000.0,
++      "default": 0.8,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_R1",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 控制权重 R1",
++      "longDescription": "MPC 控制量代价的对角权重，允许 0。",
++      "units": "-",
++      "min": 0.0,
++      "max": 1000.0,
++      "default": 0.8,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_R2",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 控制权重 R2",
++      "longDescription": "MPC 控制量代价的对角权重，允许 0。",
++      "units": "-",
++      "min": 0.0,
++      "max": 1000.0,
++      "default": 1.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_S0",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 控制增量权重 S0",
++      "longDescription": "MPC 控制增量代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 100.0,
++      "default": 0.2,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_S1",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 控制增量权重 S1",
++      "longDescription": "MPC 控制增量代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 100.0,
++      "default": 0.2,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_MPC_S2",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 控制增量权重 S2",
++      "longDescription": "MPC 控制增量代价的对角权重，必须大于 0。",
++      "units": "-",
++      "min": 0.001,
++      "max": 100.0,
++      "default": 0.25,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_SEED_POS",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 种子位置误差限",
++      "longDescription": "MPC 热启动允许的位置误差上限，必须大于 0。",
++      "units": "m",
++      "min": 0.01,
++      "max": 100.0,
++      "default": 0.5,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_SEED_VEL",
++      "type": "float",
++      "group": "MPC 权重",
++      "shortDescription": "MPC 种子速度误差限",
++      "longDescription": "MPC 热启动允许的速度误差上限，必须大于 0。",
++      "units": "m/s",
++      "min": 0.01,
++      "max": 100.0,
++      "default": 1.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_DCUT",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环 D 项截止频率",
++      "longDescription": "角速度误差微分的低通截止频率，必须大于 0 且小于 450 Hz。",
++      "units": "Hz",
++      "min": 1.0,
++      "max": 449.0,
++      "default": 40.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_ILIM_X",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度积分限幅（滚转）",
++      "longDescription": "积分项力矩限幅，必须大于 0。",
++      "units": "N·m",
++      "min": 0.001,
++      "max": 10.0,
++      "default": 0.2,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_ILIM_Y",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度积分限幅（俯仰）",
++      "longDescription": "积分项力矩限幅，必须大于 0。",
++      "units": "N·m",
++      "min": 0.001,
++      "max": 10.0,
++      "default": 0.2,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_ILIM_Z",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度积分限幅（偏航）",
++      "longDescription": "积分项力矩限幅，必须大于 0。",
++      "units": "N·m",
++      "min": 0.001,
++      "max": 10.0,
++      "default": 0.2,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_KAW_X",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环抗饱和（滚转）",
++      "longDescription": "积分抗饱和反馈增益，必须大于 0。",
++      "units": "1/s",
++      "min": 0.01,
++      "max": 100.0,
++      "default": 5.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_KAW_Y",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环抗饱和（俯仰）",
++      "longDescription": "积分抗饱和反馈增益，必须大于 0。",
++      "units": "1/s",
++      "min": 0.01,
++      "max": 100.0,
++      "default": 5.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_KAW_Z",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环抗饱和（偏航）",
++      "longDescription": "积分抗饱和反馈增益，必须大于 0。",
++      "units": "1/s",
++      "min": 0.01,
++      "max": 100.0,
++      "default": 5.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_KD_X",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环 D（滚转）",
++      "longDescription": "角速度误差微分增益，允许 0；D 项再经过 CTL_RATE_DCUT 低通。",
++      "units": "N·m/(rad/s²)",
++      "min": 0.0,
++      "max": 20.0,
++      "default": 0.002,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_KD_Y",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环 D（俯仰）",
++      "longDescription": "角速度误差微分增益，允许 0；D 项再经过 CTL_RATE_DCUT 低通。",
++      "units": "N·m/(rad/s²)",
++      "min": 0.0,
++      "max": 20.0,
++      "default": 0.002,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_KD_Z",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环 D（偏航）",
++      "longDescription": "角速度误差微分增益，允许 0；D 项再经过 CTL_RATE_DCUT 低通。",
++      "units": "N·m/(rad/s²)",
++      "min": 0.0,
++      "max": 20.0,
++      "default": 0.002,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_KI_X",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环 I（滚转）",
++      "longDescription": "角速度误差积分增益，允许 0。",
++      "units": "N·m/rad",
++      "min": 0.0,
++      "max": 20.0,
++      "default": 0.05,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_KI_Y",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环 I（俯仰）",
++      "longDescription": "角速度误差积分增益，允许 0。",
++      "units": "N·m/rad",
++      "min": 0.0,
++      "max": 20.0,
++      "default": 0.05,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_KI_Z",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环 I（偏航）",
++      "longDescription": "角速度误差积分增益，允许 0。",
++      "units": "N·m/rad",
++      "min": 0.0,
++      "max": 20.0,
++      "default": 0.05,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_KP_X",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环 P（滚转）",
++      "longDescription": "角速度误差比例增益，允许 0。",
++      "units": "N·m/(rad/s)",
++      "min": 0.0,
++      "max": 20.0,
++      "default": 0.12,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_KP_Y",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环 P（俯仰）",
++      "longDescription": "角速度误差比例增益，允许 0。",
++      "units": "N·m/(rad/s)",
++      "min": 0.0,
++      "max": 20.0,
++      "default": 0.12,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_RATE_KP_Z",
++      "type": "float",
++      "group": "姿态角速度环",
++      "shortDescription": "角速度环 P（偏航）",
++      "longDescription": "角速度误差比例增益，允许 0。",
++      "units": "N·m/(rad/s)",
++      "min": 0.0,
++      "max": 20.0,
++      "default": 0.12,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_SO3_X",
++      "type": "float",
++      "group": "装订角速度环",
++      "shortDescription": "SO(3) 姿态增益（滚转）",
++      "longDescription": "SO(3) 姿态误差到期望角速度的增益，必须大于 0。",
++      "units": "1/s",
++      "min": 0.1,
++      "max": 50.0,
++      "default": 6.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_SO3_Y",
++      "type": "float",
++      "group": "装订角速度环",
++      "shortDescription": "SO(3) 姿态增益（俯仰）",
++      "longDescription": "SO(3) 姿态误差到期望角速度的增益，必须大于 0。",
++      "units": "1/s",
++      "min": 0.1,
++      "max": 50.0,
++      "default": 6.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "CTL_SO3_Z",
++      "type": "float",
++      "group": "装订角速度环",
++      "shortDescription": "SO(3) 姿态增益（偏航）",
++      "longDescription": "SO(3) 姿态误差到期望角速度的增益，必须大于 0。",
++      "units": "1/s",
++      "min": 0.1,
++      "max": 50.0,
++      "default": 6.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_IXX",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "转动惯量 IXX",
++      "longDescription": "机体惯性张量的上三角元素（行优先，FRD 机体系）；必须保持对称正定，否则参数写入会被拒绝。",
++      "units": "kg·m²",
++      "min": 0.001,
++      "max": 5.0,
++      "default": 0.025,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_IXY",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "转动惯量 IXY",
++      "longDescription": "机体惯性张量的上三角元素（行优先，FRD 机体系）；必须保持对称正定，否则参数写入会被拒绝。",
++      "units": "kg·m²",
++      "min": -1.0,
++      "max": 1.0,
++      "default": 0.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_IXZ",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "转动惯量 IXZ",
++      "longDescription": "机体惯性张量的上三角元素（行优先，FRD 机体系）；必须保持对称正定，否则参数写入会被拒绝。",
++      "units": "kg·m²",
++      "min": -1.0,
++      "max": 1.0,
++      "default": 0.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_IYY",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "转动惯量 IYY",
++      "longDescription": "机体惯性张量的上三角元素（行优先，FRD 机体系）；必须保持对称正定，否则参数写入会被拒绝。",
++      "units": "kg·m²",
++      "min": 0.001,
++      "max": 5.0,
++      "default": 0.025,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_IYZ",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "转动惯量 IYZ",
++      "longDescription": "机体惯性张量的上三角元素（行优先，FRD 机体系）；必须保持对称正定，否则参数写入会被拒绝。",
++      "units": "kg·m²",
++      "min": -1.0,
++      "max": 1.0,
++      "default": 0.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_IZZ",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "转动惯量 IZZ",
++      "longDescription": "机体惯性张量的上三角元素（行优先，FRD 机体系）；必须保持对称正定，否则参数写入会被拒绝。",
++      "units": "kg·m²",
++      "min": 0.001,
++      "max": 5.0,
++      "default": 0.04,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M0_X",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 1 位置 X（前）",
++      "longDescription": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。",
++      "units": "m",
++      "min": -1.0,
++      "max": 1.0,
++      "default": 0.18,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M0_Y",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 1 位置 Y（右）",
++      "longDescription": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。",
++      "units": "m",
++      "min": -1.0,
++      "max": 1.0,
++      "default": -0.18,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M0_Z",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 1 位置 Z（下）",
++      "longDescription": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。",
++      "units": "m",
++      "min": -1.0,
++      "max": 1.0,
++      "default": 0.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M1_X",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 2 位置 X（前）",
++      "longDescription": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。",
++      "units": "m",
++      "min": -1.0,
++      "max": 1.0,
++      "default": 0.18,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M1_Y",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 2 位置 Y（右）",
++      "longDescription": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。",
++      "units": "m",
++      "min": -1.0,
++      "max": 1.0,
++      "default": 0.18,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M1_Z",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 2 位置 Z（下）",
++      "longDescription": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。",
++      "units": "m",
++      "min": -1.0,
++      "max": 1.0,
++      "default": 0.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M2_X",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 3 位置 X（前）",
++      "longDescription": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。",
++      "units": "m",
++      "min": -1.0,
++      "max": 1.0,
++      "default": -0.18,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M2_Y",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 3 位置 Y（右）",
++      "longDescription": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。",
++      "units": "m",
++      "min": -1.0,
++      "max": 1.0,
++      "default": 0.18,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M2_Z",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 3 位置 Z（下）",
++      "longDescription": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。",
++      "units": "m",
++      "min": -1.0,
++      "max": 1.0,
++      "default": 0.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M3_X",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 4 位置 X（前）",
++      "longDescription": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。",
++      "units": "m",
++      "min": -1.0,
++      "max": 1.0,
++      "default": -0.18,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M3_Y",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 4 位置 Y（右）",
++      "longDescription": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。",
++      "units": "m",
++      "min": -1.0,
++      "max": 1.0,
++      "default": -0.18,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M3_Z",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 4 位置 Z（下）",
++      "longDescription": "电机安装位置，机体系 FRD，相对重心。四个电机位置共同决定控制分配矩阵。",
++      "units": "m",
++      "min": -1.0,
++      "max": 1.0,
++      "default": 0.0,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M0_YAW",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 1 反扭矩系数",
++      "longDescription": "螺旋桨反扭矩与推力的比值，符号表示旋向；参与偏航控制分配。",
++      "units": "m",
++      "min": -0.2,
++      "max": 0.2,
++      "default": -0.02,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M1_YAW",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 2 反扭矩系数",
++      "longDescription": "螺旋桨反扭矩与推力的比值，符号表示旋向；参与偏航控制分配。",
++      "units": "m",
++      "min": -0.2,
++      "max": 0.2,
++      "default": 0.02,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M2_YAW",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 3 反扭矩系数",
++      "longDescription": "螺旋桨反扭矩与推力的比值，符号表示旋向；参与偏航控制分配。",
++      "units": "m",
++      "min": -0.2,
++      "max": 0.2,
++      "default": -0.02,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    },
++    {
++      "name": "VEH_M3_YAW",
++      "type": "float",
++      "group": "机体模型",
++      "shortDescription": "电机 4 反扭矩系数",
++      "longDescription": "螺旋桨反扭矩与推力的比值，符号表示旋向；参与偏航控制分配。",
++      "units": "m",
++      "min": -0.2,
++      "max": 0.2,
++      "default": 0.02,
++      "decimalPlaces": 4,
++      "rebootRequired": false
++    }
++  ]
++}
+diff --git a/src/FirmwarePlugin/Flight/FlightParameterMetaData.cc b/src/FirmwarePlugin/Flight/FlightParameterMetaData.cc
+new file mode 100644
+index 0000000..7277e19
+--- /dev/null
++++ b/src/FirmwarePlugin/Flight/FlightParameterMetaData.cc
+@@ -0,0 +1,50 @@
++#include "FlightParameterMetaData.h"
++
++#include <QtCore/QJsonArray>
++#include <QtCore/QJsonObject>
++#include <QtCore/QJsonValue>
++
++FlightParameterMetaData::FlightParameterMetaData(QObject *parent)
++    : ParameterMetaData(parent)
++{
++}
++
++FlightParameterMetaData::~FlightParameterMetaData()
++{
++}
++
++void FlightParameterMetaData::parseParameterJson(const QJsonObject &json)
++{
++    const QJsonArray parameters = json.value(QStringLiteral("parameters")).toArray();
++    for (const QJsonValue &value : parameters) {
++        if (!value.isObject()) {
++            continue;
++        }
++        const QJsonObject entry = value.toObject();
++        const QString name = entry.value(QStringLiteral("name")).toString();
++        if (name.isEmpty()) {
++            continue;
++        }
++
++        auto *metaData = new FactMetaData(FactMetaData::valueTypeFloat, this);
++        metaData->setName(name);
++        metaData->setGroup(entry.value(QStringLiteral("group")).toString());
++        metaData->setShortDescription(entry.value(QStringLiteral("shortDescription")).toString());
++        metaData->setLongDescription(entry.value(QStringLiteral("longDescription")).toString());
++        metaData->setRawUnits(entry.value(QStringLiteral("units")).toString());
++        if (entry.contains(QStringLiteral("min"))) {
++            metaData->setRawMin(entry.value(QStringLiteral("min")).toDouble());
++        }
++        if (entry.contains(QStringLiteral("max"))) {
++            metaData->setRawMax(entry.value(QStringLiteral("max")).toDouble());
++        }
++        if (entry.contains(QStringLiteral("default"))) {
++            metaData->setRawDefaultValue(entry.value(QStringLiteral("default")).toDouble());
++        }
++        if (entry.contains(QStringLiteral("decimalPlaces"))) {
++            metaData->setDecimalPlaces(entry.value(QStringLiteral("decimalPlaces")).toInt());
++        }
++        metaData->setReadOnly(false);
++        _cachedMetaData[name] = metaData;
++    }
++}
+diff --git a/src/FirmwarePlugin/Flight/FlightParameterMetaData.h b/src/FirmwarePlugin/Flight/FlightParameterMetaData.h
+new file mode 100644
+index 0000000..5b5d761
+--- /dev/null
++++ b/src/FirmwarePlugin/Flight/FlightParameterMetaData.h
+@@ -0,0 +1,18 @@
++#pragma once
++
++#include "ParameterMetaData.h"
++
++/// Reads the Flight parameter catalog generated from config/*.yaml.  The JSON
++/// uses a flat "parameters" array with Chinese titles, groups and units so the
++/// standard QGC parameter editor shows the project's own metadata.
++class FlightParameterMetaData : public ParameterMetaData
++{
++    Q_OBJECT
++
++public:
++    explicit FlightParameterMetaData(QObject *parent = nullptr);
++    ~FlightParameterMetaData() override;
++
++protected:
++    void parseParameterJson(const QJsonObject &json) override;
++};
+diff --git a/src/FlyView/GuidedActionsController.qml b/src/FlyView/GuidedActionsController.qml
+index cd3b03b..32380aa 100644
+--- a/src/FlyView/GuidedActionsController.qml
++++ b/src/FlyView/GuidedActionsController.qml
+@@ -126,12 +126,14 @@ Item {
+     property bool showArm:                  _guidedActionsEnabled && !_vehicleArmed && _canArm
+     property bool showForceArm:             _guidedActionsEnabled && !_vehicleArmed
+     property bool showDisarm:               _guidedActionsEnabled && _vehicleArmed && !_vehicleFlying
+-    property bool showRTL:                  _guidedActionsEnabled && _activeVehicle && _vehicleArmed && _activeVehicle.supports.guidedMode && _vehicleFlying && !_vehicleInRTLMode
+-    property bool showTakeoff:              _guidedActionsEnabled && _activeVehicle && (_activeVehicle.supports.guidedTakeoffWithAltitude || _activeVehicle.supports.guidedTakeoffWithoutAltitude) && !_vehicleFlying && _canTakeoff
+-    property bool showLand:                 _guidedActionsEnabled && _activeVehicle && _activeVehicle.supports.guidedMode && _vehicleArmed && !_activeVehicle.fixedWing && !_vehicleInLandMode
++    readonly property bool _flightSil: _activeVehicle ? _activeVehicle.flightSil : false
++
++    property bool showRTL:                  _guidedActionsEnabled && _activeVehicle && _vehicleArmed && (_flightSil || _activeVehicle.supports.guidedMode) && _vehicleFlying && !_vehicleInRTLMode
++    property bool showTakeoff:              _guidedActionsEnabled && _activeVehicle && ((_flightSil && _vehicleArmed) || _activeVehicle.supports.guidedTakeoffWithAltitude || _activeVehicle.supports.guidedTakeoffWithoutAltitude) && !_vehicleFlying && _canTakeoff
++    property bool showLand:                 _guidedActionsEnabled && _activeVehicle && (_flightSil || _activeVehicle.supports.guidedMode) && _vehicleArmed && !_activeVehicle.fixedWing && !_vehicleInLandMode
+     property bool showStartMission:         _guidedActionsEnabled && _missionAvailable && !_missionActive && !_vehicleFlying && _canStartMission
+     property bool showContinueMission:      _guidedActionsEnabled && _missionAvailable && !_missionActive && _vehicleArmed && _vehicleFlying && (_currentMissionIndex < _visualItemsCount - 1)
+-    property bool showPause:                _guidedActionsEnabled && _activeVehicle && _vehicleArmed && _activeVehicle.supports.pauseVehicle && _vehicleFlying && !_vehiclePaused && !_fixedWingOnApproach
++    property bool showPause:                _guidedActionsEnabled && _activeVehicle && _vehicleArmed && (_activeVehicle.supports.pauseVehicle || (_flightSil && _vehicleInMissionMode)) && _vehicleFlying && !_vehiclePaused && !_fixedWingOnApproach
+     property bool showChangeAlt:            _guidedActionsEnabled && _activeVehicle && _vehicleFlying && _activeVehicle.supports.guidedMode && _vehicleArmed && !_missionActive
+     property bool showChangeLoiterRadius:   _guidedActionsEnabled && _activeVehicle && _vehicleFlying && _activeVehicle.supports.guidedMode && _vehicleArmed && !_missionActive && _vehicleInFwdFlight && fwdFlightGotoMapCircle.visible
+     property bool showChangeSpeed:          _guidedActionsEnabled && _activeVehicle && _vehicleFlying && _activeVehicle.supports.guidedMode && _vehicleArmed && !_missionActive && _speedLimitsAvailable
+@@ -334,9 +336,9 @@ Item {
+ 
+     on_FlightModeChanged: {
+         _vehiclePaused =        _activeVehicle ? _flightMode === _activeVehicle.pauseFlightMode : false
+-        _vehicleInRTLMode =     _activeVehicle ? _flightMode === _activeVehicle.rtlFlightMode || _flightMode === _activeVehicle.smartRTLFlightMode : false
+-        _vehicleInLandMode =    _activeVehicle ? _flightMode === _activeVehicle.landFlightMode : false
+-        _vehicleInMissionMode = _activeVehicle ? _flightMode === _activeVehicle.missionFlightMode : false // Must be last to get correct signalling for showStartMission popups
++        _vehicleInRTLMode =     _activeVehicle ? (_flightSil ? _flightMode === "Safe Recovery" : (_flightMode === _activeVehicle.rtlFlightMode || _flightMode === _activeVehicle.smartRTLFlightMode)) : false
++        _vehicleInLandMode =    _activeVehicle ? (_flightSil ? _flightMode === "Land" : _flightMode === _activeVehicle.landFlightMode) : false
++        _vehicleInMissionMode = _activeVehicle ? (_flightSil ? _flightMode === "Mission" : _flightMode === _activeVehicle.missionFlightMode) : false // Must be last to get correct signalling for showStartMission popups
+     }
+ 
+     Connections {
+diff --git a/src/QmlControls/ParameterEditor.qml b/src/QmlControls/ParameterEditor.qml
+index 6b147ac..e662c20 100644
+--- a/src/QmlControls/ParameterEditor.qml
++++ b/src/QmlControls/ParameterEditor.qml
+@@ -309,7 +309,7 @@ Item {
+                 height:         parent.height
+                 width:          1
+                 color:          qgcPal.groupBorder
+-                visible:        column == 3
++                visible:        column == 4
+             }
+ 
+             // Bottom border
+@@ -354,6 +354,7 @@ Item {
+             implicitWidth:  column === 0 ? ScreenTools.implicitCheckBoxHeight + ScreenTools.defaultFontPixelWidth
+                                          : column === 1 ? nameRow.implicitWidth + ScreenTools.defaultFontPixelWidth
+                                          : column === 2 ? ScreenTools.defaultFontPixelWidth * 16
++                                         : column === 3 ? ScreenTools.defaultFontPixelWidth * 10
+                                                         : label.contentWidth + ScreenTools.defaultFontPixelWidth
+             implicitHeight: label.contentHeight + ScreenTools.defaultFontPixelHeight * 0.5
+             color:          row % 2 === 0 ? "transparent" : qgcPal.windowShade
+@@ -381,7 +382,7 @@ Item {
+                 height:         parent.height
+                 width:          1
+                 color:          qgcPal.groupBorder
+-                visible:        column == 3
++                visible:        column == 4
+             }
+ 
+             QGCCheckBox {
+@@ -423,8 +424,12 @@ Item {
+                 anchors.left:       parent.left
+                 anchors.leftMargin: ScreenTools.defaultFontPixelWidth / 2
+                 anchors.verticalCenter: parent.verticalCenter
+-                width:              column == 2 ? ScreenTools.defaultFontPixelWidth * 15 : implicitWidth
+-                text:               column == 2 ? col1String() : display
++                width:              column == 2 ? ScreenTools.defaultFontPixelWidth * 15
++                                  : column == 3 ? ScreenTools.defaultFontPixelWidth * 8
++                                  : implicitWidth
++                text:               column == 2 ? col1String()
++                                  : column == 3 ? fact.units
++                                  : display
+                 color:              column == 2 && fact.defaultValueAvailable && !fact.valueEqualsDefault ? qgcPal.modifiedParamValue : qgcPal.text
+                 font.bold:          column == 2 && fact.defaultValueAvailable && !fact.valueEqualsDefault
+                 maximumLineCount:   1
+@@ -432,7 +437,7 @@ Item {
+ 
+                 function col1String() {
+                     if (fact.enumStrings.length === 0) {
+-                        return fact.valueString + " " + fact.units
++                        return fact.valueString
+                     }
+                     if (fact.bitmaskStrings.length != 0) {
+                         return fact.selectedBitmaskStrings.join(',')
+@@ -443,7 +448,10 @@ Item {
+ 
+             QGCMouseArea {
+                 anchors.fill: parent
+-                visible:      column !== 0
++                // Only the Value cell opens the editor; name/units/description
++                // remain selectable without accidentally editing the parameter.
++                visible:      column === 2
++                cursorShape:  Qt.PointingHandCursor
+                 onClicked: mouse => {
+                     _editorDialogFact = fact
+                     editorDialogFactory.open()
+diff --git a/src/QmlControls/ParameterEditorController.cc b/src/QmlControls/ParameterEditorController.cc
+index f744ae2..94f52a0 100644
+--- a/src/QmlControls/ParameterEditorController.cc
++++ b/src/QmlControls/ParameterEditorController.cc
+@@ -63,6 +63,7 @@ QVariant ParameterTableModel::headerData(int section, Qt::Orientation orientatio
+     case FavColumn:         return tr("Fav");
+     case NameColumn:        return tr("Name");
+     case ValueColumn:       return tr("Value");
++    case UnitsColumn:       return tr("Units");
+     case DescriptionColumn: return tr("Description");
+     default:                return QVariant();
+     }
+@@ -99,6 +100,7 @@ void ParameterTableModel::insert(int row, Fact* fact)
+     colData[FavColumn] = QString();
+     colData[NameColumn] = fact->name();
+     colData[ValueColumn] = QVariant::fromValue(fact);
++    colData[UnitsColumn] = fact->cookedUnits();
+     colData[DescriptionColumn] = fact->shortDescription();
+ 
+     if (!_isResetting()) {
+diff --git a/src/QmlControls/ParameterEditorController.h b/src/QmlControls/ParameterEditorController.h
+index f0cfe65..8964aa5 100644
+--- a/src/QmlControls/ParameterEditorController.h
++++ b/src/QmlControls/ParameterEditorController.h
+@@ -28,6 +28,7 @@ class ParameterTableModel : public QAbstractTableModel
+         FavColumn = 0,
+         NameColumn,
+         ValueColumn,
++        UnitsColumn,
+         DescriptionColumn,
+     };
+ 
+@@ -53,7 +54,7 @@ class ParameterTableModel : public QAbstractTableModel
+ private:
+     bool _isResetting() const { return _resetNestingCount > 0; }
+ 
+-    int                 _tableViewColCount = 4;
++    int                 _tableViewColCount = 5;
+     QList<ColumnData>   _tableData;
+     uint                _resetNestingCount = 0;
+ };
+diff --git a/src/Vehicle/InitialConnectStateMachine.cc b/src/Vehicle/InitialConnectStateMachine.cc
+index 2d53176..9fc2cd3 100644
+--- a/src/Vehicle/InitialConnectStateMachine.cc
++++ b/src/Vehicle/InitialConnectStateMachine.cc
+@@ -342,6 +342,7 @@ void InitialConnectStateMachine::_handleAutopilotVersionSuccess(const mavlink_me
+         vehicle()->_firmwarePlugin->checkIfIsLatestStable(vehicle());
+     }
+     emit vehicle()->gitHashChanged(vehicle()->_gitHash);
++    emit vehicle()->flightSilChanged();
+ 
+     vehicle()->_setCapabilities(autopilotVersion.capabilities);
+ }
+diff --git a/src/Vehicle/Vehicle.cc b/src/Vehicle/Vehicle.cc
+index f9ffe2e..f9b485e 100644
+--- a/src/Vehicle/Vehicle.cc
++++ b/src/Vehicle/Vehicle.cc
+@@ -1827,6 +1827,10 @@ QString Vehicle::gotoFlightMode() const
+ 
+ void Vehicle::guidedModeRTL(bool smartRTL)
+ {
++    if (flightSil()) {
++        sendMavCommand(defaultComponentId(), MAV_CMD_NAV_RETURN_TO_LAUNCH, true);
++        return;
++    }
+     if (!_vehicleSupports->guidedMode()) {
+         QGC::showAppMessage(guided_mode_not_supported_by_vehicle);
+         return;
+@@ -1836,6 +1840,10 @@ void Vehicle::guidedModeRTL(bool smartRTL)
+ 
+ void Vehicle::guidedModeLand()
+ {
++    if (flightSil()) {
++        sendMavCommand(defaultComponentId(), MAV_CMD_NAV_LAND, true);
++        return;
++    }
+     if (!_vehicleSupports->guidedMode()) {
+         QGC::showAppMessage(guided_mode_not_supported_by_vehicle);
+         return;
+@@ -1881,12 +1889,20 @@ bool Vehicle::hasGripper()  const
+ 
+ void Vehicle::startTakeoff()
+ {
++    if (flightSil()) {
++        sendMavCommand(defaultComponentId(), MAV_CMD_NAV_TAKEOFF, true, 0, 0, 0, 0, 0, 0, 2.0f);
++        return;
++    }
+     _firmwarePlugin->startTakeoff(this);
+ }
+ 
+ 
+ void Vehicle::startMission()
+ {
++    if (flightSil()) {
++        sendMavCommand(defaultComponentId(), MAV_CMD_MISSION_START, true);
++        return;
++    }
+     _firmwarePlugin->startMission(this);
+ }
+ 
+@@ -2046,6 +2062,10 @@ void Vehicle::guidedModeChangeHeading(const QGeoCoordinate &headingCoord)
+ 
+ void Vehicle::pauseVehicle()
+ {
++    if (flightSil()) {
++        sendMavCommand(defaultComponentId(), MAV_CMD_DO_PAUSE_CONTINUE, true, 0.0f);
++        return;
++    }
+     if (!_vehicleSupports->pauseVehicle()) {
+         QGC::showAppMessage(QStringLiteral("Pause not supported by vehicle."));
+         return;
+diff --git a/src/Vehicle/Vehicle.h b/src/Vehicle/Vehicle.h
+index 5592a62..ee7475e 100644
+--- a/src/Vehicle/Vehicle.h
++++ b/src/Vehicle/Vehicle.h
+@@ -265,6 +265,7 @@ class Vehicle : public VehicleFactGroup, public VehicleTypes
+     Q_PROPERTY(int      firmwareCustomMajorVersion  READ firmwareCustomMajorVersion NOTIFY firmwareCustomVersionChanged)
+     Q_PROPERTY(int      firmwareCustomMinorVersion  READ firmwareCustomMinorVersion NOTIFY firmwareCustomVersionChanged)
+     Q_PROPERTY(int      firmwareCustomPatchVersion  READ firmwareCustomPatchVersion NOTIFY firmwareCustomVersionChanged)
++    Q_PROPERTY(bool     flightSil                   READ flightSil                  NOTIFY flightSilChanged)
+     Q_PROPERTY(QString  gitHash                     READ gitHash                    NOTIFY gitHashChanged)
+     Q_PROPERTY(quint64  vehicleUID                  READ vehicleUID                 NOTIFY vehicleUIDChanged)
+     Q_PROPERTY(QString  vehicleUIDStr               READ vehicleUIDStr              NOTIFY vehicleUIDChanged)
+@@ -669,6 +670,7 @@ class Vehicle : public VehicleFactGroup, public VehicleTypes
+     void setFirmwareCustomVersion(int majorVersion, int minorVersion, int patchVersion);
+     // versionNotSetValue inherited from VehicleTypes
+ 
++    bool flightSil() const { return firmwareType() == MAV_AUTOPILOT_GENERIC && _gitHash == QStringLiteral("FLTSIL01"); }
+     QString gitHash() const { return _gitHash; }
+     quint64 vehicleUID() const { return _uid; }
+     QString vehicleUIDStr();
+@@ -788,6 +790,7 @@ public slots:
+ 
+     void firmwareVersionChanged         ();
+     void firmwareCustomVersionChanged   ();
++    void flightSilChanged();
+     void gitHashChanged                 (QString hash);
+     void vehicleUIDChanged              ();
+     void loadProgressChanged            (float value);

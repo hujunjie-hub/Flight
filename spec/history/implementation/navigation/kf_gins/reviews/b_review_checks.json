@@ -1,0 +1,83 @@
+{
+  "reviewer": "B",
+  "task_reviewed": "T191-D-REVIEW",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010903",
+  "generated_by": "applications/plugins/estimator/kf_gins_quad/reviews/b_review_checks.py",
+  "checks": [
+    {
+      "id": "B-01",
+      "description": "HANDOFF records parse, unique ids, T191-D-REVIEW in REVIEW with seq 3 and acknowledgement",
+      "result": "PASS",
+      "evidence": "spec/AGENT_HANDOFF.md",
+      "note": ""
+    },
+    {
+      "id": "B-02",
+      "description": "D-REV-04 B part: four B records are still READY without acknowledgement until D merges",
+      "result": "PASS",
+      "evidence": "spec/AGENT_HANDOFF.md; applications/plugins/estimator/kf_gins_quad/status_request_T191-B-UPSTREAM.json; applications/core/m2/status_request_T191-B-ADAPTER.json; applications/core/m3/status_request_T191-B-REPLAY.json; applications/services/health/status_request_T191-B-FDIR.json",
+      "note": "FAIL before the merge is expected; the four status requests are present: True"
+    },
+    {
+      "id": "B-03",
+      "description": "09 has the Gate C row and REQ-NAV-KFG-001..013 all NOT_RUN",
+      "result": "PASS",
+      "evidence": "spec/09 §2/§4.1",
+      "note": "rows=13 not_run=13"
+    },
+    {
+      "id": "B-04",
+      "description": "02 EstimatorPort signatures equal the production header",
+      "result": "PASS",
+      "evidence": "spec/02:2357-2370; applications/contracts/fc_port_api.h:58-71",
+      "note": "spec=14 header=14"
+    },
+    {
+      "id": "B-05",
+      "description": "07 §6 budget arithmetic: 88 KiB history, 2304 B checkpoint, 184 ms span",
+      "result": "PASS",
+      "evidence": "spec/07 §6.4",
+      "note": "history=88 KiB span=184 ms"
+    },
+    {
+      "id": "B-06",
+      "description": "05 §7 does not state the body-frame lever arm / matrix order for H_bg",
+      "result": "PASS",
+      "evidence": "spec/05 §7",
+      "note": "B-R01; finite-difference showed 4-10% error for the literal order"
+    },
+    {
+      "id": "B-07",
+      "description": "00 §12.2 mandates locked Eigen while the delivered trim does not use it",
+      "result": "FAIL",
+      "evidence": "spec/00 §12.2; packages/deps.lock",
+      "note": "B-R02; a CR decision is required before target acceptance"
+    },
+    {
+      "id": "B-08",
+      "description": "32-bit enum requirement exists but is only enforced per SConscript",
+      "result": "PASS",
+      "evidence": "applications/contracts/fc_common_base.h:514; applications/core/m2/SConscript",
+      "note": "B-R03; the top-level build has no such flag yet"
+    },
+    {
+      "id": "B-09",
+      "description": "module Kconfig aggregation is incomplete (FMS symbol unreachable)",
+      "result": "PASS",
+      "evidence": "Kconfig; applications/Kconfig",
+      "note": "B-R05"
+    },
+    {
+      "id": "B-10",
+      "description": "applications/calibration is missing and no task covers the native UM982 backend",
+      "result": "PASS",
+      "evidence": "applications/; spec/AGENT_HANDOFF.md",
+      "note": "B-R06/B-R07"
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "pass": 9,
+    "fail": 1
+  }
+}

@@ -1,0 +1,5 @@
+from building import *
+
+group = DefineGroup('FlightUTest', ['protocol_utest.c'],
+                    depend=['FLIGHT_TARGET_UTEST', 'RT_USING_UTEST'])
+Return('group')

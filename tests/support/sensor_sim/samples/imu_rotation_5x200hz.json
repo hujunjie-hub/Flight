@@ -1,0 +1,14 @@
+{
+  "schema": "flight-standard-sample/1",
+  "channel": "adis16505-2-burst32",
+  "profile_id": "0x00010001",
+  "scenario": "rotate-90dps-10c",
+  "note": "raw device frames; decode with sensor_imu_decode()",
+  "samples": [
+    {"index": 0, "counter": 0, "frame_hex": "0000000000000000000000000e10e4d6008e58aaffae0dc8f063ff9c000008d8", "gyro_dps": [0, 0, 90], "accel_mps2": [0.35, -0.2, -9.79], "temperature_c": -10},
+    {"index": 1, "counter": 1, "frame_hex": "0000000000000000000000000e10e4d6008e58aaffae0dc8f063ff9c000108d9", "gyro_dps": [0, 0, 90], "accel_mps2": [0.35, -0.2, -9.79], "temperature_c": -10},
+    {"index": 2, "counter": 2, "frame_hex": "0000000000000000000000000e10e4d6008e58aaffae0dc8f063ff9c000208da", "gyro_dps": [0, 0, 90], "accel_mps2": [0.35, -0.2, -9.79], "temperature_c": -10},
+    {"index": 3, "counter": 3, "frame_hex": "0000000000000000000000000e10e4d6008e58aaffae0dc8f063ff9c000308db", "gyro_dps": [0, 0, 90], "accel_mps2": [0.35, -0.2, -9.79], "temperature_c": -10},
+    {"index": 4, "counter": 4, "frame_hex": "0000000000000000000000000e10e4d6008e58aaffae0dc8f063ff9c000408dc", "gyro_dps": [0, 0, 90], "accel_mps2": [0.35, -0.2, -9.79], "temperature_c": -10}
+  ]
+}

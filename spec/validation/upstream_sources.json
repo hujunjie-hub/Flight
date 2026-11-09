@@ -1,0 +1,40 @@
+{
+  "local_sources": {
+    "doc/Flight.xlsx": {
+      "sha256": "dac2b718a4ab2d51d58c449f24c5ca192d9f41f1c5155c4a7d32e7c695fd0c62"
+    },
+    "doc/ADIS16505/adis16505.pdf": {
+      "sha256": "08ec4726d0b99939a168380d4c6e1387e66012908a3105665acd0fbd5a23c477"
+    },
+    "doc/BMM350/BMM350.pdf": {
+      "sha256": "db26bd71f271fceaec61623b46d1ef5e66a73ebe81834e970813f364c83ba7a7"
+    },
+    "doc/BMP585/bst-bmp585-ds003.pdf": {
+      "sha256": "3110ebeb52eecfe87afb24517a84078614a29329f48ca1e7903227e7e19472b1"
+    }
+  },
+  "kf_gins": {
+    "url": "https://github.com/i2Nav-WHU/KF-GINS",
+    "commit": "8291a93e49de513fe9d21f819500d39082ded611",
+    "imported_into_project": false,
+    "files": {
+      "src/kf-gins/gi_engine.cpp": "efbbf8a66a189b6aae3e4fb063cc9c6af6dac66d9ff38f14ab61c690e864ba2d",
+      "src/kf-gins/gi_engine.h": "5579f2aecc6527bd2267b5b97217b11dd50bb281cd748208bd2bdca13dd0c750",
+      "src/kf-gins/insmech.cpp": "8a910e0dab271d288a1be66c23436d7bcbf454d6db89a074b327c7a661fe3c9f",
+      "src/kf-gins/insmech.h": "9da6bdc445d29b85674077ac47ce20e6ea41cc7334f639e768edb03b4c950246",
+      "src/kf-gins/kf_gins_types.h": "752e92f544efc28c691f1d2954d4fb3262ba89b02b0902e657e5c01d51520dae",
+      "src/common/angle.h": "ad2a7a9b3a90d6222f53c227683d762f034408bd6cdd8c5668123c89ebc35eb0",
+      "src/common/earth.h": "31970d453771eefd8a892c33a43dd7b80fa9c29747b8ab62d4cd5a6965896b9a",
+      "src/common/logging.h": "18fdb3481ef16954bcc3210d409f3158c18bad7a18082e184dc378472dbc9957",
+      "src/common/rotation.h": "f2fefd9415f8c849e5611d25bbe97646e97d6bad79523b54fe6f446f5d89d2b0",
+      "src/common/types.h": "d30b49b09f39ab4b9c225c295c421fa4571f381576567793c1598eb612415aeb",
+      "LICENSE": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809"
+    }
+  },
+  "primary_web": [
+    "https://osqp.org/docs/codegen/index.html",
+    "https://mavlink.io/en/services/command.html",
+    "https://mavlink.io/en/guide/message_signing.html"
+  ],
+  "date": "2026-11-04"
+}

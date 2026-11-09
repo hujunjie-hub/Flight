@@ -1,0 +1,274 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "round": 3,
+  "status": "PASS",
+  "scope": "DOCUMENT_STATIC_AND_SPEC_ARM_ABI_COMPILE",
+  "independent_human_review": "NOT_RUN",
+  "production_and_physical_validation": "NOT_RUN",
+  "checks": [
+    {
+      "name": "all_markdown_fences_and_local_links",
+      "status": "PASS",
+      "files": 16,
+      "links": 49
+    },
+    {
+      "name": "handoff_tasks_not_dispatched",
+      "status": "PASS",
+      "tasks": 15
+    },
+    {
+      "name": "dialect_schema_and_private_ids",
+      "status": "PASS",
+      "messages": 13,
+      "common_merge_and_production_generation": "NOT_RUN"
+    },
+    {
+      "name": "explicit_message_registry",
+      "status": "PASS",
+      "messages": 55
+    },
+    {
+      "name": "ICD_slot_and_arena_reference",
+      "status": "PASS",
+      "checked": [
+        {
+          "type": "ImuSample",
+          "count": 8,
+          "slot": 136,
+          "sizeof": 136
+        },
+        {
+          "type": "GnssSample",
+          "count": 8,
+          "slot": 168,
+          "sizeof": 168
+        },
+        {
+          "type": "BaroSample",
+          "count": 8,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "MagSample",
+          "count": 8,
+          "slot": 128,
+          "sizeof": 128
+        },
+        {
+          "type": "RangeSample",
+          "count": 8,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "FlowSample",
+          "count": 8,
+          "slot": 120,
+          "sizeof": 120
+        },
+        {
+          "type": "ExternalOdometry",
+          "count": 8,
+          "slot": 184,
+          "sizeof": 184
+        },
+        {
+          "type": "SensorMeasurement",
+          "count": 16,
+          "slot": 264,
+          "sizeof": 264
+        },
+        {
+          "type": "OperatorInput",
+          "count": 2,
+          "slot": 120,
+          "sizeof": 120
+        },
+        {
+          "type": "AuthorizedOperatorInput",
+          "count": 2,
+          "slot": 128,
+          "sizeof": 128
+        },
+        {
+          "type": "NavigationSnapshot",
+          "count": 2,
+          "slot": 224,
+          "sizeof": 224
+        },
+        {
+          "type": "MotionReference",
+          "count": 2,
+          "slot": 1536,
+          "sizeof": 1536
+        },
+        {
+          "type": "VehicleDirective",
+          "count": 2,
+          "slot": 208,
+          "sizeof": 208
+        },
+        {
+          "type": "ActuationPermit",
+          "count": 2,
+          "slot": 128,
+          "sizeof": 128
+        },
+        {
+          "type": "ActuatorDemand",
+          "count": 2,
+          "slot": 152,
+          "sizeof": 152
+        },
+        {
+          "type": "ActuatorCommitReceipt",
+          "count": 2,
+          "slot": 168,
+          "sizeof": 168
+        },
+        {
+          "type": "AuthorizedMissionSnapshot",
+          "count": 2,
+          "slot": 1184,
+          "sizeof": 1184
+        },
+        {
+          "type": "MissionUploadCandidate",
+          "count": 1,
+          "slot": 1152,
+          "sizeof": 1152
+        },
+        {
+          "type": "ProductGeofenceSnapshot",
+          "count": 8,
+          "slot": 392,
+          "sizeof": 392
+        },
+        {
+          "type": "LandedStateSnapshot",
+          "count": 2,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "MissionStatus",
+          "count": 2,
+          "slot": 120,
+          "sizeof": 120
+        },
+        {
+          "type": "GuidanceStatus",
+          "count": 2,
+          "slot": 144,
+          "sizeof": 144
+        },
+        {
+          "type": "PilotControlReference",
+          "count": 2,
+          "slot": 168,
+          "sizeof": 168
+        },
+        {
+          "type": "NavigationCapability",
+          "count": 2,
+          "slot": 136,
+          "sizeof": 136
+        },
+        {
+          "type": "NavigationOriginSnapshot",
+          "count": 2,
+          "slot": 136,
+          "sizeof": 136
+        },
+        {
+          "type": "GuidanceFeasibility",
+          "count": 2,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "OperationRequest",
+          "count": 4,
+          "slot": 160,
+          "sizeof": 160
+        },
+        {
+          "type": "CommandAck",
+          "count": 4,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "ProductObstacleObservation",
+          "count": 64,
+          "slot": 208,
+          "sizeof": 208
+        }
+      ],
+      "arena_bytes": 42400,
+      "arena_limit": 49152,
+      "scope": "SPEC_LAYOUT_REFERENCE_NOT_PRODUCTION_MAP"
+    },
+    {
+      "name": "independent_arithmetic_and_reference_cases",
+      "status": "PASS",
+      "cases": [
+        "CRC32C official vector",
+        "Baro error-retraction Jacobian",
+        "60 primitive count",
+        "time-key wait separation",
+        "CPU 54.5705%",
+        "per-profile memory admission",
+        "900us critical chain",
+        "5ms sample age",
+        "replay admission arithmetic",
+        "settings six power-cut boundaries"
+      ],
+      "scope": "DOCUMENT_REFERENCE_ONLY",
+      "SIL_HIL_or_target_validation": "NOT_RUN"
+    },
+    {
+      "name": "independent_geometric_and_observation_math",
+      "status": "PASS",
+      "report": "spec/validation/mathematical_reference_report.json",
+      "groups": 7
+    },
+    {
+      "name": "protected_sources_report",
+      "status": "PASS",
+      "sha256": "9bc7dca8fa91eaf0b80d2a32b4901670f72b4725395d208e784ed725df0e667b"
+    },
+    {
+      "name": "dialect_report",
+      "status": "PASS",
+      "sha256": "4cf871e8bfb94075acfe9cdc8110e137da66ad60c197601549c1b5c49675e09b"
+    }
+  ],
+  "inputs_sha256": {
+    "spec/00_工程基线与唯一权威规范.md": "3070adf91c9efdf67cf1b377ef824b617dbcfff284b0409313ac49c9613378ce",
+    "spec/01_系统总体架构与设计决议.md": "37441fb42795f8195418653fea8794eaea089b23aec077a70738249ab6b3b409",
+    "spec/02_接口契约与公共数据规范.md": "6ba2f52c14d369884703bde69548e4f274d0ad15d8238f78ad4ea904758c5da1",
+    "spec/03_平台软件架构与驱动设计.md": "19ec41e940cfef05f572d200eb24d33642c3ee4e4ac8008a71b3f965eb1fa1af",
+    "spec/04_飞控核心模块与控制系统设计.md": "5270517b172179674e390cccc00fcffa8208ea6484d4a315d9995aff4bb34ef2",
+    "spec/05_传感器采集时间基准与GNSS独立运行.md": "14cf67a1c701f41605e073616dbd06e13f7977d7e894d4bf90e688cb7b55eea2",
+    "spec/06_FMS通信与系统安全设计.md": "3952d3bf30e3a8c3e56e827d586edc68a8685fa7511f2d31b8fd7e6932991bd8",
+    "spec/07_实时调度与板级硬件资源设计.md": "27b419c4121ff4b2a7799fcecd3186fa270212652708a591599575cee30b7dc4",
+    "spec/08_产品配置插件与参数管理.md": "c7b85dd94e56f5d91a5ad8dbfd7f3d0fcfab15f8460df626f4978915f5e20f5c",
+    "spec/09_需求验证实施与发布管理.md": "6add2695fcac0d33347b2248af0eb389b5fdeb4538b83e6f337e687eae6fcdad",
+    "spec/10_Agent分工与工程执行规范.md": "851a557db9476bcd86978dd3964aa80567df88db55d8f3a3d6b7efe829e321f3",
+    "spec/11_审核问题闭环与变更追踪.md": "68c78a33235ae71ee74f949e54a8ff40978ea8a47c63f1f8f666e2d7fcb3a073",
+    "spec/12_全量审查问题清单与落地边界.md": "a161cc7bdedbca33f5d7c554f279e601662ea7b20f01f8533798ff809072e033",
+    "spec/AGENT.md": "6e174696573da1706ca22dd187ec57ce13bf3772e981f3f0762cea8ae7e7326b",
+    "spec/AGENT_HANDOFF.md": "e49ff231ae071da48287c2c473c9f53326f055230bd2fc36d8f65b17839ff2a8",
+    "spec/README.md": "6ac165f80097a1237db414076616da8bb2d01ca48145db6c38539ea17ba3131b",
+    "spec/contracts/FCU.xml": "1be7adc3b849bc89f812ad66353368ae2c8c6290f2ea97168ee710a7145446ed",
+    "spec/contracts/message_registry.json": "e2893aebd8c1121b1ede80591849730ec722c5f9e0616443507c2ff99179bf41",
+    "spec/tools/audit_spec.py": "f405e0e7f74a82c3122050c6666f4e49284d0e4c372c46a347d5b7f6f6aa7b3a",
+    "spec/tools/check_dialect.py": "cb201938235cd8ec6d5387470d2f21f5dc4a91bd414a9cfafc940da49a7ca025",
+    "spec/tools/check_reference_models.py": "116a1d95cc3b203b1567633a0a8dd85b5e6a2edb7f0dbc89ebf47ae820f38ad9"
+  },
+  "abi_layout_sha256": "b787e5800f3e706d2d5241bc6888b28608933c1d6a1f914afd37c7ff18a73705",
+  "abi_artifact": "spec/validation/round3_abi_layout.json"
+}

@@ -1,0 +1,172 @@
+{
+  "task_id": "T191-A-ABI",
+  "task_type": "IMPLEMENTATION",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010904",
+  "update_sequence": 7,
+  "submission": {
+    "revision": 4,
+    "submitted_at": "2026-11-05T00:18+08:00",
+    "supersedes_sha256": "d28f60825ab49adbca28f17618b5820a7cf7d47bdb41d4314e35bd3f63354f51",
+    "reason": "D recorded T191-A-ABI ACCEPTED/PASS at seq 7 after independently verifying the 0x00010904 lock (4781f28b), 145 types, ARM 588707eb/Host 2e8c855d and firmware build flags. This revision keeps the evidence index current and adds the post-acceptance CR-C02/B-R08 follow-through; no further transition is requested.",
+    "dedup_key": "T191-A-ABI:7"
+  },
+  "requested_transition": "NO_CHANGE",
+  "transition_note": "T191-A-ABI is ACCEPTED/PASS at update_sequence 7 (D closed A-REV-01). This file is retained as the ABI evidence index; CR-V191-C02 and B-R08 follow-through are recorded for D's ledger closure, not as a new acceptance request.",
+  "assignee": "A",
+  "acknowledgement": {
+    "prompt_received": true,
+    "baseline_confirmed": true,
+    "received_at": "2026-11-04T22:10+08:00",
+    "prerequisite": {
+      "task_id": "T191-D-REVIEW",
+      "task_status_seen": "ACCEPTED",
+      "update_sequence_seen": 5,
+      "acknowledgement_seen": "用户2026-11-04指示执行Agent D任务；D接单、执行静态复核并提交交付；用户指示后记 ACCEPTED。",
+      "verification_status_seen": "PASS",
+      "handoff_last_modified": "2026-11-05T00:06:15+08:00",
+      "reviewer_status": "A/B/C non-author opinions recorded (A: ACCEPT_WITH_CONDITIONS); Gate A/ABI freeze still requires user approval.",
+      "review_evidence": [
+        "applications/tests/abi/reviews/A_REVIEW_T191-D-REVIEW.md",
+        "applications/tests/abi/reviews/a_review_checks.json",
+        "applications/tests/abi/reviews/a_review_checks.py"
+      ]
+    }
+  },
+  "deliverable_refs": [
+    "applications/contracts/fc_contract_version.h",
+    "applications/contracts/fc_common_base.h",
+    "applications/contracts/fc_product_contract.h",
+    "applications/contracts/fc_control_model_types.h",
+    "applications/contracts/fc_common_messages.h",
+    "applications/contracts/fc_port_types.h",
+    "applications/contracts/fc_port_api.h",
+    "applications/contracts/fc_message_ids.h",
+    "applications/contracts/README.md",
+    "applications/products/QUAD_X4_H723/product_contract.h",
+    "applications/products/QUAD_X4_H723/abi_lock.h",
+    "applications/tests/abi/abi_report.py",
+    "applications/tests/abi/negative_control.py",
+    "applications/tests/abi/evidence/abi_arm.json",
+    "applications/tests/abi/evidence/abi_host.json",
+    "applications/tests/abi/evidence/abi_compare.json",
+    "applications/tests/abi/evidence/commands.json",
+    "applications/tests/abi/evidence/abi_report.md",
+    "applications/tests/abi/evidence/abi_probe.c",
+    "applications/tests/abi/evidence/abi_canonical_arm.txt",
+    "applications/tests/abi/evidence/abi_canonical_host.txt",
+    "applications/tests/abi/evidence/artifact_sha256.json",
+    "applications/tests/abi/T191-A-ABI_DELIVERY.md",
+    "applications/tests/abi/reviews/A_REVIEW_T191-D-REVIEW.md",
+    "applications/tests/abi/reviews/a_review_checks.json",
+    "applications/tests/abi/reviews/a_review_checks.py",
+    "applications/tests/abi/CR_V191_C01_C02_REPORT.md",
+    "spec/00_工程基线与唯一权威规范.md",
+    "spec/02_接口契约与公共数据规范.md",
+    "spec/05_传感器采集时间基准与GNSS独立运行.md",
+    "spec/06_FMS通信与系统安全设计.md",
+    "spec/07_实时调度与板级硬件资源设计.md",
+    "spec/08_产品配置插件与参数管理.md",
+    "rtconfig.py"
+  ],
+  "actual_commands": [
+    {
+      "command": "python applications/tests/abi/abi_report.py --emit-lock",
+      "exit_code": 0,
+      "result": "PASS: 142 types, ARM hash f1e36c57..., Host hash e288b875..., spec_mismatches=0, unexpected_host_arm=0, lock=PASS"
+    },
+    {
+      "command": "python applications/tests/abi/abi_report.py",
+      "exit_code": 0,
+      "result": "PASS in CI/lock-verification mode (no regeneration)"
+    },
+    {
+      "command": "python applications/tests/abi/negative_control.py",
+      "exit_code": 0,
+      "result": "PASS: mutated NavStateCore produced checker FAIL with 14 size/alignment/offset mismatches"
+    }
+  ],
+  "toolchain": {
+    "arm": "arm-none-eabi-gcc 14.3.1 20250623 (GNU Tools for STM32 14.3.rel1.20251027-0700)",
+    "host": "x86_64-w64-mingw32 gcc 16.2.0 (MinGW-Builds)",
+    "arm_flags": "-mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -Wall -Wextra -Werror -fno-short-enums",
+    "languages": ["c11", "c++14"],
+    "self_containment_extra": "ARM -std=c99 (matches existing rtconfig.py firmware build)"
+  },
+  "verification": {
+    "scope": "HOST_PRODUCTION_ABI",
+    "status": "PASS",
+    "production_headers": true,
+    "product_port_revision": "0x00010904",
+    "schema": "6.0",
+    "types": 145,
+    "fields": 1003,
+    "probe_expressions": 1323,
+    "spec_layout_compared_types": 145,
+    "spec_layout_compared_offsets": 998,
+    "spec_layout_mismatches": 0,
+    "host_arm_identical_types": 140,
+    "host_arm_pointer_dependent_types": 5,
+    "host_arm_unexpected_differences": 0,
+    "message_registry_checked": 55,
+    "abi_hash_arm": "588707eb4e722b7d9d885d9ab2c40767a69bfad99f8e214da54d17ba4cc8d9fc",
+    "abi_hash_host": "2e8c855d1b6522cccc725cd582007bd141306982fcc69ac68c8bbd7ffe166a4b",
+    "contract_header_bytes": 88,
+    "product_operation_payload_bytes": 48,
+    "operation_request_bytes": 160,
+    "abi_lock_status": "PASS",
+    "rechecked_at": "2026-11-05T00:15+08:00",
+    "recheck_command": "python applications/tests/abi/abi_report.py --emit-lock",
+    "recheck_result": "PASS (types=145, spec_layout=145/998 offsets, mismatches=0, host_arm unexpected=0, lock=PASS)",
+    "independent_review": "NOT_RUN",
+    "evidence_paths": [
+      "applications/tests/abi/evidence/abi_compare.json",
+      "applications/tests/abi/evidence/commands.json",
+      "applications/tests/abi/evidence/artifact_sha256.json",
+      "applications/tests/abi/evidence/abi_report.md"
+    ]
+  },
+  "not_run": [
+    "ARM_TARGET_BUILD (scons, ELF/MAP, RAM/stack/WCET/RTA)",
+    "consumer recompilation (no M1-M7 consumers exist yet)",
+    "Keil/armcc and IAR/iccarm header compilation",
+    "applications/SConscript include-path/profile-resolver integration",
+    "profile manifest and Profile/ABI hash generator in build/generated",
+    "applications/tools/contract_layout.py and build/validation registration (D-owned)",
+    "SIL/HIL, target board and flight",
+    "UGV_BICYCLE/USV_3DOF product contracts (non-normative drafts)"
+  ],
+  "private_types_excluded": {
+    "types": ["MpcOutputSnapshot"],
+    "reason": "M6 private snapshot defined in spec 04; it is not a public ICD type and must not enter applications/contracts."
+  },
+  "reviewer_evidence": {
+    "task_reviewed": "T191-D-REVIEW",
+    "reviewer": "A",
+    "verdict": "ACCEPT_WITH_CONDITIONS",
+    "checks": 14,
+    "failed_checks": 0,
+    "observations": [
+      "OBS-A-01: review_checks.json predates D's own fixes; ABI-02 still FAIL in the snapshot while 11:9 is corrected.",
+      "OBS-A-02: TOOL-04 description says pymavlink present but detail is pymavlink=false."
+    ],
+    "conditions": [
+      "C1: D re-runs review_checks.py with a new label and updates the report summary/ABI-02/BUD-12.",
+      "C2: D rebuilds round3/inputs_sha256 after A's 07 correction (SHA256 aacf4ca9...; pre-fix 27b419c4...).",
+      "C3: D merges this A-ABI resubmission; T191-D-REVIEW ACCEPTED still needs B/C opinions and user Gate A approval."
+    ],
+    "evidence": [
+      "applications/tests/abi/reviews/A_REVIEW_T191-D-REVIEW.md",
+      "applications/tests/abi/reviews/a_review_checks.json",
+      "applications/tests/abi/reviews/a_review_checks.py"
+    ]
+  },
+  "reviewer": "D",
+  "blocked_by": [],
+  "resume_state": "T191-A-ABI = ACCEPTED/PASS/seq 7; ABI lock 4781f28b and hashes are frozen for this revision. ABI freeze still needs user approval; no further ABI resume is pending.",
+  "next_owner": "D",
+  "next_action": "D: close the ledger rows introduced by this pass — 11 §4.1 CR-C01 (SPECIFIED→implemented/closed), CR-C02 (PROPOSED→SPECIFIED), 09 C-REV-01/02 rows, 09:472 B-R08, 09:349 P0-01 revision string; rebuild round3/change_summary after the 02/05/06/07/08 edits; then release A-PLATFORM stage 2 (already ASSIGNED/IN_PROGRESS/seq 7).",
+  "known_issue_for_d": "AGENT/README/HANDOFF are already 0x00010904; 09:349 P0-01 and 11:9 still say 0x00010903. UGV/USV preview blocks intentionally remain 0x00010903 (non-normative, not buildable). The 11 CR table still marks C02 PROPOSED and B-R08 open; A's 07/05 per-instance lines (30KiB/15,360B) and 02/06/08 C02 text are submitted for D closure. round3/change_summary predate the 05/07 edits.",
+  "commit": null,
+  "commit_note": "Workspace has no Git metadata. Added: CR report and 0x00010904 lock/evidence. Modified: spec/00,02,05,06,07,08; applications/contracts/fc_contract_version.h, README.md; applications/products/QUAD_X4_H723/product_contract.h; applications/tests/abi/abi_report.py, negative_control.py; rtconfig.py. The 0x00010903 lock/hashes are superseded, not reusable.",
+  "rollback": "Restore spec/00,02,05,06,07,08 and the listed headers/tool files from the pre-CR snapshot; regenerate abi_lock.h with --emit-lock only after restoring the old 02. Do not mix old 0x00010903 headers with the new spec."
+}

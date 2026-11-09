@@ -1,0 +1,15 @@
+"""Build the fixed OSQP 1.0.0 embedded workspace owned by the M6 controller.
+
+The solver, its generated workspace and the lock/generator that reproduce it
+stay together in this directory (spec 13 §1); M6 consumes it only through
+mpc.c.
+"""
+import os
+from building import *
+cwd = GetCurrentDir()
+group = DefineGroup('OSQP_1_0_0', Glob('generated/src/*.c') + Glob('generated/quad_workspace.c'),
+                    depend=['CONTROLLER_ENABLE'],
+                    LOCAL_CPPPATH=[os.path.join(cwd, path) for path in (
+                        'generated', 'generated/inc/public', 'generated/inc/private')],
+                    LOCAL_CCFLAGS=' -std=c99 -fno-short-enums', LIBS=['m'])
+Return('group')

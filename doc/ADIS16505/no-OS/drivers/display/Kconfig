@@ -1,0 +1,21 @@
+menuconfig DISPLAY
+    bool "Display Drivers"
+    default n
+    help
+      Enable support for display drivers.
+
+if DISPLAY
+
+config DISPLAY_NHD_C12832A1Z
+    depends on SPI
+    select GPIO
+    bool "Enable NHD-C12832A1Z display driver"
+    default n
+
+config DISPLAY_SSD1306
+    depends on I2C || SPI
+    select GPIO
+    bool "Enable SSD1306 display driver"
+    default n
+
+endif

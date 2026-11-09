@@ -1,0 +1,27 @@
+{
+  "task_id": "T191-C-M5",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010903",
+  "commands": [
+    {
+      "command": "wsl.exe -d Ubuntu-26.04 -- bash applications/core/m5/hosttest/run_host_tests.sh",
+      "cwd": "Flight/",
+      "exit_code": 0,
+      "result": "Host build gcc 16.0.1 -std=c11 -Wall -Wextra -Werror against production contracts; 10 tests, 72 checks, 0 failures",
+      "log": "applications/core/m5/hosttest/evidence/host_tests.log"
+    },
+    {
+      "command": "pwsh -NoProfile -File applications/core/m5/hosttest/arm_build_check.ps1",
+      "cwd": "Flight/",
+      "exit_code": 0,
+      "result": "Cortex-M7 compile PASS (arm-none-eabi-gcc 14.3.1); text 4972+8156+192 = 13320 B; bss 304 B; M5_ARM_COMPILE_OK",
+      "log": "applications/core/m5/hosttest/evidence/arm_build.log"
+    }
+  ],
+  "not_executed": [
+    "A*/kinodynamic planner, local map manager, obstacle collision/continuous swept-volume validation",
+    "missions with requires_obstacle_avoidance (rejected by design; reported NOT_RUN)",
+    "target build/WCET/stack, SIL/HIL, M4/M6/M7 consumer round-trip",
+    "M5-05 trajectory optimizer (minimum-jerk quintic budget solver beyond the direct quintic)",
+    "D independent review and 09 registration"
+  ]
+}

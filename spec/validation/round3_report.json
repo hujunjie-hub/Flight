@@ -1,0 +1,324 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "round": 3,
+  "label": "round3",
+  "status": "PASS",
+  "scope": "DOCUMENT_STATIC_AND_SPEC_ARM_ABI_COMPILE",
+  "independent_human_review": "NOT_RUN",
+  "production_and_physical_validation": "NOT_RUN",
+  "checks": [
+    {
+      "name": "all_markdown_fences_and_local_links",
+      "status": "PASS",
+      "files": 17,
+      "links": 63
+    },
+    {
+      "name": "handoff_task_records_legal",
+      "status": "PASS",
+      "tasks": 15,
+      "states": [
+        "ACCEPTED",
+        "ASSIGNED",
+        "READY_FOR_ASSIGNMENT",
+        "REVIEW"
+      ]
+    },
+    {
+      "name": "dialect_schema_and_private_ids",
+      "status": "PASS",
+      "messages": 13,
+      "common_merge_and_production_generation": "NOT_RUN"
+    },
+    {
+      "name": "explicit_message_registry",
+      "status": "PASS",
+      "messages": 55
+    },
+    {
+      "name": "ICD_slot_and_arena_reference",
+      "status": "PASS",
+      "checked": [
+        {
+          "type": "ImuSample",
+          "count": 8,
+          "slot": 136,
+          "sizeof": 136
+        },
+        {
+          "type": "GnssSample",
+          "count": 8,
+          "slot": 168,
+          "sizeof": 168
+        },
+        {
+          "type": "BaroSample",
+          "count": 8,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "MagSample",
+          "count": 8,
+          "slot": 128,
+          "sizeof": 128
+        },
+        {
+          "type": "RangeSample",
+          "count": 8,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "FlowSample",
+          "count": 8,
+          "slot": 120,
+          "sizeof": 120
+        },
+        {
+          "type": "ExternalOdometry",
+          "count": 8,
+          "slot": 184,
+          "sizeof": 184
+        },
+        {
+          "type": "SensorMeasurement",
+          "count": 16,
+          "slot": 264,
+          "sizeof": 264
+        },
+        {
+          "type": "OperatorInput",
+          "count": 2,
+          "slot": 120,
+          "sizeof": 120
+        },
+        {
+          "type": "AuthorizedOperatorInput",
+          "count": 2,
+          "slot": 128,
+          "sizeof": 128
+        },
+        {
+          "type": "NavigationSnapshot",
+          "count": 2,
+          "slot": 224,
+          "sizeof": 224
+        },
+        {
+          "type": "MotionReference",
+          "count": 2,
+          "slot": 1536,
+          "sizeof": 1536
+        },
+        {
+          "type": "VehicleDirective",
+          "count": 2,
+          "slot": 232,
+          "sizeof": 232
+        },
+        {
+          "type": "ActuationPermit",
+          "count": 2,
+          "slot": 128,
+          "sizeof": 128
+        },
+        {
+          "type": "ActuatorDemand",
+          "count": 2,
+          "slot": 152,
+          "sizeof": 152
+        },
+        {
+          "type": "ActuatorCommitReceipt",
+          "count": 2,
+          "slot": 168,
+          "sizeof": 168
+        },
+        {
+          "type": "AuthorizedMissionSnapshot",
+          "count": 2,
+          "slot": 1184,
+          "sizeof": 1184
+        },
+        {
+          "type": "MissionUploadCandidate",
+          "count": 1,
+          "slot": 1152,
+          "sizeof": 1152
+        },
+        {
+          "type": "ProductGeofenceSnapshot",
+          "count": 8,
+          "slot": 392,
+          "sizeof": 392
+        },
+        {
+          "type": "LandedStateSnapshot",
+          "count": 2,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "MissionStatus",
+          "count": 2,
+          "slot": 120,
+          "sizeof": 120
+        },
+        {
+          "type": "GuidanceStatus",
+          "count": 2,
+          "slot": 144,
+          "sizeof": 144
+        },
+        {
+          "type": "PilotControlReference",
+          "count": 2,
+          "slot": 168,
+          "sizeof": 168
+        },
+        {
+          "type": "NavigationCapability",
+          "count": 2,
+          "slot": 136,
+          "sizeof": 136
+        },
+        {
+          "type": "NavigationOriginSnapshot",
+          "count": 2,
+          "slot": 136,
+          "sizeof": 136
+        },
+        {
+          "type": "GuidanceFeasibility",
+          "count": 2,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "OperationRequest",
+          "count": 4,
+          "slot": 160,
+          "sizeof": 160
+        },
+        {
+          "type": "CommandAck",
+          "count": 4,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "ProductObstacleObservation",
+          "count": 64,
+          "slot": 208,
+          "sizeof": 208
+        }
+      ],
+      "arena_bytes": 42472,
+      "arena_limit": 49152,
+      "scope": "SPEC_LAYOUT_REFERENCE_NOT_PRODUCTION_MAP"
+    },
+    {
+      "name": "independent_arithmetic_and_reference_cases",
+      "status": "PASS",
+      "cases": [
+        "CRC32C official vector",
+        "Baro error-retraction Jacobian",
+        "60 primitive count",
+        "time-key wait separation",
+        "CPU 54.5705%",
+        "per-profile memory admission",
+        "900us critical chain",
+        "5ms sample age",
+        "replay admission arithmetic",
+        "settings six power-cut boundaries"
+      ],
+      "scope": "DOCUMENT_REFERENCE_ONLY",
+      "SIL_HIL_or_target_validation": "NOT_RUN"
+    },
+    {
+      "name": "independent_geometric_and_observation_math",
+      "status": "PASS",
+      "report": "spec/validation/mathematical_reference_report.json",
+      "groups": 7
+    },
+    {
+      "name": "protected_sources_report",
+      "status": "NOT_ENFORCED",
+      "reason": "pass --outside-baseline <report> to assert a frozen tree; implementation work necessarily changes it"
+    },
+    {
+      "name": "dialect_report",
+      "status": "PASS",
+      "sha256": "4cf871e8bfb94075acfe9cdc8110e137da66ad60c197601549c1b5c49675e09b"
+    }
+  ],
+  "inputs_sha256": {
+    "spec/00_工程基线与唯一权威规范.md": "b65dc6f7daa0b12d7c4e8c3cf21c1356a0978e32d6fcc63d76e8ff713b13a242",
+    "spec/01_系统总体架构与设计决议.md": "6bab2fe4b2b5c6eda4598eb79c5cca9a0bcaa0df2c9dafcc4785cb1c3bec4167",
+    "spec/02_接口契约与公共数据规范.md": "833aa62b6e2cc12745aaae13dc88c10adf3ce3fa9a2df7f745ded8cb54c97881",
+    "spec/03_平台软件架构与驱动设计.md": "25d7f7db6b98c5f26cbce754f9e741821566c990fa50b5584cff91d10760664e",
+    "spec/04_飞控核心模块与控制系统设计.md": "48283b798dcd68295ca24068d13259412af3a98df4edc2b6dda74183cbc3edbb",
+    "spec/05_传感器采集时间基准与GNSS独立运行.md": "f1dfe68ea70dd7e0bc493d45254a87f636a7f4f714a3627d4913459e4577a16b",
+    "spec/06_FMS通信与系统安全设计.md": "720df661ce3b251c5080b989fecbcb39481aed17f43f56c8075cfce291a600f3",
+    "spec/07_实时调度与板级硬件资源设计.md": "dee73b92192aadb1b10dae1d894a6c3afdef262d9a7a356ca3167d8b54d55483",
+    "spec/08_产品配置插件与参数管理.md": "23f0974b760605f81b1e885d7106f7ce5753e19ee5e67241310ff9bfebb16978",
+    "spec/09_需求验证实施与发布管理.md": "b48339530a67cfe7dc46da982e0f27bfdcb42e1e430422f2efbe099fd3fec7e0",
+    "spec/10_Agent分工与工程执行规范.md": "880845c275078e038e176aaf97d0537f735053944f80986734ce6f7a85efa804",
+    "spec/11_审核问题闭环与变更追踪.md": "2bb2edbecf8045e03570296f4ec128f36ccafa6088bc3ee2e11ec31ae6933b8a",
+    "spec/12_全量审查问题清单与落地边界.md": "fe3dfacae0278fd9134413c39b38e2883f5c40a06232acebe6e0baab9a762301",
+    "spec/13_三层源码重构方案.md": "31f551030118c98d7716ea1b1471196c967beb547a622f1d771ea4f03f493c8b",
+    "spec/AGENT.md": "dbf31dc36c5a4e105bd288b44e749bcc5698b5075a9da42ad301559ea78b3172",
+    "spec/AGENT_HANDOFF.md": "eea934bd223edc7e1e7f71886c11f69b5cdc52e8d2e1d6ad2ab71a1ea531a061",
+    "spec/README.md": "e3365f2310fb0895f83a67c0ee567c331b2cbb602685313d411ba9ca9749b923",
+    "spec/contracts/FCU.xml": "1be7adc3b849bc89f812ad66353368ae2c8c6290f2ea97168ee710a7145446ed",
+    "spec/contracts/message_registry.json": "e2893aebd8c1121b1ede80591849730ec722c5f9e0616443507c2ff99179bf41",
+    "spec/history/board_template.md": "e7601cf09a0c3ddcba10f381d4359548c79562dcc2b228898f6ad8b6297578a0",
+    "spec/tools/audit_spec.py": "370e54a05472bbaaf002d71682ed3c6e70b525fe1b01846ec558967ebb456a1f",
+    "spec/tools/check_dialect.py": "cb201938235cd8ec6d5387470d2f21f5dc4a91bd414a9cfafc940da49a7ca025",
+    "spec/tools/check_reference_models.py": "116a1d95cc3b203b1567633a0a8dd85b5e6a2edb7f0dbc89ebf47ae820f38ad9",
+    "spec/history/implementation/abi/CR_V191_C01_C02_REPORT.md": "61c19a82c6c5c8783c500c164f3158c0436f0c5f3bc046dcc8c3df3df86d0fbf",
+    "spec/history/implementation/abi/status_request_T191-A-ABI.json": "2c8b2c7319ad9ebae559d353f91fec187fe2488b71da39f9ad1f1e39f8e6103a",
+    "spec/history/implementation/abi/T191-A-ABI_DELIVERY.md": "656cc9ffd259cc1cbbaf3e061dea835b65acfe8b1bc05080a97744571c3d8780",
+    "spec/history/implementation/actuation/status_request_T191-C-M7.json": "04286a1b93daa63c7a8a63017a51795500323079d4255a652567126e548c720d",
+    "spec/history/implementation/control/status_request_T191-C-M6.json": "46cecac9ea5127de7b5aa4944158177ed6997e3332341be288909f3242d4683b",
+    "spec/history/implementation/flight_management/status_request_T191-C-FMS.json": "6c38aade141df612340a7eb4b342a65d12173e7506d711b9a74026b308fdce30",
+    "spec/history/implementation/flight_management/T191-C-FMS_DELIVERY.md": "d83a6d23f03d43a166b3f7d403df3131e5cfd823d28314e803b03a60dbeddd58",
+    "spec/history/implementation/guidance/M4_M5_IMPLEMENTATION.md": "e142fb222f236dc8172c7e7d7275cfb179abe4e11b605b3cc8adf958abf01143",
+    "spec/history/implementation/guidance/status_request_T191-C-M5.json": "77a63e18586ceda2524b365f71a1a4a2148d2950bd5e6d94fb382981a59a166c",
+    "spec/history/implementation/guidance/T191-C-M5_DELIVERY.md": "d52074d508cadbebf4410371bfa718372a8af194c8db40b3f72323f3ff727e2b",
+    "spec/history/implementation/health/status_request_T191-B-FDIR.json": "3f2e0c61be74b8e61d18a1bfcf27b8e2e31244aa7b99154bd15e274cd116132f",
+    "spec/history/implementation/navigation/status_request_T191-B-REPLAY.json": "0fadc4878ea7dbc0bd7efbe518bf83a55f30765bb6dbd86370f0b70ef35f9a08",
+    "spec/history/implementation/sensor_processing/status_request_T191-B-ADAPTER.json": "28691e890c27e021ae75c33be362a0dde32013d0f03c044545e7b1f666102afb",
+    "spec/history/implementation/submissions/build_submissions.py": "2d069b17181b8e3e7bfb3e42567cff9d0a83c233c5efb1a439e94ed0c85f302a",
+    "spec/history/implementation/submissions/finalize_cr_submission.py": "ab3b34b27cccf24e0f40ef344cbf9fa7385ab12b23204200c6addc7dde15bbb2",
+    "spec/history/implementation/submissions/index.json": "c978e43c01b687fcc23eb97b9e6a1499185f87b0978355be9816263b2ee3c87c",
+    "spec/history/implementation/submissions/README.md": "ce48dddc934e17d3ab93acba80a3503aa1f8fdf4bbcdf560b1e7f388af8d31f3",
+    "spec/history/implementation/submissions/status_update_20261105_C.json": "2d1c45f7efea10dac8f2bd0a24e4f65ffb1b228b65060138d8f8cfbf21c2f8cc",
+    "spec/history/implementation/submissions/sync_review.py": "753332b02d631bc267822bdda088c648520af86f38a26b2b3e7dd7d3c7158016",
+    "spec/history/implementation/submissions/sync_state.py": "54251a6d6c50c67e7ef5b67833bdd5ef812fb5873afd9add47a4f4979c7f8b5e",
+    "spec/history/implementation/platform/rtthread/B_REVIEW_ACTIONS_A.md": "425ccbf91942ba904be2e0213f82d7579e102b346360b7b66142a68204aba2de",
+    "spec/history/implementation/platform/rtthread/status_request_T191-A-PLATFORM.json": "8c2a5334e508491cda69761cdeb29d4c13673f0dfdf912e5974a6524c66e5a84",
+    "spec/history/implementation/platform/rtthread/T191-A-PLATFORM_DELIVERY.md": "1afc881e5c1681bd0d6f8db4cd5dc3273214c955b8f89b4400dbd47cd51a40b1",
+    "spec/history/implementation/platform/tools/gate_b_check.py": "1f21b0b2328c2601165ee1dd4837640ccb08494b1b3998b4f30513ebd5f6e74b",
+    "spec/history/implementation/platform/tools/gate_b_package.py": "7c9cb54237a31712e00ab1177fd3f3534caef7ca119576b2d87e39fed8ad1589",
+    "spec/history/implementation/platform/tools/platform_inventory.py": "d3ea61ef2d1a88907b5dcacb48304a6e53130920a046b3148d2130cb8dada8a8",
+    "spec/history/implementation/navigation/kf_gins/status_request_T191-B-UPSTREAM.json": "5095ff6996ee7422aa8eab24066d3bb5a4d4820f649d5734a893e32e6279e0e7",
+    "spec/history/implementation/navigation/kf_gins/reviews/b_review_checks.json": "ce404a36be0deb9a71dd46d11b62e9c01235dd2c1f3c4e5a1485f795da86b3c2",
+    "spec/history/implementation/navigation/kf_gins/reviews/b_review_checks.py": "94a06eb698d93b925cb49484ee877c9dc0197ec7da1205d814c71eaf8d2bc2a2",
+    "spec/history/implementation/navigation/kf_gins/reviews/B_REVIEW_T191-D-REVIEW.md": "eb652f1c1ee43955bcee7fb4f8a56c58872e28b3983961e6305aa9630bc54035",
+    "spec/history/implementation/navigation/kf_gins/tools/gen_b_status_requests.py": "03d92576fb61d3cfdf2a648ca30b431ea6b81ddb1327b6d1cf8d85bc7d2c3ba0",
+    "spec/history/implementation/flight_management/reviews/c_review_checks.json": "993b2c130b9e28d2726afec2bbe1d3785ca5a962ce9961b2bc3a66c04eb01954",
+    "spec/history/implementation/flight_management/reviews/c_review_checks.py": "6210f25aab7f63550bb73bc4742005c042ec20e8692a977114c2cb45928230e2",
+    "spec/history/implementation/flight_management/reviews/C_REVIEW_SUBMISSION.json": "605ab28bf0e3c6ab11ee3e4a1d8b2e1724aa7c7b23db19a9a95f0df05657ddf6",
+    "spec/history/implementation/flight_management/reviews/C_REVIEW_T191-D-REVIEW.md": "3b4360b26812618e46e562b5433270dfdac054fbf1f27720f7cc6c8244b458ee",
+    "spec/history/implementation/abi/reviews/a_review_checks.json": "d362e7482fcc5af34a73a05b2d8b22f546e9c286ce086124d88df909bff4cd71",
+    "spec/history/implementation/abi/reviews/a_review_checks.py": "8bb31f9c98f16f4cce2a0e3302759b94a926e8d026d02156136f262aa63400c1",
+    "spec/history/implementation/abi/reviews/A_REVIEW_T191-D-REVIEW.md": "64c44acf6969bbed5afe1cc309d51fdb0853c8077b72cbd225a282488240610a",
+    "spec/history/implementation/abi/reviews/C_CONTRACT_DIFF_A_REVIEW.md": "cd57c6fc0a87fc6c634a191387d0709b45bf43656ab7e99c6f40f4c6905bae5d",
+    "spec/history/implementation/abi/reviews/c_contract_diff_check.json": "435523ca786c420a8cd1bc8a9b39806660bb9dfb95ba97fda40102158d4a5fb8",
+    "spec/history/implementation/abi/reviews/c_contract_diff_check.py": "43ab39cffc2605184347e13b93fe41348b1d4c9c65e2621b658046f2666dba0e"
+  },
+  "abi_layout_sha256": "e087a54b752b8e938b1401d0491d506e81bdf04b32efe2bfdda3603a516a96d4",
+  "abi_artifact": "spec/validation/round3_abi_layout.json"
+}

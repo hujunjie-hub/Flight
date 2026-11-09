@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "fileType": "MavlinkActions",
+  "actions": [
+    {
+      "label": "SIL 记录 Home",
+      "description": "仿真专用。上锁时以当前导航位置设置 Home。",
+      "mavCmd": 179,
+      "param1": 1
+    },
+    {
+      "label": "SIL 解锁",
+      "description": "仿真专用。向 Flight FMS 请求解锁。",
+      "mavCmd": 400,
+      "param1": 1
+    },
+    {
+      "label": "SIL 起飞至 2 m",
+      "description": "仿真专用。请求升到 Home 上方 2 米并悬停。",
+      "mavCmd": 22,
+      "param7": 2
+    },
+    {
+      "label": "SIL 开始任务",
+      "description": "仿真专用。起飞完成后执行已上传的航点任务。",
+      "mavCmd": 300
+    },
+    {
+      "label": "SIL 暂停任务",
+      "description": "仿真专用。暂停当前任务并悬停。",
+      "mavCmd": 193,
+      "param1": 0
+    },
+    {
+      "label": "SIL 恢复任务",
+      "description": "仿真专用。继续已暂停任务的当前航点。",
+      "mavCmd": 193,
+      "param1": 1
+    },
+    {
+      "label": "SIL 终止任务",
+      "description": "仿真专用。终止任务并悬停。",
+      "mavCmd": 31010
+    },
+    {
+      "label": "SIL 返航",
+      "description": "仿真专用。返回 FMS Home 并降落。",
+      "mavCmd": 20
+    },
+    {
+      "label": "SIL 原地降落",
+      "description": "仿真专用。请求在当前位置降落。",
+      "mavCmd": 21
+    },
+    {
+      "label": "SIL 上锁",
+      "description": "仿真专用。接地确认后请求上锁。",
+      "mavCmd": 400,
+      "param1": 0
+    }
+  ]
+}

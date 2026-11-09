@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "profile": "QUAD_X4",
+  "status": "SIM_ONLY",
+  "inner_loop": {
+    "so3_gain_per_s": [6, 6, 6],
+    "rate_kp_nm_per_radps": [0.12, 0.12, 0.12],
+    "rate_ki_nm_per_rad": [0.05, 0.05, 0.05],
+    "rate_kd_nm_per_radps2": [0.002, 0.002, 0.002],
+    "rate_kaw_per_s": [5, 5, 5],
+    "rate_d_cutoff_hz": 40,
+    "rate_integral_limit_nm": [0.2, 0.2, 0.2],
+    "manual_hover_throttle_norm": 0.5
+  },
+  "outer_loop": {
+    "mpc_structure": {"sample_time_s": 0.02, "prediction_horizon": 20, "control_horizon": 5},
+    "fallback_kp_per_s2": [2, 2, 2],
+    "fallback_kd_per_s": [2, 2, 2],
+    "mpc_q_diag": [8, 8, 12, 3, 3, 4],
+    "mpc_qf_diag": [8, 8, 12, 3, 3, 4],
+    "mpc_r_diag": [0.8, 0.8, 1.0],
+    "mpc_s_diag": [0.2, 0.2, 0.25],
+    "actuation_preview_delay_s": 0,
+    "mpc_seed_position_error_limit_m": 0.5,
+    "mpc_seed_velocity_error_limit_mps": 1
+  }
+}

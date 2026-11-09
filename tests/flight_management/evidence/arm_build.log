@@ -1,0 +1,8 @@
+   text	   data	    bss	    dec	    hex	filename
+   1520	      0	      0	   1520	    5f0	D:\STM32Project\FMT-Firmware-1.2.0\Flight\build\m4_arm\m4_authority.o
+  11484	      0	      0	  11484	   2cdc	D:\STM32Project\FMT-Firmware-1.2.0\Flight\build\m4_arm\m4_engine.o
+   3744	      0	      0	   3744	    ea0	D:\STM32Project\FMT-Firmware-1.2.0\Flight\build\m4_arm\m4_mission.o
+   2168	      0	      0	   2168	    878	D:\STM32Project\FMT-Firmware-1.2.0\Flight\build\m4_arm\m4_permit.o
+   4512	      0	      0	   4512	   11a0	D:\STM32Project\FMT-Firmware-1.2.0\Flight\build\m4_arm\m4_support.o
+   2340	      0	   7213	   9553	   2551	D:\STM32Project\FMT-Firmware-1.2.0\Flight\build\m4_arm\quad_x4_fms.o
+ARM_COMPILE_AND_ABI_OK

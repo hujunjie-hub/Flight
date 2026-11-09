@@ -1,0 +1,166 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "scope": "GATE_B_STATIC_SOURCE_AND_ARM_COMPILE",
+  "production_target_validation": "NOT_RUN",
+  "files": {
+    "board/fc_board_platform.c": "f0b3f939dafd4ace6a66f98333abd46ed65228142f3ea50edfb4b69a3209a4f6",
+    "board/fc_board_platform.h": "e84d4f4059fe39192fa106c14fa251a1d3caf5a516c157d76d1e64937df82c3d",
+    "board/SConscript": "64e6388bfc18a80f76711f6c892bb18559c057ba40194be101a52fb19b9fb7bc",
+    "libraries/HAL_Drivers/drivers/drv_tim.c": "9ff4c69234a106320b6a1eb17151f7847c5bebcacb445fde06a2895ee830cbee"
+  },
+  "checks": [
+    {
+      "id": "board_source_registered",
+      "status": "PASS",
+      "detail": {
+        "sconscript": "board/SConscript"
+      }
+    },
+    {
+      "id": "handles_defined",
+      "status": "PASS",
+      "detail": {
+        "handles": [
+          "htim1",
+          "htim2",
+          "hdma_tim1_up"
+        ]
+      }
+    },
+    {
+      "id": "irq_handlers_exist",
+      "status": "PASS",
+      "detail": {
+        "handlers": [
+          "TIM2",
+          "TIM1_UP",
+          "DMA2_Stream2"
+        ]
+      }
+    },
+    {
+      "id": "tim2_priority_1",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "tim1_up_priority_2",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "dma2_stream2_tim1_up",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "tim2_32bit_free_running",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "tim2_capture_ch3_ch4",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "tim2_64bit_retry",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "mpu_d2_noncacheable",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "dshot_dma_burst",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "dshot_stop_threshold",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "drdy_hook_present",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "drv_tim_hook_present",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "dshot_timing_275mhz_300k",
+      "status": "PASS",
+      "detail": {
+        "N": 917,
+        "ARR": 916,
+        "T0H": 344,
+        "T1H": 688
+      }
+    },
+    {
+      "id": "arm_compile",
+      "status": "PASS",
+      "detail": {
+        "command": "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe -mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=c99 -Wall -Wextra -Werror -fno-short-enums -DSTM32H723xx -DUSE_HAL_DRIVER -Dgcc -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\board -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\board\\CubeMX_Config\\Inc -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\libraries\\HAL_Drivers -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\libraries\\HAL_Drivers\\drivers -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\libraries\\HAL_Drivers\\drivers\\config -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\libraries\\HAL_Drivers\\CMSIS\\Include -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\packages\\stm32h7_hal_driver-latest\\Inc -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\packages\\stm32h7_cmsis_driver-latest\\Include -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\packages\\CMSIS-Core-latest\\Include -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\rt-thread\\include -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\rt-thread\\components\\drivers\\include -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\rt-thread\\components\\finsh -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\rt-thread\\libcpu\\arm\\cortex-m7 -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\applications\\contracts -c D:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\board\\fc_board_platform.c -o D:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\applications\\platform\\rtthread53\\evidence\\gate_b\\fc_board_platform.o",
+        "exit": 0,
+        "log": "applications/platform/rtthread53/evidence/gate_b/arm_compile.log",
+        "stderr": ""
+      }
+    }
+  ],
+  "failed_checks": [],
+  "gate_b_items": [
+    {
+      "item": "BSP clock/source init reuse",
+      "status": "PASS_STATIC",
+      "evidence": "board.c SystemClock_Config + CubeMX MSP; target readback NOT_RUN"
+    },
+    {
+      "item": "IRQ/NVIC mapping",
+      "status": "PASS_STATIC",
+      "evidence": "MSP TIM2=1, TIM1_UP=2, DMA2_Stream2; target dump NOT_RUN"
+    },
+    {
+      "item": "DMA2_Stream2 TIM1_UP mapping",
+      "status": "PASS_STATIC",
+      "evidence": "MSP hdma_tim1_up + .ioc; target transfer NOT_RUN"
+    },
+    {
+      "item": "TIM2 free-running/capture/64-bit extension",
+      "status": "PASS_STATIC",
+      "evidence": "fc_board_platform.c; target waveform NOT_RUN"
+    },
+    {
+      "item": "MPU/D-Cache",
+      "status": "PASS_STATIC",
+      "evidence": "four regions + D2 non-cacheable + SCB_EnableDCache; cache stress NOT_RUN"
+    },
+    {
+      "item": "DShot TC->Update / DMA burst",
+      "status": "PASS_STATIC",
+      "evidence": "TIM1 4ch + DMA burst + absolute stop gate; waveform NOT_RUN"
+    },
+    {
+      "item": "DRDY -> pre-armed SPI1 DMA",
+      "status": "NOT_RUN",
+      "evidence": "weak fc_board_imu_drdy_isr hook only; drv_spi async extension missing"
+    },
+    {
+      "item": "map/WCET/stack/RTA",
+      "status": "NOT_RUN",
+      "evidence": "no target build"
+    },
+    {
+      "item": "HIL / board waveform",
+      "status": "NOT_RUN",
+      "evidence": "no hardware"
+    }
+  ],
+  "verdict": "PASS_STATIC"
+}

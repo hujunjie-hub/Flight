@@ -1,0 +1,75 @@
+menu "Flight application tasks"
+
+config FLIGHT_RUNTIME_ENABLE
+    bool "Run the Flight firmware pipeline (bench output inhibited)"
+    default y
+    depends on BSP_USING_FLIGHT_DRIVERS
+    select RT_USING_MESSAGEQUEUE
+    select RT_USING_ULOG
+    select INS_BACKEND_ENABLE
+    select SENSOR_PROCESSING_ENABLE
+    select INS_REPLAY_ENABLE
+    select SENSOR_INTEGRITY_ENABLE
+    select FMS_ENABLE
+    select GUIDANCE_ENABLE
+    select CONTROLLER_ENABLE
+    help
+      Starts the real acquisition/navigation/control, FMS/guidance, MPC and
+      actuator guard owners. Existing unverified parameters are for bench
+      diagnostics only; M7 advertises zero physical output capability.
+      GNU Arm C++14 is required. MATLAB is not part of this firmware image.
+
+config FLIGHT_SIM_LINK
+    bool "HIL sim link (FMT-SIM through the UDP bridge)"
+    default n
+    depends on FLIGHT_RUNTIME_ENABLE
+    help
+      Builds applications/tasks/communication/task_sim.c: MAVLink HIL over one UART
+      (HIL_SENSOR/HIL_GPS in, HIL_ACTUATOR_CONTROLS/HEARTBEAT out) for the
+      FMT-SIM SIH loop, with middleware/communication/sim/fmt_sim_udp_bridge.py
+      as the PC-side serial-to-UDP bridge. The HIL serial driver takes the
+      shared radio UART, while the ELRS UART remains independent. Native
+      GNSS/baro/mag acquisition stops in HIL. Physical output stays inhibited
+      (output_policy_id 1): the uplink carries the M6 demand, never an M7
+      committed frame, so no motor can spin.
+
+config FLIGHT_BENCH_TUNING
+    bool "Enable local session tuning in the bench console"
+    default y
+    depends on FLIGHT_RUNTIME_ENABLE && FINSH_USING_MSH
+    help
+      Allows local changes to control gains while disarmed and output
+      inhibited. A reboot reloads the compiled settings.
+
+config FLIGHT_SKIP_ABI_LOCK
+    bool "Skip release ABI lock during HIL (ABI lock is enabled by default)"
+    default n
+    depends on FLIGHT_SIM_LINK
+    help
+      Use the current source contracts for HIL without checking or advertising
+      the released ABI fingerprint. The HIL wire protocol and runtime contract
+      checks are still in effect.
+
+config FLIGHT_TARGET_UTEST
+    bool "Register Flight board unit tests"
+    default n
+    depends on FLIGHT_RUNTIME_ENABLE && FINSH_USING_MSH && RT_USING_HEAP
+    select RT_USING_UTEST
+    help
+      Registers protocol and IPC cases for manual use from FinSH.
+
+config FLIGHT_LOGGER_ENABLE
+    bool "Record Flight data on SD"
+    default y
+    depends on FLIGHT_RUNTIME_ENABLE && BSP_USING_SDMMC && RT_USING_HEAP
+    depends on RT_USING_DFS_V1 && RT_USING_DFS_ELMFAT
+    help
+      Writes flight snapshots and events to an existing FAT32 SD card.
+      Uses a low-priority task and a separate bounded event queue.
+
+config FLIGHT_NOR_LOG_ENABLE
+    bool "Retain critical events on W25Q64 in BENCH_INHIBIT"
+    default y
+    depends on FLIGHT_RUNTIME_ENABLE && BSP_USING_FLIGHT_DRIVERS && RT_USING_MTD_NOR
+
+endmenu

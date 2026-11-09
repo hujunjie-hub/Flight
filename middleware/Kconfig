@@ -1,0 +1,5 @@
+menu "Flight business and data processing"
+rsource "sensor/Kconfig"
+rsource "model/Kconfig"
+rsource "guidance/Kconfig"
+endmenu

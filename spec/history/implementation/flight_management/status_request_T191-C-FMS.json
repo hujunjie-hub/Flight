@@ -1,0 +1,252 @@
+{
+  "task_id": "T191-C-FMS",
+  "task_type": "IMPLEMENTATION",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010904",
+  "update_sequence": 2,
+  "submission": {
+    "revision": 4,
+    "submitted_at": "2026-11-05T00:12:52+08:00",
+    "supersedes_sha256": "2846d3f43658c0034ba8e22641c832c4fd83ddfe4a6c8cbeaf0d4e82ac317349",
+    "reason": "Implements CR-V191-C01 (mission_epoch in ProductOperationPayload + M4 stale/absent-epoch rejection) and CR-V191-C02 (compile-time ProductGeofenceConfig loaded by M4 at init, no runtime SET_GEOFENCE). Refreshes Host/ARM evidence (17 tests/240 checks). Contract/product revision coordinated with A's FC_PORT_API_REVISION 0x00010904; A must review the contract diff and regenerate abi_lock.h.",
+    "dedup_key": "T191-C-FMS:4",
+    "baseline_correction": "Top-level baseline corrected from 0x00010903 to 0x00010904 after A bumped FC_PORT_API_REVISION and the product contract revision for CR-V191-C01; no revision bump because the revision-4 change set is otherwise unchanged and D has not merged it yet."
+  },
+  "requested_transition": "ASSIGNED->IN_PROGRESS->REVIEW",
+  "transition_note": "T191-C-FMS is ASSIGNED/seq4. C started and completed the CR-C01/C02 implementation in this session. This resubmission requests IN_PROGRESS->REVIEW after D merges it. A must review the C-applied product-contract diff and regenerate applications/products/QUAD_X4_H723/abi_lock.h (port revision is already 0x00010904; product revision is set to match). No ACCEPTED/CLOSED is requested.",
+  "assignee": "C",
+  "acknowledgement": {
+    "prompt_received": true,
+    "baseline_confirmed": true,
+    "received_at": "2026-11-04T22:10+08:00",
+    "prerequisite": {
+      "task_id": "T191-D-REVIEW",
+      "task_status_seen": "REVIEW",
+      "update_sequence_seen": 3,
+      "acknowledgement_seen": "用户2026-11-04指示执行Agent D任务；D接单并提交静态复核（spec/validation/T191-D-REVIEW）。",
+      "verification_status_seen": "IN_PROGRESS",
+      "handoff_last_modified": "2026-11-04T22:55:23+08:00",
+      "reviewer_status": "A and C independent opinions submitted; B opinion and user Gate A approval remain NOT_RUN.",
+      "review_evidence": [
+        "applications/core/m4/reviews/C_REVIEW_T191-D-REVIEW.md",
+        "applications/core/m4/reviews/c_review_checks.json",
+        "applications/core/m4/reviews/c_review_checks.py",
+        "applications/tests/abi/reviews/A_REVIEW_T191-D-REVIEW.md"
+      ]
+    },
+    "direct_dependencies": [
+      {
+        "task_id": "T191-A-ABI",
+        "task_status_seen": "READY_FOR_ASSIGNMENT",
+        "artifacts_used": [
+          "applications/contracts/ (8 headers + README)",
+          "applications/products/QUAD_X4_H723/product_contract.h",
+          "applications/products/QUAD_X4_H723/abi_lock.h"
+        ],
+        "note": "Production headers are used as the compile/test contract; this does not imply A-ABI is accepted."
+      },
+      {
+        "task_id": "T191-B-ADAPTER",
+        "task_status_seen": "READY_FOR_ASSIGNMENT",
+        "acknowledgement_seen": null,
+        "verification_status_seen": "NOT_RUN",
+        "note": "No M2/M3 adapter delivery; M4 Host tests still use fixture navigation/link/actuator data."
+      }
+    ]
+  },
+  "deliverable_refs": [
+    "applications/core/m4/include/m4_contract.h",
+    "applications/core/m4/include/m4_state_values.h",
+    "applications/core/m4/include/m4_policy_profile.h",
+    "applications/core/m4/src/m4_internal.h",
+    "applications/core/m4/src/m4_engine.c",
+    "applications/core/m4/src/m4_mission.c",
+    "applications/core/m4/src/m4_authority.c",
+    "applications/core/m4/src/m4_permit.c",
+    "applications/core/m4/src/m4_support.c",
+    "applications/core/m4/Kconfig",
+    "applications/core/m4/SConscript",
+    "applications/core/Kconfig",
+    "applications/core/SConscript",
+    "applications/plugins/fms/SConscript",
+    "applications/plugins/fms/quad_x4/quad_x4_fms.h",
+    "applications/plugins/fms/quad_x4/quad_x4_fms.c",
+    "applications/plugins/fms/quad_x4/SConscript",
+    "applications/core/m4/hosttest/test_m4_main.c",
+    "applications/core/m4/hosttest/run_host_tests.sh",
+    "applications/core/m4/hosttest/arm_build_check.ps1",
+    "applications/core/m4/hosttest/evidence/host_tests.log",
+    "applications/core/m4/hosttest/evidence/arm_build.log",
+    "applications/core/m4/hosttest/evidence/commands.json",
+    "applications/core/m4/hosttest/evidence/environment.txt",
+    "applications/core/m4/hosttest/evidence/artifact_sha256.json",
+    "applications/core/m4/reviews/C_REVIEW_T191-D-REVIEW.md",
+    "applications/core/m4/reviews/c_review_checks.json",
+    "applications/core/m4/reviews/c_review_checks.py",
+    "applications/core/m4/T191-C-FMS_DELIVERY.md",
+    "applications/products/QUAD_X4_H723/product_contract.h"
+  ],
+  "actual_commands": [
+    {
+      "command": "wsl.exe -d Ubuntu-26.04 -- bash applications/core/m4/hosttest/run_host_tests.sh",
+      "exit_code": 0,
+      "result": "17 tests, 240 checks, 0 failures (production headers; CR-C01/C02 paths covered)"
+    },
+    {
+      "command": "pwsh -NoProfile -File applications/core/m4/hosttest/arm_build_check.ps1",
+      "exit_code": 0,
+      "result": "Cortex-M7 compile PASS; text 25768 B; .bss 7213 B"
+    },
+    {
+      "command": "host gcc size probe",
+      "exit_code": 0,
+      "result": "ProductOperationPayload=48 OperationRequest=160 ProductMissionPayload=1040 AuthorizedMissionSnapshot=1184"
+    }
+  ],
+  "verification": {
+    "scope": "IMPLEMENTATION_HOST",
+    "status": "PASS (executor-run Host evidence only; not a 09 ledger PASS and not independently reviewed)",
+    "tests": {
+      "count": 17,
+      "assertions": 240,
+      "failures": 0,
+      "log": "applications/core/m4/hosttest/evidence/host_tests.log"
+    },
+    "arm_compile": {
+      "compiler": "arm-none-eabi-gcc 14.3.1",
+      "flags": "-mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=c11 -Wall -Wextra -Werror -fno-short-enums",
+      "text_bytes": 25768,
+      "bss_bytes": 7213,
+      "log": "applications/core/m4/hosttest/evidence/arm_build.log"
+    },
+    "independent_review": "NOT_RUN (D has not reviewed T191-C-FMS; C's review above is of T191-D-REVIEW, not of its own delivery)",
+    "ledger_note": "D must register/review; until then spec/09 stays NOT_RUN.",
+    "layout_delta": {
+      "ProductOperationPayload": {
+        "before": 44,
+        "after": 48
+      },
+      "OperationRequest": {
+        "before": 160,
+        "after": 160
+      }
+    }
+  },
+  "design_dispositions": [
+    {
+      "id": "C-FMS-D1",
+      "topic": "mission_epoch binding for START/PAUSE/RESUME/ABORT/CLEAR",
+      "status": "OPEN_CR_REQUIRED",
+      "detail": "Confirmed independently in C's review of T191-D-REVIEW (C-REV-01): 06 §12 requires the current mission_epoch, but OperationRequest/ProductOperationPayload carry no such field. Implementation binds by mission_id + authenticated source/session and does not claim epoch binding. CR against 02 required."
+    },
+    {
+      "id": "C-FMS-D2",
+      "topic": "Geofence configuration entry",
+      "status": "OPEN_CR_REQUIRED",
+      "detail": "C-REV-02: no command/field/FmsInputView input; implementation uses a product non-Port hook quad_x4_fms_set_geofence() and cannot claim a closed configuration path until 02/06/08 define one."
+    },
+    {
+      "id": "C-FMS-D3",
+      "topic": "Mission commit while ARMED",
+      "status": "CONSERVATIVE_POLICY",
+      "detail": "Rejected with NOT_PERMITTED; 06 does not explicitly permit in-air commit."
+    },
+    {
+      "id": "C-FMS-D4",
+      "topic": "Mission completion outcome",
+      "status": "PRODUCT_POLICY_PENDING_REVIEW",
+      "detail": "Final waypoint -> COMPLETED/SUCCESS, token 0, POS_HOLD, Authority NONE; LAND/RETURN require explicit command."
+    },
+    {
+      "id": "C-FMS-D5",
+      "topic": "Item advance epoch semantics",
+      "status": "IMPLEMENTED_AND_TESTED",
+      "detail": "Advance rotates execution_token only; mission_epoch increments on commit/start/pause/resume/abort/clear/completion."
+    },
+    {
+      "id": "C-FMS-D6",
+      "topic": "Static M4 state budget",
+      "status": "ACCOUNTING_REQUIRED_BY_A_D",
+      "detail": "~6.1 KiB .bss static engine instance is outside FmsOutputView scratch; 07 arena/map accounting must include it. No target map was produced."
+    }
+  ],
+  "not_run": [
+    "ARM_TARGET_BUILD (scons/Keil/IAR, ELF/MAP, 52.5 KiB stack, 48 KiB arena accounting)",
+    "WCET/RTA/DWT/stack watermark/CPU budget",
+    "SIL/HIL/target board/flight",
+    "M1 MAVLink parsing/signing/dedup transport and FCU.xml ACK encoding",
+    "M5/M6/M7 consumer integration for READY/Permit/ACTIVE",
+    "real M2/M3 inputs (B-ADAPTER absent); Host fixture data used",
+    "TAKEOFF/LAND/RETURN tracker completion/timeout/IN_PROGRESS tests",
+    "full failsafe matrix (GNSS/IMU/baro/mag/energy/GCS/Companion/impact/model mismatch/TERMINAL clear)",
+    "time_epoch/boot change tests and persistence",
+    "M5 trajectory-level geofence/collision and NONE applicability matrix",
+    "real output policy (>=0x100 registry/verification)",
+    "D independent review and 09 ledger registration"
+  ],
+  "reviewer": "D",
+  "blocked_by": [
+    "T191-A-ABI",
+    "T191-B-ADAPTER"
+  ],
+  "resume_state": "READY_FOR_ASSIGNMENT (from C's side); after D accepts prerequisites and binds the task, C re-runs integration against real M2/M3 and M5/M6/M7",
+  "next_owner": "D",
+  "next_action": "A: review the product-contract diff (mission_epoch/geofence config) and regenerate abi_lock.h/ABI evidence at revision 0x00010904. D: merge this revision, move C-FMS to REVIEW, record CR-C01/C02 disposition, and keep target/SIL/HIL NOT_RUN. C-M5 remains waiting for C-FMS acceptance; C-M6/M7 stay NOT_STARTED.",
+  "known_issues_for_d": [
+    "A/B artifacts appeared concurrently without HANDOFF updates; file presence is not acceptance.",
+    "spec/validation/protected_sources_report.json and round3 audit are invalidated by added implementation files outside spec/ (D must rebaseline; C-REV-03/D-REV-03).",
+    "applications/core/Kconfig is not yet sourced by the root Kconfig chain; FMS_QUAD_X4_ENABLE stays off and the firmware source set is unchanged.",
+    "D report §17 is stale on D-REV-02 (07 is now 3000us) and review_checks.json is a pre-fix snapshot; D should rerun with a new label (C's OBS-01/02)."
+  ],
+  "commit": null,
+  "commit_note": "Workspace has no Git metadata; source snapshot is evidence/artifact_sha256.json plus the file list in T191-C-FMS_DELIVERY.md. No pre-existing file was modified.",
+  "rollback": "Delete applications/core/ and applications/plugins/fms/ (all added paths; applications/plugins/SConscript is pre-existing and was not modified). build/m4_host and build/m4_arm are ignored generated outputs. The previous status request revision is preserved by its SHA256 above.",
+  "d_rev_04_c_part": {
+    "role": "C",
+    "status": "SUBMITTED_FOR_MERGE",
+    "tasks": [
+      "T191-C-FMS",
+      "T191-C-M5",
+      "T191-C-M6",
+      "T191-C-M7"
+    ],
+    "index": "applications/core/status_requests/index.json",
+    "note": "C submits all four status requests so D can close the C part of D-REV-04. C does not edit AGENT_HANDOFF; closure remains a D action."
+  },
+  "review_opinion": {
+    "task": "T191-D-REVIEW",
+    "revision": 2,
+    "path": "applications/core/m4/reviews/C_REVIEW_T191-D-REVIEW.md",
+    "submission": "applications/core/m4/reviews/C_REVIEW_SUBMISSION.json",
+    "sha256": "3b4360b26812618e46e562b5433270dfdac054fbf1f27720f7cc6c8244b458ee",
+    "conclusion": "ACCEPT_WITH_CONDITIONS",
+    "summary": {
+      "checks": 22,
+      "pass": 15,
+      "fail": 1,
+      "obs": 6
+    },
+    "status": "SUBMITTED_FOR_MERGE",
+    "note": "Use revision 2 (post-fix review_checks_post.json). Not an ACCEPTED state or Gate A approval."
+  },
+  "cr_implementation": {
+    "CR-V191-C01": {
+      "status": "IMPLEMENTED_PENDING_A_REVIEW",
+      "contract": "ProductOperationPayload += uint32_t mission_epoch (0 = not applicable); valid bit PRODUCT_OPERATION_VALID_MISSION_EPOCH (1u<<8)",
+      "layout": {
+        "ProductOperationPayload_before": 44,
+        "ProductOperationPayload_after": 48,
+        "OperationRequest_before": 160,
+        "OperationRequest_after": 160
+      },
+      "m4": "START/PAUSE/RESUME/ABORT/CLEAR require the valid bit, a non-zero epoch equal to the current M4 mission_epoch; missing/stale epoch -> REJECTED reason 12 (EPOCH). Non-mission commands must carry zero/absent epoch.",
+      "revision": "FC_PORT_API_REVISION=0x00010904 (already set by A); PRODUCT_CONTRACT_REVISION set to 0x00010904 by C to satisfy the contract invariant.",
+      "owner_action": "A: review the contract diff, decide Schema Major stays 6.0, regenerate abi_lock.h and ABI evidence; D: record CR disposition."
+    },
+    "CR-V191-C02": {
+      "status": "IMPLEMENTED_PENDING_D_MERGE",
+      "contract": "ProductGeofenceDefinition/ProductGeofenceConfigPayload/ProductGeofenceConfig provided by A in product_contract.h",
+      "m4": "quad_x4_fms_configure_product_geofence() installs the immutable .rodata configuration before fms_policy_init(); M4 validates profile_hash/config_version/geofence_hash/geometry and holds the fences. A required fence with no configuration fails init (PROFILE_MISMATCH); no runtime SET_GEOFENCE command exists; engine setter rejects changes while ARMED.",
+      "owner_action": "D: merge and close CR-V191-C02 after reviewing the Host evidence."
+    }
+  }
+}

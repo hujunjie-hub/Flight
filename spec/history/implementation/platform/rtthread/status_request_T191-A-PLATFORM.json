@@ -1,0 +1,176 @@
+{
+  "task_id": "T191-A-PLATFORM",
+  "task_type": "IMPLEMENTATION",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010904",
+  "update_sequence": 7,
+  "submission": {
+    "revision": 4,
+    "submitted_at": "2026-11-05T00:42+08:00",
+    "supersedes_sha256": "4c3cb1fb269ebdd60d4982abd44091bb30fa87b0c34b1c4f139ce7aa20387514",
+    "reason": "Delivers the stage-2 acceptance evidence package: Gate B static checks, ARM Cortex-M7 compile, global symbol/section evidence, and a per-item acceptance matrix (TIM2/DRDY capture/MPU/DShot). Implementation unchanged from revision 3 except a drv_tim uint32_t clock-flatency fix and the board-owned HAL_TIM_PeriodElapsedCallback fallback; target waveform/map/HIL remain NOT_RUN.",
+    "dedup_key": "T191-A-PLATFORM:7"
+  },
+  "requested_transition": "ASSIGNED->IN_PROGRESS->REVIEW",
+  "transition_note": "T191-A-PLATFORM is ASSIGNED/IN_PROGRESS/seq 7. This submission moves stage 2 to REVIEW for D; it does not request ACCEPTED/CLOSED because target waveform, MPU/cache stress, map/WCET and HIL are NOT_RUN.",
+  "assignee": "A",
+  "acknowledgement": {
+    "prompt_received": true,
+    "baseline_confirmed": true,
+    "received_at": "2026-11-04T22:52+08:00",
+    "prerequisite": {
+      "task_id": "T191-A-ABI",
+      "task_status_seen": "ACCEPTED",
+      "update_sequence_seen": 7,
+      "verification_status_seen": "PASS",
+      "note": "D accepted 0x00010904 ABI (145 types, lock 4781f28b); stage 2 released. Gate B still needs target evidence."
+    }
+  },
+  "deliverable_refs": [
+    "board/fc_board_platform.h",
+    "board/fc_board_platform.c",
+    "board/SConscript",
+    "libraries/HAL_Drivers/drivers/drv_tim.c",
+    "applications/platform/rtthread53/tools/gate_b_check.py",
+    "applications/platform/rtthread53/tools/gate_b_package.py",
+    "applications/platform/rtthread53/evidence/gate_b/gate_b_evidence.json",
+    "applications/platform/rtthread53/evidence/gate_b/gate_b_report.md",
+    "applications/platform/rtthread53/evidence/gate_b/GATE_B_EVIDENCE_PACKAGE.md",
+    "applications/platform/rtthread53/evidence/gate_b/acceptance_matrix.json",
+    "applications/platform/rtthread53/evidence/gate_b/symbols.txt",
+    "applications/platform/rtthread53/evidence/gate_b/sizes.txt",
+    "applications/platform/rtthread53/evidence/gate_b/package_sha256.json",
+    "applications/platform/rtthread53/evidence/gate_b/arm_compile.log",
+    "spec/06_FMS通信与系统安全设计.md",
+    "spec/08_产品配置插件与参数管理.md",
+    "applications/services/time/fc_time_service.h",
+    "applications/services/time/fc_time_service.c",
+    "applications/services/time/hosttest/test_time_service.c",
+    "applications/services/raw_ingress/fc_raw_ingress.h",
+    "applications/services/raw_ingress/fc_raw_ingress.c",
+    "applications/services/raw_ingress/hosttest/test_raw_ingress.c",
+    "applications/platform/rtthread53/README.md",
+    "applications/platform/rtthread53/tools/platform_inventory.py",
+    "applications/platform/rtthread53/tools/run_platform_tests.ps1",
+    "applications/platform/rtthread53/evidence/platform_gap.md",
+    "applications/platform/rtthread53/evidence/platform_asset_scan.json",
+    "applications/platform/rtthread53/evidence/platform_tests.json",
+    "applications/platform/rtthread53/evidence/toolchains.txt",
+    "applications/platform/rtthread53/evidence/artifact_sha256.json",
+    "applications/platform/rtthread53/T191-A-PLATFORM_DELIVERY.md",
+    "applications/platform/rtthread53/B_REVIEW_ACTIONS_A.md",
+    "rtconfig.py",
+    "applications/Kconfig"
+  ],
+  "post_merge_actions": [
+    {
+      "id": "B-R03",
+      "owner": "A",
+      "status": "DONE",
+      "action": "rtconfig.py GCC CFLAGS adds -fno-short-enums (C and C++ inherit it); abi_report.py now fails if the firmware layout flags drift",
+      "evidence": ["rtconfig.py", "applications/tests/abi/evidence/abi_compare.json", "applications/platform/rtthread53/B_REVIEW_ACTIONS_A.md"]
+    },
+    {
+      "id": "B-R05",
+      "owner": "A",
+      "status": "DONE_REACHABILITY_VERIFIED",
+      "action": "applications/Kconfig documents and enforces the aggregation rule; core/Kconfig already reaches m4/m5 (FMS_QUAD_X4_ENABLE is reachable). No plugins/m6/m7 Kconfig files exist yet, so nothing else can be sourced.",
+      "evidence": ["applications/Kconfig", "applications/core/Kconfig", "applications/core/m4/Kconfig"]
+    },
+    {
+      "id": "B-R08",
+      "owner": "A/B",
+      "status": "OPEN",
+      "action": "28KiB budget margin 464B needs per-instance runtime overhead; not addressed in this slice and still requires an 07 table update."
+    }
+  ],
+  "actual_commands": [
+    {
+      "command": "python applications/platform/rtthread53/tools/platform_inventory.py",
+      "exit_code": 0,
+      "result": "17 requirements: 6 MISSING, 7 ENABLE_NEEDED, 3 REUSE, 1 STUB"
+    },
+    {
+      "command": "pwsh -NoProfile -File applications/platform/rtthread53/tools/run_platform_tests.ps1",
+      "exit_code": 0,
+      "result": "raw_ingress host 72 checks/0 failures; time_service host 114 checks/0 failures; ARM C99 compile exit 0 for both services"
+    },
+    {
+      "command": "python applications/tests/abi/abi_report.py",
+      "exit_code": 0,
+      "result": "PASS; firmware_build_flags.missing=[] (rtconfig.py now carries -fno-short-enums)"
+    }
+  ],
+  "toolchain": {
+    "arm": "arm-none-eabi-gcc 14.3.1 20250623 (GNU Tools for STM32 14.3.rel1), Cortex-M7 hard-float, C99",
+    "host": "x86_64-w64-mingw32 gcc 16.2.0, C11",
+    "arm_flags": "-mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -Wall -Wextra -Werror -fno-short-enums -std=c99"
+  },
+  "verification": {
+    "scope": "IMPLEMENTATION",
+    "status": "IN_PROGRESS",
+    "partial_results": [
+      {
+        "item": "raw_ingress service",
+        "scope": "HOST_UNIT",
+        "result": "PASS",
+        "checks": 72,
+        "evidence": "applications/platform/rtthread53/evidence/run_raw_ingress.log"
+      },
+      {
+        "item": "time_service mapping/PPS/UTC",
+        "scope": "HOST_UNIT",
+        "result": "PASS",
+        "checks": 114,
+        "evidence": "applications/platform/rtthread53/evidence/run_time_service.log"
+      },
+      {
+        "item": "Gate B static: MPU/D-Cache + TIM2 capture + DShot/DMA",
+        "scope": "GATE_B_STATIC_SOURCE_AND_ARM_COMPILE",
+        "result": "PASS_STATIC",
+        "checks": 16,
+        "evidence": "applications/platform/rtthread53/evidence/gate_b/gate_b_evidence.json"
+      },
+      {
+        "item": "ARM C99 compile (Cortex-M7, services + board module)",
+        "scope": "ARM_COMPILE_ONLY",
+        "result": "PASS",
+        "evidence": "applications/platform/rtthread53/evidence/arm_*.log; evidence/gate_b/arm_compile.log"
+      }
+    ],
+    "review_actions": {
+      "B-R03": "DONE (rtconfig.py -fno-short-enums + ABI flag check)",
+      "B-R05": "DONE_REACHABILITY_VERIFIED (applications/Kconfig rule; FMS_QUAD_X4_ENABLE reachable)",
+      "B-R08": "DONE_STATIC (07/05 per-instance 1,256B, 30KiB arena; D ledger row pending)"
+    },
+    "independent_review": "NOT_RUN",
+    "gate_b_status": "PASS_STATIC",
+    "target_validation": "NOT_RUN",
+    "evidence_package": {
+      "package": "applications/platform/rtthread53/evidence/gate_b/GATE_B_EVIDENCE_PACKAGE.md",
+      "acceptance_matrix": "applications/platform/rtthread53/evidence/gate_b/acceptance_matrix.json",
+      "verdict": "PASS_STATIC",
+      "recommendation": "ACCEPT_STATIC_WITH_TARGET_NOT_RUN",
+      "static_items": 12,
+      "target_not_run_items": ["GB-09 map/WCET/RTA/stack", "GB-10 DMA/cache stress", "GB-11 PPS waveform", "GB-12 HIL"],
+      "symbols": "htim1/htim2/hdma_tim1_up defined; board strong fc_board_tim_period_elapsed; weak fc_board_imu_drdy_isr",
+      "sizes": {"board": {"text": 3330, "data": 8, "bss": 1457}, "drv_tim": {"text": 909, "data": 0, "bss": 0}}
+    }
+  },
+  "not_run": [
+    "DRDY -> pre-armed SPI1 DMA fast path (drv_spi async extension; weak hook only)",
+    "MPU/D-Cache target stress and cache-coherency test",
+    "TIM2 capture / PPS / DRDY target waveform and timestamp accuracy",
+    "DShot bit timing, zero-tail and TC->Update waveform on the target",
+    "firmware scons link, map/WCET/stack/RTA, DMA pressure, SIL/HIL, target board",
+    "double-slot latest-value snapshot service and fc_os_* RTOS adapter",
+    "Keil/armcc and IAR compilation"
+  ],
+  "blocked_by": [],
+  "resume_state": "T191-A-ABI ACCEPTED/PASS/seq 7; stage 2 implemented as static and ARM-compiled. Resume after D's Gate B review and target evidence (waveform/map/HIL).",
+  "reviewer": "D",
+  "next_owner": "D",
+  "next_action": "D: merge revision 3 (dedup T191-A-PLATFORM:7), review the Gate B static evidence and CR-C02 entry text, register stage 2 as IMPLEMENTATION/IN_PROGRESS with target items NOT_RUN, and schedule target waveform/map/HIL evidence.",
+  "commit": null,
+  "commit_note": "Workspace has no Git metadata. Added: board/fc_board_platform.{c,h}, gate_b_check.py/evidence, CR-C02 06/08 text. Modified: board/SConscript (adds fc_board_platform.c + contracts include), libraries/HAL_Drivers/drivers/drv_tim.c (weak fc_board_tim_period_elapsed hook). The 0x00010903 lock is superseded by 0x00010904.",
+  "rollback": "Delete board/fc_board_platform.{c,h} and evidence/gate_b; revert board/SConscript and the drv_tim weak hook. Do not revert fc_board_platform.c alone while leaving board/SConscript referencing it. No target behaviour was validated, so removal cannot invalidate a target PASS (none exists)."
+}

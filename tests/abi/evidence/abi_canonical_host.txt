@@ -1,0 +1,1136 @@
+FC-ABI 1
+target x86_64-w64-mingw32
+pointer_bits 64
+profile 0x00010001
+schema 6.0
+port_revision 0x00010906
+product_revision 0x00010906
+T ActuationPermit 128 8 struct
+F ActuationPermit.authority_epoch 96
+F ActuationPermit.directive_epoch 92
+F ActuationPermit.header 0
+F ActuationPermit.output_policy_id 122
+F ActuationPermit.permit_epoch 88
+F ActuationPermit.permit_expires_at_us 112
+F ActuationPermit.permit_flags 108
+F ActuationPermit.reason_code 120
+F ActuationPermit.reference_epoch 104
+F ActuationPermit.state_epoch 100
+T ActuatorCapability 152 8 struct
+F ActuatorCapability.actuator_layout_id 88
+F ActuatorCapability.available_mask 92
+F ActuatorCapability.controllable_dof_mask 96
+F ActuatorCapability.degraded_dof_mask 100
+F ActuatorCapability.header 0
+F ActuatorCapability.vehicle_extension 104
+T ActuatorCommitReceipt 168 8 struct
+F ActuatorCommitReceipt.applied_control_sequence 88
+F ActuatorCommitReceipt.authority_epoch 100
+F ActuatorCommitReceipt.commit_time_us 112
+F ActuatorCommitReceipt.committed_demand 144
+F ActuatorCommitReceipt.directive_epoch 96
+F ActuatorCommitReceipt.estimated_apply_time_us 120
+F ActuatorCommitReceipt.header 0
+F ActuatorCommitReceipt.limit_flags 136
+F ActuatorCommitReceipt.output_policy_id 140
+F ActuatorCommitReceipt.permit_epoch 92
+F ActuatorCommitReceipt.receipt_expires_at_us 128
+F ActuatorCommitReceipt.reference_epoch 108
+F ActuatorCommitReceipt.result_code 142
+F ActuatorCommitReceipt.state_epoch 104
+T ActuatorDemand 152 8 struct
+F ActuatorDemand.actuator_layout_id 88
+F ActuatorDemand.authority_epoch 104
+F ActuatorDemand.control_sequence 116
+F ActuatorDemand.demand 128
+F ActuatorDemand.demand_expires_at_us 120
+F ActuatorDemand.directive_epoch 100
+F ActuatorDemand.header 0
+F ActuatorDemand.permit_epoch 96
+F ActuatorDemand.reference_epoch 112
+F ActuatorDemand.state_epoch 108
+F ActuatorDemand.valid_channel_mask 92
+T ActuatorHealth 128 8 ModuleHealth
+T ActuatorStatus 144 8 struct
+F ActuatorStatus.actuator_layout_id 88
+F ActuatorStatus.available_mask 92
+F ActuatorStatus.fault_mask 96
+F ActuatorStatus.feedback 104
+F ActuatorStatus.feedback_valid_mask 100
+F ActuatorStatus.header 0
+T AirspeedSample 112 8 struct
+F AirspeedSample.calibration_version 92
+F AirspeedSample.header 0
+F AirspeedSample.quality_flags 96
+F AirspeedSample.sensor_instance_id 88
+F AirspeedSample.true_airspeed_mps 100
+F AirspeedSample.variance_m2ps2 104
+T AuthorityStatus 112 8 struct
+F AuthorityStatus.authority_epoch 88
+F AuthorityStatus.authority_owner 92
+F AuthorityStatus.flags 100
+F AuthorityStatus.header 0
+F AuthorityStatus.operation_mode 94
+F AuthorityStatus.reason_code 104
+F AuthorityStatus.reserved 106
+F AuthorityStatus.selected_source_id 96
+T AuthorizedMissionSnapshot 1184 8 struct
+F AuthorizedMissionSnapshot.authority_epoch 92
+F AuthorizedMissionSnapshot.current_item_id 128
+F AuthorizedMissionSnapshot.current_item_index 132
+F AuthorizedMissionSnapshot.directive_epoch 96
+F AuthorizedMissionSnapshot.execution_token 136
+F AuthorizedMissionSnapshot.header 0
+F AuthorizedMissionSnapshot.mission 144
+F AuthorizedMissionSnapshot.mission_epoch 88
+F AuthorizedMissionSnapshot.mission_expires_at_us 120
+F AuthorizedMissionSnapshot.mission_hash 116
+F AuthorizedMissionSnapshot.mission_id 108
+F AuthorizedMissionSnapshot.mission_revision 112
+F AuthorizedMissionSnapshot.origin_id 104
+F AuthorizedMissionSnapshot.reserved 134
+F AuthorizedMissionSnapshot.state_epoch 100
+T AuthorizedOperatorInput 128 8 struct
+F AuthorizedOperatorInput.authority_class 94
+F AuthorizedOperatorInput.authority_epoch 88
+F AuthorizedOperatorInput.header 0
+F AuthorizedOperatorInput.input_layout_id 96
+F AuthorizedOperatorInput.payload 100
+F AuthorizedOperatorInput.selected_source_id 92
+T BaroSample 112 8 struct
+F BaroSample.altitude_m 100
+F BaroSample.calibration_version 92
+F BaroSample.header 0
+F BaroSample.quality_flags 96
+F BaroSample.sensor_instance_id 88
+F BaroSample.variance_m2 104
+T ClockDomainMappingStatus 64 8 struct
+F ClockDomainMappingStatus.anchor_local_time_us 24
+F ClockDomainMappingStatus.anchor_source_time_ns 16
+F ClockDomainMappingStatus.last_sync_local_us 48
+F ClockDomainMappingStatus.local_time_epoch 12
+F ClockDomainMappingStatus.mapping_epoch 8
+F ClockDomainMappingStatus.mapping_state 36
+F ClockDomainMappingStatus.reserved 37
+F ClockDomainMappingStatus.source_clock_domain_id 0
+F ClockDomainMappingStatus.source_rate_error_ppb 32
+F ClockDomainMappingStatus.source_reset_counter 4
+F ClockDomainMappingStatus.uncertainty_ns 40
+F ClockDomainMappingStatus.valid_until_local_us 56
+T ClockInstant 24 8 struct
+F ClockInstant.boot_id 0
+F ClockInstant.monotonic_us 8
+F ClockInstant.reserved 20
+F ClockInstant.time_epoch 16
+T ClockMappingState 4 4 enum
+T CommandAck 112 8 struct
+F CommandAck.ack_state 100
+F CommandAck.completion_time_us 104
+F CommandAck.header 0
+F CommandAck.reason_code 102
+F CommandAck.request_id 88
+F CommandAck.request_source_id 96
+F CommandAck.reserved_source 98
+F CommandAck.source_session_id 92
+T CommunicationLinkStatus 144 8 struct
+F CommunicationLinkStatus.crc_error_count 108
+F CommunicationLinkStatus.flags 140
+F CommunicationLinkStatus.header 0
+F CommunicationLinkStatus.last_rx_us 128
+F CommunicationLinkStatus.last_valid_frame_us 120
+F CommunicationLinkStatus.link_instance_id 88
+F CommunicationLinkStatus.link_kind 92
+F CommunicationLinkStatus.link_quality_permille 118
+F CommunicationLinkStatus.link_state 94
+F CommunicationLinkStatus.packet_loss_ppm 112
+F CommunicationLinkStatus.reason_code 96
+F CommunicationLinkStatus.recovery_stable_ms 136
+F CommunicationLinkStatus.rssi_dbm 116
+F CommunicationLinkStatus.sequence_gap_count 104
+F CommunicationLinkStatus.valid_frame_count 100
+T ContractHeader 88 8 struct
+F ContractHeader.boot_id 24
+F ContractHeader.clock_domain_id 32
+F ContractHeader.event_time_uncertainty_us 72
+F ContractHeader.frame_id 16
+F ContractHeader.message_type 4
+F ContractHeader.profile_id 12
+F ContractHeader.reserved 78
+F ContractHeader.schema_major 0
+F ContractHeader.schema_minor 2
+F ContractHeader.sequence 8
+F ContractHeader.source_clock_domain_id 40
+F ContractHeader.source_id 6
+F ContractHeader.source_mapping_epoch 44
+F ContractHeader.time_epoch 36
+F ContractHeader.timestamp_flags 77
+F ContractHeader.timestamp_publish_us 56
+F ContractHeader.timestamp_quality 76
+F ContractHeader.timestamp_sample_us 48
+F ContractHeader.valid_until_us 64
+F ContractHeader.validity_flags 80
+T ControlCapability 104 8 struct
+F ControlCapability.control_layout_id 88
+F ControlCapability.control_level 101
+F ControlCapability.controllable_dof_mask 92
+F ControlCapability.degraded_dof_mask 96
+F ControlCapability.header 0
+F ControlCapability.health_state 100
+F ControlCapability.reason_code 102
+T ControlHealth 152 8 struct
+F ControlHealth.allocation_failure_count 148
+F ControlHealth.common 0
+F ControlHealth.deadline_miss_count 132
+F ControlHealth.last_valid_command_us 136
+F ControlHealth.max_input_age_us 144
+F ControlHealth.solver_status 128
+T ControlLinearModel 244 4 struct
+F ControlLinearModel.A 0
+F ControlLinearModel.B 144
+F ControlLinearModel.c 216
+F ControlLinearModel.sample_time_s 240
+T ControlModelBounds 84 4 struct
+F ControlModelBounds.input_max 60
+F ControlModelBounds.input_min 48
+F ControlModelBounds.input_slew_max 72
+F ControlModelBounds.state_max 24
+F ControlModelBounds.state_min 0
+T ControlModelDescriptor 24 4 struct
+F ControlModelDescriptor.input_layout_id 12
+F ControlModelDescriptor.model_hash 16
+F ControlModelDescriptor.model_id 0
+F ControlModelDescriptor.model_kind 20
+F ControlModelDescriptor.model_version 4
+F ControlModelDescriptor.reserved 21
+F ControlModelDescriptor.state_layout_id 8
+T ControlModelInput 12 4 struct
+F ControlModelInput.input 0
+T ControlModelState 24 4 struct
+F ControlModelState.state 0
+T ControlModelView 448 8 struct
+F ControlModelView.bounds 356
+F ControlModelView.descriptor 88
+F ControlModelView.header 0
+F ControlModelView.linear_model 112
+F ControlModelView.model_epoch 440
+F ControlModelView.operating_point_id 444
+T ControlReasonCode 4 4 enum
+T ControllerInput 112 8 struct
+F ControllerInput.actuation_permit 56
+F ControllerInput.actuator_capability 72
+F ControllerInput.actuator_commit_receipt 80
+F ControllerInput.actuator_status 64
+F ControllerInput.authority_status 48
+F ControllerInput.control_model_view 88
+F ControllerInput.control_time_us 96
+F ControllerInput.directive 32
+F ControllerInput.evaluation_time_us 104
+F ControllerInput.guidance_status 24
+F ControllerInput.navigation 0
+F ControllerInput.pilot_control_reference 16
+F ControllerInput.reference 8
+F ControllerInput.safety_envelope 40
+T ControllerOutput 408 8 struct
+F ControllerOutput.actuator_demand 0
+F ControllerOutput.capability 152
+F ControllerOutput.health 256
+T DecisionEvent 112 8 struct
+F DecisionEvent.decision_code 104
+F DecisionEvent.decision_id 88
+F DecisionEvent.evidence_mask 100
+F DecisionEvent.header 0
+F DecisionEvent.policy_id 96
+F DecisionEvent.reason_code 106
+F DecisionEvent.request_id 92
+T EnvironmentConstraint 120 8 struct
+F EnvironmentConstraint.constraint_expires_at_us 96
+F EnvironmentConstraint.constraint_id 92
+F EnvironmentConstraint.constraint_kind 88
+F EnvironmentConstraint.header 0
+F EnvironmentConstraint.payload 104
+F EnvironmentConstraint.severity 90
+T EnvironmentInput 16 4 struct
+F EnvironmentInput.state 0
+T EstimatorHealth 152 8 struct
+F EstimatorHealth.common 0
+F EstimatorHealth.covariance_fault_count 144
+F EstimatorHealth.last_imu_sample_us 128
+F EstimatorHealth.propagation_age_us 136
+F EstimatorHealth.rejected_measurement_count 140
+T EstimatorResetRequest 208 8 struct
+F EstimatorResetRequest.header 0
+F EstimatorResetRequest.initial_source 90
+F EstimatorResetRequest.initial_state 100
+F EstimatorResetRequest.requested_origin_id 92
+F EstimatorResetRequest.reset_type 88
+F EstimatorResetRequest.valid_initial_state_mask 96
+T ExternalClockSyncObservation 64 8 struct
+F ExternalClockSyncObservation.local_receive_time_us 40
+F ExternalClockSyncObservation.local_send_time_us 16
+F ExternalClockSyncObservation.local_time_epoch 8
+F ExternalClockSyncObservation.reserved 58
+F ExternalClockSyncObservation.reserved0 12
+F ExternalClockSyncObservation.source_clock_domain_id 0
+F ExternalClockSyncObservation.source_receive_time_ns 24
+F ExternalClockSyncObservation.source_reset_counter 52
+F ExternalClockSyncObservation.source_send_time_ns 32
+F ExternalClockSyncObservation.source_sequence 4
+F ExternalClockSyncObservation.source_uncertainty_ns 48
+F ExternalClockSyncObservation.validity_flags 56
+T ExternalOdometry 184 8 struct
+F ExternalOdometry.attitude_variance_rad2 164
+F ExternalOdometry.header 0
+F ExternalOdometry.position_ned_m 100
+F ExternalOdometry.position_variance_m2 140
+F ExternalOdometry.q_nb_wxyz 124
+F ExternalOdometry.reset_counter 92
+F ExternalOdometry.source_origin_id 88
+F ExternalOdometry.time_sync_uncertainty_us 176
+F ExternalOdometry.tracking_status 96
+F ExternalOdometry.velocity_ned_mps 112
+F ExternalOdometry.velocity_variance_m2ps2 152
+T FaultEvidenceEvent 136 8 struct
+F FaultEvidenceEvent.active 133
+F FaultEvidenceEvent.event_id 88
+F FaultEvidenceEvent.evidence_class 94
+F FaultEvidenceEvent.fault_domain 92
+F FaultEvidenceEvent.first_seen_us 112
+F FaultEvidenceEvent.header 0
+F FaultEvidenceEvent.last_seen_us 120
+F FaultEvidenceEvent.occurrence_count 128
+F FaultEvidenceEvent.reason_code 104
+F FaultEvidenceEvent.related_sequence 108
+F FaultEvidenceEvent.reserved 134
+F FaultEvidenceEvent.severity 132
+F FaultEvidenceEvent.source_component_id 96
+F FaultEvidenceEvent.source_instance_id 100
+T FaultSummary 112 8 struct
+F FaultSummary.active_fault_count 88
+F FaultSummary.fault_domain_mask 96
+F FaultSummary.header 0
+F FaultSummary.highest_severity 104
+F FaultSummary.highest_severity_fault_id 100
+F FaultSummary.latched_fault_count 92
+F FaultSummary.reserved 105
+T FlowSample 120 8 struct
+F FlowSample.calibration_version 92
+F FlowSample.header 0
+F FlowSample.integration_time_s 108
+F FlowSample.quality 112
+F FlowSample.quality_flags 96
+F FlowSample.sensor_instance_id 88
+F FlowSample.velocity_xy_mps 100
+T FmsHealth 128 8 ModuleHealth
+T FmsInputSnapshot 256 8 FmsInputView
+T FmsInputView 256 8 struct
+F FmsInputView.actuator_capability 88
+F FmsInputView.actuator_status 96
+F FmsInputView.control_capability 80
+F FmsInputView.evaluation_time_us 248
+F FmsInputView.fault_summary 104
+F FmsInputView.guidance_feasibility 64
+F FmsInputView.guidance_status 72
+F FmsInputView.link_status_count 32
+F FmsInputView.link_statuses 24
+F FmsInputView.mission_candidate 56
+F FmsInputView.navigation 40
+F FmsInputView.navigation_capability 48
+F FmsInputView.operator_input 16
+F FmsInputView.pending_request_count 8
+F FmsInputView.pending_requests 0
+F FmsInputView.presence_mask 112
+F FmsInputView.product_extension 120
+F FmsInputView.reserved0 10
+F FmsInputView.reserved1 34
+T FmsOutput 4584 8 FmsOutputView
+T FmsOutputView 4584 8 struct
+F FmsOutputView.actuation_permit 416
+F FmsOutputView.authority_status 672
+F FmsOutputView.authorized_mission 1256
+F FmsOutputView.authorized_operator_input 544
+F FmsOutputView.command_result_count 4464
+F FmsOutputView.command_results 4016
+F FmsOutputView.decision_event 4472
+F FmsOutputView.directive 0
+F FmsOutputView.geofence_count 4008
+F FmsOutputView.geofences 2440
+F FmsOutputView.landed_state 1144
+F FmsOutputView.mission_status 912
+F FmsOutputView.prearm_result 1032
+F FmsOutputView.reserved 4466
+F FmsOutputView.reserved_geofence 4010
+F FmsOutputView.safety_envelope 232
+F FmsOutputView.state_snapshot 784
+T FmsStateSnapshot 128 8 struct
+F FmsStateSnapshot.active_mission_id 116
+F FmsStateSnapshot.active_policy_id 120
+F FmsStateSnapshot.arm_state 88
+F FmsStateSnapshot.authority 90
+F FmsStateSnapshot.authority_epoch 96
+F FmsStateSnapshot.directive_epoch 100
+F FmsStateSnapshot.failsafe_level 91
+F FmsStateSnapshot.flight_mode 89
+F FmsStateSnapshot.header 0
+F FmsStateSnapshot.mission_state 92
+F FmsStateSnapshot.permit_epoch 104
+F FmsStateSnapshot.reference_epoch 108
+F FmsStateSnapshot.reserved 93
+F FmsStateSnapshot.state_epoch 112
+T GnssSample 168 8 struct
+F GnssSample.altitude_m 120
+F GnssSample.calibration_version 96
+F GnssSample.fix_type 160
+F GnssSample.header 0
+F GnssSample.latitude_deg 104
+F GnssSample.longitude_deg 112
+F GnssSample.position_variance_m2 136
+F GnssSample.quality_flags 100
+F GnssSample.reserved 162
+F GnssSample.sample_sequence 92
+F GnssSample.satellite_count 161
+F GnssSample.sensor_instance_id 88
+F GnssSample.velocity_ned_mps 124
+F GnssSample.velocity_variance_m2ps2 148
+T GnssTimeObservation 32 8 struct
+F GnssTimeObservation.paired_pps_tick64 8
+F GnssTimeObservation.pps_edge_sequence 16
+F GnssTimeObservation.receiver_accuracy_ns 24
+F GnssTimeObservation.time_epoch 20
+F GnssTimeObservation.time_scale 28
+F GnssTimeObservation.utc_time_ns 0
+F GnssTimeObservation.validity_flags 30
+T GuidanceFeasibility 112 8 struct
+F GuidanceFeasibility.earliest_violation_offset_us 104
+F GuidanceFeasibility.feasible 96
+F GuidanceFeasibility.header 0
+F GuidanceFeasibility.reason_code 98
+F GuidanceFeasibility.reference_epoch 92
+F GuidanceFeasibility.reference_id 88
+F GuidanceFeasibility.severity 97
+F GuidanceFeasibility.violated_constraint_id 100
+T GuidanceHealth 128 8 ModuleHealth
+T GuidanceInput 120 8 struct
+F GuidanceInput.active_permit 64
+F GuidanceInput.authority_status 48
+F GuidanceInput.authorized_mission 56
+F GuidanceInput.authorized_operator_input 40
+F GuidanceInput.control_time_us 104
+F GuidanceInput.directive 16
+F GuidanceInput.environment 96
+F GuidanceInput.evaluation_time_us 112
+F GuidanceInput.geofence_count 80
+F GuidanceInput.geofences 72
+F GuidanceInput.landed_state 32
+F GuidanceInput.navigation 0
+F GuidanceInput.navigation_capability 8
+F GuidanceInput.observation_count 82
+F GuidanceInput.observations 88
+F GuidanceInput.safety_envelope 24
+T GuidanceOutput 1960 8 struct
+F GuidanceOutput.feasibility 1848
+F GuidanceOutput.guidance_status 1704
+F GuidanceOutput.pilot_control_reference 1536
+F GuidanceOutput.reference 0
+T GuidanceReasonCode 4 4 enum
+T GuidanceReferenceKind 4 4 enum
+T GuidanceRunState 4 4 enum
+T GuidanceStatus 144 8 struct
+F GuidanceStatus.authority_epoch 104
+F GuidanceStatus.current_item_id 116
+F GuidanceStatus.directive_epoch 108
+F GuidanceStatus.execution_token 120
+F GuidanceStatus.guidance_state 128
+F GuidanceStatus.header 0
+F GuidanceStatus.item_result 134
+F GuidanceStatus.mission_epoch 112
+F GuidanceStatus.origin_id 100
+F GuidanceStatus.reason_code 132
+F GuidanceStatus.reference_epoch 92
+F GuidanceStatus.reference_expires_at_us 136
+F GuidanceStatus.reference_id 88
+F GuidanceStatus.reference_kind 130
+F GuidanceStatus.state_epoch 96
+T ImuSample 136 8 struct
+F ImuSample.accel_frd_mps2 116
+F ImuSample.calibration_version 96
+F ImuSample.gyro_frd_radps 104
+F ImuSample.header 0
+F ImuSample.quality_flags 100
+F ImuSample.sample_sequence 92
+F ImuSample.sensor_instance_id 88
+F ImuSample.temperature_c 128
+T LandedState 4 4 enum
+T LandedStateSnapshot 112 8 struct
+F LandedStateSnapshot.confidence_0_to_1 96
+F LandedStateSnapshot.evidence_mask 94
+F LandedStateSnapshot.header 0
+F LandedStateSnapshot.stable_duration_ms 100
+F LandedStateSnapshot.state 92
+F LandedStateSnapshot.state_revision 88
+F LandedStateSnapshot.state_since_us 104
+T LocalTimebaseDisciplineState 4 4 enum
+T LocalTimebaseDisciplineStatus 64 8 struct
+F LocalTimebaseDisciplineStatus.accepted_interval_count 56
+F LocalTimebaseDisciplineStatus.anchor_monotonic_us 16
+F LocalTimebaseDisciplineStatus.anchor_tick64 8
+F LocalTimebaseDisciplineStatus.discipline_epoch 4
+F LocalTimebaseDisciplineStatus.discipline_state 58
+F LocalTimebaseDisciplineStatus.last_phase_error_ns 32
+F LocalTimebaseDisciplineStatus.last_update_monotonic_us 48
+F LocalTimebaseDisciplineStatus.last_valid_pps_tick64 40
+F LocalTimebaseDisciplineStatus.rate_correction_ppb 24
+F LocalTimebaseDisciplineStatus.rate_uncertainty_ppb 28
+F LocalTimebaseDisciplineStatus.time_epoch 0
+F LocalTimebaseDisciplineStatus.valid 59
+T MagSample 128 8 struct
+F MagSample.calibration_version 92
+F MagSample.field_frd_ut 100
+F MagSample.header 0
+F MagSample.quality_flags 96
+F MagSample.sensor_instance_id 88
+F MagSample.variance_ut2 112
+T MissionStatus 120 8 struct
+F MissionStatus.current_item_id 92
+F MissionStatus.execution_token 104
+F MissionStatus.header 0
+F MissionStatus.mission_epoch 96
+F MissionStatus.mission_id 88
+F MissionStatus.mission_revision 100
+F MissionStatus.mission_state 112
+F MissionStatus.progress_0_to_1 116
+F MissionStatus.result_code 114
+T MissionUploadCandidate 1152 8 struct
+F MissionUploadCandidate.header 0
+F MissionUploadCandidate.mission 108
+F MissionUploadCandidate.mission_hash 104
+F MissionUploadCandidate.origin_id 100
+F MissionUploadCandidate.source_session_id 92
+F MissionUploadCandidate.state_epoch 96
+F MissionUploadCandidate.transaction_id 88
+T ModuleHealth 128 8 struct
+F ModuleHealth.component_id 88
+F ModuleHealth.consecutive_error_count 96
+F ModuleHealth.header 0
+F ModuleHealth.health_state 120
+F ModuleHealth.last_error_code 92
+F ModuleHealth.last_heartbeat_time_us 112
+F ModuleHealth.last_success_time_us 104
+F ModuleHealth.reserved 121
+T MotionReference 1536 8 struct
+F MotionReference.anchor 136
+F MotionReference.authority_epoch 104
+F MotionReference.current_item_id 116
+F MotionReference.directive_epoch 108
+F MotionReference.execution_token 120
+F MotionReference.header 0
+F MotionReference.mission_epoch 112
+F MotionReference.origin_id 100
+F MotionReference.point_count 128
+F MotionReference.points 192
+F MotionReference.reference_epoch 92
+F MotionReference.reference_id 88
+F MotionReference.reference_kind 130
+F MotionReference.reserved 132
+F MotionReference.state_epoch 96
+T MotionReferencePoint 56 4 struct
+F MotionReferencePoint.offset_us 0
+F MotionReferencePoint.point 8
+F MotionReferencePoint.valid_mask 4
+T NavStateCore 104 4 struct
+F NavStateCore.acceleration_ned_mps2 28
+F NavStateCore.attitude_std_rad 92
+F NavStateCore.body_rate_frd_radps 56
+F NavStateCore.position_ned_m 4
+F NavStateCore.position_std_m 68
+F NavStateCore.q_nb_wxyz 40
+F NavStateCore.valid_mask 0
+F NavStateCore.velocity_ned_mps 16
+F NavStateCore.velocity_std_mps 80
+T NavigationCapability 136 8 struct
+F NavigationCapability.active_source_mask 124
+F NavigationCapability.capability_mask 96
+F NavigationCapability.degraded_mask 100
+F NavigationCapability.header 0
+F NavigationCapability.heading_std_rad 120
+F NavigationCapability.horizontal_position_std_m 108
+F NavigationCapability.origin_id 92
+F NavigationCapability.rejected_source_mask 128
+F NavigationCapability.reserved 105
+F NavigationCapability.solution_state 104
+F NavigationCapability.state_epoch 88
+F NavigationCapability.velocity_std_mps 116
+F NavigationCapability.vertical_position_std_m 112
+T NavigationOriginSnapshot 136 8 struct
+F NavigationOriginSnapshot.ellipsoid_height_m 120
+F NavigationOriginSnapshot.geoid_separation_m 128
+F NavigationOriginSnapshot.header 0
+F NavigationOriginSnapshot.latitude_deg 104
+F NavigationOriginSnapshot.local_radius_limit_m 132
+F NavigationOriginSnapshot.longitude_deg 112
+F NavigationOriginSnapshot.origin_id 88
+F NavigationOriginSnapshot.reserved 100
+F NavigationOriginSnapshot.state_epoch 92
+F NavigationOriginSnapshot.valid_mask 96
+T NavigationSnapshot 224 8 struct
+F NavigationSnapshot.core 96
+F NavigationSnapshot.header 0
+F NavigationSnapshot.origin_id 92
+F NavigationSnapshot.state_epoch 88
+F NavigationSnapshot.vehicle_extension 200
+T OperatingPoint 44 4 struct
+F OperatingPoint.input 24
+F OperatingPoint.operating_speed_mps 36
+F OperatingPoint.operating_voltage_v 40
+F OperatingPoint.state 0
+T OperationRequest 160 8 struct
+F OperationRequest.authority_class 98
+F OperationRequest.command_code 96
+F OperationRequest.execution_deadline_us 104
+F OperationRequest.header 0
+F OperationRequest.payload 112
+F OperationRequest.payload_schema_id 100
+F OperationRequest.request_id 88
+F OperationRequest.reserved 102
+F OperationRequest.source_session_id 92
+T OperatorInput 120 8 struct
+F OperatorInput.header 0
+F OperatorInput.input_layout_id 88
+F OperatorInput.payload 96
+F OperatorInput.valid_axis_mask 92
+T PilotControlReference 168 8 struct
+F PilotControlReference.authority_epoch 104
+F PilotControlReference.directive_epoch 108
+F PilotControlReference.header 0
+F PilotControlReference.origin_id 100
+F PilotControlReference.reference_epoch 92
+F PilotControlReference.reference_id 88
+F PilotControlReference.reference_kind 112
+F PilotControlReference.state_epoch 96
+F PilotControlReference.valid_mask 114
+F PilotControlReference.vehicle_extension 116
+T PilotReferenceKind 4 4 enum
+T PlantInitialCondition 68 4 struct
+F PlantInitialCondition.state 0
+T PlantSimConfig 20 4 struct
+F PlantSimConfig.fixed_step_s 16
+F PlantSimConfig.parameter_hash 12
+F PlantSimConfig.plant_model_id 4
+F PlantSimConfig.plant_model_version 8
+F PlantSimConfig.product_profile_id 0
+T PlantTruth 80 8 struct
+F PlantTruth.sample_time_us 0
+F PlantTruth.truth 8
+T PpsCaptureEvent 24 8 struct
+F PpsCaptureEvent.capture_flags 16
+F PpsCaptureEvent.capture_tick64 0
+F PpsCaptureEvent.edge_sequence 8
+F PpsCaptureEvent.reserved 18
+F PpsCaptureEvent.time_epoch 12
+T PreArmCheckResult 112 8 struct
+F PreArmCheckResult.check_epoch 88
+F PreArmCheckResult.checked_at_us 104
+F PreArmCheckResult.failed_checks_mask 92
+F PreArmCheckResult.failed_count 100
+F PreArmCheckResult.header 0
+F PreArmCheckResult.primary_reason_code 98
+F PreArmCheckResult.state 96
+F PreArmCheckResult.warning_count 102
+T PreArmState 4 4 enum
+T ProductActuatorCapability 48 4 struct
+F ProductActuatorCapability.max_slew_nps 32
+F ProductActuatorCapability.max_thrust_n 16
+F ProductActuatorCapability.min_thrust_n 0
+T ProductActuatorConfig 472 4 struct
+F ProductActuatorConfig.calibration_hash 8
+F ProductActuatorConfig.calibration_set_id 4
+F ProductActuatorConfig.config_version 12
+F ProductActuatorConfig.payload 16
+F ProductActuatorConfig.profile_hash 0
+T ProductActuatorConfigPayload 456 4 struct
+F ProductActuatorConfigPayload.calibration_version 8
+F ProductActuatorConfigPayload.dshot_curve_code 280
+F ProductActuatorConfigPayload.esc_bit_rate 4
+F ProductActuatorConfigPayload.max_slew_nps 440
+F ProductActuatorConfigPayload.max_thrust_n 424
+F ProductActuatorConfigPayload.min_thrust_n 408
+F ProductActuatorConfigPayload.motor_to_timer_channel 12
+F ProductActuatorConfigPayload.output_policy_id 0
+F ProductActuatorConfigPayload.thrust_curve_count 16
+F ProductActuatorConfigPayload.thrust_curve_n 24
+T ProductActuatorDemand 20 4 struct
+F ProductActuatorDemand.motor_thrust_n 4
+F ProductActuatorDemand.valid_mask 0
+T ProductActuatorFeedback 36 4 struct
+F ProductActuatorFeedback.motor_rpm 4
+F ProductActuatorFeedback.motor_thrust_est_n 20
+F ProductActuatorFeedback.valid_mask 0
+T ProductControllerConfig 308 4 struct
+F ProductControllerConfig.config_version 12
+F ProductControllerConfig.parameter_hash 8
+F ProductControllerConfig.parameter_set_id 4
+F ProductControllerConfig.payload 16
+F ProductControllerConfig.profile_hash 0
+T ProductControllerConfigPayload 292 4 struct
+F ProductControllerConfigPayload.actuation_preview_delay_s 276
+F ProductControllerConfigPayload.fallback_kd_per_s 192
+F ProductControllerConfigPayload.fallback_kp_per_s2 180
+F ProductControllerConfigPayload.inertia_frd_kgm2 4
+F ProductControllerConfigPayload.manual_hover_throttle_norm 280
+F ProductControllerConfigPayload.mass_kg 0
+F ProductControllerConfigPayload.motor_position_frd_m 40
+F ProductControllerConfigPayload.motor_yaw_torque_ratio_m 88
+F ProductControllerConfigPayload.mpc_q_diag 204
+F ProductControllerConfigPayload.mpc_qf_diag 228
+F ProductControllerConfigPayload.mpc_r_diag 252
+F ProductControllerConfigPayload.mpc_s_diag 264
+F ProductControllerConfigPayload.mpc_seed_position_error_limit_m 284
+F ProductControllerConfigPayload.mpc_seed_velocity_error_limit_mps 288
+F ProductControllerConfigPayload.rate_d_cutoff_hz 164
+F ProductControllerConfigPayload.rate_integral_limit_nm 168
+F ProductControllerConfigPayload.rate_kaw_per_s 152
+F ProductControllerConfigPayload.rate_kd_nm_per_radps2 140
+F ProductControllerConfigPayload.rate_ki_nm_per_rad 128
+F ProductControllerConfigPayload.rate_kp_nm_per_radps 116
+F ProductControllerConfigPayload.so3_gain_per_s 104
+T ProductDirectivePayload 104 8 struct
+F ProductDirectivePayload.failsafe_policy 1
+F ProductDirectivePayload.flight_phase 0
+F ProductDirectivePayload.home 16
+F ProductDirectivePayload.max_height_above_home_m 12
+F ProductDirectivePayload.max_tilt_rad 4
+F ProductDirectivePayload.min_height_above_home_m 8
+F ProductDirectivePayload.reserved 2
+F ProductDirectivePayload.target_position_ned_m 84
+F ProductDirectivePayload.target_valid_mask 80
+F ProductDirectivePayload.target_yaw_rad 96
+T ProductEnvironmentConstraint 12 4 struct
+F ProductEnvironmentConstraint.max_wind_mps 8
+F ProductEnvironmentConstraint.min_clearance_m 4
+F ProductEnvironmentConstraint.obstacle_count 0
+T ProductEnvironmentState 16 4 struct
+F ProductEnvironmentState.air_density_kgpm3 12
+F ProductEnvironmentState.wind_ned_mps 0
+T ProductEstimatorConfig 2400 8 struct
+F ProductEstimatorConfig.config_version 12
+F ProductEstimatorConfig.parameter_hash 8
+F ProductEstimatorConfig.parameter_set_id 4
+F ProductEstimatorConfig.payload 16
+F ProductEstimatorConfig.profile_hash 0
+T ProductEstimatorConfigPayload 2384 8 struct
+F ProductEstimatorConfigPayload.accel_bias_std_mps2 2096
+F ProductEstimatorConfigPayload.accel_noise_density_mps2_per_sqrt_hz 2048
+F ProductEstimatorConfigPayload.accel_scale_std 2144
+F ProductEstimatorConfigPayload.aiding_mask 2376
+F ProductEstimatorConfigPayload.antenna_lever_frd_m 2272
+F ProductEstimatorConfigPayload.baro_bias_rw_psd_m2ps 2200
+F ProductEstimatorConfigPayload.baro_floor_m 2256
+F ProductEstimatorConfigPayload.bias_correlation_time_s 2168
+F ProductEstimatorConfigPayload.calibration_version 2380
+F ProductEstimatorConfigPayload.gnss_position_floor_m 2208
+F ProductEstimatorConfigPayload.gnss_velocity_floor_mps 2232
+F ProductEstimatorConfigPayload.gyro_bias_std_radps 2072
+F ProductEstimatorConfigPayload.gyro_noise_density_radps_per_sqrt_hz 2024
+F ProductEstimatorConfigPayload.gyro_scale_std 2120
+F ProductEstimatorConfigPayload.imu_to_vehicle_reference_frd_m 2296
+F ProductEstimatorConfigPayload.initial_covariance_upper 0
+F ProductEstimatorConfigPayload.initial_ellipsoid_height_m 2360
+F ProductEstimatorConfigPayload.initial_latitude_deg 2344
+F ProductEstimatorConfigPayload.initial_longitude_deg 2352
+F ProductEstimatorConfigPayload.initial_origin_valid_mask 2372
+F ProductEstimatorConfigPayload.local_radius_limit_m 2368
+F ProductEstimatorConfigPayload.mag_heading_floor_rad 2264
+F ProductEstimatorConfigPayload.magnetic_declination_rad 2320
+F ProductEstimatorConfigPayload.magnetic_declination_variance_rad2 2328
+F ProductEstimatorConfigPayload.min_horizontal_field_ut 2336
+F ProductEstimatorConfigPayload.scale_correlation_time_s 2184
+T ProductFmsConfig 80 4 struct
+F ProductFmsConfig.config_version 12
+F ProductFmsConfig.parameter_hash 8
+F ProductFmsConfig.parameter_set_id 4
+F ProductFmsConfig.payload 16
+F ProductFmsConfig.profile_hash 0
+T ProductFmsConfigPayload 64 4 struct
+F ProductFmsConfigPayload.attitude_std_limit_rad 32
+F ProductFmsConfigPayload.first_reference_timeout_us 24
+F ProductFmsConfigPayload.geofence_required 60
+F ProductFmsConfigPayload.heading_std_limit_rad 36
+F ProductFmsConfigPayload.horizontal_position_std_limit_m 40
+F ProductFmsConfigPayload.horizontal_velocity_std_limit_mps 48
+F ProductFmsConfigPayload.landed_dwell_us 20
+F ProductFmsConfigPayload.nav_enter_dwell_us 28
+F ProductFmsConfigPayload.nav_enter_ratio 56
+F ProductFmsConfigPayload.output_policy_id 4
+F ProductFmsConfigPayload.rc_lost_timeout_us 12
+F ProductFmsConfigPayload.rc_recovery_dwell_us 16
+F ProductFmsConfigPayload.safety_policy_id 0
+F ProductFmsConfigPayload.verified_input_mask 8
+F ProductFmsConfigPayload.vertical_position_std_limit_m 44
+F ProductFmsConfigPayload.vertical_velocity_std_limit_mps 52
+T ProductFmsInputExtension 128 8 struct
+F ProductFmsInputExtension.battery_remaining_fraction 96
+F ProductFmsInputExtension.energy_state 95
+F ProductFmsInputExtension.estimated_landing_energy_fraction 104
+F ProductFmsInputExtension.estimated_return_energy_fraction 100
+F ProductFmsInputExtension.geofence_state 94
+F ProductFmsInputExtension.ground_contact_state 92
+F ProductFmsInputExtension.header 0
+F ProductFmsInputExtension.landing_zone_valid 93
+F ProductFmsInputExtension.valid_mask 88
+F ProductFmsInputExtension.wind_ned_mps 108
+F ProductFmsInputExtension.wind_uncertainty_mps 120
+T ProductGeofenceConfig 1144 4 struct
+F ProductGeofenceConfig.config_version 4
+F ProductGeofenceConfig.geofence_hash 8
+F ProductGeofenceConfig.payload 12
+F ProductGeofenceConfig.profile_hash 0
+T ProductGeofenceConfigPayload 1132 4 struct
+F ProductGeofenceConfigPayload.config_version 0
+F ProductGeofenceConfigPayload.fence_count 4
+F ProductGeofenceConfigPayload.fences 12
+F ProductGeofenceConfigPayload.geofence_hash 8
+T ProductGeofenceDefinition 280 4 struct
+F ProductGeofenceDefinition.fence_id 0
+F ProductGeofenceDefinition.horizontal_margin_m 272
+F ProductGeofenceDefinition.kind 4
+F ProductGeofenceDefinition.max_height_above_home_m 268
+F ProductGeofenceDefinition.min_height_above_home_m 264
+F ProductGeofenceDefinition.reserved0 6
+F ProductGeofenceDefinition.vertex_count 5
+F ProductGeofenceDefinition.vertical_margin_m 276
+F ProductGeofenceDefinition.vertices_ne_m 8
+T ProductGeofenceKind 4 4 enum
+T ProductGeofenceSnapshot 392 8 struct
+F ProductGeofenceSnapshot.fence_hash 96
+F ProductGeofenceSnapshot.fence_id 88
+F ProductGeofenceSnapshot.fence_revision 92
+F ProductGeofenceSnapshot.frame_id 100
+F ProductGeofenceSnapshot.header 0
+F ProductGeofenceSnapshot.horizontal_margin_m 380
+F ProductGeofenceSnapshot.kind 113
+F ProductGeofenceSnapshot.max_height_above_home_m 376
+F ProductGeofenceSnapshot.min_height_above_home_m 372
+F ProductGeofenceSnapshot.origin_id 104
+F ProductGeofenceSnapshot.reserved0 115
+F ProductGeofenceSnapshot.state_epoch 108
+F ProductGeofenceSnapshot.validity 112
+F ProductGeofenceSnapshot.vertex_count 114
+F ProductGeofenceSnapshot.vertical_margin_m 384
+F ProductGeofenceSnapshot.vertices_ne_m 116
+T ProductGeofenceValidity 4 4 enum
+T ProductGuidanceConfig 88 4 struct
+F ProductGuidanceConfig.config_version 12
+F ProductGuidanceConfig.parameter_hash 8
+F ProductGuidanceConfig.parameter_set_id 4
+F ProductGuidanceConfig.payload 16
+F ProductGuidanceConfig.profile_hash 0
+T ProductGuidanceConfigPayload 72 4 struct
+F ProductGuidanceConfigPayload.clearance_margin_m 40
+F ProductGuidanceConfigPayload.gravity_mps2 68
+F ProductGuidanceConfigPayload.mass_kg 64
+F ProductGuidanceConfigPayload.max_acceleration_ned_mps2 12
+F ProductGuidanceConfigPayload.max_dynamic_prediction_us 60
+F ProductGuidanceConfigPayload.max_jerk_ned_mps3 24
+F ProductGuidanceConfigPayload.max_velocity_ned_mps 0
+F ProductGuidanceConfigPayload.obstacle_source_mode 48
+F ProductGuidanceConfigPayload.planning_deadline_us 52
+F ProductGuidanceConfigPayload.primitive_table_version 56
+F ProductGuidanceConfigPayload.uncertainty_inflation_factor 44
+F ProductGuidanceConfigPayload.vehicle_radius_m 36
+T ProductHomeCaptureSource 4 4 enum
+T ProductHomeQuality 4 4 enum
+T ProductHomeTargetSnapshot 64 8 struct
+F ProductHomeTargetSnapshot.capture_source 22
+F ProductHomeTargetSnapshot.captured_at_us 24
+F ProductHomeTargetSnapshot.frame_id 8
+F ProductHomeTargetSnapshot.home_expires_at_us 32
+F ProductHomeTargetSnapshot.home_id 0
+F ProductHomeTargetSnapshot.home_revision 4
+F ProductHomeTargetSnapshot.origin_id 12
+F ProductHomeTargetSnapshot.position_ned_m 40
+F ProductHomeTargetSnapshot.position_std_m 52
+F ProductHomeTargetSnapshot.quality 21
+F ProductHomeTargetSnapshot.reserved0 23
+F ProductHomeTargetSnapshot.state_epoch 16
+F ProductHomeTargetSnapshot.validity 20
+T ProductHomeValidity 4 4 enum
+T ProductMissionPayload 1040 4 struct
+F ProductMissionPayload.flags 14
+F ProductMissionPayload.mission_hash 8
+F ProductMissionPayload.mission_id 0
+F ProductMissionPayload.mission_revision 4
+F ProductMissionPayload.waypoint_count 12
+F ProductMissionPayload.waypoints 16
+T ProductMissionWaypoint 32 4 struct
+F ProductMissionWaypoint.acceptance_radius_m 20
+F ProductMissionWaypoint.flags 28
+F ProductMissionWaypoint.position_ned_m 4
+F ProductMissionWaypoint.speed_limit_mps 24
+F ProductMissionWaypoint.waypoint_id 0
+F ProductMissionWaypoint.yaw_rad 16
+T ProductMotionPoint 48 4 struct
+F ProductMotionPoint.acceleration_ned_mps2 28
+F ProductMotionPoint.position_ned_m 4
+F ProductMotionPoint.valid_mask 0
+F ProductMotionPoint.velocity_ned_mps 16
+F ProductMotionPoint.yaw_rad 40
+F ProductMotionPoint.yaw_rate_radps 44
+T ProductNavExtension 24 4 struct
+F ProductNavExtension.baro_altitude_m 4
+F ProductNavExtension.terrain_range_m 8
+F ProductNavExtension.valid_mask 0
+F ProductNavExtension.wind_ned_mps 12
+T ProductObstacleObservation 208 8 struct
+F ProductObstacleObservation.confidence_0_to_1 204
+F ProductObstacleObservation.header 0
+F ProductObstacleObservation.observation_id 88
+F ProductObstacleObservation.observation_kind 108
+F ProductObstacleObservation.obstacle_center_ned_m 120
+F ProductObstacleObservation.obstacle_half_extent_m 132
+F ProductObstacleObservation.obstacle_velocity_ned_mps 168
+F ProductObstacleObservation.origin_id 100
+F ProductObstacleObservation.position_std_m 180
+F ProductObstacleObservation.quality_flags 116
+F ProductObstacleObservation.ray_end_ned_m 156
+F ProductObstacleObservation.ray_start_ned_m 144
+F ProductObstacleObservation.reserved0 113
+F ProductObstacleObservation.sensor_instance_id 92
+F ProductObstacleObservation.shape_kind 110
+F ProductObstacleObservation.source_health 112
+F ProductObstacleObservation.source_health_epoch 96
+F ProductObstacleObservation.state_epoch 104
+F ProductObstacleObservation.velocity_std_mps 192
+T ProductObstacleObservationKind 4 4 enum
+T ProductObstacleShape 4 4 enum
+T ProductObstacleSourceHealth 4 4 enum
+T ProductOperationPayload 48 4 struct
+F ProductOperationPayload.mission_epoch 44
+F ProductOperationPayload.mission_id 0
+F ProductOperationPayload.mission_transaction_id 40
+F ProductOperationPayload.operation_flags 30
+F ProductOperationPayload.prearm_check_epoch 36
+F ProductOperationPayload.requested_altitude_m 20
+F ProductOperationPayload.requested_mode 28
+F ProductOperationPayload.settings_transaction_id 32
+F ProductOperationPayload.target_ned_m 4
+F ProductOperationPayload.target_yaw_rad 16
+F ProductOperationPayload.valid_mask 24
+T ProductOperatorInput 24 4 struct
+F ProductOperatorInput.aux_switch_bits 20
+F ProductOperatorInput.mode_switch_bits 16
+F ProductOperatorInput.pitch_norm 4
+F ProductOperatorInput.roll_norm 0
+F ProductOperatorInput.throttle_norm 12
+F ProductOperatorInput.yaw_norm 8
+T ProductPilotControlReferencePayload 48 4 struct
+F ProductPilotControlReferencePayload.altitude_above_origin_m 40
+F ProductPilotControlReferencePayload.body_rate_frd_radps 4
+F ProductPilotControlReferencePayload.collective_throttle_norm 36
+F ProductPilotControlReferencePayload.q_nb_desired_wxyz 16
+F ProductPilotControlReferencePayload.valid_mask 0
+F ProductPilotControlReferencePayload.vertical_velocity_up_mps 44
+F ProductPilotControlReferencePayload.yaw_rate_ff_radps 32
+T ProductPlantInitialState 68 4 struct
+F ProductPlantInitialState.body_rate_frd_radps 40
+F ProductPlantInitialState.motor_omega_radps 52
+F ProductPlantInitialState.position_ned_m 0
+F ProductPlantInitialState.q_nb_wxyz 24
+F ProductPlantInitialState.velocity_ned_mps 12
+T ProductPlantTruth 68 4 struct
+F ProductPlantTruth.body_rate_frd_radps 40
+F ProductPlantTruth.motor_omega_radps 52
+F ProductPlantTruth.position_ned_m 0
+F ProductPlantTruth.q_nb_wxyz 24
+F ProductPlantTruth.velocity_ned_mps 12
+T ProductProfile 52 4 struct
+F ProductProfile.actuator_adapter_id 48
+F ProductProfile.actuator_layout_id 20
+F ProductProfile.control_model_id 44
+F ProductProfile.controller_impl_id 40
+F ProductProfile.estimator_impl_id 32
+F ProductProfile.fms_policy_id 28
+F ProductProfile.guidance_impl_id 36
+F ProductProfile.model_manifest_hash 24
+F ProductProfile.motion_reference_layout_id 16
+F ProductProfile.nav_layout_id 12
+F ProductProfile.product_profile_id 0
+F ProductProfile.profile_hash 8
+F ProductProfile.profile_version 4
+T ProductSafetyEnvelopePayload 72 4 struct
+F ProductSafetyEnvelopePayload.max_acceleration_ned_mps2 16
+F ProductSafetyEnvelopePayload.max_body_rate_frd_radps 52
+F ProductSafetyEnvelopePayload.max_height_above_home_m 68
+F ProductSafetyEnvelopePayload.max_jerk_ned_mps3 28
+F ProductSafetyEnvelopePayload.max_tilt_rad 40
+F ProductSafetyEnvelopePayload.max_total_thrust_n 48
+F ProductSafetyEnvelopePayload.max_velocity_ned_mps 4
+F ProductSafetyEnvelopePayload.min_height_above_home_m 64
+F ProductSafetyEnvelopePayload.min_total_thrust_n 44
+F ProductSafetyEnvelopePayload.valid_mask 0
+T ProductSensorMeasurement 168 8 union
+F ProductSensorMeasurement.baro 0
+F ProductSensorMeasurement.flow 0
+F ProductSensorMeasurement.gnss 0
+F ProductSensorMeasurement.mag 0
+F ProductSensorMeasurement.range 0
+T QuadSensorProcessingConfig 416 8 struct
+F QuadSensorProcessingConfig.baro_delay_uncertainty_us 396
+F QuadSensorProcessingConfig.baro_delay_us 392
+F QuadSensorProcessingConfig.calibration_version 4
+F QuadSensorProcessingConfig.config_version 0
+F QuadSensorProcessingConfig.imu_axis_delay_us 344
+F QuadSensorProcessingConfig.imu_bias_accel_mps2 176
+F QuadSensorProcessingConfig.imu_bias_gyro_radps 152
+F QuadSensorProcessingConfig.imu_delay_uncertainty_us 368
+F QuadSensorProcessingConfig.imu_scale_accel 224
+F QuadSensorProcessingConfig.imu_scale_gyro 200
+F QuadSensorProcessingConfig.imu_to_frd_rotation 8
+F QuadSensorProcessingConfig.mag_delay_uncertainty_us 404
+F QuadSensorProcessingConfig.mag_delay_us 400
+F QuadSensorProcessingConfig.mag_hard_iron_ut 248
+F QuadSensorProcessingConfig.mag_soft_iron_matrix 272
+F QuadSensorProcessingConfig.mag_to_frd_rotation 80
+F QuadSensorProcessingConfig.reserved 412
+F QuadSensorProcessingConfig.verified_sensor_mask 408
+T RangeSample 112 8 struct
+F RangeSample.calibration_version 92
+F RangeSample.header 0
+F RangeSample.quality_flags 96
+F RangeSample.range_m 100
+F RangeSample.sensor_instance_id 88
+F RangeSample.variance_m2 104
+T SafetyEnvelope 184 8 struct
+F SafetyEnvelope.envelope_epoch 92
+F SafetyEnvelope.header 0
+F SafetyEnvelope.max_angular_rate_radps 104
+F SafetyEnvelope.max_linear_accel_mps2 100
+F SafetyEnvelope.max_linear_speed_mps 96
+F SafetyEnvelope.max_yaw_rate_radps 108
+F SafetyEnvelope.safety_envelope_id 88
+F SafetyEnvelope.vehicle_extension 112
+T SensorConsistencyEvidence 144 8 struct
+F SensorConsistencyEvidence.accepted_count 110
+F SensorConsistencyEvidence.calibration_version 100
+F SensorConsistencyEvidence.evaluated_count 108
+F SensorConsistencyEvidence.evaluation_mode 122
+F SensorConsistencyEvidence.evidence_expires_at_us 136
+F SensorConsistencyEvidence.evidence_flags 116
+F SensorConsistencyEvidence.header 0
+F SensorConsistencyEvidence.last_evaluated_sample_time_us 128
+F SensorConsistencyEvidence.policy_epoch 92
+F SensorConsistencyEvidence.probation_pass_count 114
+F SensorConsistencyEvidence.reason_code 120
+F SensorConsistencyEvidence.rejected_count 112
+F SensorConsistencyEvidence.sensor_instance_id 88
+F SensorConsistencyEvidence.state_epoch 96
+F SensorConsistencyEvidence.window_duration_us 104
+T SensorConsistencyReason 4 4 enum
+T SensorDataGapEvent 120 8 struct
+F SensorDataGapEvent.first_missing_sequence 92
+F SensorDataGapEvent.header 0
+F SensorDataGapEvent.last_good_sample_time_us 104
+F SensorDataGapEvent.last_missing_sequence 96
+F SensorDataGapEvent.next_sample_time_us 112
+F SensorDataGapEvent.reason_code 100
+F SensorDataGapEvent.sensor_instance_id 88
+T SensorDiagnostic 112 8 struct
+F SensorDiagnostic.diagnostic_class 92
+F SensorDiagnostic.flags 95
+F SensorDiagnostic.header 0
+F SensorDiagnostic.last_good_sample_us 104
+F SensorDiagnostic.occurrence_count 100
+F SensorDiagnostic.reason_code 96
+F SensorDiagnostic.sensor_instance_id 88
+F SensorDiagnostic.severity 94
+T SensorMeasurement 264 8 struct
+F SensorMeasurement.header 0
+F SensorMeasurement.measurement_kind 92
+F SensorMeasurement.payload 96
+F SensorMeasurement.reserved 94
+F SensorMeasurement.sensor_instance_id 88
+T SensorUsePolicy 128 8 struct
+F SensorUsePolicy.degraded_noise_profile_id 100
+F SensorUsePolicy.effective_time_us 112
+F SensorUsePolicy.evaluation_flags 104
+F SensorUsePolicy.header 0
+F SensorUsePolicy.policy_epoch 92
+F SensorUsePolicy.policy_expires_at_us 120
+F SensorUsePolicy.reason_code 98
+F SensorUsePolicy.sensor_instance_id 88
+F SensorUsePolicy.use_state 96
+T SimulatedMeasurementBatch 4776 8 struct
+F SimulatedMeasurementBatch.imu_count 0
+F SimulatedMeasurementBatch.imu_samples 8
+F SimulatedMeasurementBatch.measurement_count 2
+F SimulatedMeasurementBatch.measurements 552
+T StateResetEvent 144 8 struct
+F StateResetEvent.attitude_delta_rad 132
+F StateResetEvent.header 0
+F StateResetEvent.new_origin_id 100
+F StateResetEvent.new_state_epoch 92
+F StateResetEvent.old_origin_id 96
+F StateResetEvent.old_state_epoch 88
+F StateResetEvent.position_delta_m 108
+F StateResetEvent.reserved 106
+F StateResetEvent.reset_type 104
+F StateResetEvent.velocity_delta_mps 120
+T Status 4 4 int32_t
+T TimeQuality 4 4 enum
+T TimeReferenceSource 4 4 enum
+T TimeServiceStatus 80 8 struct
+F TimeServiceStatus.clock_domain_id 52
+F TimeServiceStatus.estimated_frequency_error_ppb 48
+F TimeServiceStatus.frequency_discipline_valid 72
+F TimeServiceStatus.holdover_duration_us 24
+F TimeServiceStatus.last_valid_pps_us 32
+F TimeServiceStatus.last_valid_reference_us 40
+F TimeServiceStatus.local_clock_valid 71
+F TimeServiceStatus.monotonic_now_us 0
+F TimeServiceStatus.reference_source 69
+F TimeServiceStatus.reserved 73
+F TimeServiceStatus.state 68
+F TimeServiceStatus.status_flags 64
+F TimeServiceStatus.time_epoch 56
+F TimeServiceStatus.utc_estimate_ns 8
+F TimeServiceStatus.utc_mapping_epoch 60
+F TimeServiceStatus.utc_uncertainty_ns 16
+F TimeServiceStatus.utc_valid 70
+T TimerCaptureEvent 48 8 struct
+F TimerCaptureEvent.boot_id 0
+F TimerCaptureEvent.capture_ticks64 8
+F TimerCaptureEvent.capture_time_us 16
+F TimerCaptureEvent.channel 42
+F TimerCaptureEvent.discipline_epoch 28
+F TimerCaptureEvent.edge_sequence 32
+F TimerCaptureEvent.event_time_uncertainty_us 36
+F TimerCaptureEvent.flags 43
+F TimerCaptureEvent.time_epoch 24
+F TimerCaptureEvent.timer_instance 40
+T TimestampQuality 4 4 enum
+T VehicleDirective 232 8 struct
+F VehicleDirective.authority_epoch 92
+F VehicleDirective.directive_epoch 88
+F VehicleDirective.directive_expires_at_us 112
+F VehicleDirective.guidance_mode_code 106
+F VehicleDirective.header 0
+F VehicleDirective.operation_code 104
+F VehicleDirective.payload 128
+F VehicleDirective.policy_id 100
+F VehicleDirective.reason_code 108
+F VehicleDirective.required_nav_capabilities 120
+F VehicleDirective.reserved 110
+F VehicleDirective.safety_envelope_id 124
+F VehicleDirective.state_epoch 96
+T WaterSpeedSample 112 8 struct
+F WaterSpeedSample.calibration_version 92
+F WaterSpeedSample.header 0
+F WaterSpeedSample.quality_flags 96
+F WaterSpeedSample.sensor_instance_id 88
+F WaterSpeedSample.variance_m2ps2 104
+F WaterSpeedSample.water_speed_mps 100
+T WheelOdometrySample 120 8 struct
+F WheelOdometrySample.calibration_version 92
+F WheelOdometrySample.header 0
+F WheelOdometrySample.quality_flags 96
+F WheelOdometrySample.sensor_instance_id 88
+F WheelOdometrySample.steering_angle_rad 116
+F WheelOdometrySample.wheel_speed_mps 100

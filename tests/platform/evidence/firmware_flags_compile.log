@@ -1,0 +1,4 @@
+
+cc1plus.exe: warning: command-line option '-std=c99' is valid for C/ObjC but not for C++
+C exit=0
+C++ exit=0

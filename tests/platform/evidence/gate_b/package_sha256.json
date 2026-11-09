@@ -1,0 +1,14 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "board/fc_board_platform.c": "f0b3f939dafd4ace6a66f98333abd46ed65228142f3ea50edfb4b69a3209a4f6",
+    "board/fc_board_platform.h": "e84d4f4059fe39192fa106c14fa251a1d3caf5a516c157d76d1e64937df82c3d",
+    "board/SConscript": "64e6388bfc18a80f76711f6c892bb18559c057ba40194be101a52fb19b9fb7bc",
+    "libraries/HAL_Drivers/drivers/drv_tim.c": "9ff4c69234a106320b6a1eb17151f7847c5bebcacb445fde06a2895ee830cbee",
+    "applications/platform/rtthread53/evidence/gate_b/gate_b_evidence.json": "f3ee1832258cdf0542b9a5680e24fbd63cddcda6def2fb0dcc7f31bb27e4f172",
+    "applications/platform/rtthread53/evidence/gate_b/gate_b_report.md": "8cb8f54ba8c5f846c45ec9f81408409c2a36682ce3f72a9a0296f07a59ebe3dd",
+    "applications/platform/rtthread53/evidence/gate_b/acceptance_matrix.json": "c83c3e8b638d3c633f007d911d1f25123d3a8f3b2cb37cccd62f8c7ff66234b5",
+    "applications/platform/rtthread53/evidence/gate_b/symbols.txt": "cf28b2176f9318b39945094b5ef895186110e3546235d763f257c3034a6401ff",
+    "applications/platform/rtthread53/evidence/gate_b/sizes.txt": "16bad3c99dd8ea66954cb270f6bc1bb0dfa69275c9e0d4b47c05fcf0fc0211d9"
+  }
+}

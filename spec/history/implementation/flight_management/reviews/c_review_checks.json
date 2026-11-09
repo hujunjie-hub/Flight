@@ -1,0 +1,235 @@
+{
+  "reviewer": "C",
+  "revision": 2,
+  "task": "T191-D-REVIEW",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010903",
+  "scope": "DOCUMENT_STATIC + C-owned contract/implementation cross-check; uses D's post-fix rerun",
+  "handoff_seen": {
+    "T191-D-REVIEW": "REVIEW/seq4",
+    "T191-A-ABI": "ASSIGNED/seq3"
+  },
+  "d_post_fix_evidence": "spec/validation/T191-D-REVIEW/review_checks_post.json",
+  "summary": {
+    "checks": 22,
+    "pass": 15,
+    "fail": 1,
+    "obs": 6
+  },
+  "results": [
+    {
+      "id": "GOV-01",
+      "area": "GOVERNANCE",
+      "status": "PASS",
+      "description": "HANDOFF 15 unique tasks, owner not reviewer, dependencies exist, DAG acyclic",
+      "detail": {
+        "tasks": 15
+      }
+    },
+    {
+      "id": "GOV-02",
+      "area": "GOVERNANCE",
+      "status": "PASS",
+      "description": "T191-D-REVIEW is REVIEW/seq4 with acknowledgement",
+      "detail": {
+        "status": "REVIEW",
+        "seq": 4
+      }
+    },
+    {
+      "id": "GOV-03",
+      "area": "GOVERNANCE",
+      "status": "PASS",
+      "description": "T191-A-ABI merged as ASSIGNED/seq3 (D accepted A's resubmission)",
+      "detail": {
+        "status": "ASSIGNED",
+        "seq": 3
+      }
+    },
+    {
+      "id": "GOV-04",
+      "area": "GOVERNANCE",
+      "status": "PASS",
+      "description": "B's four and C's four status submissions exist on disk",
+      "detail": {
+        "B": 4,
+        "C": 4
+      }
+    },
+    {
+      "id": "EVID-01",
+      "area": "EVIDENCE",
+      "status": "PASS",
+      "description": "D SHA256SUMS match the current evidence files (post-fix manifest includes review_checks_post.json)",
+      "detail": {
+        "files": 6,
+        "mismatch": []
+      }
+    },
+    {
+      "id": "EVID-02",
+      "area": "EVIDENCE",
+      "status": "PASS",
+      "description": "post-fix rerun: 59 checks, 46/2/6/5; the only FAILs are the expected historical-input drifts",
+      "detail": {
+        "counts": {
+          "FAIL": 2,
+          "DRIFT": 5,
+          "PASS": 46,
+          "OBS": 6
+        },
+        "failed": [
+          "EVID-01",
+          "EVID-02"
+        ]
+      }
+    },
+    {
+      "id": "EVID-03",
+      "area": "EVIDENCE",
+      "status": "PASS",
+      "description": "the 22:58 report summary matches the pre-fix snapshot it cites",
+      "detail": {}
+    },
+    {
+      "id": "REV-01",
+      "area": "DISPOSAL",
+      "status": "PASS",
+      "description": "D-REV-01 fixed: 11:9 says Schema 6.0",
+      "detail": {}
+    },
+    {
+      "id": "REV-02",
+      "area": "DISPOSAL",
+      "status": "PASS",
+      "description": "D-REV-02: 07 table is 3000us and the post-fix rerun no longer fails BUD-12",
+      "detail": {
+        "table": "| MAX_IMU_PIPELINE_DELAY_US | 3000us，具体滤波配置必须经标定证明不超此上限 |"
+      }
+    },
+    {
+      "id": "REV-03",
+      "area": "DISPOSAL",
+      "status": "PASS",
+      "description": "D-REV-03 tool fixes exist",
+      "detail": {}
+    },
+    {
+      "id": "C-REV-01",
+      "area": "CONTRACT",
+      "status": "FAIL",
+      "description": "06 §12 requires the current mission_epoch for mission commands, but OperationRequest/ProductOperationPayload carry no such field",
+      "detail": {
+        "spec_requires": true,
+        "d_report_mentions": false
+      }
+    },
+    {
+      "id": "C-REV-02",
+      "area": "CONTRACT",
+      "status": "OBS",
+      "description": "M4 owns the geofence per 06:433, but 02 defines no geofence command/field and FmsInputView has no fence input",
+      "detail": {
+        "fms_input_has_geofence": false,
+        "command_has_geofence": false,
+        "d_report_mentions": false
+      }
+    },
+    {
+      "id": "C-REV-03",
+      "area": "CONTRACT",
+      "status": "OBS",
+      "description": "02:2559 requires real output_policy_id>=0x100 registration but 08/09 define no registry",
+      "detail": {
+        "mentions_0x100": true
+      }
+    },
+    {
+      "id": "BUD-01",
+      "area": "BUDGET",
+      "status": "PASS",
+      "description": "CPU 54.5705%",
+      "detail": {}
+    },
+    {
+      "id": "BUD-02",
+      "area": "BUDGET",
+      "status": "PASS",
+      "description": "900us chain",
+      "detail": {}
+    },
+    {
+      "id": "BUD-03",
+      "area": "BUDGET",
+      "status": "PASS",
+      "description": "DShot bit timing/ARR recompute",
+      "detail": {
+        "300k": [
+          917,
+          344,
+          688,
+          916
+        ],
+        "600k": [
+          458,
+          172,
+          344,
+          457
+        ]
+      }
+    },
+    {
+      "id": "BUD-04",
+      "area": "BUDGET",
+      "status": "PASS",
+      "description": "M5 62,016B vs item sum 61,952B (64B capacity note)",
+      "detail": {}
+    },
+    {
+      "id": "REC-01",
+      "area": "RECORDS",
+      "status": "PASS",
+      "description": "09 has TEST-T191-D-REVIEW = IN_PROGRESS",
+      "detail": {}
+    },
+    {
+      "id": "REC-02",
+      "area": "RECORDS",
+      "status": "OBS",
+      "description": "09 still has no T191-C-FMS/T191-C-M5 implementation rows; D registers C evidence on acceptance",
+      "detail": {
+        "c_fms": 0,
+        "c_m5": 0
+      }
+    },
+    {
+      "id": "OBS-01",
+      "area": "SNAPSHOT",
+      "status": "OBS",
+      "description": "the 22:58 report markdown still cites the pre-fix snapshot and §17 still says 07:419=1900us/D-REV-02 open; only the post-fix JSON was rerun",
+      "detail": {
+        "stale_rev02": false,
+        "post_run": true
+      }
+    },
+    {
+      "id": "OBS-02",
+      "area": "ABI-COUNT",
+      "status": "OBS",
+      "description": "D counts 143 spec types while A's production ABI counts 142; the counting basis needs a note",
+      "detail": {
+        "d_143": true,
+        "a_142": true
+      }
+    },
+    {
+      "id": "OBS-03",
+      "area": "BUILD",
+      "status": "OBS",
+      "description": "B-R05 also applies to C: FMS_QUAD_X4_ENABLE is defined but applications/core/Kconfig is not sourced by the root/applications Kconfig chain, so menuconfig cannot reach it",
+      "detail": {
+        "core_kconfig_exists": true,
+        "root_sources_core": false
+      }
+    }
+  ]
+}

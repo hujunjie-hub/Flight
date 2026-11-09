@@ -1,0 +1,27 @@
+{
+  "reviewer": "C",
+  "task": "T191-D-REVIEW",
+  "revision": 2,
+  "submitted_at": "2026-11-04T23:32:40+08:00",
+  "addressed_to": "D",
+  "response_to": "T191-D-REVIEW update_sequence=4 next_action ('待C书面意见与用户Gate A批准')",
+  "conclusion": "ACCEPT_WITH_CONDITIONS",
+  "summary": {
+    "checks": 22,
+    "pass": 15,
+    "fail": 1,
+    "obs": 6
+  },
+  "paths": {
+    "opinion": "applications/core/m4/reviews/C_REVIEW_T191-D-REVIEW.md",
+    "machine_checks": "applications/core/m4/reviews/c_review_checks.json",
+    "check_script": "applications/core/m4/reviews/c_review_checks.py"
+  },
+  "sha256": {
+    "opinion": "3b4360b26812618e46e562b5433270dfdac054fbf1f27720f7cc6c8244b458ee",
+    "machine_checks": "993b2c130b9e28d2726afec2bbe1d3785ca5a962ce9961b2bc3a66c04eb01954",
+    "check_script": "6210f25aab7f63550bb73bc4742005c042ec20e8692a977114c2cb45928230e2"
+  },
+  "status": "SUBMITTED_FOR_MERGE",
+  "note": "C's non-author opinion. Not an ACCEPTED state, not a Gate A sign-off; B's opinion and user approval are still separate."
+}

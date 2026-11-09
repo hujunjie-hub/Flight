@@ -1,0 +1,185 @@
+{
+  "change_set": "USER-20261104-GLOBAL-AUDIT",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "issues": 78,
+  "rounds": [
+    {
+      "round": 1,
+      "status": "PASS",
+      "input_files": 18
+    },
+    {
+      "round": 2,
+      "status": "PASS",
+      "input_files": 18
+    },
+    {
+      "round": 3,
+      "status": "PASS",
+      "input_files": 21
+    }
+  ],
+  "scope": "SPEC_ONLY",
+  "production_firmware_build": "NOT_RUN",
+  "independent_human_review": "NOT_RUN",
+  "outside_spec": {
+    "scope": "OUTSIDE_SPEC_INTEGRITY",
+    "status": "PASS",
+    "baseline_files": 10059,
+    "current_files": 10059,
+    "changed": [],
+    "added": [],
+    "removed": [],
+    "baseline_sha256": "8c5143982c96b436bdad7d8633b1f00902dd530d907420926987b749b7d826b5",
+    "tree_sha256": "ccca543b5db29ea42da34777333fdea19b71f0da95bbc10aeb6746062eb8c9f2"
+  },
+  "files": [
+    {
+      "path": "spec/00_工程基线与唯一权威规范.md",
+      "change": "MODIFIED",
+      "added_lines": 26,
+      "removed_lines": 26,
+      "sha256": "3070adf91c9efdf67cf1b377ef824b617dbcfff284b0409313ac49c9613378ce"
+    },
+    {
+      "path": "spec/01_系统总体架构与设计决议.md",
+      "change": "MODIFIED",
+      "added_lines": 4,
+      "removed_lines": 2,
+      "sha256": "37441fb42795f8195418653fea8794eaea089b23aec077a70738249ab6b3b409"
+    },
+    {
+      "path": "spec/02_接口契约与公共数据规范.md",
+      "change": "MODIFIED",
+      "added_lines": 322,
+      "removed_lines": 33,
+      "sha256": "6ba2f52c14d369884703bde69548e4f274d0ad15d8238f78ad4ea904758c5da1"
+    },
+    {
+      "path": "spec/03_平台软件架构与驱动设计.md",
+      "change": "MODIFIED",
+      "added_lines": 13,
+      "removed_lines": 7,
+      "sha256": "19ec41e940cfef05f572d200eb24d33642c3ee4e4ac8008a71b3f965eb1fa1af"
+    },
+    {
+      "path": "spec/04_飞控核心模块与控制系统设计.md",
+      "change": "MODIFIED",
+      "added_lines": 88,
+      "removed_lines": 18,
+      "sha256": "5270517b172179674e390cccc00fcffa8208ea6484d4a315d9995aff4bb34ef2"
+    },
+    {
+      "path": "spec/05_传感器采集时间基准与GNSS独立运行.md",
+      "change": "MODIFIED",
+      "added_lines": 71,
+      "removed_lines": 42,
+      "sha256": "14cf67a1c701f41605e073616dbd06e13f7977d7e894d4bf90e688cb7b55eea2"
+    },
+    {
+      "path": "spec/06_FMS通信与系统安全设计.md",
+      "change": "MODIFIED",
+      "added_lines": 22,
+      "removed_lines": 8,
+      "sha256": "3952d3bf30e3a8c3e56e827d586edc68a8685fa7511f2d31b8fd7e6932991bd8"
+    },
+    {
+      "path": "spec/07_实时调度与板级硬件资源设计.md",
+      "change": "MODIFIED",
+      "added_lines": 64,
+      "removed_lines": 49,
+      "sha256": "27b419c4121ff4b2a7799fcecd3186fa270212652708a591599575cee30b7dc4"
+    },
+    {
+      "path": "spec/08_产品配置插件与参数管理.md",
+      "change": "MODIFIED",
+      "added_lines": 19,
+      "removed_lines": 5,
+      "sha256": "c7b85dd94e56f5d91a5ad8dbfd7f3d0fcfab15f8460df626f4978915f5e20f5c"
+    },
+    {
+      "path": "spec/09_需求验证实施与发布管理.md",
+      "change": "MODIFIED",
+      "added_lines": 28,
+      "removed_lines": 10,
+      "sha256": "6add2695fcac0d33347b2248af0eb389b5fdeb4538b83e6f337e687eae6fcdad"
+    },
+    {
+      "path": "spec/10_Agent分工与工程执行规范.md",
+      "change": "MODIFIED",
+      "added_lines": 6,
+      "removed_lines": 4,
+      "sha256": "851a557db9476bcd86978dd3964aa80567df88db55d8f3a3d6b7efe829e321f3"
+    },
+    {
+      "path": "spec/11_审核问题闭环与变更追踪.md",
+      "change": "MODIFIED",
+      "added_lines": 26,
+      "removed_lines": 24,
+      "sha256": "68c78a33235ae71ee74f949e54a8ff40978ea8a47c63f1f8f666e2d7fcb3a073"
+    },
+    {
+      "path": "spec/12_全量审查问题清单与落地边界.md",
+      "change": "ADDED",
+      "added_lines": 133,
+      "removed_lines": 0,
+      "sha256": "a161cc7bdedbca33f5d7c554f279e601662ea7b20f01f8533798ff809072e033"
+    },
+    {
+      "path": "spec/AGENT.md",
+      "change": "MODIFIED",
+      "added_lines": 4,
+      "removed_lines": 4,
+      "sha256": "6e174696573da1706ca22dd187ec57ce13bf3772e981f3f0762cea8ae7e7326b"
+    },
+    {
+      "path": "spec/AGENT_HANDOFF.md",
+      "change": "MODIFIED",
+      "added_lines": 66,
+      "removed_lines": 66,
+      "sha256": "e49ff231ae071da48287c2c473c9f53326f055230bd2fc36d8f65b17839ff2a8"
+    },
+    {
+      "path": "spec/contracts/FCU.xml",
+      "change": "ADDED",
+      "added_lines": 192,
+      "removed_lines": 0,
+      "sha256": "1be7adc3b849bc89f812ad66353368ae2c8c6290f2ea97168ee710a7145446ed"
+    },
+    {
+      "path": "spec/contracts/message_registry.json",
+      "change": "ADDED",
+      "added_lines": 66,
+      "removed_lines": 0,
+      "sha256": "e2893aebd8c1121b1ede80591849730ec722c5f9e0616443507c2ff99179bf41"
+    },
+    {
+      "path": "spec/README.md",
+      "change": "MODIFIED",
+      "added_lines": 9,
+      "removed_lines": 2,
+      "sha256": "6ac165f80097a1237db414076616da8bb2d01ca48145db6c38539ea17ba3131b"
+    },
+    {
+      "path": "spec/tools/audit_spec.py",
+      "change": "ADDED",
+      "added_lines": 267,
+      "removed_lines": 0,
+      "sha256": "f405e0e7f74a82c3122050c6666f4e49284d0e4c372c46a347d5b7f6f6aa7b3a"
+    },
+    {
+      "path": "spec/tools/check_dialect.py",
+      "change": "ADDED",
+      "added_lines": 82,
+      "removed_lines": 0,
+      "sha256": "cb201938235cd8ec6d5387470d2f21f5dc4a91bd414a9cfafc940da49a7ca025"
+    },
+    {
+      "path": "spec/tools/check_reference_models.py",
+      "change": "ADDED",
+      "added_lines": 213,
+      "removed_lines": 0,
+      "sha256": "116a1d95cc3b203b1567633a0a8dd85b5e6a2edb7f0dbc89ebf47ae820f38ad9"
+    }
+  ]
+}

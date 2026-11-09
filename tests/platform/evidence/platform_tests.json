@@ -1,0 +1,28 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "scope": "HOST_UNIT + ARM_COMPILE_ONLY",
+  "production_target_validation": "NOT_RUN",
+  "generated_at": "2026-11-07T15:59:53+08:00",
+  "tests": [
+    {
+      "name": "time_service",
+      "sources": [
+        "D:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\sensor_device\\time_base\\systime.c",
+        "D:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\tests\\time\\test_time_service.c"
+      ],
+      "build_command": "D:\\STM32CubeCLT\\mingw64\\bin\\gcc.exe -std=c11 -Wall -Wextra -Werror -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts -ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\sensor_device\\time_base D:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\sensor_device\\time_base\\systime.c D:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\tests\\time\\test_time_service.c -o C:\\Users\\26718\\AppData\\Local\\Temp\\platform_time_service.exe",
+      "build_exit": 0,
+      "run_exit": 0,
+      "output": "time_service host tests: 134 checks, 0 failures"
+    }
+  ],
+  "arm_compile": [
+    {
+      "name": "time_service_c99",
+      "source": "sensor_device/time_base/systime.c",
+      "std": "c99",
+      "exit": 0,
+      "output": ""
+    }
+  ]
+}

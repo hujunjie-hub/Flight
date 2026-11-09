@@ -1,0 +1,276 @@
+/***************************************************************************//**
+ *   @file   projects/adf5902_sdz/src/adf5902_sdz.c
+ *   @brief  Implementation of Main Function.
+ *   @author Antoniu Miclaus (antoniu.miclaus@analog.com)
+********************************************************************************
+ * Copyright 2021(c) Analog Devices, Inc.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of Analog Devices, Inc. nor the names of its
+ *    contributors may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY ANALOG DEVICES, INC. “AS IS” AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+ * EVENT SHALL ANALOG DEVICES, INC. BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+ * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*******************************************************************************/
+
+#include <xparameters.h>
+#include <xil_cache.h>
+#include "no_os_spi.h"
+#include "xilinx_spi.h"
+#include "no_os_gpio.h"
+#include "xilinx_gpio.h"
+#include "no_os_error.h"
+#include "adf5902.h"
+#include "parameters.h"
+#include "no_os_util.h"
+
+#ifdef IIO_SUPPORT
+#include "iio_app.h"
+#include "iio_adf5902.h"
+#include "no_os_uart.h"
+#include "xilinx_uart.h"
+#endif
+
+#define NO_OS_LOG_LEVEL 6
+#include "no_os_print_log.h"
+
+int main(void)
+{
+	int32_t ret;
+	struct adf5902_dev *dev;
+	float temperature = 0;
+	uint64_t freq = 0;
+
+	struct xil_spi_init_param xil_spi_init = {
+		.flags = 0,
+		.type = SPI_PS,
+#ifdef SDT
+		.base_addr = XPAR_XSPIPS_0_BASEADDR,
+#endif
+	};
+
+	struct xil_gpio_init_param xil_gpio_init = {
+		.device_id = GPIO_DEVICE_ID,
+		.type = GPIO_PS,
+#ifdef SDT
+		.base_addr = XPAR_XGPIOPS_0_BASEADDR,
+#endif
+	};
+
+	struct no_os_gpio_init_param gpio_ce_param = {
+		.number = GPIO_CE,
+		.platform_ops = &xil_gpio_ops,
+		.extra = &xil_gpio_init
+	};
+
+	struct no_os_spi_init_param spi_init = {
+		.device_id = SPI_DEVICE_ID,
+		.max_speed_hz = 2000000,
+		.chip_select = SPI_ADF5902_CS,
+		.mode = NO_OS_SPI_MODE_0,
+		.platform_ops = &xil_spi_ops,
+		.extra = &xil_spi_init
+	};
+
+	struct slope slopes_param[ADF5902_MAX_SLOPE_NO] = {
+		{
+			.dev_word = 455,
+			.dev_offset = 9,
+			.step_word = 144
+		},
+		{
+			.dev_word = -7280,
+			.dev_offset = 9,
+			.step_word = 9
+		},
+		{
+			.dev_word = 455,
+			.dev_offset = 9,
+			.step_word = 144
+		},
+		{
+			.dev_word = -7280,
+			.dev_offset = 9,
+			.step_word = 9
+		},
+	};
+
+	struct adf5902_init_param adf5902_param = {
+
+		/* SPI Initialization Structure */
+		.spi_init = &spi_init,
+
+		/* GPIO Chip Enable Initialization Structure */
+		.gpio_ce_param = &gpio_ce_param,
+
+		/* Reference Frequency (Hz) */
+		.ref_in = 100000000,
+
+		/* VCO Frequency (Hz) */
+		.rf_out = 24025000000,
+
+		/* Reference Doubler */
+		.ref_doubler_en = ADF5902_REF_DOUBLER_DISABLE,
+
+		/* Ref / 2 */
+		.ref_div2_en = ADF5902_R_DIV_2_DISABLE,
+
+		/* ADC Average Output */
+		.adc_avg = ADF5902_ADC_AVG_1,
+
+		/* Transmitter Amplitude Calibration Reference Code */
+		.tx_amp_cal_ref = ADF5902_TX_AMP_CAL_MAX_REF_CODE,
+
+		/* Ramp Delay Enable/Disable */
+		.ramp_delay_en = ADF5902_RAMP_DEL_DISABLE,
+
+		/* TX Data Trigger */
+		.tx_trig_en = ADF5902_TX_DATA_TRIG_DISABLE,
+
+		/* Delay Words Number */
+		.delay_words_no = ADF5902_MAX_DELAY_WORD_NO,
+
+		/* Delay Words */
+		.delay_wd = {0, 0, 0, 0},
+
+		/* Number of Slopes*/
+		.slopes_no = ADF5902_MAX_SLOPE_NO,
+
+		/* Slopes Initialization Parameters (DEV/DEVoff/Steps) */
+		.slopes = slopes_param,
+
+		/* TX Ramp CLK */
+		.tx_ramp_clk = ADF5902_TX_RAMP_CLK_DIV,
+
+		/* TX Data invert */
+		.tx_data_invert = AD5902_TX_DATA_INV_DISABLE,
+
+		/* Ramp status */
+		.ramp_status = ADF5902_RAMP_DOWN_TO_MUXOUT,
+
+		/*Ramp  CLK1 */
+		.clk1_div_ramp = 10,
+
+		/* Number of Ramp Timing Parameters */
+		.clk2_div_no = ADF5902_MAX_CLK2_DIV_NO,
+
+		/* Timing Parameters Values */
+		.clk2_div = {10, 10, 10, 10},
+
+		/* Latch Enable Select */
+		.le_sel = ADF5902_LE_FROM_PIN,
+
+		/* Clock Divider Mode */
+		.clk_div_mode = ADF5902_RAMP_DIV,
+
+		/* Charge Pump Current */
+		.cp_current = ADF5902_CP_CURRENT_2MA24,
+
+		/* Charge Pump Tristate */
+		.cp_tristate_en = ADF5902_CP_TRISTATE_DISABLE,
+
+		/* Ramp Mode */
+		.ramp_mode = ADF5902_CONTINUOUS_TRIANGULAR
+	};
+
+	/* Enable the instruction cache. */
+	Xil_ICacheEnable();
+	/* Enable the data cache. */
+	Xil_DCacheEnable();
+
+	ret = adf5902_init(&dev, &adf5902_param);
+	if (ret != 0) {
+		pr_err("ADF5902 Initialization failed!\n");
+		return -1;
+	}
+
+	ret = adf5902_recalibrate(dev);
+	if (ret != 0) {
+		pr_err("ADF5902 Recalibration failed!\n");
+		return -1;
+	}
+
+	pr_info("ADF5902 Successfully initialized!\n");
+
+	ret = adf5902f_compute_frequency(dev, &freq);
+	if (ret != 0) {
+		pr_err("ADF5902 Output Frequency not locked!\n");
+		return -1;
+	}
+
+	pr_info("ADF5902 Locked Frequency: %llu Hz\n", freq);
+
+	ret = adf5902_read_temp(dev, &temperature);
+	if (ret != 0) {
+		pr_err("ADF5902 Temperature read failed!\n");
+		return -1;
+	}
+
+	pr_info("ADF5902 Temperature value: %.2f degC \n", temperature);
+
+#ifdef IIO_SUPPORT
+	struct xil_uart_init_param platform_uart_init_par = {
+		.type = UART_PS,
+#ifdef SDT
+		.base_addr = XPAR_XUARTPS_0_BASEADDR,
+#endif
+		.irq_id = UART_IRQ_ID
+	};
+
+	struct no_os_uart_init_param iio_uart_ip = {
+		.device_id = UART_DEVICE_ID,
+		.irq_id = UART_IRQ_ID,
+		.baud_rate = UART_BAUDRATE,
+		.size = NO_OS_UART_CS_8,
+		.parity = NO_OS_UART_PAR_NO,
+		.stop = NO_OS_UART_STOP_1_BIT,
+		.extra = &platform_uart_init_par,
+		.platform_ops = &xil_uart_ops
+	};
+
+	struct iio_app_desc *app;
+	struct iio_app_init_param app_init_param = { 0 };
+
+	struct iio_app_device devices[] = {
+		IIO_APP_DEVICE("adf5902_dev", dev, &adf5902_iio_descriptor,
+			       NULL, NULL, NULL),
+	};
+
+	app_init_param.devices = devices;
+	app_init_param.nb_devices = NO_OS_ARRAY_SIZE(devices);
+	app_init_param.uart_init_params = iio_uart_ip;
+
+	ret = iio_app_init(&app, app_init_param);
+	if (ret)
+		return ret;
+
+	return iio_app_run(app);
+#endif
+
+	/* Disable the instruction cache. */
+	Xil_ICacheDisable();
+	/* Disable the data cache. */
+	Xil_DCacheDisable();
+
+	ret = adf5902_remove(dev);
+
+	return ret;
+}

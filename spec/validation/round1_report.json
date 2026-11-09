@@ -1,0 +1,219 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "round": 1,
+  "status": "PASS",
+  "scope": "DOCUMENT_STATIC_AND_SPEC_ARM_ABI_COMPILE",
+  "independent_human_review": "NOT_RUN",
+  "production_and_physical_validation": "NOT_RUN",
+  "checks": [
+    {
+      "name": "all_markdown_fences_and_local_links",
+      "status": "PASS",
+      "files": 16,
+      "links": 45
+    },
+    {
+      "name": "handoff_tasks_not_dispatched",
+      "status": "PASS",
+      "tasks": 15
+    },
+    {
+      "name": "dialect_schema_and_private_ids",
+      "status": "PASS",
+      "messages": 13,
+      "common_merge_and_production_generation": "NOT_RUN"
+    },
+    {
+      "name": "explicit_message_registry",
+      "status": "PASS",
+      "messages": 53
+    },
+    {
+      "name": "ICD_slot_and_arena_reference",
+      "status": "PASS",
+      "checked": [
+        {
+          "type": "ImuSample",
+          "count": 8,
+          "slot": 136,
+          "sizeof": 136
+        },
+        {
+          "type": "GnssSample",
+          "count": 8,
+          "slot": 168,
+          "sizeof": 168
+        },
+        {
+          "type": "BaroSample",
+          "count": 8,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "MagSample",
+          "count": 8,
+          "slot": 128,
+          "sizeof": 128
+        },
+        {
+          "type": "RangeSample",
+          "count": 8,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "FlowSample",
+          "count": 8,
+          "slot": 120,
+          "sizeof": 120
+        },
+        {
+          "type": "ExternalOdometry",
+          "count": 8,
+          "slot": 184,
+          "sizeof": 184
+        },
+        {
+          "type": "SensorMeasurement",
+          "count": 16,
+          "slot": 264,
+          "sizeof": 264
+        },
+        {
+          "type": "OperatorInput",
+          "count": 2,
+          "slot": 120,
+          "sizeof": 120
+        },
+        {
+          "type": "AuthorizedOperatorInput",
+          "count": 2,
+          "slot": 128,
+          "sizeof": 128
+        },
+        {
+          "type": "NavigationSnapshot",
+          "count": 2,
+          "slot": 224,
+          "sizeof": 224
+        },
+        {
+          "type": "MotionReference",
+          "count": 2,
+          "slot": 1536,
+          "sizeof": 1536
+        },
+        {
+          "type": "VehicleDirective",
+          "count": 2,
+          "slot": 208,
+          "sizeof": 208
+        },
+        {
+          "type": "ActuationPermit",
+          "count": 2,
+          "slot": 128,
+          "sizeof": 128
+        },
+        {
+          "type": "ActuatorDemand",
+          "count": 2,
+          "slot": 152,
+          "sizeof": 152
+        },
+        {
+          "type": "ActuatorCommitReceipt",
+          "count": 2,
+          "slot": 168,
+          "sizeof": 168
+        },
+        {
+          "type": "AuthorizedMissionSnapshot",
+          "count": 2,
+          "slot": 1184,
+          "sizeof": 1184
+        },
+        {
+          "type": "MissionUploadCandidate",
+          "count": 1,
+          "slot": 1152,
+          "sizeof": 1152
+        },
+        {
+          "type": "ProductGeofenceSnapshot",
+          "count": 8,
+          "slot": 392,
+          "sizeof": 392
+        },
+        {
+          "type": "LandedStateSnapshot",
+          "count": 2,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "MissionStatus",
+          "count": 2,
+          "slot": 120,
+          "sizeof": 120
+        },
+        {
+          "type": "GuidanceStatus",
+          "count": 2,
+          "slot": 144,
+          "sizeof": 144
+        },
+        {
+          "type": "ProductObstacleObservation",
+          "count": 64,
+          "slot": 208,
+          "sizeof": 208
+        }
+      ],
+      "arena_bytes": 39184,
+      "arena_limit": 40960,
+      "scope": "SPEC_LAYOUT_REFERENCE_NOT_PRODUCTION_MAP"
+    },
+    {
+      "name": "independent_arithmetic_and_reference_cases",
+      "status": "PASS",
+      "cases": [
+        "CRC32C official vector",
+        "Baro error-retraction Jacobian",
+        "60 primitive count",
+        "time-key wait separation",
+        "CPU 54.5705%",
+        "per-profile memory admission",
+        "900us critical chain",
+        "5ms sample age",
+        "replay admission arithmetic",
+        "settings six power-cut boundaries"
+      ],
+      "scope": "DOCUMENT_REFERENCE_ONLY",
+      "SIL_HIL_or_target_validation": "NOT_RUN"
+    }
+  ],
+  "inputs_sha256": {
+    "spec/00_工程基线与唯一权威规范.md": "6f207d47eb3416def023c96b5541e1b6ea9f3785e728e5a54cb04b9a827df0ad",
+    "spec/01_系统总体架构与设计决议.md": "37441fb42795f8195418653fea8794eaea089b23aec077a70738249ab6b3b409",
+    "spec/02_接口契约与公共数据规范.md": "fbe8868e82a69fe58f1410dafab187bdf27eea207335c785b0781ab9f463356f",
+    "spec/03_平台软件架构与驱动设计.md": "5662f3e57915a0ee299ae60227faa59e046bb0fe674be1cc708c4eaa55b90e07",
+    "spec/04_飞控核心模块与控制系统设计.md": "48d2f32bf5dbdef6734f7adf847311dc4eb3d8d3071b653916367ffd31da95de",
+    "spec/05_传感器采集时间基准与GNSS独立运行.md": "11950a8c9818ad3d71d82f20ac10bb60c220c12e0934c1f08e48140868eb3478",
+    "spec/06_FMS通信与系统安全设计.md": "db446e08f49ab75772b2582408327afd5cd279787926f8bae3493203097214d5",
+    "spec/07_实时调度与板级硬件资源设计.md": "0af7f617a55e4a6462e3b522cd1ec35ca97fa946e27484fcf07ef075c18f7e75",
+    "spec/08_产品配置插件与参数管理.md": "fba8140040248941f901e0ceeeccb92d4a47c7fb5ee03745082721c14953f746",
+    "spec/09_需求验证实施与发布管理.md": "4837d60e84f9ba8514354ff6084185f8d4298bd418b7e8fb21c9022d0c1576ef",
+    "spec/10_Agent分工与工程执行规范.md": "851a557db9476bcd86978dd3964aa80567df88db55d8f3a3d6b7efe829e321f3",
+    "spec/11_审核问题闭环与变更追踪.md": "68c78a33235ae71ee74f949e54a8ff40978ea8a47c63f1f8f666e2d7fcb3a073",
+    "spec/12_全量审查问题清单与落地边界.md": "67fadf5d4e4637d98dd36a1ffc259396812604b9953504bfbe567db2f2013bd6",
+    "spec/AGENT.md": "6e174696573da1706ca22dd187ec57ce13bf3772e981f3f0762cea8ae7e7326b",
+    "spec/AGENT_HANDOFF.md": "e49ff231ae071da48287c2c473c9f53326f055230bd2fc36d8f65b17839ff2a8",
+    "spec/README.md": "e14e9704d147d75c7b2aeeed6b837a7c56be791ed411d9059e38e89400549359",
+    "spec/contracts/FCU.xml": "1be7adc3b849bc89f812ad66353368ae2c8c6290f2ea97168ee710a7145446ed",
+    "spec/tools/audit_spec.py": "12f54a9a66290b0f08ce23b77215bfdda56ed6f79178e82438415b809e3e884a"
+  },
+  "abi_layout_sha256": "39d40722262de1115c43cb8d9bbdf96eca52a0a3d1c62043b6e47b3cac67ccfc",
+  "artifact_note": "Initial ABI digest recorded; per-slot results retained in this report. Latest complete offsets are in abi_layout.json; round2/3 also retain their own ABI artifacts."
+}

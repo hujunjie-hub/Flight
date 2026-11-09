@@ -1,0 +1,10 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "scope": "BUILD_FLAG_COMPATIBILITY",
+  "platform": "gcc",
+  "cflags": "-mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -ffunction-sections -fdata-sections -Dgcc -fno-short-enums -O0 -gdwarf-2 -g -std=c99",
+  "cxxflags": "-mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -ffunction-sections -fdata-sections -Dgcc -fno-short-enums -O0 -gdwarf-2 -g -std=c++14 -fno-exceptions -fno-rtti",
+  "c_header_compile_exit": 0,
+  "cpp_header_compile_exit": 0,
+  "note": "compiled with the actual GCC branch of rtconfig.py (RTT_CC=gcc); header enum static asserts pass, no short-enum layout"
+}

@@ -1,0 +1,40 @@
+"""Build physical devices using RT-Thread's native drivers and device classes.
+
+Sensor categories contain a source/header pair per device model.
+Only the models selected for the current board are built here.
+"""
+import os
+from building import *
+
+if GetDepend('BSP_USING_FLIGHT_DRIVERS') and (
+        not GetDepend(['RT_USING_DEVICE_OPS', 'RT_USING_SERIAL', 'RT_USING_SERIAL_V2',
+                       'RT_SERIAL_USING_DMA', 'RT_SERIAL_BUF_STRATEGY_OVERWRITE'])
+        or GetDepend('RT_USING_SERIAL_V1')):
+    raise RuntimeError('Flight drivers require device ops and Serial V2 with DMA and RX overwrite')
+
+cwd = GetCurrentDir()
+sources = ['imu/adis16505.c', 'mag/bmm350.c',
+           'barometer/bmp585.c', 'pmu/pmu.c',
+           'gnss/um982.c',
+           'time_base/timer_capture.c', 'time_base/systime.c', 'time_base/systime_rtthread.c']
+paths = [cwd, os.path.join(cwd, '../middleware/contracts')]
+paths += [os.path.join(cwd, category) for category in sorted({source.split('/')[0] for source in sources})]
+group = []
+group.extend(DefineGroup('FlightSensors', sources, depend=['BSP_USING_FLIGHT_DRIVERS'],
+    CPPPATH=paths, LOCAL_CFLAGS=' -std=c99 -fno-short-enums', LIBS=['m']))
+group.extend(DefineGroup('DShotDevice', ['actuator/dshot.c'],
+    depend=['BSP_USING_FLIGHT_DRIVERS'], CPPPATH=[os.path.join(cwd, 'actuator')],
+    LOCAL_CFLAGS=' -std=c99 -fno-short-enums'))
+telemetry_paths = [cwd, os.path.join(cwd, '../board')]
+group.extend(DefineGroup('TelemetryDevices', ['telemetry/elrs/elrs.c', 'telemetry/data_radio/data_radio.c'],
+    depend=['FLIGHT_RUNTIME_ENABLE'], CPPPATH=telemetry_paths,
+    LOCAL_CFLAGS=' -std=c99 -fno-short-enums'))
+group.extend(DefineGroup('HilSerialDevice', ['telemetry/sim/hil_serial.c'],
+    depend=['FLIGHT_SIM_LINK'], CPPPATH=telemetry_paths,
+    LOCAL_CFLAGS=' -std=c99 -fno-short-enums'))
+group.extend(DefineGroup('NorFlashStorage', ['storage/W25Q64/w25q64jv.c'],
+    depend=['BSP_USING_FLIGHT_DRIVERS', 'RT_USING_MTD_NOR'],
+    LOCAL_CFLAGS=' -std=c99 -fno-short-enums'))
+group.extend(DefineGroup('SdmmcStorage', ['storage/SDMMC/drv_sdmmc.c'],
+    depend=['BSP_USING_SDMMC', 'RT_USING_SDIO']))
+Return('group')

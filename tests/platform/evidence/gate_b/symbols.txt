@@ -1,0 +1,25 @@
+## board
+T HAL_TIM_IC_CaptureCallback
+T HAL_TIM_PWM_PulseFinishedCallback
+T HAL_TIM_PeriodElapsedCallback
+R __rt_init_fc_board_platform_init
+T fc_board_dshot_arr
+T fc_board_dshot_fault_count
+T fc_board_dshot_init
+T fc_board_dshot_stop
+T fc_board_dshot_submit
+W fc_board_imu_drdy_isr
+T fc_board_mpu_cache_init
+T fc_board_platform_init
+T fc_board_tim2_init
+T fc_board_tim2_read64
+T fc_board_tim2_read_capture
+T fc_board_tim2_tick_hz
+T fc_board_tim_period_elapsed
+B hdma_tim1_up
+B htim1
+B htim2
+
+## drv_tim
+T stm32_tim_enable_clock
+T stm32_tim_pclkx_doubler_get

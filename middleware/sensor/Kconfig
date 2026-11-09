@@ -1,0 +1,14 @@
+config SENSOR_PROCESSING_ENABLE
+    bool "M2 sensor management and sample processing"
+    default n
+    help
+        Builds sensor payload processing and the GNSS log parser.
+        The Flight application selects this option and adds device acquisition.
+
+config SENSOR_INTEGRITY_ENABLE
+    bool "Sensor Integrity Manager (source isolation and probation)"
+    default n
+    help
+        Builds the source health state machine, sensor use policy and recovery
+        probation described in spec 05. It consumes evidence such as rejected
+        samples, device faults and timeouts.

@@ -1,0 +1,24 @@
+{
+	"version": 7,
+	"cmakeMinimumRequired": {
+		"major": 3,
+		"minor": 28,
+		"patch": 0
+	},
+
+	"include": [
+		"board_configs/maxim/CMakePresets.json",
+		"board_configs/stm32/CMakePresets.json",
+		"board_configs/pico/CMakePresets.json",
+		"board_configs/aducm3029/CMakePresets.json",
+		"board_configs/xilinx/CMakePresets.json"
+	],
+
+	"configurePresets": [
+		{
+			"name": "default",
+			"description": "Default config",
+			"generator": "Ninja"
+		}
+	]
+}

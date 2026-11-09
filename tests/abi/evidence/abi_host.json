@@ -1,0 +1,2006 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "scope": "HOST_PRODUCTION_ABI",
+  "independent_review": "NOT_RUN",
+  "target_firmware_build": "NOT_RUN",
+  "profile": "QUAD_X4",
+  "schema": "6.0",
+  "port_api_revision": "0x00010906",
+  "product_contract_revision": "0x00010906",
+  "headers": [
+    "middleware/contracts/base_types/contract_version.h",
+    "middleware/contracts/base_types/common_base.h",
+    "middleware/contracts/ports/control_model_types.h",
+    "middleware/contracts/messages/common_messages.h",
+    "middleware/contracts/ports/port_types.h",
+    "middleware/contracts/ports/port_api.h",
+    "middleware/contracts/messages/message_ids.h",
+    "middleware/contracts/product_contract/product_contract.h"
+  ],
+  "header_sha256": {
+    "middleware/contracts/base_types/contract_version.h": "6c1a2aaef949e6b9441a0f4044f2df41352ccc0953b8918abe95db29318b5df5",
+    "middleware/contracts/base_types/common_base.h": "b28c37f625060e249254f4140a17668279baa86b9899a87511ee459a17b89102",
+    "middleware/contracts/ports/control_model_types.h": "bb36451790060d8b0a7588617f5dc2f18277cf63dbd78edee8cf2e0b847d43f2",
+    "middleware/contracts/messages/common_messages.h": "f4293e8ecd40d13ac8f8846f9efe08c05411976bcb2cf6d4fe7792ead2963d87",
+    "middleware/contracts/ports/port_types.h": "b64d0c331a5da74fc5a7dadd427505e152203fc1d897abcfd4291a83c5dadb46",
+    "middleware/contracts/ports/port_api.h": "2a641af4578ad8634ccca91c87f6efe3fea7f617b0d15dda6fff672de565ee8c",
+    "middleware/contracts/messages/message_ids.h": "4574ec4874d59a6f64f5feeb92338f09c37430795668e5918fb6d8a6c10fda46",
+    "middleware/contracts/product_contract/product_contract.h": "461477d6d870bc2755c84ff5d5366cf28f032b9ad7d425bb7bdb19320817a7e1"
+  },
+  "status": "PASS",
+  "failures": [],
+  "warnings": [],
+  "compiler": "gcc.exe (x86_64-win32-seh-rev1, Built by MinGW-Builds project) 16.2.0",
+  "flags": [
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts"
+  ],
+  "abi_hash": "0edc9d8baaca7a826d9e807132f0cf232fd55f7a9b646d4d9a82aab4c288eacf",
+  "types": 143,
+  "fields": 986,
+  "layout": {
+    "ContractHeader": {
+      "kind": "struct",
+      "fields": {
+        "schema_major": 0,
+        "schema_minor": 2,
+        "message_type": 4,
+        "source_id": 6,
+        "sequence": 8,
+        "profile_id": 12,
+        "frame_id": 16,
+        "boot_id": 24,
+        "clock_domain_id": 32,
+        "time_epoch": 36,
+        "source_clock_domain_id": 40,
+        "source_mapping_epoch": 44,
+        "timestamp_sample_us": 48,
+        "timestamp_publish_us": 56,
+        "valid_until_us": 64,
+        "event_time_uncertainty_us": 72,
+        "timestamp_quality": 76,
+        "timestamp_flags": 77,
+        "reserved": 78,
+        "validity_flags": 80
+      },
+      "size": 88,
+      "alignment": 8
+    },
+    "TimerCaptureEvent": {
+      "kind": "struct",
+      "fields": {
+        "boot_id": 0,
+        "capture_ticks64": 8,
+        "capture_time_us": 16,
+        "time_epoch": 24,
+        "discipline_epoch": 28,
+        "edge_sequence": 32,
+        "event_time_uncertainty_us": 36,
+        "timer_instance": 40,
+        "channel": 42,
+        "flags": 43
+      },
+      "size": 48,
+      "alignment": 8
+    },
+    "ClockInstant": {
+      "kind": "struct",
+      "fields": {
+        "boot_id": 0,
+        "monotonic_us": 8,
+        "time_epoch": 16,
+        "reserved": 20
+      },
+      "size": 24,
+      "alignment": 8
+    },
+    "TimeQuality": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "TimestampQuality": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "TimeReferenceSource": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "LocalTimebaseDisciplineState": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "PpsCaptureEvent": {
+      "kind": "struct",
+      "fields": {
+        "capture_tick64": 0,
+        "edge_sequence": 8,
+        "time_epoch": 12,
+        "capture_flags": 16,
+        "reserved": 18
+      },
+      "size": 24,
+      "alignment": 8
+    },
+    "LocalTimebaseDisciplineStatus": {
+      "kind": "struct",
+      "fields": {
+        "time_epoch": 0,
+        "discipline_epoch": 4,
+        "anchor_tick64": 8,
+        "anchor_monotonic_us": 16,
+        "rate_correction_ppb": 24,
+        "rate_uncertainty_ppb": 28,
+        "last_phase_error_ns": 32,
+        "last_valid_pps_tick64": 40,
+        "last_update_monotonic_us": 48,
+        "accepted_interval_count": 56,
+        "discipline_state": 58,
+        "valid": 59
+      },
+      "size": 64,
+      "alignment": 8
+    },
+    "GnssTimeObservation": {
+      "kind": "struct",
+      "fields": {
+        "utc_time_ns": 0,
+        "paired_pps_tick64": 8,
+        "pps_edge_sequence": 16,
+        "time_epoch": 20,
+        "receiver_accuracy_ns": 24,
+        "time_scale": 28,
+        "validity_flags": 30
+      },
+      "size": 32,
+      "alignment": 8
+    },
+    "ExternalClockSyncObservation": {
+      "kind": "struct",
+      "fields": {
+        "source_clock_domain_id": 0,
+        "source_sequence": 4,
+        "local_time_epoch": 8,
+        "reserved0": 12,
+        "local_send_time_us": 16,
+        "source_receive_time_ns": 24,
+        "source_send_time_ns": 32,
+        "local_receive_time_us": 40,
+        "source_uncertainty_ns": 48,
+        "source_reset_counter": 52,
+        "validity_flags": 56,
+        "reserved": 58
+      },
+      "size": 64,
+      "alignment": 8
+    },
+    "ClockMappingState": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "ClockDomainMappingStatus": {
+      "kind": "struct",
+      "fields": {
+        "source_clock_domain_id": 0,
+        "source_reset_counter": 4,
+        "mapping_epoch": 8,
+        "local_time_epoch": 12,
+        "anchor_source_time_ns": 16,
+        "anchor_local_time_us": 24,
+        "source_rate_error_ppb": 32,
+        "mapping_state": 36,
+        "reserved": 37,
+        "uncertainty_ns": 40,
+        "last_sync_local_us": 48,
+        "valid_until_local_us": 56
+      },
+      "size": 64,
+      "alignment": 8
+    },
+    "TimeServiceStatus": {
+      "kind": "struct",
+      "fields": {
+        "monotonic_now_us": 0,
+        "utc_estimate_ns": 8,
+        "utc_uncertainty_ns": 16,
+        "holdover_duration_us": 24,
+        "last_valid_pps_us": 32,
+        "last_valid_reference_us": 40,
+        "estimated_frequency_error_ppb": 48,
+        "clock_domain_id": 52,
+        "time_epoch": 56,
+        "utc_mapping_epoch": 60,
+        "status_flags": 64,
+        "state": 68,
+        "reference_source": 69,
+        "utc_valid": 70,
+        "local_clock_valid": 71,
+        "frequency_discipline_valid": 72,
+        "reserved": 73
+      },
+      "size": 80,
+      "alignment": 8
+    },
+    "ImuSample": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "sample_sequence": 92,
+        "calibration_version": 96,
+        "quality_flags": 100,
+        "gyro_frd_radps": 104,
+        "accel_frd_mps2": 116,
+        "temperature_c": 128
+      },
+      "size": 136,
+      "alignment": 8
+    },
+    "GnssSample": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "sample_sequence": 92,
+        "calibration_version": 96,
+        "quality_flags": 100,
+        "latitude_deg": 104,
+        "longitude_deg": 112,
+        "altitude_m": 120,
+        "velocity_ned_mps": 124,
+        "position_variance_m2": 136,
+        "velocity_variance_m2ps2": 148,
+        "fix_type": 160,
+        "satellite_count": 161,
+        "reserved": 162
+      },
+      "size": 168,
+      "alignment": 8
+    },
+    "BaroSample": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "calibration_version": 92,
+        "quality_flags": 96,
+        "altitude_m": 100,
+        "variance_m2": 104
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "MagSample": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "calibration_version": 92,
+        "quality_flags": 96,
+        "field_frd_ut": 100,
+        "variance_ut2": 112
+      },
+      "size": 128,
+      "alignment": 8
+    },
+    "RangeSample": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "calibration_version": 92,
+        "quality_flags": 96,
+        "range_m": 100,
+        "variance_m2": 104
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "FlowSample": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "calibration_version": 92,
+        "quality_flags": 96,
+        "velocity_xy_mps": 100,
+        "integration_time_s": 108,
+        "quality": 112
+      },
+      "size": 120,
+      "alignment": 8
+    },
+    "WheelOdometrySample": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "calibration_version": 92,
+        "quality_flags": 96,
+        "wheel_speed_mps": 100,
+        "steering_angle_rad": 116
+      },
+      "size": 120,
+      "alignment": 8
+    },
+    "AirspeedSample": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "calibration_version": 92,
+        "quality_flags": 96,
+        "true_airspeed_mps": 100,
+        "variance_m2ps2": 104
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "WaterSpeedSample": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "calibration_version": 92,
+        "quality_flags": 96,
+        "water_speed_mps": 100,
+        "variance_m2ps2": 104
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "NavStateCore": {
+      "kind": "struct",
+      "fields": {
+        "valid_mask": 0,
+        "position_ned_m": 4,
+        "velocity_ned_mps": 16,
+        "acceleration_ned_mps2": 28,
+        "q_nb_wxyz": 40,
+        "body_rate_frd_radps": 56,
+        "position_std_m": 68,
+        "velocity_std_mps": 80,
+        "attitude_std_rad": 92
+      },
+      "size": 104,
+      "alignment": 4
+    },
+    "SensorDiagnostic": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "diagnostic_class": 92,
+        "severity": 94,
+        "flags": 95,
+        "reason_code": 96,
+        "occurrence_count": 100,
+        "last_good_sample_us": 104
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "SensorDataGapEvent": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "first_missing_sequence": 92,
+        "last_missing_sequence": 96,
+        "reason_code": 100,
+        "last_good_sample_time_us": 104,
+        "next_sample_time_us": 112
+      },
+      "size": 120,
+      "alignment": 8
+    },
+    "Status": {
+      "kind": "int32_t",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "ControlModelState": {
+      "kind": "struct",
+      "fields": {
+        "state": 0
+      },
+      "size": 24,
+      "alignment": 4
+    },
+    "ControlModelInput": {
+      "kind": "struct",
+      "fields": {
+        "input": 0
+      },
+      "size": 12,
+      "alignment": 4
+    },
+    "ControlLinearModel": {
+      "kind": "struct",
+      "fields": {
+        "A": 0,
+        "B": 144,
+        "c": 216,
+        "sample_time_s": 240
+      },
+      "size": 244,
+      "alignment": 4
+    },
+    "ControlModelBounds": {
+      "kind": "struct",
+      "fields": {
+        "state_min": 0,
+        "state_max": 24,
+        "input_min": 48,
+        "input_max": 60,
+        "input_slew_max": 72
+      },
+      "size": 84,
+      "alignment": 4
+    },
+    "OperatingPoint": {
+      "kind": "struct",
+      "fields": {
+        "state": 0,
+        "input": 24,
+        "operating_speed_mps": 36,
+        "operating_voltage_v": 40
+      },
+      "size": 44,
+      "alignment": 4
+    },
+    "ControlModelDescriptor": {
+      "kind": "struct",
+      "fields": {
+        "model_id": 0,
+        "model_version": 4,
+        "state_layout_id": 8,
+        "input_layout_id": 12,
+        "model_hash": 16,
+        "model_kind": 20,
+        "reserved": 21
+      },
+      "size": 24,
+      "alignment": 4
+    },
+    "OperationRequest": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "request_id": 88,
+        "source_session_id": 92,
+        "command_code": 96,
+        "authority_class": 98,
+        "payload_schema_id": 100,
+        "reserved": 102,
+        "execution_deadline_us": 104,
+        "payload": 112
+      },
+      "size": 160,
+      "alignment": 8
+    },
+    "OperatorInput": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "input_layout_id": 88,
+        "valid_axis_mask": 92,
+        "payload": 96
+      },
+      "size": 120,
+      "alignment": 8
+    },
+    "ExternalOdometry": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "source_origin_id": 88,
+        "reset_counter": 92,
+        "tracking_status": 96,
+        "position_ned_m": 100,
+        "velocity_ned_mps": 112,
+        "q_nb_wxyz": 124,
+        "position_variance_m2": 140,
+        "velocity_variance_m2ps2": 152,
+        "attitude_variance_rad2": 164,
+        "time_sync_uncertainty_us": 176
+      },
+      "size": 184,
+      "alignment": 8
+    },
+    "SensorMeasurement": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "measurement_kind": 92,
+        "reserved": 94,
+        "payload": 96
+      },
+      "size": 264,
+      "alignment": 8
+    },
+    "NavigationSnapshot": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "state_epoch": 88,
+        "origin_id": 92,
+        "core": 96,
+        "vehicle_extension": 200
+      },
+      "size": 224,
+      "alignment": 8
+    },
+    "NavigationCapability": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "state_epoch": 88,
+        "origin_id": 92,
+        "capability_mask": 96,
+        "degraded_mask": 100,
+        "solution_state": 104,
+        "reserved": 105,
+        "horizontal_position_std_m": 108,
+        "vertical_position_std_m": 112,
+        "velocity_std_mps": 116,
+        "heading_std_rad": 120,
+        "active_source_mask": 124,
+        "rejected_source_mask": 128
+      },
+      "size": 136,
+      "alignment": 8
+    },
+    "StateResetEvent": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "old_state_epoch": 88,
+        "new_state_epoch": 92,
+        "old_origin_id": 96,
+        "new_origin_id": 100,
+        "reset_type": 104,
+        "reserved": 106,
+        "position_delta_m": 108,
+        "velocity_delta_mps": 120,
+        "attitude_delta_rad": 132
+      },
+      "size": 144,
+      "alignment": 8
+    },
+    "EstimatorResetRequest": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "reset_type": 88,
+        "initial_source": 90,
+        "requested_origin_id": 92,
+        "valid_initial_state_mask": 96,
+        "initial_state": 100
+      },
+      "size": 208,
+      "alignment": 8
+    },
+    "SafetyEnvelope": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "safety_envelope_id": 88,
+        "envelope_epoch": 92,
+        "max_linear_speed_mps": 96,
+        "max_linear_accel_mps2": 100,
+        "max_angular_rate_radps": 104,
+        "max_yaw_rate_radps": 108,
+        "vehicle_extension": 112
+      },
+      "size": 184,
+      "alignment": 8
+    },
+    "SensorUsePolicy": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "policy_epoch": 92,
+        "use_state": 96,
+        "reason_code": 98,
+        "degraded_noise_profile_id": 100,
+        "evaluation_flags": 104,
+        "effective_time_us": 112,
+        "policy_expires_at_us": 120
+      },
+      "size": 128,
+      "alignment": 8
+    },
+    "SensorConsistencyReason": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "SensorConsistencyEvidence": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "sensor_instance_id": 88,
+        "policy_epoch": 92,
+        "state_epoch": 96,
+        "calibration_version": 100,
+        "window_duration_us": 104,
+        "evaluated_count": 108,
+        "accepted_count": 110,
+        "rejected_count": 112,
+        "probation_pass_count": 114,
+        "evidence_flags": 116,
+        "reason_code": 120,
+        "evaluation_mode": 122,
+        "last_evaluated_sample_time_us": 128,
+        "evidence_expires_at_us": 136
+      },
+      "size": 144,
+      "alignment": 8
+    },
+    "LandedState": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "LandedStateSnapshot": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "state_revision": 88,
+        "state": 92,
+        "evidence_mask": 94,
+        "confidence_0_to_1": 96,
+        "stable_duration_ms": 100,
+        "state_since_us": 104
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "VehicleDirective": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "directive_epoch": 88,
+        "authority_epoch": 92,
+        "state_epoch": 96,
+        "policy_id": 100,
+        "operation_code": 104,
+        "guidance_mode_code": 106,
+        "reason_code": 108,
+        "reserved": 110,
+        "directive_expires_at_us": 112,
+        "required_nav_capabilities": 120,
+        "safety_envelope_id": 124,
+        "payload": 128
+      },
+      "size": 232,
+      "alignment": 8
+    },
+    "ActuationPermit": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "permit_epoch": 88,
+        "directive_epoch": 92,
+        "authority_epoch": 96,
+        "state_epoch": 100,
+        "reference_epoch": 104,
+        "permit_flags": 108,
+        "permit_expires_at_us": 112,
+        "reason_code": 120,
+        "output_policy_id": 122
+      },
+      "size": 128,
+      "alignment": 8
+    },
+    "MotionReferencePoint": {
+      "kind": "struct",
+      "fields": {
+        "offset_us": 0,
+        "valid_mask": 4,
+        "point": 8
+      },
+      "size": 56,
+      "alignment": 4
+    },
+    "MotionReference": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "reference_id": 88,
+        "reference_epoch": 92,
+        "state_epoch": 96,
+        "origin_id": 100,
+        "authority_epoch": 104,
+        "directive_epoch": 108,
+        "mission_epoch": 112,
+        "current_item_id": 116,
+        "execution_token": 120,
+        "point_count": 128,
+        "reference_kind": 130,
+        "reserved": 132,
+        "anchor": 136,
+        "points": 192
+      },
+      "size": 1536,
+      "alignment": 8
+    },
+    "ActuatorDemand": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "actuator_layout_id": 88,
+        "valid_channel_mask": 92,
+        "permit_epoch": 96,
+        "directive_epoch": 100,
+        "authority_epoch": 104,
+        "state_epoch": 108,
+        "reference_epoch": 112,
+        "control_sequence": 116,
+        "demand_expires_at_us": 120,
+        "demand": 128
+      },
+      "size": 152,
+      "alignment": 8
+    },
+    "ActuatorCommitReceipt": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "applied_control_sequence": 88,
+        "permit_epoch": 92,
+        "directive_epoch": 96,
+        "authority_epoch": 100,
+        "state_epoch": 104,
+        "reference_epoch": 108,
+        "commit_time_us": 112,
+        "estimated_apply_time_us": 120,
+        "receipt_expires_at_us": 128,
+        "limit_flags": 136,
+        "output_policy_id": 140,
+        "result_code": 142,
+        "committed_demand": 144
+      },
+      "size": 168,
+      "alignment": 8
+    },
+    "ActuatorStatus": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "actuator_layout_id": 88,
+        "available_mask": 92,
+        "fault_mask": 96,
+        "feedback_valid_mask": 100,
+        "feedback": 104
+      },
+      "size": 144,
+      "alignment": 8
+    },
+    "ActuatorCapability": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "actuator_layout_id": 88,
+        "available_mask": 92,
+        "controllable_dof_mask": 96,
+        "degraded_dof_mask": 100,
+        "vehicle_extension": 104
+      },
+      "size": 152,
+      "alignment": 8
+    },
+    "ControlReasonCode": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "ControlCapability": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "control_layout_id": 88,
+        "controllable_dof_mask": 92,
+        "degraded_dof_mask": 96,
+        "health_state": 100,
+        "control_level": 101,
+        "reason_code": 102
+      },
+      "size": 104,
+      "alignment": 8
+    },
+    "FaultSummary": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "active_fault_count": 88,
+        "latched_fault_count": 92,
+        "fault_domain_mask": 96,
+        "highest_severity_fault_id": 100,
+        "highest_severity": 104,
+        "reserved": 105
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "MissionStatus": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "mission_id": 88,
+        "current_item_id": 92,
+        "mission_epoch": 96,
+        "mission_revision": 100,
+        "execution_token": 104,
+        "mission_state": 112,
+        "result_code": 114,
+        "progress_0_to_1": 116
+      },
+      "size": 120,
+      "alignment": 8
+    },
+    "GuidanceFeasibility": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "reference_id": 88,
+        "reference_epoch": 92,
+        "feasible": 96,
+        "severity": 97,
+        "reason_code": 98,
+        "violated_constraint_id": 100,
+        "earliest_violation_offset_us": 104
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "CommandAck": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "request_id": 88,
+        "source_session_id": 92,
+        "request_source_id": 96,
+        "reserved_source": 98,
+        "ack_state": 100,
+        "reason_code": 102,
+        "completion_time_us": 104
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "DecisionEvent": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "decision_id": 88,
+        "request_id": 92,
+        "policy_id": 96,
+        "evidence_mask": 100,
+        "decision_code": 104,
+        "reason_code": 106
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "GuidanceRunState": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "GuidanceReferenceKind": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "GuidanceReasonCode": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "GuidanceStatus": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "reference_id": 88,
+        "reference_epoch": 92,
+        "state_epoch": 96,
+        "origin_id": 100,
+        "authority_epoch": 104,
+        "directive_epoch": 108,
+        "mission_epoch": 112,
+        "current_item_id": 116,
+        "execution_token": 120,
+        "guidance_state": 128,
+        "reference_kind": 130,
+        "reason_code": 132,
+        "item_result": 134,
+        "reference_expires_at_us": 136
+      },
+      "size": 144,
+      "alignment": 8
+    },
+    "FmsStateSnapshot": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "arm_state": 88,
+        "flight_mode": 89,
+        "authority": 90,
+        "failsafe_level": 91,
+        "mission_state": 92,
+        "reserved": 93,
+        "authority_epoch": 96,
+        "directive_epoch": 100,
+        "permit_epoch": 104,
+        "reference_epoch": 108,
+        "state_epoch": 112,
+        "active_mission_id": 116,
+        "active_policy_id": 120
+      },
+      "size": 128,
+      "alignment": 8
+    },
+    "PreArmState": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "PreArmCheckResult": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "check_epoch": 88,
+        "failed_checks_mask": 92,
+        "state": 96,
+        "primary_reason_code": 98,
+        "failed_count": 100,
+        "warning_count": 102,
+        "checked_at_us": 104
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "PilotReferenceKind": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "PilotControlReference": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "reference_id": 88,
+        "reference_epoch": 92,
+        "state_epoch": 96,
+        "origin_id": 100,
+        "authority_epoch": 104,
+        "directive_epoch": 108,
+        "reference_kind": 112,
+        "valid_mask": 114,
+        "vehicle_extension": 116
+      },
+      "size": 168,
+      "alignment": 8
+    },
+    "ModuleHealth": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "component_id": 88,
+        "last_error_code": 92,
+        "consecutive_error_count": 96,
+        "last_success_time_us": 104,
+        "last_heartbeat_time_us": 112,
+        "health_state": 120,
+        "reserved": 121
+      },
+      "size": 128,
+      "alignment": 8
+    },
+    "EstimatorHealth": {
+      "kind": "struct",
+      "fields": {
+        "common": 0,
+        "last_imu_sample_us": 128,
+        "propagation_age_us": 136,
+        "rejected_measurement_count": 140,
+        "covariance_fault_count": 144
+      },
+      "size": 152,
+      "alignment": 8
+    },
+    "ControlHealth": {
+      "kind": "struct",
+      "fields": {
+        "common": 0,
+        "solver_status": 128,
+        "deadline_miss_count": 132,
+        "last_valid_command_us": 136,
+        "max_input_age_us": 144,
+        "allocation_failure_count": 148
+      },
+      "size": 152,
+      "alignment": 8
+    },
+    "CommunicationLinkStatus": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "link_instance_id": 88,
+        "link_kind": 92,
+        "link_state": 94,
+        "reason_code": 96,
+        "valid_frame_count": 100,
+        "sequence_gap_count": 104,
+        "crc_error_count": 108,
+        "packet_loss_ppm": 112,
+        "rssi_dbm": 116,
+        "link_quality_permille": 118,
+        "last_valid_frame_us": 120,
+        "last_rx_us": 128,
+        "recovery_stable_ms": 136,
+        "flags": 140
+      },
+      "size": 144,
+      "alignment": 8
+    },
+    "NavigationOriginSnapshot": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "origin_id": 88,
+        "state_epoch": 92,
+        "valid_mask": 96,
+        "reserved": 100,
+        "latitude_deg": 104,
+        "longitude_deg": 112,
+        "ellipsoid_height_m": 120,
+        "geoid_separation_m": 128,
+        "local_radius_limit_m": 132
+      },
+      "size": 136,
+      "alignment": 8
+    },
+    "AuthorizedOperatorInput": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "authority_epoch": 88,
+        "selected_source_id": 92,
+        "authority_class": 94,
+        "input_layout_id": 96,
+        "payload": 100
+      },
+      "size": 128,
+      "alignment": 8
+    },
+    "AuthorityStatus": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "authority_epoch": 88,
+        "authority_owner": 92,
+        "operation_mode": 94,
+        "selected_source_id": 96,
+        "flags": 100,
+        "reason_code": 104,
+        "reserved": 106
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "FaultEvidenceEvent": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "event_id": 88,
+        "fault_domain": 92,
+        "evidence_class": 94,
+        "source_component_id": 96,
+        "source_instance_id": 100,
+        "reason_code": 104,
+        "related_sequence": 108,
+        "first_seen_us": 112,
+        "last_seen_us": 120,
+        "occurrence_count": 128,
+        "severity": 132,
+        "active": 133,
+        "reserved": 134
+      },
+      "size": 136,
+      "alignment": 8
+    },
+    "MissionUploadCandidate": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "transaction_id": 88,
+        "source_session_id": 92,
+        "state_epoch": 96,
+        "origin_id": 100,
+        "mission_hash": 104,
+        "mission": 108
+      },
+      "size": 1152,
+      "alignment": 8
+    },
+    "ControlModelView": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "descriptor": 88,
+        "linear_model": 112,
+        "bounds": 356,
+        "model_epoch": 440,
+        "operating_point_id": 444
+      },
+      "size": 448,
+      "alignment": 8
+    },
+    "EnvironmentConstraint": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "constraint_kind": 88,
+        "severity": 90,
+        "constraint_id": 92,
+        "constraint_expires_at_us": 96,
+        "payload": 104
+      },
+      "size": 120,
+      "alignment": 8
+    },
+    "FmsHealth": {
+      "kind": "ModuleHealth",
+      "fields": {},
+      "size": 128,
+      "alignment": 8
+    },
+    "GuidanceHealth": {
+      "kind": "ModuleHealth",
+      "fields": {},
+      "size": 128,
+      "alignment": 8
+    },
+    "ActuatorHealth": {
+      "kind": "ModuleHealth",
+      "fields": {},
+      "size": 128,
+      "alignment": 8
+    },
+    "ProductProfile": {
+      "kind": "struct",
+      "fields": {
+        "product_profile_id": 0,
+        "profile_version": 4,
+        "profile_hash": 8,
+        "nav_layout_id": 12,
+        "motion_reference_layout_id": 16,
+        "actuator_layout_id": 20,
+        "model_manifest_hash": 24,
+        "fms_policy_id": 28,
+        "estimator_impl_id": 32,
+        "guidance_impl_id": 36,
+        "controller_impl_id": 40,
+        "control_model_id": 44,
+        "actuator_adapter_id": 48
+      },
+      "size": 52,
+      "alignment": 4
+    },
+    "FmsInputView": {
+      "kind": "struct",
+      "fields": {
+        "pending_requests": 0,
+        "pending_request_count": 8,
+        "reserved0": 10,
+        "operator_input": 16,
+        "link_statuses": 24,
+        "link_status_count": 32,
+        "reserved1": 34,
+        "navigation": 40,
+        "navigation_capability": 48,
+        "mission_candidate": 56,
+        "guidance_feasibility": 64,
+        "guidance_status": 72,
+        "control_capability": 80,
+        "actuator_capability": 88,
+        "actuator_status": 96,
+        "fault_summary": 104,
+        "presence_mask": 112,
+        "product_extension": 120,
+        "evaluation_time_us": 248
+      },
+      "size": 256,
+      "alignment": 8
+    },
+    "FmsOutputView": {
+      "kind": "struct",
+      "fields": {
+        "directive": 0,
+        "safety_envelope": 232,
+        "actuation_permit": 416,
+        "authorized_operator_input": 544,
+        "authority_status": 672,
+        "state_snapshot": 784,
+        "mission_status": 912,
+        "prearm_result": 1032,
+        "landed_state": 1144,
+        "authorized_mission": 1256,
+        "geofences": 2440,
+        "geofence_count": 4008,
+        "reserved_geofence": 4010,
+        "command_results": 4016,
+        "command_result_count": 4464,
+        "reserved": 4466,
+        "decision_event": 4472
+      },
+      "size": 4584,
+      "alignment": 8
+    },
+    "GuidanceInput": {
+      "kind": "struct",
+      "fields": {
+        "navigation": 0,
+        "navigation_capability": 8,
+        "directive": 16,
+        "safety_envelope": 24,
+        "landed_state": 32,
+        "authorized_operator_input": 40,
+        "authority_status": 48,
+        "authorized_mission": 56,
+        "active_permit": 64,
+        "geofences": 72,
+        "geofence_count": 80,
+        "observation_count": 82,
+        "observations": 88,
+        "environment": 96,
+        "control_time_us": 104,
+        "evaluation_time_us": 112
+      },
+      "size": 120,
+      "alignment": 8
+    },
+    "GuidanceOutput": {
+      "kind": "struct",
+      "fields": {
+        "reference": 0,
+        "pilot_control_reference": 1536,
+        "guidance_status": 1704,
+        "feasibility": 1848
+      },
+      "size": 1960,
+      "alignment": 8
+    },
+    "ControllerInput": {
+      "kind": "struct",
+      "fields": {
+        "navigation": 0,
+        "reference": 8,
+        "pilot_control_reference": 16,
+        "guidance_status": 24,
+        "directive": 32,
+        "safety_envelope": 40,
+        "authority_status": 48,
+        "actuation_permit": 56,
+        "actuator_status": 64,
+        "actuator_capability": 72,
+        "actuator_commit_receipt": 80,
+        "control_model_view": 88,
+        "control_time_us": 96,
+        "evaluation_time_us": 104
+      },
+      "size": 112,
+      "alignment": 8
+    },
+    "ControllerOutput": {
+      "kind": "struct",
+      "fields": {
+        "actuator_demand": 0,
+        "capability": 152,
+        "health": 256
+      },
+      "size": 408,
+      "alignment": 8
+    },
+    "PlantSimConfig": {
+      "kind": "struct",
+      "fields": {
+        "product_profile_id": 0,
+        "plant_model_id": 4,
+        "plant_model_version": 8,
+        "parameter_hash": 12,
+        "fixed_step_s": 16
+      },
+      "size": 20,
+      "alignment": 4
+    },
+    "PlantInitialCondition": {
+      "kind": "struct",
+      "fields": {
+        "state": 0
+      },
+      "size": 68,
+      "alignment": 4
+    },
+    "PlantTruth": {
+      "kind": "struct",
+      "fields": {
+        "sample_time_us": 0,
+        "truth": 8
+      },
+      "size": 80,
+      "alignment": 8
+    },
+    "EnvironmentInput": {
+      "kind": "struct",
+      "fields": {
+        "state": 0
+      },
+      "size": 16,
+      "alignment": 4
+    },
+    "SimulatedMeasurementBatch": {
+      "kind": "struct",
+      "fields": {
+        "imu_count": 0,
+        "measurement_count": 2,
+        "imu_samples": 8,
+        "measurements": 552
+      },
+      "size": 4776,
+      "alignment": 8
+    },
+    "FmsInputSnapshot": {
+      "kind": "FmsInputView",
+      "fields": {},
+      "size": 256,
+      "alignment": 8
+    },
+    "FmsOutput": {
+      "kind": "FmsOutputView",
+      "fields": {},
+      "size": 4584,
+      "alignment": 8
+    },
+    "ProductMissionWaypoint": {
+      "kind": "struct",
+      "fields": {
+        "waypoint_id": 0,
+        "position_ned_m": 4,
+        "yaw_rad": 16,
+        "acceptance_radius_m": 20,
+        "speed_limit_mps": 24,
+        "flags": 28
+      },
+      "size": 32,
+      "alignment": 4
+    },
+    "ProductMissionPayload": {
+      "kind": "struct",
+      "fields": {
+        "mission_id": 0,
+        "mission_revision": 4,
+        "mission_hash": 8,
+        "waypoint_count": 12,
+        "flags": 14,
+        "waypoints": 16
+      },
+      "size": 1040,
+      "alignment": 4
+    },
+    "ProductEnvironmentConstraint": {
+      "kind": "struct",
+      "fields": {
+        "obstacle_count": 0,
+        "min_clearance_m": 4,
+        "max_wind_mps": 8
+      },
+      "size": 12,
+      "alignment": 4
+    },
+    "ProductNavExtension": {
+      "kind": "struct",
+      "fields": {
+        "valid_mask": 0,
+        "baro_altitude_m": 4,
+        "terrain_range_m": 8,
+        "wind_ned_mps": 12
+      },
+      "size": 24,
+      "alignment": 4
+    },
+    "ProductOperationPayload": {
+      "kind": "struct",
+      "fields": {
+        "mission_id": 0,
+        "target_ned_m": 4,
+        "target_yaw_rad": 16,
+        "requested_altitude_m": 20,
+        "valid_mask": 24,
+        "requested_mode": 28,
+        "operation_flags": 30,
+        "settings_transaction_id": 32,
+        "prearm_check_epoch": 36,
+        "mission_transaction_id": 40,
+        "mission_epoch": 44
+      },
+      "size": 48,
+      "alignment": 4
+    },
+    "ProductHomeValidity": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "ProductHomeQuality": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "ProductHomeCaptureSource": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "ProductHomeTargetSnapshot": {
+      "kind": "struct",
+      "fields": {
+        "home_id": 0,
+        "home_revision": 4,
+        "frame_id": 8,
+        "origin_id": 12,
+        "state_epoch": 16,
+        "validity": 20,
+        "quality": 21,
+        "capture_source": 22,
+        "reserved0": 23,
+        "captured_at_us": 24,
+        "home_expires_at_us": 32,
+        "position_ned_m": 40,
+        "position_std_m": 52
+      },
+      "size": 64,
+      "alignment": 8
+    },
+    "ProductGeofenceValidity": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "ProductGeofenceKind": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "ProductGeofenceSnapshot": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "fence_id": 88,
+        "fence_revision": 92,
+        "fence_hash": 96,
+        "frame_id": 100,
+        "origin_id": 104,
+        "state_epoch": 108,
+        "validity": 112,
+        "kind": 113,
+        "vertex_count": 114,
+        "reserved0": 115,
+        "vertices_ne_m": 116,
+        "min_height_above_home_m": 372,
+        "max_height_above_home_m": 376,
+        "horizontal_margin_m": 380,
+        "vertical_margin_m": 384
+      },
+      "size": 392,
+      "alignment": 8
+    },
+    "ProductGeofenceDefinition": {
+      "kind": "struct",
+      "fields": {
+        "fence_id": 0,
+        "kind": 4,
+        "vertex_count": 5,
+        "reserved0": 6,
+        "vertices_ne_m": 8,
+        "min_height_above_home_m": 264,
+        "max_height_above_home_m": 268,
+        "horizontal_margin_m": 272,
+        "vertical_margin_m": 276
+      },
+      "size": 280,
+      "alignment": 4
+    },
+    "ProductGeofenceConfigPayload": {
+      "kind": "struct",
+      "fields": {
+        "config_version": 0,
+        "fence_count": 4,
+        "geofence_hash": 8,
+        "fences": 12
+      },
+      "size": 1132,
+      "alignment": 4
+    },
+    "ProductGeofenceConfig": {
+      "kind": "struct",
+      "fields": {
+        "profile_hash": 0,
+        "config_version": 4,
+        "geofence_hash": 8,
+        "payload": 12
+      },
+      "size": 1144,
+      "alignment": 4
+    },
+    "AuthorizedMissionSnapshot": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "mission_epoch": 88,
+        "authority_epoch": 92,
+        "directive_epoch": 96,
+        "state_epoch": 100,
+        "origin_id": 104,
+        "mission_id": 108,
+        "mission_revision": 112,
+        "mission_hash": 116,
+        "mission_expires_at_us": 120,
+        "current_item_id": 128,
+        "current_item_index": 132,
+        "reserved": 134,
+        "execution_token": 136,
+        "mission": 144
+      },
+      "size": 1184,
+      "alignment": 8
+    },
+    "ProductDirectivePayload": {
+      "kind": "struct",
+      "fields": {
+        "flight_phase": 0,
+        "failsafe_policy": 1,
+        "reserved": 2,
+        "max_tilt_rad": 4,
+        "min_height_above_home_m": 8,
+        "max_height_above_home_m": 12,
+        "home": 16,
+        "target_valid_mask": 80,
+        "target_position_ned_m": 84,
+        "target_yaw_rad": 96
+      },
+      "size": 104,
+      "alignment": 8
+    },
+    "ProductMotionPoint": {
+      "kind": "struct",
+      "fields": {
+        "valid_mask": 0,
+        "position_ned_m": 4,
+        "velocity_ned_mps": 16,
+        "acceleration_ned_mps2": 28,
+        "yaw_rad": 40,
+        "yaw_rate_radps": 44
+      },
+      "size": 48,
+      "alignment": 4
+    },
+    "ProductActuatorDemand": {
+      "kind": "struct",
+      "fields": {
+        "valid_mask": 0,
+        "motor_thrust_n": 4
+      },
+      "size": 20,
+      "alignment": 4
+    },
+    "ProductActuatorFeedback": {
+      "kind": "struct",
+      "fields": {
+        "valid_mask": 0,
+        "motor_rpm": 4,
+        "motor_thrust_est_n": 20
+      },
+      "size": 36,
+      "alignment": 4
+    },
+    "ProductActuatorCapability": {
+      "kind": "struct",
+      "fields": {
+        "min_thrust_n": 0,
+        "max_thrust_n": 16,
+        "max_slew_nps": 32
+      },
+      "size": 48,
+      "alignment": 4
+    },
+    "ProductSafetyEnvelopePayload": {
+      "kind": "struct",
+      "fields": {
+        "valid_mask": 0,
+        "max_velocity_ned_mps": 4,
+        "max_acceleration_ned_mps2": 16,
+        "max_jerk_ned_mps3": 28,
+        "max_tilt_rad": 40,
+        "min_total_thrust_n": 44,
+        "max_total_thrust_n": 48,
+        "max_body_rate_frd_radps": 52,
+        "min_height_above_home_m": 64,
+        "max_height_above_home_m": 68
+      },
+      "size": 72,
+      "alignment": 4
+    },
+    "ProductPilotControlReferencePayload": {
+      "kind": "struct",
+      "fields": {
+        "valid_mask": 0,
+        "body_rate_frd_radps": 4,
+        "q_nb_desired_wxyz": 16,
+        "yaw_rate_ff_radps": 32,
+        "collective_throttle_norm": 36,
+        "altitude_above_origin_m": 40,
+        "vertical_velocity_up_mps": 44
+      },
+      "size": 48,
+      "alignment": 4
+    },
+    "ProductObstacleObservationKind": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "ProductObstacleShape": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "ProductObstacleSourceHealth": {
+      "kind": "enum",
+      "fields": {},
+      "size": 4,
+      "alignment": 4
+    },
+    "ProductObstacleObservation": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "observation_id": 88,
+        "sensor_instance_id": 92,
+        "source_health_epoch": 96,
+        "origin_id": 100,
+        "state_epoch": 104,
+        "observation_kind": 108,
+        "shape_kind": 110,
+        "source_health": 112,
+        "reserved0": 113,
+        "quality_flags": 116,
+        "obstacle_center_ned_m": 120,
+        "obstacle_half_extent_m": 132,
+        "ray_start_ned_m": 144,
+        "ray_end_ned_m": 156,
+        "obstacle_velocity_ned_mps": 168,
+        "position_std_m": 180,
+        "velocity_std_mps": 192,
+        "confidence_0_to_1": 204
+      },
+      "size": 208,
+      "alignment": 8
+    },
+    "ProductSensorMeasurement": {
+      "kind": "union",
+      "fields": {
+        "gnss": 0,
+        "baro": 0,
+        "mag": 0,
+        "range": 0,
+        "flow": 0
+      },
+      "size": 168,
+      "alignment": 8
+    },
+    "ProductPlantInitialState": {
+      "kind": "struct",
+      "fields": {
+        "position_ned_m": 0,
+        "velocity_ned_mps": 12,
+        "q_nb_wxyz": 24,
+        "body_rate_frd_radps": 40,
+        "motor_omega_radps": 52
+      },
+      "size": 68,
+      "alignment": 4
+    },
+    "ProductPlantTruth": {
+      "kind": "struct",
+      "fields": {
+        "position_ned_m": 0,
+        "velocity_ned_mps": 12,
+        "q_nb_wxyz": 24,
+        "body_rate_frd_radps": 40,
+        "motor_omega_radps": 52
+      },
+      "size": 68,
+      "alignment": 4
+    },
+    "ProductEnvironmentState": {
+      "kind": "struct",
+      "fields": {
+        "wind_ned_mps": 0,
+        "air_density_kgpm3": 12
+      },
+      "size": 16,
+      "alignment": 4
+    },
+    "ProductOperatorInput": {
+      "kind": "struct",
+      "fields": {
+        "roll_norm": 0,
+        "pitch_norm": 4,
+        "yaw_norm": 8,
+        "throttle_norm": 12,
+        "mode_switch_bits": 16,
+        "aux_switch_bits": 20
+      },
+      "size": 24,
+      "alignment": 4
+    },
+    "ProductFmsInputExtension": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "valid_mask": 88,
+        "ground_contact_state": 92,
+        "landing_zone_valid": 93,
+        "geofence_state": 94,
+        "energy_state": 95,
+        "battery_remaining_fraction": 96,
+        "estimated_return_energy_fraction": 100,
+        "estimated_landing_energy_fraction": 104,
+        "wind_ned_mps": 108,
+        "wind_uncertainty_mps": 120
+      },
+      "size": 128,
+      "alignment": 8
+    },
+    "QuadSensorProcessingConfig": {
+      "kind": "struct",
+      "fields": {
+        "config_version": 0,
+        "calibration_version": 4,
+        "imu_to_frd_rotation": 8,
+        "mag_to_frd_rotation": 80,
+        "imu_bias_gyro_radps": 152,
+        "imu_bias_accel_mps2": 176,
+        "imu_scale_gyro": 200,
+        "imu_scale_accel": 224,
+        "mag_hard_iron_ut": 248,
+        "mag_soft_iron_matrix": 272,
+        "imu_axis_delay_us": 344,
+        "imu_delay_uncertainty_us": 368,
+        "baro_delay_us": 392,
+        "baro_delay_uncertainty_us": 396,
+        "mag_delay_us": 400,
+        "mag_delay_uncertainty_us": 404,
+        "verified_sensor_mask": 408,
+        "reserved": 412
+      },
+      "size": 416,
+      "alignment": 8
+    },
+    "ProductFmsConfigPayload": {
+      "kind": "struct",
+      "fields": {
+        "safety_policy_id": 0,
+        "output_policy_id": 4,
+        "verified_input_mask": 8,
+        "rc_lost_timeout_us": 12,
+        "rc_recovery_dwell_us": 16,
+        "landed_dwell_us": 20,
+        "first_reference_timeout_us": 24,
+        "nav_enter_dwell_us": 28,
+        "attitude_std_limit_rad": 32,
+        "heading_std_limit_rad": 36,
+        "horizontal_position_std_limit_m": 40,
+        "vertical_position_std_limit_m": 44,
+        "horizontal_velocity_std_limit_mps": 48,
+        "vertical_velocity_std_limit_mps": 52,
+        "nav_enter_ratio": 56,
+        "geofence_required": 60
+      },
+      "size": 64,
+      "alignment": 4
+    },
+    "ProductEstimatorConfigPayload": {
+      "kind": "struct",
+      "fields": {
+        "initial_covariance_upper": 0,
+        "gyro_noise_density_radps_per_sqrt_hz": 2024,
+        "accel_noise_density_mps2_per_sqrt_hz": 2048,
+        "gyro_bias_std_radps": 2072,
+        "accel_bias_std_mps2": 2096,
+        "gyro_scale_std": 2120,
+        "accel_scale_std": 2144,
+        "bias_correlation_time_s": 2168,
+        "scale_correlation_time_s": 2184,
+        "baro_bias_rw_psd_m2ps": 2200,
+        "gnss_position_floor_m": 2208,
+        "gnss_velocity_floor_mps": 2232,
+        "baro_floor_m": 2256,
+        "mag_heading_floor_rad": 2264,
+        "antenna_lever_frd_m": 2272,
+        "imu_to_vehicle_reference_frd_m": 2296,
+        "magnetic_declination_rad": 2320,
+        "magnetic_declination_variance_rad2": 2328,
+        "min_horizontal_field_ut": 2336,
+        "initial_latitude_deg": 2344,
+        "initial_longitude_deg": 2352,
+        "initial_ellipsoid_height_m": 2360,
+        "local_radius_limit_m": 2368,
+        "initial_origin_valid_mask": 2372,
+        "aiding_mask": 2376,
+        "calibration_version": 2380
+      },
+      "size": 2384,
+      "alignment": 8
+    },
+    "ProductGuidanceConfigPayload": {
+      "kind": "struct",
+      "fields": {
+        "max_velocity_ned_mps": 0,
+        "max_acceleration_ned_mps2": 12,
+        "max_jerk_ned_mps3": 24,
+        "vehicle_radius_m": 36,
+        "clearance_margin_m": 40,
+        "uncertainty_inflation_factor": 44,
+        "obstacle_source_mode": 48,
+        "planning_deadline_us": 52,
+        "primitive_table_version": 56,
+        "max_dynamic_prediction_us": 60,
+        "mass_kg": 64,
+        "gravity_mps2": 68
+      },
+      "size": 72,
+      "alignment": 4
+    },
+    "ProductControllerConfigPayload": {
+      "kind": "struct",
+      "fields": {
+        "mass_kg": 0,
+        "inertia_frd_kgm2": 4,
+        "motor_position_frd_m": 40,
+        "motor_yaw_torque_ratio_m": 88,
+        "so3_gain_per_s": 104,
+        "rate_kp_nm_per_radps": 116,
+        "rate_ki_nm_per_rad": 128,
+        "rate_kd_nm_per_radps2": 140,
+        "rate_kaw_per_s": 152,
+        "rate_d_cutoff_hz": 164,
+        "rate_integral_limit_nm": 168,
+        "fallback_kp_per_s2": 180,
+        "fallback_kd_per_s": 192,
+        "mpc_q_diag": 204,
+        "mpc_qf_diag": 228,
+        "mpc_r_diag": 252,
+        "mpc_s_diag": 264,
+        "actuation_preview_delay_s": 276,
+        "manual_hover_throttle_norm": 280,
+        "mpc_seed_position_error_limit_m": 284,
+        "mpc_seed_velocity_error_limit_mps": 288
+      },
+      "size": 292,
+      "alignment": 4
+    },
+    "ProductActuatorConfigPayload": {
+      "kind": "struct",
+      "fields": {
+        "output_policy_id": 0,
+        "esc_bit_rate": 4,
+        "calibration_version": 8,
+        "motor_to_timer_channel": 12,
+        "thrust_curve_count": 16,
+        "thrust_curve_n": 24,
+        "dshot_curve_code": 280,
+        "min_thrust_n": 408,
+        "max_thrust_n": 424,
+        "max_slew_nps": 440
+      },
+      "size": 456,
+      "alignment": 4
+    },
+    "ProductFmsConfig": {
+      "kind": "struct",
+      "fields": {
+        "profile_hash": 0,
+        "parameter_set_id": 4,
+        "parameter_hash": 8,
+        "config_version": 12,
+        "payload": 16
+      },
+      "size": 80,
+      "alignment": 4
+    },
+    "ProductEstimatorConfig": {
+      "kind": "struct",
+      "fields": {
+        "profile_hash": 0,
+        "parameter_set_id": 4,
+        "parameter_hash": 8,
+        "config_version": 12,
+        "payload": 16
+      },
+      "size": 2400,
+      "alignment": 8
+    },
+    "ProductGuidanceConfig": {
+      "kind": "struct",
+      "fields": {
+        "profile_hash": 0,
+        "parameter_set_id": 4,
+        "parameter_hash": 8,
+        "config_version": 12,
+        "payload": 16
+      },
+      "size": 88,
+      "alignment": 4
+    },
+    "ProductControllerConfig": {
+      "kind": "struct",
+      "fields": {
+        "profile_hash": 0,
+        "parameter_set_id": 4,
+        "parameter_hash": 8,
+        "config_version": 12,
+        "payload": 16
+      },
+      "size": 308,
+      "alignment": 4
+    },
+    "ProductActuatorConfig": {
+      "kind": "struct",
+      "fields": {
+        "profile_hash": 0,
+        "calibration_set_id": 4,
+        "calibration_hash": 8,
+        "config_version": 12,
+        "payload": 16
+      },
+      "size": 472,
+      "alignment": 4
+    }
+  }
+}

@@ -1,0 +1,134 @@
+diff --git a/src/FlyView/GuidedActionsController.qml b/src/FlyView/GuidedActionsController.qml
+index cd3b03b..32380aa 100644
+--- a/src/FlyView/GuidedActionsController.qml
++++ b/src/FlyView/GuidedActionsController.qml
+@@ -126,12 +126,14 @@ Item {
+     property bool showArm:                  _guidedActionsEnabled && !_vehicleArmed && _canArm
+     property bool showForceArm:             _guidedActionsEnabled && !_vehicleArmed
+     property bool showDisarm:               _guidedActionsEnabled && _vehicleArmed && !_vehicleFlying
+-    property bool showRTL:                  _guidedActionsEnabled && _activeVehicle && _vehicleArmed && _activeVehicle.supports.guidedMode && _vehicleFlying && !_vehicleInRTLMode
+-    property bool showTakeoff:              _guidedActionsEnabled && _activeVehicle && (_activeVehicle.supports.guidedTakeoffWithAltitude || _activeVehicle.supports.guidedTakeoffWithoutAltitude) && !_vehicleFlying && _canTakeoff
+-    property bool showLand:                 _guidedActionsEnabled && _activeVehicle && _activeVehicle.supports.guidedMode && _vehicleArmed && !_activeVehicle.fixedWing && !_vehicleInLandMode
++    readonly property bool _flightSil: _activeVehicle ? _activeVehicle.flightSil : false
++
++    property bool showRTL:                  _guidedActionsEnabled && _activeVehicle && _vehicleArmed && (_flightSil || _activeVehicle.supports.guidedMode) && _vehicleFlying && !_vehicleInRTLMode
++    property bool showTakeoff:              _guidedActionsEnabled && _activeVehicle && ((_flightSil && _vehicleArmed) || _activeVehicle.supports.guidedTakeoffWithAltitude || _activeVehicle.supports.guidedTakeoffWithoutAltitude) && !_vehicleFlying && _canTakeoff
++    property bool showLand:                 _guidedActionsEnabled && _activeVehicle && (_flightSil || _activeVehicle.supports.guidedMode) && _vehicleArmed && !_activeVehicle.fixedWing && !_vehicleInLandMode
+     property bool showStartMission:         _guidedActionsEnabled && _missionAvailable && !_missionActive && !_vehicleFlying && _canStartMission
+     property bool showContinueMission:      _guidedActionsEnabled && _missionAvailable && !_missionActive && _vehicleArmed && _vehicleFlying && (_currentMissionIndex < _visualItemsCount - 1)
+-    property bool showPause:                _guidedActionsEnabled && _activeVehicle && _vehicleArmed && _activeVehicle.supports.pauseVehicle && _vehicleFlying && !_vehiclePaused && !_fixedWingOnApproach
++    property bool showPause:                _guidedActionsEnabled && _activeVehicle && _vehicleArmed && (_activeVehicle.supports.pauseVehicle || (_flightSil && _vehicleInMissionMode)) && _vehicleFlying && !_vehiclePaused && !_fixedWingOnApproach
+     property bool showChangeAlt:            _guidedActionsEnabled && _activeVehicle && _vehicleFlying && _activeVehicle.supports.guidedMode && _vehicleArmed && !_missionActive
+     property bool showChangeLoiterRadius:   _guidedActionsEnabled && _activeVehicle && _vehicleFlying && _activeVehicle.supports.guidedMode && _vehicleArmed && !_missionActive && _vehicleInFwdFlight && fwdFlightGotoMapCircle.visible
+     property bool showChangeSpeed:          _guidedActionsEnabled && _activeVehicle && _vehicleFlying && _activeVehicle.supports.guidedMode && _vehicleArmed && !_missionActive && _speedLimitsAvailable
+@@ -334,9 +336,9 @@ Item {
+ 
+     on_FlightModeChanged: {
+         _vehiclePaused =        _activeVehicle ? _flightMode === _activeVehicle.pauseFlightMode : false
+-        _vehicleInRTLMode =     _activeVehicle ? _flightMode === _activeVehicle.rtlFlightMode || _flightMode === _activeVehicle.smartRTLFlightMode : false
+-        _vehicleInLandMode =    _activeVehicle ? _flightMode === _activeVehicle.landFlightMode : false
+-        _vehicleInMissionMode = _activeVehicle ? _flightMode === _activeVehicle.missionFlightMode : false // Must be last to get correct signalling for showStartMission popups
++        _vehicleInRTLMode =     _activeVehicle ? (_flightSil ? _flightMode === "Safe Recovery" : (_flightMode === _activeVehicle.rtlFlightMode || _flightMode === _activeVehicle.smartRTLFlightMode)) : false
++        _vehicleInLandMode =    _activeVehicle ? (_flightSil ? _flightMode === "Land" : _flightMode === _activeVehicle.landFlightMode) : false
++        _vehicleInMissionMode = _activeVehicle ? (_flightSil ? _flightMode === "Mission" : _flightMode === _activeVehicle.missionFlightMode) : false // Must be last to get correct signalling for showStartMission popups
+     }
+ 
+     Connections {
+diff --git a/src/Vehicle/InitialConnectStateMachine.cc b/src/Vehicle/InitialConnectStateMachine.cc
+index 2d53176..9fc2cd3 100644
+--- a/src/Vehicle/InitialConnectStateMachine.cc
++++ b/src/Vehicle/InitialConnectStateMachine.cc
+@@ -342,6 +342,7 @@ void InitialConnectStateMachine::_handleAutopilotVersionSuccess(const mavlink_me
+         vehicle()->_firmwarePlugin->checkIfIsLatestStable(vehicle());
+     }
+     emit vehicle()->gitHashChanged(vehicle()->_gitHash);
++    emit vehicle()->flightSilChanged();
+ 
+     vehicle()->_setCapabilities(autopilotVersion.capabilities);
+ }
+diff --git a/src/Vehicle/Vehicle.cc b/src/Vehicle/Vehicle.cc
+index f9ffe2e..f9b485e 100644
+--- a/src/Vehicle/Vehicle.cc
++++ b/src/Vehicle/Vehicle.cc
+@@ -1827,6 +1827,10 @@ QString Vehicle::gotoFlightMode() const
+ 
+ void Vehicle::guidedModeRTL(bool smartRTL)
+ {
++    if (flightSil()) {
++        sendMavCommand(defaultComponentId(), MAV_CMD_NAV_RETURN_TO_LAUNCH, true);
++        return;
++    }
+     if (!_vehicleSupports->guidedMode()) {
+         QGC::showAppMessage(guided_mode_not_supported_by_vehicle);
+         return;
+@@ -1836,6 +1840,10 @@ void Vehicle::guidedModeRTL(bool smartRTL)
+ 
+ void Vehicle::guidedModeLand()
+ {
++    if (flightSil()) {
++        sendMavCommand(defaultComponentId(), MAV_CMD_NAV_LAND, true);
++        return;
++    }
+     if (!_vehicleSupports->guidedMode()) {
+         QGC::showAppMessage(guided_mode_not_supported_by_vehicle);
+         return;
+@@ -1881,12 +1889,20 @@ bool Vehicle::hasGripper()  const
+ 
+ void Vehicle::startTakeoff()
+ {
++    if (flightSil()) {
++        sendMavCommand(defaultComponentId(), MAV_CMD_NAV_TAKEOFF, true, 0, 0, 0, 0, 0, 0, 2.0f);
++        return;
++    }
+     _firmwarePlugin->startTakeoff(this);
+ }
+ 
+ 
+ void Vehicle::startMission()
+ {
++    if (flightSil()) {
++        sendMavCommand(defaultComponentId(), MAV_CMD_MISSION_START, true);
++        return;
++    }
+     _firmwarePlugin->startMission(this);
+ }
+ 
+@@ -2046,6 +2062,10 @@ void Vehicle::guidedModeChangeHeading(const QGeoCoordinate &headingCoord)
+ 
+ void Vehicle::pauseVehicle()
+ {
++    if (flightSil()) {
++        sendMavCommand(defaultComponentId(), MAV_CMD_DO_PAUSE_CONTINUE, true, 0.0f);
++        return;
++    }
+     if (!_vehicleSupports->pauseVehicle()) {
+         QGC::showAppMessage(QStringLiteral("Pause not supported by vehicle."));
+         return;
+diff --git a/src/Vehicle/Vehicle.h b/src/Vehicle/Vehicle.h
+index 5592a62..ee7475e 100644
+--- a/src/Vehicle/Vehicle.h
++++ b/src/Vehicle/Vehicle.h
+@@ -265,6 +265,7 @@ class Vehicle : public VehicleFactGroup, public VehicleTypes
+     Q_PROPERTY(int      firmwareCustomMajorVersion  READ firmwareCustomMajorVersion NOTIFY firmwareCustomVersionChanged)
+     Q_PROPERTY(int      firmwareCustomMinorVersion  READ firmwareCustomMinorVersion NOTIFY firmwareCustomVersionChanged)
+     Q_PROPERTY(int      firmwareCustomPatchVersion  READ firmwareCustomPatchVersion NOTIFY firmwareCustomVersionChanged)
++    Q_PROPERTY(bool     flightSil                   READ flightSil                  NOTIFY flightSilChanged)
+     Q_PROPERTY(QString  gitHash                     READ gitHash                    NOTIFY gitHashChanged)
+     Q_PROPERTY(quint64  vehicleUID                  READ vehicleUID                 NOTIFY vehicleUIDChanged)
+     Q_PROPERTY(QString  vehicleUIDStr               READ vehicleUIDStr              NOTIFY vehicleUIDChanged)
+@@ -669,6 +670,7 @@ class Vehicle : public VehicleFactGroup, public VehicleTypes
+     void setFirmwareCustomVersion(int majorVersion, int minorVersion, int patchVersion);
+     // versionNotSetValue inherited from VehicleTypes
+ 
++    bool flightSil() const { return firmwareType() == MAV_AUTOPILOT_GENERIC && _gitHash == QStringLiteral("FLTSIL01"); }
+     QString gitHash() const { return _gitHash; }
+     quint64 vehicleUID() const { return _uid; }
+     QString vehicleUIDStr();
+@@ -788,6 +790,7 @@ public slots:
+ 
+     void firmwareVersionChanged         ();
+     void firmwareCustomVersionChanged   ();
++    void flightSilChanged();
+     void gitHashChanged                 (QString hash);
+     void vehicleUIDChanged              ();
+     void loadProgressChanged            (float value);

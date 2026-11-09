@@ -1,0 +1,16 @@
+"""Build the selected board and its board-owned services."""
+from building import *
+Import('env')
+
+cwd = GetCurrentDir()
+env.AppendUnique(CPPDEFINES=['STM32H723xx'])
+paths = [cwd, cwd + '/CubeMX_Config/Inc']
+
+group = []
+group.extend(DefineGroup('Drivers', ['board.c', 'CubeMX_Config/Src/stm32h7xx_hal_msp.c'],
+    depend=[''], CPPPATH=paths))
+group.extend(DefineGroup('FlightBoardServices', [
+    'board_identity.c', 'diagnostics/device_diagnostics.c'],
+    depend=['BSP_USING_FLIGHT_DRIVERS'], CPPPATH=paths,
+    LOCAL_CFLAGS=' -std=c99 -fno-short-enums'))
+Return('group')

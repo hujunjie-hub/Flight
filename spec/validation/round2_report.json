@@ -1,0 +1,254 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "round": 2,
+  "status": "PASS",
+  "scope": "DOCUMENT_STATIC_AND_SPEC_ARM_ABI_COMPILE",
+  "independent_human_review": "NOT_RUN",
+  "production_and_physical_validation": "NOT_RUN",
+  "checks": [
+    {
+      "name": "all_markdown_fences_and_local_links",
+      "status": "PASS",
+      "files": 16,
+      "links": 45
+    },
+    {
+      "name": "handoff_tasks_not_dispatched",
+      "status": "PASS",
+      "tasks": 15
+    },
+    {
+      "name": "dialect_schema_and_private_ids",
+      "status": "PASS",
+      "messages": 13,
+      "common_merge_and_production_generation": "NOT_RUN"
+    },
+    {
+      "name": "explicit_message_registry",
+      "status": "PASS",
+      "messages": 55
+    },
+    {
+      "name": "ICD_slot_and_arena_reference",
+      "status": "PASS",
+      "checked": [
+        {
+          "type": "ImuSample",
+          "count": 8,
+          "slot": 136,
+          "sizeof": 136
+        },
+        {
+          "type": "GnssSample",
+          "count": 8,
+          "slot": 168,
+          "sizeof": 168
+        },
+        {
+          "type": "BaroSample",
+          "count": 8,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "MagSample",
+          "count": 8,
+          "slot": 128,
+          "sizeof": 128
+        },
+        {
+          "type": "RangeSample",
+          "count": 8,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "FlowSample",
+          "count": 8,
+          "slot": 120,
+          "sizeof": 120
+        },
+        {
+          "type": "ExternalOdometry",
+          "count": 8,
+          "slot": 184,
+          "sizeof": 184
+        },
+        {
+          "type": "SensorMeasurement",
+          "count": 16,
+          "slot": 264,
+          "sizeof": 264
+        },
+        {
+          "type": "OperatorInput",
+          "count": 2,
+          "slot": 120,
+          "sizeof": 120
+        },
+        {
+          "type": "AuthorizedOperatorInput",
+          "count": 2,
+          "slot": 128,
+          "sizeof": 128
+        },
+        {
+          "type": "NavigationSnapshot",
+          "count": 2,
+          "slot": 224,
+          "sizeof": 224
+        },
+        {
+          "type": "MotionReference",
+          "count": 2,
+          "slot": 1536,
+          "sizeof": 1536
+        },
+        {
+          "type": "VehicleDirective",
+          "count": 2,
+          "slot": 208,
+          "sizeof": 208
+        },
+        {
+          "type": "ActuationPermit",
+          "count": 2,
+          "slot": 128,
+          "sizeof": 128
+        },
+        {
+          "type": "ActuatorDemand",
+          "count": 2,
+          "slot": 152,
+          "sizeof": 152
+        },
+        {
+          "type": "ActuatorCommitReceipt",
+          "count": 2,
+          "slot": 168,
+          "sizeof": 168
+        },
+        {
+          "type": "AuthorizedMissionSnapshot",
+          "count": 2,
+          "slot": 1184,
+          "sizeof": 1184
+        },
+        {
+          "type": "MissionUploadCandidate",
+          "count": 1,
+          "slot": 1152,
+          "sizeof": 1152
+        },
+        {
+          "type": "ProductGeofenceSnapshot",
+          "count": 8,
+          "slot": 392,
+          "sizeof": 392
+        },
+        {
+          "type": "LandedStateSnapshot",
+          "count": 2,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "MissionStatus",
+          "count": 2,
+          "slot": 120,
+          "sizeof": 120
+        },
+        {
+          "type": "GuidanceStatus",
+          "count": 2,
+          "slot": 144,
+          "sizeof": 144
+        },
+        {
+          "type": "PilotControlReference",
+          "count": 2,
+          "slot": 168,
+          "sizeof": 168
+        },
+        {
+          "type": "NavigationCapability",
+          "count": 2,
+          "slot": 136,
+          "sizeof": 136
+        },
+        {
+          "type": "NavigationOriginSnapshot",
+          "count": 2,
+          "slot": 136,
+          "sizeof": 136
+        },
+        {
+          "type": "GuidanceFeasibility",
+          "count": 2,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "OperationRequest",
+          "count": 4,
+          "slot": 160,
+          "sizeof": 160
+        },
+        {
+          "type": "CommandAck",
+          "count": 4,
+          "slot": 112,
+          "sizeof": 112
+        },
+        {
+          "type": "ProductObstacleObservation",
+          "count": 64,
+          "slot": 208,
+          "sizeof": 208
+        }
+      ],
+      "arena_bytes": 41376,
+      "arena_limit": 49152,
+      "scope": "SPEC_LAYOUT_REFERENCE_NOT_PRODUCTION_MAP"
+    },
+    {
+      "name": "independent_arithmetic_and_reference_cases",
+      "status": "PASS",
+      "cases": [
+        "CRC32C official vector",
+        "Baro error-retraction Jacobian",
+        "60 primitive count",
+        "time-key wait separation",
+        "CPU 54.5705%",
+        "per-profile memory admission",
+        "900us critical chain",
+        "5ms sample age",
+        "replay admission arithmetic",
+        "settings six power-cut boundaries"
+      ],
+      "scope": "DOCUMENT_REFERENCE_ONLY",
+      "SIL_HIL_or_target_validation": "NOT_RUN"
+    }
+  ],
+  "inputs_sha256": {
+    "spec/00_工程基线与唯一权威规范.md": "b9708d4ee29fa502d7963f3a9f318e7f3a872d53dcc08a94494934ac22d0227f",
+    "spec/01_系统总体架构与设计决议.md": "37441fb42795f8195418653fea8794eaea089b23aec077a70738249ab6b3b409",
+    "spec/02_接口契约与公共数据规范.md": "64c8bec5274245df080fc70c75d405ff4f08737509b0c568cec7dac31958ba38",
+    "spec/03_平台软件架构与驱动设计.md": "5662f3e57915a0ee299ae60227faa59e046bb0fe674be1cc708c4eaa55b90e07",
+    "spec/04_飞控核心模块与控制系统设计.md": "0a994400102967da3d2ac6393b71fa5f63f60e7cb0716523e2f5eae9b4158a2d",
+    "spec/05_传感器采集时间基准与GNSS独立运行.md": "5310f81753056b3a8f6928cecb8e8a55e8e125a7d950760602d0323e374e1646",
+    "spec/06_FMS通信与系统安全设计.md": "db446e08f49ab75772b2582408327afd5cd279787926f8bae3493203097214d5",
+    "spec/07_实时调度与板级硬件资源设计.md": "167ddc07c22e063b849e241af4f9c0368782aa41617a98389d8fb448be121795",
+    "spec/08_产品配置插件与参数管理.md": "fba8140040248941f901e0ceeeccb92d4a47c7fb5ee03745082721c14953f746",
+    "spec/09_需求验证实施与发布管理.md": "c6db102d20991dcb4ee6090f7afd5cb3bdc25d91138d8087aca526fe083bc42b",
+    "spec/10_Agent分工与工程执行规范.md": "851a557db9476bcd86978dd3964aa80567df88db55d8f3a3d6b7efe829e321f3",
+    "spec/11_审核问题闭环与变更追踪.md": "68c78a33235ae71ee74f949e54a8ff40978ea8a47c63f1f8f666e2d7fcb3a073",
+    "spec/12_全量审查问题清单与落地边界.md": "24096d192a1f0016095474d7e605abf921af3d4b5599be0ccdd9419192dbfc66",
+    "spec/AGENT.md": "6e174696573da1706ca22dd187ec57ce13bf3772e981f3f0762cea8ae7e7326b",
+    "spec/AGENT_HANDOFF.md": "e49ff231ae071da48287c2c473c9f53326f055230bd2fc36d8f65b17839ff2a8",
+    "spec/README.md": "e14e9704d147d75c7b2aeeed6b837a7c56be791ed411d9059e38e89400549359",
+    "spec/contracts/FCU.xml": "1be7adc3b849bc89f812ad66353368ae2c8c6290f2ea97168ee710a7145446ed",
+    "spec/tools/audit_spec.py": "2e202dd707ac64fe923adba0bf8676fa3735da9c88a27fcfb6fe1b7b8b30be39"
+  },
+  "abi_layout_sha256": "5eab14b470e9f53f41027ce31805790485bf30b6fec7ee81929ed0935d8695f1"
+}

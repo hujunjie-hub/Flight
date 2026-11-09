@@ -1,0 +1,367 @@
+# T191-D-REVIEW 实际命令与输出
+# 机器: Windows; 工程根: D:/STM32Project/FMT-Firmware-1.2.0/Flight; Shell: PowerShell 7 (pwsh)
+# Python: 3.14.8; ARM GCC: arm-none-eabi-gcc (GNU Tools for STM32 14.3.rel1.20251027-0700) 14.3.1 20250623
+# 时间: 2026-11-04 22:10–22:32 (Asia/Shanghai)，分钟精度来自会话记录
+# 说明: 本文件只记录实际执行的命令与看到的输出；长输出保留原样，未执行项不在此文件出现。
+
+## [22:12] 1. 冻结树上的 round3 全量重跑（下游实现文件出现之前）
+$ Copy-Item spec\validation\* -> %TEMP%\t191_review_20261104_221240
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "status": "PASS", "types": 143, "checks": 9}
+elapsed_ms=2917
+$ Get-ChildItem <snapshot> | sha256 compare with spec\validation
+abi_layout.json                    IDENTICAL
+change_summary.json                IDENTICAL
+dialect_report.json                IDENTICAL
+mathematical_reference_report.json IDENTICAL
+project_structure_report.json      IDENTICAL
+protected_sources_report.json      IDENTICAL
+round1_report.json                 IDENTICAL
+round2_abi_layout.json             IDENTICAL
+round2_report.json                 IDENTICAL
+round3_abi_layout.json             IDENTICAL
+round3_report.json                 IDENTICAL
+upstream_sources.json              IDENTICAL
+# => 12/12 相同；此后未再改写任何 spec/validation/*.json
+
+## [22:16–22:21] 2. 工作区漂移（无命令；文件系统观察）
+# 36 个非 spec 文件在 R3 后创建/修改：applications 28、packages/KF-GINS 7、build/m4_abi 1
+# 相关 HANDOFF 记录仍为 READY_FOR_ASSIGNMENT / acknowledgement=null
+
+## [22:21] 3. 文档化 round3 命令在当前树上的结果
+$ python spec\tools\audit_spec.py --round 3
+Traceback (most recent call last):
+  File "spec\tools\audit_spec.py", line 267, in <module>
+    main()
+  File "spec\tools\audit_spec.py", line 253, in main
+    assert tree_hash == proof['tree_sha256'] and len(current) == proof['current_files'], 'outside-spec tree changed'
+AssertionError: outside-spec tree changed
+exit=1
+# abi_layout.json 未变化（b787e580…）：失败发生在写 round3 报告之前
+
+## [22:27] 4. ABI 布局与数学参考复现（独立于 round3 外部树断言）
+$ python -X utf8 t191_repro.py
+== abi_layout.json before b787e5800f3e706d2d5241bc6888b28608933c1d6a1f914afd37c7ff18a73705
+== abi_layout.json after  b787e5800f3e706d2d5241bc6888b28608933c1d6a1f914afd37c7ff18a73705
+== layout types 143 header 88 compiler arm-none-eabi-gcc.exe (GNU Tools for STM32 14.3.rel1.20251027-0700) 14.3.1 20250623
+== mathematical_reference_report.json before 87c85d1b201c08301913d4de9f5c12e627d4c4a5f380b5eeae03ed42e3217d49
+== mathematical_reference_report.json after  87c85d1b201c08301913d4de9f5c12e627d4c4a5f380b5eeae03ed42e3217d49
+== reference groups 7
+== change_summary hashes match current spec: True
+
+## [22:31] 5. T191-D-REVIEW 复核检查（最终运行）
+$ python spec\validation\T191-D-REVIEW\review_checks.py
+PASS EVID-01 change_summary per-file SHA256 matches current spec tree
+PASS EVID-02 round3_report inputs_sha256 matches current spec inputs
+DRIFT EVID-03 outside-spec tree matches the R3 protected snapshot
+DRIFT EVID-06 documented round-3 command still passes on current tree
+PASS EVID-04 round1/round2 reports are historical (input drift quantified)
+PASS EVID-05 validation artifacts present (12 JSON reports)
+PASS ABI-01 02 C macros fix Schema 6.0 / Product-Port 0x00010903
+FAIL ABI-02 no current document claims Schema 5.0 while baseline is 6.0
+PASS ABI-03 0x00010901 only in explicitly historical context
+PASS ABI-04 ContractHeader 88B; 55 Header-bearing messages with unique IDs
+PASS ABI-05 07 slot table sizeof equals compiled spec layout
+PASS GOV-01 10 file-owner table covers 00-12/AGENT/HANDOFF/README
+PASS GOV-02 Gate A-F table defined only in 09
+PASS GOV-03 HANDOFF 15 tasks: schema, owner/reviewer independence, DAG, baseline
+PASS GOV-04 HANDOFF dependency order is acyclic (topological in file order)
+PASS GOV-05 10 defines the seven main task states used by HANDOFF
+PASS GOV-06 no non-normative main task state in HANDOFF
+DRIFT GOV-07 files under READY task source_paths changed after R3 (path-based attribution)
+PASS CLOS-01 11 lists R01-R22 with SPEC_RESOLVED and test IDs
+PASS CLOS-02 09 4.7 has unique R01-R22 acceptance rows, all NOT_RUN
+PASS CLOS-03 owner of each R item matches between 11 and 09
+PASS CLOS-04 11 has 22 per-item sections with authoritative locations
+PASS CLOS-05 each closed R item has body evidence in its authoritative doc
+PASS CLOS-06 document numbers referenced by 11/12 exist
+PASS AUD-10 12 lists A01-A58, B01-B08, C01-C12 = 78 unique items
+PASS AUD-11 each audit fix has a body-text evidence hit in the claimed doc
+PASS BUD-01 07 task stacks sum to 52.5KiB excluding dev FinSH
+PASS BUD-02 07 AXI table sums to 232KiB with 88KiB unallocated
+PASS BUD-03 DTCM 92.5KiB and >=32KiB protection
+PASS BUD-04 M5 planner 62,016B < 64KiB (itemized 61,952B + 64B primitive capacity)
+PASS BUD-05 ICD arena 42,400B <= 48KiB per compiled spec layout
+PASS BUD-06 critical CPU 54.5705% (450us*1053 + 35us*2053)
+PASS BUD-07 900us chain = 810us stages + 90us margin
+PASS BUD-08 physical window 3000+900+100 = 4000us < 5000us input age
+PASS BUD-09 frame feedback age 5000+2500 = 7500us
+PASS BUD-10 DShot 275MHz N/ARR/T0H/T1H values match 07 and TEST-ACC-061
+PASS BUD-11 burst byte times 184.3us(22B) / 284.9us(34B) verified
+FAIL BUD-12 07 defines one pipeline limit (table vs 7.2 prose vs 00/05/11)
+OBS  BUD-13 07 10 states ICD reference 41,376B while current compiled layout is 42,400B
+PASS BLD-01 root SConstruct keeps RT-Thread PrepareBuilding/DoBuilding and HAL_Drivers group
+PASS BLD-02 root and applications SConscript recurse only registered subdirectories
+PASS BLD-03 no top-level/project CMake entry outside doc/ and rt-thread/
+DRIFT BLD-04 applications/ still matches the R3 baseline (only main.c and SConscript)
+PASS BLD-05 root Kconfig sources rt-thread, packages, libraries, board
+PASS BLD-06 rtconfig.py default Keil with RTT_CC/RTT_EXEC_PATH and GCC path
+PASS BLD-07 rtconfig.h confirms 32 priorities, 1kHz tick, GPIO/UART1/FinSH as 03 states
+PASS BLD-08 packages/pkgs.json keeps three -latest packages (not silently upgraded)
+DRIFT BLD-09 no planned applications subdirectory existed at the R3 baseline
+OBS  TOOL-01 audit_spec.py asserts every HANDOFF task is READY/ack=null (breaks on legal transition)
+OBS  TOOL-02 no delivered generator rebuilds protected_sources_report.json / change_summary.json
+OBS  TOOL-03 audit_spec.py --round always rewrites roundN artifacts (no verify-only mode)
+OBS  TOOL-04 TEST-SPEC-DIALECT reproducible in this environment (pymavlink present)
+PASS TOOL-05 audit_spec.py ARM compiler default path is machine-specific (documented --cc override)
+OBS  TOOL-06 TEST-V191-AGENT acceptance (state transition legality) has no checking tool beyond READY snapshot
+PASS TRC-01 09 table primary IDs unique
+PASS TRC-02 09 table result cells use only the five allowed statuses
+PASS TRC-03 PASS rows limited to document/reference scope
+PASS TRC-04 TEST-PROJECT-STRUCTURE evidence file exists and is cited
+PASS TRC-05 every TEST-V191-Rxx cited by 11 exists in 09
+RESULT checks=59 fail=2 obs=6 -> D:\STM32Project\FMT-Firmware-1.2.0\Flight\spec\validation\T191-D-REVIEW\review_checks.json
+
+## [22:32] 6. 生成人读报告
+$ python spec\validation\T191-D-REVIEW\make_report.py
+wrote D:\STM32Project\FMT-Firmware-1.2.0\Flight\spec\validation\T191-D-REVIEW\T191-D-REVIEW_report.md 296 lines counts 59 46 2 6 5
+
+## [22:33] 7. 复核产物与 R3 证据未被改写（最终核对）
+$ sha256 compare snapshot vs spec\validation -> 12/12 IDENTICAL
+$ change_summary per-file hash check -> True
+
+## [22:54] 8. 复核后处置（D-REV-01 / D-REV-03 / 任务记录）
+$ python spec\tools\audit_spec.py --round 3 --write-outside-baseline %TEMP%\t191_outside_test.json
+{"outside_baseline": "C:\\Users\\...\\t191_outside_test.json", "status": "PASS"}
+# 生成器可用；未用它覆盖 spec/validation/protected_sources_report.json（当前树处于实现阶段）
+
+$ python spec\tools\audit_spec.py --round 3 --label t191-d-review
+{"round": 3, "label": "t191-d-review", "status": "PASS", "types": 143, "checks": 9}
+# 新报告 spec/validation/t191-d-review_report.json，SHA256 ba3ccf1c…；
+# 9 项 checks: all_markdown_fences_and_local_links, handoff_task_records_legal,
+# dialect_schema_and_private_ids, explicit_message_registry, ICD_slot_and_arena_reference,
+# independent_arithmetic_and_reference_cases, independent_geometric_and_observation_math,
+# protected_sources_report(NOT_ENFORCED), dialect_report
+# 历史 round3_report.json 未被改写（A5CB7173…）
+
+$ python -X utf8 -c "<check inputs_sha256>"
+post_report_inputs_current= True count= 21 bad= []
+
+$ 历史证据核对（spec/validation/*.json）
+round1 F6524C7E / round2 104E1B86 / round3 A5CB7173 / abi B787E580 /
+project_structure 071E6DA4 / protected 9BC7DCA8 / change_summary 6EC6D7B6
+# 均与 22:12 快照一致；11/09/HANDOFF/tools 的更改只进入新 label 报告
+
+## [23:2x] 9. 复核意见合并后的处置与证据
+$ python -X utf8 spec\tools\audit_spec.py --round 3 --label t191-d-review-r2
+{"round": 3, "label": "t191-d-review-r2", "status": "PASS", "types": 143, "checks": 9}
+# 07 已由 A 修正为 3000us；报告 SHA256 1e41f0ea…8fbb12；历史 round3 未改写
+
+$ arm-none-eabi-gcc -mcpu=cortex-m7 -mthumb -dM -E -x c e.c | grep ARM_SIZEOF_MINIMAL_ENUM
+#define __ARM_SIZEOF_MINIMAL_ENUM 1
+# 默认最小化枚举；_Static_assert(sizeof(TimeQuality)==4) 失败；-fno-short-enums 后 =4 且编译通过
+# 结论：B-R03 成立（CR-V191-B03），00 §12.1 已列强制旗标，rtconfig.py 待 A
+
+$ python spec\validation\T191-D-REVIEW\review_checks.py --out review_checks_post.json --note "post-fix C1"
+RESULT checks=59 fail=2 obs=6
+# ABI-02 PASS、BUD-12 PASS；EVID-01/02 因 R3 change_summary/round3 属历史而 FAIL（预期）
+# SHA256 46c80a65…1da42a
+
+$ Get-FileHash spec\07_…md -> aacf4ca9…（与 A 声明一致）
+
+## [23:4x] 10. 按用户指示接受与重建
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 143, "checks": 9}
+# round3 重建（07=3000us）：SHA256 1b840879…；原 R3 报告归档 r3_archive/
+
+$ python spec\tools\audit_spec.py --round 3 --write-outside-baseline spec\validation\protected_sources_report.json
+{"outside_baseline": "spec\\validation\\protected_sources_report.json", "status": "PASS"}
+$ python spec\validation\T191-D-REVIEW\rebuild_change_summary.py
+{"files": 21, "modified": 6, "added": 0, "removed": 0}
+# change_summary 258e8dbb…；protected 3b2f177f…（10,309 files）
+
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_accept
+RESULT checks=59 fail=0 obs=6
+# ABI-02/BUD-12/TRC-03 PASS；EVID-01/02/03/06 PASS；BLD-04/09 DRIFT（实现目录）
+
+## [23:5x] 11. 合并 B 四份请求并关闭 D-REV-04
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 143, "checks": 9}
+$ python spec\tools\audit_spec.py --round 3 --write-outside-baseline spec\validation\protected_sources_report.json
+{"outside_baseline": "spec\\validation\\protected_sources_report.json", "status": "PASS"}
+$ python spec\validation\T191-D-REVIEW\rebuild_change_summary.py
+{"files": 21, "modified": 6, "added": 0, "removed": 0}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_b
+RESULT checks=59 fail=0 obs=6
+# round3 6f7c52a3…; change_summary 9708b639…; protected e90a4115…; post_b 6397b9dc…
+# B-UPSTREAM seq4; B-ADAPTER/B-REPLAY/B-FDIR seq3; C-FMS seq3; C-M5 NO_CHANGE READY
+
+## [00:0x] 12. 合并 C 四份提交、C 复核 revision 2、开 CR、Kconfig 聚合
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 143, "checks": 9}
+$ python spec\tools\audit_spec.py --round 3 --write-outside-baseline spec\validation\protected_sources_report.json
+{"outside_baseline": "spec\\validation\\protected_sources_report.json", "status": "PASS"}
+$ python spec\validation\T191-D-REVIEW\rebuild_change_summary.py
+{"files": 21, "modified": 6, "added": 0, "removed": 0}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_c
+RESULT checks=59 fail=0 obs=6
+# round3 9aa72643…; change_summary 0b7b4b78…; protected b8dbccb5…; post_c 3984365b…
+# Kconfig: applications/Kconfig -> core/Kconfig -> rsource m4/m5; duplicate FMS symbol removed
+# CR-V191-C01/C02 登记于 11 §4.1；C-M6/M7 NOT_STARTED、C-M5 NO_CHANGE 已记录
+
+## [00:1x] 13. A-PLATFORM rev2、A-ABI 复核与 CR-C01 后的暂停
+$ python applications\tests\abi\abi_report.py   # CR-C01 前布局
+{"status": "PASS", "types": 142, "arm_hash": "f1e36c57…", "host_hash": "e288b875…", "spec_mismatches": 0, "lock": "PASS"}
+# 独立复跑：abi_arm/host/compare 与 lock 逐字节相同
+
+$ arm-none-eabi-gcc ... -c probe.c        # 无 -fno-short-enums
+error: static assertion failed: "public enums are stored as 32-bit"  (fc_contract_version.h:45)
+$ arm-none-eabi-gcc ... -fno-short-enums -c probe.c
+exit=0
+# build-flag 检查成立；A 已在 rtconfig.py 落实（B-R03 关闭）
+
+$ python spec\tools\audit_spec.py --round 3   # CR-C01 后 02
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python applications\tests\abi\abi_report.py
+{"status": "FAIL", "types": 142, "arm_hash": "180aaae8…", "host_hash": "1d2019…", "spec_mismatches": 0, "lock": "FAIL"}
+# 02 已升 0x00010904，但 Schema 仍6.0、lock/基线串仍旧 -> A-REV-01，暂停接受
+
+## [00:2x] 14. B 数据集登记与 A-PLATFORM/A-ABI 终态
+$ python applications\tests\abi\abi_report.py   # 0x00010904 布局
+{"status": "PASS", "types": 145, "arm_hash": "588707eb…", "host_hash": "2e8c855d…", "spec_mismatches": 0, "lock": "PASS"}
+# 独立复核：dataset 三文件 Hash、全量输出三文件 Hash、dual_compare 重跑数值均与 B 记录一致
+
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_f
+RESULT checks=59 fail=0 obs=6
+# round3 c2f94d89…; change_summary 06a0b21e…; protected 7dc0fb40…; post_f ba5d4b80…
+# A-ABI ACCEPTED/seq7; A-PLATFORM stage2 released; REQ-NAV-KFG-001 PASS(Host), 013 IN_PROGRESS
+
+## [00:3x] 15. B-UPSTREAM 审核接受与 B-ADAPTER 路由
+$ python -X utf8 -c "<lock/spec/local hash compare>"
+files 10 bad_spec [] bad_local [] missing []
+commit 8291a93e… tree 6d255a9c… archive 183a86c0… license GPL-3.0-or-later
+# 5项Host测试 3,341 checks 0 failures（build/validation/kf_gins_upstream/）
+
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_g
+RESULT checks=59 fail=0 obs=6
+# round3 9ab77718…; change_summary 117e7633…; protected fd0d2a2d…; post_g 8651ca4c…
+# B-UPSTREAM ACCEPTED/seq6; B-ADAPTER ASSIGNED/seq4 blocked_by=[A-PLATFORM]
+
+## [00:4x] 16. C-FMS rev4 合并与 CR-C01/C02 处置
+$ python -X utf8 -c "<C-FMS evidence check>"
+REVIEW IN_PROGRESS 5 True
+# host_tests.log: checks=240 failures=0 (17 cases)
+# arm_build.log: 6 objects + ARM_COMPILE_AND_ABI_OK
+# mission_epoch: m4_engine.c:497-506; geofence: quad_x4_fms_configure_product_geofence (no SET_GEOFENCE)
+
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_h
+RESULT checks=59 fail=0 obs=6
+# round3 1ebcb4a9…; change_summary fbae8f7a…; protected 078f1312…; post_h f7a82b64…
+
+## [00:5x] 17. CR 关闭、B-R08 与版本串同步
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python spec\tools\audit_spec.py --round 3 --write-outside-baseline spec\validation\protected_sources_report.json
+{"outside_baseline": "spec\\validation\\protected_sources_report.json", "status": "PASS"}
+$ python spec\validation\T191-D-REVIEW\rebuild_change_summary.py
+{"files": 21, "modified": 12, "added": 0, "removed": 0}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_i
+RESULT checks=59 fail=0 obs=6
+# round3 f803b463…; change_summary 0522ad49…; protected e256e14c…; post_i 3fb63e6d…
+# CR-C01 CLOSED / CR-C02 SPECIFIED; B-R08 closed (15,360B, DTCM 94.5KiB); 09:349/11:9 -> 0x00010904
+
+## [00:5x] 18. B-UPSTREAM 复验与 golden 清单关闭
+$ python -X utf8 -c "<golden SHA256SUMS verify>"
+OK packages/KF-GINS/tools/dataset_dual_compare.cpp
+OK build/validation/kf_gins_golden/DATASET_EVIDENCE.md
+OK build/validation/kf_gins_golden/dataset_run.json
+... 7/7 OK
+# B-UPSTREAM ACCEPTED/seq6；B-ADAPTER ASSIGNED/seq4 blocked=[A-PLATFORM]
+
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_j
+RESULT checks=59 fail=0 obs=6
+# round3 690938e1…; change_summary ff0d98de…; protected f37c6240…; post_j c6dc8de5…
+
+## [00:6x] 19. 契约diff复核合并、C02入口文字与3项观察
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python spec\tools\audit_spec.py --round 3 --write-outside-baseline spec\validation\protected_sources_report.json
+{"outside_baseline": "spec\\validation\\protected_sources_report.json", "status": "PASS"}
+$ python spec\validation\T191-D-REVIEW\rebuild_change_summary.py
+{"files": 21, "modified": 12, "added": 0, "removed": 0}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_k
+RESULT checks=59 fail=0 obs=6
+# round3 b8759d7a…; change_summary 9f9cf5e2…; protected b1ede039…; post_k 4197c4fe…
+# ABI lock unchanged 145/0x00010904; OBS-01/02 fixed by C; OBS-03 02/06/08 hook wording aligned
+
+## [00:7x] 20. C-FMS 接受与 A-PLATFORM 阶段2 复核
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python spec\tools\audit_spec.py --round 3 --write-outside-baseline spec\validation\protected_sources_report.json
+{"outside_baseline": "spec\\validation\\protected_sources_report.json", "status": "PASS"}
+$ python spec\validation\T191-D-REVIEW\rebuild_change_summary.py
+{"files": 21, "modified": 12, "added": 0, "removed": 0}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_l
+RESULT checks=59 fail=0 obs=6
+# C-FMS ACCEPTED/PASS/seq7; A-PLATFORM REVIEW/seq8 (Gate B static 16/16, DRDY NOT_RUN)
+# round3 87f4b0e8…; change_summary 5b0384f3…; protected 55134053…; post_l bd913f71…
+
+## [00:8x] 21. CR 定稿、MPC 决策与 C-M5/B-REPLAY 受理
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python spec\tools\audit_spec.py --round 3 --write-outside-baseline spec\validation\protected_sources_report.json
+{"outside_baseline": "spec\\validation\\protected_sources_report.json", "status": "PASS"}
+$ python spec\validation\T191-D-REVIEW\rebuild_change_summary.py
+{"files": 21, "modified": 12, "added": 0, "removed": 0}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_m
+RESULT checks=59 fail=0 obs=6
+# C-FMS REVIEW/seq8 (CR pending user); CR-C01/C02 independent review PASS, user PENDING
+# CR-V191-C03: OSQP 1.0.0 + ControlModelPort ABI v1 (SPECIFIED)
+# B-REPLAY REVIEW/seq4; C-M5 READY/seq5; C-M6 READY/seq4 blocked by C-M5+B-REPLAY
+# round3 7d88f1b3…; change_summary 52ce9c29…; protected 823bbb57…; post_m accd117d…
+
+## [00:9x] 22. C-FMS Gate D 受理与 CR-C02 关闭
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python spec\tools\audit_spec.py --round 3 --write-outside-baseline spec\validation\protected_sources_report.json
+{"outside_baseline": "spec\\validation\\protected_sources_report.json", "status": "PASS"}
+$ python spec\validation\T191-D-REVIEW\rebuild_change_summary.py
+{"files": 21, "modified": 12, "added": 0, "removed": 0}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_n
+RESULT checks=59 fail=0 obs=6
+# C-FMS ACCEPTED/PASS/seq9; CR-C01/C02 CLOSED (user approval); C-M5 ASSIGNED/seq6
+# round3 8c63b412…; change_summary addb5fca…; post_n accd117d…
+
+## [01:1x] 23. 三份 B 增量复核受理
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python spec\tools\audit_spec.py --round 3 --write-outside-baseline spec\validation\protected_sources_report.json
+{"outside_baseline": "spec\\validation\\protected_sources_report.json", "status": "PASS"}
+$ python spec\validation\T191-D-REVIEW\rebuild_change_summary.py
+{"files": 21, "modified": 12, "added": 0, "removed": 0}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_o
+RESULT checks=59 fail=0 obs=6
+# B-ADAPTER REVIEW/seq5; B-REPLAY REVIEW/seq5; B-FDIR REVIEW/seq4
+# round3 b7781d68…; change_summary 0fb2b7de…; post_o fecaeee3…
+
+## [01:2x] 24. T191-A-PLATFORM 验收
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python spec\tools\audit_spec.py --round 3 --write-outside-baseline spec\validation\protected_sources_report.json
+{"outside_baseline": "spec\\validation\\protected_sources_report.json", "status": "PASS"}
+$ python spec\validation\T191-D-REVIEW\rebuild_change_summary.py
+{"files": 21, "modified": 12, "added": 0, "removed": 0}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_p
+RESULT checks=59 fail=0 obs=6
+# A-PLATFORM ACCEPTED/PASS/seq9 (static; target NOT_RUN); B-ADAPTER unblocked
+# round3 59c0af45…; change_summary bb178ee6…; post_p 1868a938…
+
+## [01:3x] 25. B-ADAPTER 接受与 B-REPLAY 解阻
+$ python spec\tools\audit_spec.py --round 3
+{"round": 3, "label": "round3", "status": "PASS", "types": 146, "checks": 9}
+$ python spec\tools\audit_spec.py --round 3 --write-outside-baseline spec\validation\protected_sources_report.json
+{"outside_baseline": "spec\\validation\\protected_sources_report.json", "status": "PASS"}
+$ python spec\validation\T191-D-REVIEW\rebuild_change_summary.py
+{"files": 21, "modified": 12, "added": 0, "removed": 0}
+$ python spec\validation\T191-D-REVIEW\review_checks.py --label review_checks_post_q
+RESULT checks=59 fail=0 obs=6
+# B-ADAPTER ACCEPTED/PASS/seq6; B-REPLAY unblocked seq6; B-FDIR still blocked
+# round3 81db8b3a…; change_summary 12e4572a…; post_q dc294bc0…

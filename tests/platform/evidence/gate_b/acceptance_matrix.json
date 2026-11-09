@@ -1,0 +1,117 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "scope": "GATE_B_STATIC_IMPLEMENTATION",
+  "target_validation": "NOT_RUN",
+  "recommendation": "ACCEPT_STATIC_WITH_TARGET_NOT_RUN",
+  "symbols": {
+    "missing_or_wrong": [],
+    "weak_hook_in_drv_tim": false,
+    "drv_tim_hook_dormant": true,
+    "strong_hook_in_board": true,
+    "drv_tim_compiled": true
+  },
+  "sizes": {
+    "board": {
+      "text": 3330,
+      "data": 8,
+      "bss": 1457
+    },
+    "drv_tim": {
+      "text": 909,
+      "data": 0,
+      "bss": 0
+    }
+  },
+  "items": [
+    {
+      "id": "GB-01",
+      "test": "TEST-HW-IRQ-001",
+      "item": "Pin/AF owner (PA2/PA3 TIM2, PE9/11/13/14 TIM1)",
+      "status": "PASS_STATIC",
+      "evidence": "CubeMX MSP + .ioc; target pin measurement NOT_RUN"
+    },
+    {
+      "id": "GB-02",
+      "test": "TEST-HW-DMA-002",
+      "item": "DMAMUX TIM1_UP -> DMA2_Stream2",
+      "status": "PASS_STATIC",
+      "evidence": "MSP hdma_tim1_up/DMA_REQUEST_TIM1_UP; target transfer NOT_RUN"
+    },
+    {
+      "id": "GB-03",
+      "test": "TEST-HW-DMA-003",
+      "item": "DMA stream uniqueness",
+      "status": "PASS_STATIC",
+      "evidence": "DMA2_Stream2 only for TIM1_UP; target dump NOT_RUN"
+    },
+    {
+      "id": "GB-04",
+      "test": "TEST-HW-IRQ-004",
+      "item": "NVIC mapping (TIM2=1, TIM1_UP=2)",
+      "status": "PASS_STATIC",
+      "evidence": "MSP priorities; runtime register dump NOT_RUN"
+    },
+    {
+      "id": "GB-05",
+      "test": "TEST-HW-IRQ-005",
+      "item": "ISR API policy (no RTOS API in TIM2/TIM1/DMA ISR)",
+      "status": "PASS_STATIC",
+      "evidence": "source scan of callbacks; target trace NOT_RUN"
+    },
+    {
+      "id": "GB-06",
+      "test": "TEST-HW-DMA-006",
+      "item": "MPU/D-Cache (D2 non-cacheable)",
+      "status": "PASS_STATIC",
+      "evidence": "fc_board_mpu_cache_init; cache stress NOT_RUN"
+    },
+    {
+      "id": "GB-07",
+      "test": "TEST-HW-IMU-007",
+      "item": "ADIS burst DRDY capture (TIM2 CH4)",
+      "status": "PASS_STATIC",
+      "evidence": "capture ring/64-bit snapshot; SPI pre-armed DMA path NOT_RUN"
+    },
+    {
+      "id": "GB-08",
+      "test": "TEST-HW-SAFE-013",
+      "item": "DShot TIM1 + DMA burst + TC->Update stop",
+      "status": "PASS_STATIC",
+      "evidence": "code/静态 checks; target waveform NOT_RUN"
+    },
+    {
+      "id": "GB-09",
+      "test": "TEST-RT-003/4/7",
+      "item": "map/WCET/RTA/stack/critical section",
+      "status": "NOT_RUN",
+      "evidence": "no scons/SCons available; no target build"
+    },
+    {
+      "id": "GB-10",
+      "test": "TEST-RT-010/11",
+      "item": "DMA reachability/cache stress",
+      "status": "NOT_RUN",
+      "evidence": "no target board"
+    },
+    {
+      "id": "GB-11",
+      "test": "TEST-HW-GNSS-008",
+      "item": "PPS capture / timestamp accuracy",
+      "status": "NOT_RUN",
+      "evidence": "CH3 configured; no PPS source/waveform"
+    },
+    {
+      "id": "GB-12",
+      "test": "TEST-RT-018",
+      "item": "Worst-case combined load / HIL",
+      "status": "NOT_RUN",
+      "evidence": "no HIL"
+    }
+  ],
+  "checks": {
+    "gate_b_static_pass": true,
+    "symbols_pass": true,
+    "drv_tim_warning_only": true
+  },
+  "verdict": "PASS_STATIC"
+}

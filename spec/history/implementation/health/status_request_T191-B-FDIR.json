@@ -1,0 +1,107 @@
+{
+  "task_id": "T191-B-FDIR",
+  "task_type": "IMPLEMENTATION",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010903",
+  "update_sequence": 3,
+  "submission": {
+    "revision": 2,
+    "submitted_at": "2026-11-05T01:05+08:00",
+    "reason": "Integration increment on top of A's delivered platform services (TimeService/raw ingress) and the accepted T191-B-UPSTREAM; requests review of the complete deliverable.",
+    "dedup_key": "T191-B-FDIR:3:2"
+  },
+  "requested_transition": "ASSIGNED->IN_PROGRESS->REVIEW (same session)",
+  "transition_note": "Dependency delivered but not ACCEPTED (T191-B-REPLAY); the increment uses the delivered interfaces and keeps the dependency visible. No ACCEPTED/CLOSED requested.",
+  "assignee": "B",
+  "acknowledgement": {
+    "prompt_received": true,
+    "baseline_confirmed": true,
+    "received_at": "2026-11-04T22:10+08:00",
+    "prerequisite": {
+      "task_id": "T191-D-REVIEW",
+      "task_status_seen": "REVIEW",
+      "update_sequence_seen": 3,
+      "acknowledgement_seen": "用户2026-11-04指示执行Agent D任务；D接单、执行静态复核并提交交付（见spec/validation/T191-D-REVIEW）。",
+      "verification_status_seen": "IN_PROGRESS",
+      "reviewer_status": "B's independent review submitted (ACCEPT_WITH_CONDITIONS); A/C opinions and user Gate A approval still NOT_RUN.",
+      "review_evidence": [
+        "applications/plugins/estimator/kf_gins_quad/reviews/B_REVIEW_T191-D-REVIEW.md",
+        "applications/plugins/estimator/kf_gins_quad/reviews/b_review_checks.json",
+        "applications/plugins/estimator/kf_gins_quad/reviews/b_review_checks.py"
+      ]
+    }
+  },
+  "deliverable_refs": [
+    "applications/services/health/include/sensor_integrity.h",
+    "applications/services/health/src/sensor_integrity.c",
+    "applications/services/health/SConscript",
+    "applications/services/health/Kconfig",
+    "applications/services/SConscript",
+    "applications/services/health/hosttest/test_health.c",
+    "applications/services/health/hosttest/run_host_tests.ps1",
+    "build/validation/b_replay_fdir/",
+    "build/validation/b_replay_fdir/test_health.log"
+  ],
+  "actual_commands": [
+    {
+      "command": "pwsh -NoProfile -File applications/services/health/hosttest/run_host_tests.ps1",
+      "exit_code": 0,
+      "result": "test_health 102/0; Cortex-M7 compile PASS"
+    },
+    {
+      "command": "python -m SCons -n (SENSOR_INTEGRITY_ENABLE)",
+      "exit_code": 0,
+      "result": "CC applications\\services\\health\\src\\sensor_integrity.o"
+    },
+    {
+      "command": "pwsh applications/services/health/hosttest/run_host_tests.ps1",
+      "exit_code": 0,
+      "result": "127 checks, 0 failures (M2 result mapping added); Cortex-M7 compile PASS"
+    }
+  ],
+  "verification": {
+    "scope": "IMPLEMENTATION_HOST_AND_ARM_COMPILE",
+    "status": "PASS (executor-run; no estimator handle, so it cannot modify the active P)",
+    "evidence_paths": [
+      "build/validation/b_replay_fdir/test_health.log",
+      "build/validation/b_replay_fdir/arm_health.log"
+    ]
+  },
+  "not_run": [
+    "integration with M2 diagnostics and the M3 capability publisher",
+    "combined fault-injection matrix (GNSS loss/recovery, IMU stale, baro stuck)",
+    "SIL/HIL"
+  ],
+  "reviewer": "D",
+  "blocked_by": [
+    "T191-B-REPLAY"
+  ],
+  "resume_state": null,
+  "next_owner": "D",
+  "next_action": "D: review the FDIR increment (M2 result mapping), then integration with M3 capability publishing remains.",
+  "known_issues_for_d": [
+    "Single-instance sources have no redundancy by construction; isolating the only IMU must degrade the navigation capability, not switch to a phantom source."
+  ],
+  "reviewer_evidence": {
+    "task_reviewed": "T191-D-REVIEW",
+    "reviewer": "B",
+    "verdict": "ACCEPT_WITH_CONDITIONS",
+    "checks": 10,
+    "failed_checks_in_snapshot": 2,
+    "fail_note": "B-02 closes with this submission; B-10 is the unassigned calibration/GNSS task gap.",
+    "conditions": [
+      "B-1: D merges the four B status requests and marks the B part of D-REV-04 as submitted.",
+      "B-2: D decides B-R02 (Eigen vs dependency-free fixed-size math) and B-R03 (-fno-short-enums top-level rule).",
+      "B-3: after D confirms, B patches 05 §7 notation (B-R01) and the pipeline delay bound in sensor_alignment.",
+      "B-4: D assigns or explicitly waives B-R05 (Kconfig aggregation), B-R06 (applications/calibration) and B-R07 (GNSS native backend / Mag calibration tasks)."
+    ],
+    "evidence": [
+      "applications/plugins/estimator/kf_gins_quad/reviews/B_REVIEW_T191-D-REVIEW.md",
+      "applications/plugins/estimator/kf_gins_quad/reviews/b_review_checks.json",
+      "applications/plugins/estimator/kf_gins_quad/reviews/b_review_checks.py"
+    ],
+    "increment": "build/validation/b_replay_fdir/test_health.log"
+  },
+  "commit": null,
+  "commit_note": "Workspace has no Git metadata; the source snapshot is the SHA256 lists in build/validation and the delivered file lists above. No pre-existing file was modified except one root Kconfig line sourcing applications/Kconfig.",
+  "rollback": "Delete applications/services/health and applications/services/SConscript; remove the applications/Kconfig line sourcing services/health/Kconfig."
+}

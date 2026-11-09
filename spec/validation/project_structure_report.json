@@ -1,0 +1,26 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "scope": "DOCUMENT_STATIC",
+  "status": "PASS",
+  "source": "round3_report.json",
+  "checks": [
+    {
+      "name": "all_markdown_fences_and_local_links",
+      "status": "PASS",
+      "files": 17,
+      "links": 63
+    },
+    {
+      "name": "handoff_task_records_legal",
+      "status": "PASS",
+      "tasks": 15,
+      "states": [
+        "ACCEPTED",
+        "ASSIGNED",
+        "READY_FOR_ASSIGNMENT",
+        "REVIEW"
+      ]
+    }
+  ],
+  "protected_sources_report_sha256": "823bbb5733e03caa855f9b366288a494a67e7f515f806ffa544c3efc4139d434"
+}

@@ -1,0 +1,10 @@
+config GUIDANCE_ENABLE
+    bool "Guidance (M5)"
+    default n
+    depends on FMS_ENABLE
+    help
+        Build the M5 Guidance core (NONE obstacle source only:
+        takeoff/point-to-point/hold/return/land reference generation with the
+        anchor+24 preview and READY/ACTIVE lifecycle). A*/local map and
+        obstacle avoidance are not admitted on the H723 profile and missions requiring
+        avoidance are rejected. Off by default; no firmware default changes.

@@ -1,0 +1,105 @@
+{
+  "fileType": "Plan",
+  "groundStation": "QGroundControl",
+  "version": 1,
+  "geoFence": {
+    "circles": [],
+    "polygons": [],
+    "version": 2
+  },
+  "rallyPoints": {
+    "points": [],
+    "version": 2
+  },
+  "mission": {
+    "cruiseSpeed": 2,
+    "firmwareType": 0,
+    "globalPlanAltitudeMode": 1,
+    "hoverSpeed": 2,
+    "plannedHomePosition": [
+      31.2,
+      121.5,
+      0
+    ],
+    "vehicleType": 2,
+    "version": 2,
+    "items": [
+      {
+        "AMSLAltAboveTerrain": null,
+        "Altitude": 2,
+        "AltitudeMode": 0,
+        "autoContinue": true,
+        "command": 22,
+        "doJumpId": 1,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          31.2,
+          121.5,
+          2
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": null,
+        "Altitude": 2,
+        "AltitudeMode": 0,
+        "autoContinue": true,
+        "command": 16,
+        "doJumpId": 2,
+        "frame": 3,
+        "params": [
+          0,
+          0.35,
+          0,
+          0,
+          31.2000117,
+          121.5,
+          2
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": null,
+        "Altitude": 2,
+        "AltitudeMode": 0,
+        "autoContinue": true,
+        "command": 16,
+        "doJumpId": 3,
+        "frame": 3,
+        "params": [
+          0,
+          0.35,
+          0,
+          0,
+          31.2000117,
+          121.5000137,
+          2
+        ],
+        "type": "SimpleItem"
+      },
+      {
+        "AMSLAltAboveTerrain": null,
+        "Altitude": 0,
+        "AltitudeMode": 0,
+        "autoContinue": true,
+        "command": 21,
+        "doJumpId": 4,
+        "frame": 3,
+        "params": [
+          0,
+          0,
+          0,
+          null,
+          31.2000117,
+          121.5000137,
+          0
+        ],
+        "type": "SimpleItem"
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+"""Build the entry point, application tasks and runtime."""
+from building import *
+
+cwd = GetCurrentDir()
+paths = [cwd, cwd + '/runtime', cwd + '/tasks']
+tasks = Glob('tasks/task_manager.c') + [
+    source for source in Glob('tasks/*/*.c')
+    if source.name != 'task_sim.c' and source.dir.name not in ('logger', 'flash')]
+group = []
+group.extend(DefineGroup('Applications', ['main.c'], depend=[''], CPPPATH=paths,
+    LOCAL_CFLAGS=' -std=c99 -fno-short-enums'))
+group.extend(DefineGroup('FlightApplication', tasks + Glob('runtime/*.c'),
+    depend=['FLIGHT_RUNTIME_ENABLE'], CPPPATH=paths, LOCAL_CFLAGS=' -std=c99 -fno-short-enums'))
+group.extend(DefineGroup('FlightSimulation', ['tasks/communication/task_sim.c'],
+    depend=['FLIGHT_SIM_LINK'], CPPPATH=paths, LOCAL_CFLAGS=' -std=c99 -fno-short-enums'))
+group.extend(DefineGroup('FlightLogger', Glob('tasks/logger/*.c'),
+    depend=['FLIGHT_LOGGER_ENABLE'], CPPPATH=paths, LOCAL_CFLAGS=' -std=c99 -fno-short-enums'))
+group.extend(DefineGroup('FlightNorLog', Glob('tasks/flash/*.c'),
+    depend=['FLIGHT_NOR_LOG_ENABLE'], CPPPATH=paths, LOCAL_CFLAGS=' -std=c99 -fno-short-enums'))
+Return('group')

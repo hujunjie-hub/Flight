@@ -1,0 +1,28 @@
+config INS_BACKEND_ENABLE
+    bool "Navigation backend (GNU Arm C++14)"
+    default n
+
+config INS_BARO_AIDING
+    bool "Barometer height aiding"
+    depends on INS_BACKEND_ENABLE
+    default n
+
+config INS_MAG_AIDING
+    bool "Magnetometer heading aiding (requires verified calibration)"
+    depends on INS_BACKEND_ENABLE
+    default n
+
+config INS_REPLAY_ENABLE
+    bool "M3 navigation Port / alignment / history / shadow replay"
+    default n
+    depends on INS_BACKEND_ENABLE
+    help
+        Builds middleware/model/ins: the public EstimatorPort, static alignment,
+        GNSS/barometer/magnetometer aiding, fixed-lag IMU ring, observation
+        journal, 2304-byte checkpoints and shadow replay with commit guards.
+        Requires the platform TimeService and explicit source use policies.
+        The reference replay is serialized; no RTOS budget server is created.
+
+        Requires INS_BACKEND_ENABLE (it links the trimmed estimator core).
+        Off by default: the replay budget has no target WCET evidence yet and
+        enabling it without the Gate C data is not authorized.

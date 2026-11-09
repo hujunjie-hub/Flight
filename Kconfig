@@ -1,0 +1,29 @@
+mainmenu "RT-Thread Configuration"
+
+BSP_DIR := .
+
+RTT_DIR := rt-thread
+
+PKGS_DIR := packages
+
+config SOC_STM32H723ZG
+    bool
+    select SOC_SERIES_STM32H7
+    select RT_USING_COMPONENTS_INIT
+    select RT_USING_USER_MAIN
+    default y
+
+# The first applicable default wins for the RT-Thread serial choice.
+choice RT_USING_SERIAL_VERSION
+    default RT_USING_SERIAL_V2 if BSP_USING_FLIGHT_DRIVERS
+endchoice
+
+source "$(RTT_DIR)/Kconfig"
+osource "$PKGS_DIR/Kconfig"
+rsource "libraries/Kconfig"
+rsource "middleware/Kconfig"
+rsource "applications/Kconfig"
+
+if !RT_USING_NANO
+rsource "board/Kconfig"
+endif

@@ -1,0 +1,244 @@
+{
+  "reviewer": "A",
+  "subject": "C product_contract.h contract diff (CR-V191-C01/C02)",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010904",
+  "pre_cr_baseline": "spec/validation/T191-D-REVIEW/r3_archive/round3_abi_layout.json",
+  "files": {
+    "applications/products/QUAD_X4_H723/product_contract.h": "940b94461c6230ff535e00b29f8a82a75f4da0c8f5a02cc47f6537f4f899dcca",
+    "applications/products/QUAD_X4_H723/abi_lock.h": "4781f28b6e5a20a159097050e60fbb16b043421149e9ece6059845d62662e8e2",
+    "applications/tests/abi/evidence/abi_arm.json": "c20185e365c6b796d724e1dbd1e681aca69da587c37119e54b2906db6c45f8af",
+    "applications/tests/abi/evidence/abi_host.json": "c0beff4b4903a1aba7bf848a3535be4946a702e0a940360a0e1d1a49cd2f0816",
+    "applications/tests/abi/evidence/abi_compare.json": "4aff2e60c2b2358d550fcaa45e0f6c76bc7d7d75441bfe3c828493f29927a9d0"
+  },
+  "deltas": {
+    "added_types": [
+      "ProductGeofenceConfig",
+      "ProductGeofenceConfigPayload",
+      "ProductGeofenceDefinition"
+    ],
+    "removed_types": [],
+    "size_or_alignment_changes": [
+      {
+        "type": "ProductOperationPayload",
+        "old_size": 44,
+        "new_size": 48,
+        "old_align": 4,
+        "new_align": 4
+      }
+    ],
+    "product_operation_payload": {
+      "old_size": 44,
+      "new_size": 48,
+      "mission_epoch_offset": 44
+    },
+    "operation_request": {
+      "old_size": 160,
+      "new_size": 160
+    }
+  },
+  "checks": [
+    {
+      "id": "type_set_delta",
+      "status": "PASS",
+      "detail": {
+        "added": [
+          "ProductGeofenceConfig",
+          "ProductGeofenceConfigPayload",
+          "ProductGeofenceDefinition"
+        ],
+        "removed": [],
+        "expected_added": [
+          "ProductGeofenceConfig",
+          "ProductGeofenceConfigPayload",
+          "ProductGeofenceDefinition"
+        ]
+      }
+    },
+    {
+      "id": "size_align_delta_only_pop",
+      "status": "PASS",
+      "detail": {
+        "changed": [
+          {
+            "type": "ProductOperationPayload",
+            "old_size": 44,
+            "new_size": 48,
+            "old_align": 4,
+            "new_align": 4
+          }
+        ]
+      }
+    },
+    {
+      "id": "pop_size_44_to_48",
+      "status": "PASS",
+      "detail": {
+        "old": 44,
+        "new": 48
+      }
+    },
+    {
+      "id": "pop_mission_epoch_offset_44",
+      "status": "PASS",
+      "detail": {
+        "mission_epoch_offset": 44
+      }
+    },
+    {
+      "id": "pop_existing_offsets_unchanged",
+      "status": "PASS",
+      "detail": {
+        "old_fields": {
+          "mission_id": 0,
+          "target_ned_m": 4,
+          "target_yaw_rad": 16,
+          "requested_altitude_m": 20,
+          "valid_mask": 24,
+          "requested_mode": 28,
+          "operation_flags": 30,
+          "settings_transaction_id": 32,
+          "prearm_check_epoch": 36,
+          "mission_transaction_id": 40
+        },
+        "new_fields": {
+          "mission_id": 0,
+          "target_ned_m": 4,
+          "target_yaw_rad": 16,
+          "requested_altitude_m": 20,
+          "valid_mask": 24,
+          "requested_mode": 28,
+          "operation_flags": 30,
+          "settings_transaction_id": 32,
+          "prearm_check_epoch": 36,
+          "mission_transaction_id": 40,
+          "mission_epoch": 44
+        }
+      }
+    },
+    {
+      "id": "operation_request_unchanged",
+      "status": "PASS",
+      "detail": {
+        "old_size": 160,
+        "new_size": 160,
+        "fields_equal": true
+      }
+    },
+    {
+      "id": "revision_0x00010904",
+      "status": "PASS",
+      "detail": {
+        "match": [
+          "#define PRODUCT_CONTRACT_REVISION 0x00010904u /* CR-V191-C01: + mission_epoch; must match FC_PORT_API_REVISION */"
+        ]
+      }
+    },
+    {
+      "id": "port_revision_matches",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "mission_epoch_valid_bit",
+      "status": "PASS",
+      "detail": {
+        "match": [
+          "#define PRODUCT_OPERATION_VALID_MISSION_EPOCH       (1u << 8)"
+        ]
+      }
+    },
+    {
+      "id": "mission_epoch_in_payload_once",
+      "status": "PASS",
+      "detail": {
+        "occurrences": 1
+      }
+    },
+    {
+      "id": "profile_id_unchanged",
+      "status": "PASS",
+      "detail": {}
+    },
+    {
+      "id": "geofence_types_present",
+      "status": "PASS",
+      "detail": {
+        "ProductGeofenceDefinition": true,
+        "ProductGeofenceConfig": true,
+        "ProductGeofenceConfigPayload": true
+      }
+    },
+    {
+      "id": "lock_type_count_145",
+      "status": "PASS",
+      "detail": {
+        "value": 145
+      }
+    },
+    {
+      "id": "lock_revisions",
+      "status": "PASS",
+      "detail": {
+        "port": 67844,
+        "product": 67844,
+        "schema": [
+          6,
+          0
+        ]
+      }
+    },
+    {
+      "id": "lock_header_bytes_88",
+      "status": "PASS",
+      "detail": {
+        "value": 88
+      }
+    },
+    {
+      "id": "lock_hashes_match_evidence",
+      "status": "PASS",
+      "detail": {
+        "arm": "588707eb4e722b7d9d885d9ab2c40767a69bfad99f8e214da54d17ba4cc8d9fc",
+        "host": "2e8c855d1b6522cccc725cd582007bd141306982fcc69ac68c8bbd7ffe166a4b"
+      }
+    },
+    {
+      "id": "spec_layout_145_998",
+      "status": "PASS",
+      "detail": {
+        "status": "PASS",
+        "types": 145,
+        "offsets": 998
+      }
+    },
+    {
+      "id": "host_arm_no_unexpected",
+      "status": "PASS",
+      "detail": {
+        "identical": 140,
+        "pointer_dependent": 5
+      }
+    },
+    {
+      "id": "registry_and_flags",
+      "status": "PASS",
+      "detail": {
+        "registry": "PASS",
+        "firmware_flags": "PASS"
+      }
+    },
+    {
+      "id": "overall_evidence_status",
+      "status": "PASS",
+      "detail": {
+        "status": "PASS"
+      }
+    }
+  ],
+  "failed_checks": [],
+  "observations": [
+    "C's status request was written before D accepted T191-A-ABI and still cites A-ABI READY_FOR_ASSIGNMENT; D should update the dependency view.",
+    "This review covers the contract/ABI diff only; C's M4 epoch-rejection and geofence-init implementation behaviour is outside this review (C-FMS evidence)."
+  ],
+  "verdict": "PASS"
+}

@@ -1,0 +1,48 @@
+"""Select one implementation per firmware model interface."""
+import os
+from building import *
+
+cwd = GetCurrentDir()
+paths = [os.path.join(cwd, folder) for folder in ('../contracts', 'ins', 'fms', 'control')]
+inner = 'control/inner_loop/quad_x4'
+outer = 'control/outer_loop/quad_x4'
+osqp = outer + '/mpc_solver/osqp'
+kf_gins = 'ins/kf_gins'
+fms = 'fms/quad_x4'
+
+models = [
+    ('Navigation', 'INS_REPLAY_ENABLE',
+     ['ins/ins_interface.c'] + [kf_gins + '/' + file for file in (
+         'navigation_estimator/kf_gins_ins.cpp', 'navigation_estimator/quad_x4_estimator_sim_config.cpp',
+         'observation_replay/ins_observation.cpp', 'observation_replay/ins_replay.cpp')],
+     [kf_gins, kf_gins + '/trimmed_core/include']),
+    ('FlightManagement', 'FMS_ENABLE',
+     ['fms/fms_interface.c'] + [fms + '/' + file for file in (
+         'flight_state_machine/fms.c', 'mission_lifecycle/mission_lifecycle.c', 'operator_authority/operator_authority.c',
+         'flight_safety/actuation_permit.c', 'flight_safety/fms_safety.c', 'flight_policy/quad_x4_fms.c')],
+     [fms]),
+    ('Control', 'CONTROLLER_ENABLE',
+     ['control/control_interface.c'] + [inner + '/' + file for file in (
+         'attitude_rate_control/attitude_math.c', 'attitude_rate_control/controller.c', 'control_allocation/control_allocation.c',
+         'simulation_config/quad_x4_controller_sim_config.c')]
+     + [outer + '/' + file for file in (
+         'position_tracking/control_reference.c', 'position_tracking/position_control.c', 'prediction_model/control_model.c', 'mpc_solver/mpc.c')],
+     [inner, osqp + '/generated', osqp + '/generated/inc/public']),
+]
+
+group = []
+for name, dependency, sources, includes in models:
+    placement = ' -DFLIGHT_NAV_DTCM' if name == 'Navigation' else ''
+    group.extend(DefineGroup(name, sources, depend=[dependency], CPPPATH=paths,
+        LOCAL_CPPPATH=[os.path.join(cwd, folder) for folder in includes],
+        LOCAL_CFLAGS=' -std=c99 -fno-short-enums',
+        LOCAL_CXXFLAGS=' -std=c++14 -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-short-enums' + placement,
+        LIBS=['m']))
+
+if GetDepend('FMS_ENABLE') or GetDepend('GUIDANCE_ENABLE'):
+    group.extend(DefineGroup('FlightGeometry', ['fms/geofence_geometry/geofence_geometry.c'],
+        depend=[], CPPPATH=paths))
+
+for backend in (kf_gins, osqp):
+    group.extend(SConscript(os.path.join(backend, 'SConscript')))
+Return('group')

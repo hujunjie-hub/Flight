@@ -1,0 +1,175 @@
+{
+  "task_id": "T191-B-UPSTREAM",
+  "task_type": "IMPLEMENTATION",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010903",
+  "update_sequence": 4,
+  "submission": {
+    "revision": 3,
+    "submitted_at": "2026-11-05T00:20+08:00",
+    "supersedes_sha256": null,
+    "reason": "Deliverable completed: the official KF-GINS data set was reproduced with the pristine locked sources (full run + truth comparison) and the QUAD core was compared against the pristine engine on the same inputs. Adds the D-REVIEW closures B-R01 (05 §7 notation) and B-R06 (applications/calibration). Requests review of the complete T191-B-UPSTREAM delivery.",
+    "dedup_key": "T191-B-UPSTREAM:4:3"
+  },
+  "requested_transition": "ASSIGNED->IN_PROGRESS->REVIEW (same session)",
+  "transition_note": "B confirms the deliverable is complete and auditable. D-REVIEW is ACCEPTED (seq 5); no prerequisite blocks this task. No ACCEPTED/CLOSED is requested: independent review and 09 registration remain with D.",
+  "assignee": "B",
+  "acknowledgement": {
+    "prompt_received": true,
+    "baseline_confirmed": true,
+    "received_at": "2026-11-04T22:10+08:00",
+    "prerequisite": {
+      "task_id": "T191-D-REVIEW",
+      "task_status_seen": "REVIEW",
+      "update_sequence_seen": 3,
+      "acknowledgement_seen": "用户2026-11-04指示执行Agent D任务；D接单、执行静态复核并提交交付（见spec/validation/T191-D-REVIEW）。",
+      "verification_status_seen": "IN_PROGRESS",
+      "reviewer_status": "B's independent review submitted (ACCEPT_WITH_CONDITIONS); A/C opinions and user Gate A approval still NOT_RUN.",
+      "review_evidence": [
+        "applications/plugins/estimator/kf_gins_quad/reviews/B_REVIEW_T191-D-REVIEW.md",
+        "applications/plugins/estimator/kf_gins_quad/reviews/b_review_checks.json",
+        "applications/plugins/estimator/kf_gins_quad/reviews/b_review_checks.py"
+      ]
+    }
+  },
+  "deliverable_refs": [
+    "packages/KF-GINS/UPSTREAM_LOCK.json",
+    "packages/KF-GINS/MODIFICATIONS.md",
+    "packages/KF-GINS/LICENSE",
+    "packages/KF-GINS/trim/include/kfgins/quad_core.hpp",
+    "packages/KF-GINS/trim/include/kfgins/quad_types.hpp",
+    "packages/KF-GINS/trim/include/kfgins/quad_models.hpp",
+    "packages/KF-GINS/trim/include/kfgins/quad_math.hpp",
+    "packages/KF-GINS/trim/include/kfgins/quad_earth.hpp",
+    "packages/KF-GINS/trim/src/quad_core.cpp",
+    "packages/KF-GINS/trim/src/quad_models.cpp",
+    "packages/KF-GINS/SConscript",
+    "packages/KF-GINS/tools/gen_locks.py",
+    "packages/deps.lock",
+    "applications/plugins/estimator/kf_gins_quad/kf_gins_quad_port.h",
+    "applications/plugins/estimator/kf_gins_quad/kf_gins_quad_port.cpp",
+    "applications/plugins/estimator/kf_gins_quad/kf_gins_adapter.hpp",
+    "applications/plugins/estimator/kf_gins_quad/kf_gins_adapter.cpp",
+    "applications/plugins/estimator/kf_gins_quad/SConscript",
+    "applications/plugins/estimator/kf_gins_quad/hosttest/",
+    "applications/plugins/estimator/kf_gins_quad/reviews/",
+    "build/validation/kf_gins_upstream/",
+    "build/validation/kf_gins_golden/DATASET_EVIDENCE.md",
+    "build/validation/kf_gins_golden/commands.log",
+    "build/validation/kf_gins_golden/dataset_run.json",
+    "build/validation/kf_gins_golden/dual_compare.log",
+    "packages/KF-GINS/tools/dataset_dual_compare.cpp",
+    "packages/KF-GINS/tools/run_dataset_evidence.ps1",
+    "applications/calibration/README.md",
+    "build/validation/review_b/CLOSURE_B-R01_B-R06.md"
+  ],
+  "actual_commands": [
+    {
+      "command": "python packages/KF-GINS/tools/gen_locks.py",
+      "exit_code": 0,
+      "result": "UPSTREAM_LOCK.json: 10 files, 0 hash mismatches; packages/deps.lock written"
+    },
+    {
+      "command": "pwsh -NoProfile -File applications/plugins/estimator/kf_gins_quad/hosttest/run_host_tests.ps1",
+      "exit_code": 0,
+      "result": "test_jacobian 220/0, test_core 2636/0, test_port 179/0, test_contract_coexistence PASS, test_upstream_compare 426/0 (dpos 3.66e-8 m, dvel 4.33e-8 m/s)"
+    },
+    {
+      "command": "arm-none-eabi-g++ -std=c++14 -fno-exceptions -fno-rtti -mcpu=cortex-m7 ... -c quad_core.cpp quad_models.cpp kf_gins_adapter.cpp kf_gins_quad_port.cpp",
+      "exit_code": 0,
+      "result": "4 objects compile; text 20288/3512/600/2104 B; nm -u has no malloc/free/operator new/__cxa_throw"
+    },
+    {
+      "command": "python -m SCons -n (RTT_CC=gcc)",
+      "exit_code": 0,
+      "result": "default build unchanged; with KF_GINS_QUAD_ENABLE defined quad_core/quad_models/kf_gins_adapter/kf_gins_quad_port compile"
+    },
+    {
+      "command": "cmake -S <checkout> -B <build> -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5; cmake --build <build> -j 8",
+      "exit_code": 0,
+      "result": "pristine KF-GINS built (230 targets) after one yaml-cpp portability include; bin/KF-GINS.exe"
+    },
+    {
+      "command": "./bin/KF-GINS.exe ./dataset/kf-gins-full.yaml",
+      "exit_code": 0,
+      "result": "3364.62 s of data processed in 17.499 s; 672,923 nav epochs; outputs hashed in dataset_run.json"
+    },
+    {
+      "command": "python truth_statistics.py (nav vs dataset/truth.nav)",
+      "exit_code": 0,
+      "result": "horizontal RMS 0.0390 m / max 0.0973 m; vertical RMS 0.0090 m / max 0.1209 m; 3D RMS 0.0400 m"
+    },
+    {
+      "command": "dataset_dual_compare ./dataset/kf-gins-120s.yaml",
+      "exit_code": 0,
+      "result": "24k epochs, worst dp 1.137e-07 m, dvel 9.218e-08 m/s, datt 1.919e-09 rad"
+    }
+  ],
+  "verification": {
+    "scope": "IMPLEMENTATION_REFERENCE_DATASET",
+    "status": "PASS (executor-run; not a 09 ledger PASS and not independently reviewed)",
+    "upstream_reproduction": {
+      "commit": "8291a93e49de513fe9d21f819500d39082ded611",
+      "processed_seconds": 3364.62,
+      "wall_seconds": 17.5,
+      "nav_epochs": 672923
+    },
+    "truth_comparison": {
+      "horizontal_rms_m": 0.039,
+      "horizontal_max_m": 0.0973,
+      "vertical_rms_m": 0.009,
+      "vertical_max_m": 0.1209,
+      "three_d_rms_m": 0.04
+    },
+    "project_host_vs_pristine": {
+      "epochs": 23999,
+      "max_position_m": 1.137e-07,
+      "max_velocity_mps": 9.218e-08,
+      "max_attitude_rad": 1.919e-09
+    },
+    "evidence_paths": [
+      "build/validation/kf_gins_golden/"
+    ]
+  },
+  "not_run": [
+    "H723 target build/link/map/WCET/RTA (T191-A-TARGET)",
+    "SIL/HIL and target board",
+    "evaluation of KF_GINS_STD.txt covariance against the project filter",
+    "independent review and Gate C sign-off"
+  ],
+  "reviewer": "D",
+  "blocked_by": [],
+  "resume_state": null,
+  "next_owner": "D",
+  "next_action": "D: review the complete T191-B-UPSTREAM delivery, register the dataset reproduction in 09 (REQ-NAV-KFG-001/013 evidence), record the B-R01/B-R06 closures, then route T191-B-ADAPTER once T191-A-PLATFORM is accepted.",
+  "known_issues_for_d": [
+    "B-R02: the firmware does not link Eigen although 00 §12.2 names Eigen fixed-size; a CR decision is required.",
+    "B-R03: contract headers need -fno-short-enums at the top-level build, currently only per-SConscript.",
+    "F-01 latent defect found by B's replay test (stale gain columns) was fixed in packages/KF-GINS/trim; the KF-GINS Host suite was re-run clean."
+  ],
+  "reviewer_evidence": {
+    "task_reviewed": "T191-D-REVIEW",
+    "reviewer": "B",
+    "verdict": "ACCEPT_WITH_CONDITIONS",
+    "checks": 10,
+    "failed_checks_in_snapshot": 2,
+    "fail_note": "B-02 closes with this submission; B-10 is the unassigned calibration/GNSS task gap.",
+    "conditions": [
+      "B-1: D merges the four B status requests and marks the B part of D-REV-04 as submitted.",
+      "B-2: D decides B-R02 (Eigen vs dependency-free fixed-size math) and B-R03 (-fno-short-enums top-level rule).",
+      "B-3: after D confirms, B patches 05 §7 notation (B-R01) and the pipeline delay bound in sensor_alignment.",
+      "B-4: D assigns or explicitly waives B-R05 (Kconfig aggregation), B-R06 (applications/calibration) and B-R07 (GNSS native backend / Mag calibration tasks)."
+    ],
+    "evidence": [
+      "applications/plugins/estimator/kf_gins_quad/reviews/B_REVIEW_T191-D-REVIEW.md",
+      "applications/plugins/estimator/kf_gins_quad/reviews/b_review_checks.json",
+      "applications/plugins/estimator/kf_gins_quad/reviews/b_review_checks.py"
+    ],
+    "closures": [
+      "B-R01 (05 §7) closed",
+      "B-R06 (applications/calibration) closed"
+    ]
+  },
+  "commit": null,
+  "commit_note": "Workspace has no Git metadata; the source snapshot is the SHA256 lists in build/validation and the delivered file lists above. No pre-existing file was modified except one root Kconfig line sourcing applications/Kconfig.",
+  "rollback": "Delete packages/KF-GINS, packages/deps.lock, applications/plugins/estimator/kf_gins_quad and the build/validation evidence; restore the one root Kconfig line added for M2/M3/health if the whole B batch is reverted."
+}

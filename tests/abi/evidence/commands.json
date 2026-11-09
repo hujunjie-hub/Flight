@@ -1,0 +1,650 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "generated_at_utc": "2026-11-07T07:44:55Z",
+  "commands": [
+    {
+      "label": "compile arm c11",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe",
+        "-std=c11",
+        "-mcpu=cortex-m7",
+        "-mthumb",
+        "-mfpu=fpv5-d16",
+        "-mfloat-abi=hard",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fno-short-enums",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-9gkjna0f\\abi_probe.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-9gkjna0f\\arm_c11.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 256
+    },
+    {
+      "label": "objcopy .rodata",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-objcopy.exe",
+        "--dump-section",
+        ".rodata=C:\\Users\\26718\\AppData\\Local\\Temp\\tmp62bggv8z.bin",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-9gkjna0f\\arm_c11.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 0
+    },
+    {
+      "label": "compile arm c++14",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-g++.exe",
+        "-std=c++14",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-mcpu=cortex-m7",
+        "-mthumb",
+        "-mfpu=fpv5-d16",
+        "-mfloat-abi=hard",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fno-short-enums",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-9gkjna0f\\abi_probe.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-9gkjna0f\\arm_cpp14.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 306
+    },
+    {
+      "label": "objcopy .rodata",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-objcopy.exe",
+        "--dump-section",
+        ".rodata=C:\\Users\\26718\\AppData\\Local\\Temp\\tmp_y9bk35b.bin",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-9gkjna0f\\arm_cpp14.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 0
+    },
+    {
+      "label": "compile host c11",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\gcc.exe",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-9gkjna0f\\abi_probe.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-9gkjna0f\\host_c11.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 216
+    },
+    {
+      "label": "objcopy .rdata",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\objcopy.exe",
+        "--dump-section",
+        ".rdata=C:\\Users\\26718\\AppData\\Local\\Temp\\tmpg9m0ilqh.bin",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-9gkjna0f\\host_c11.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 0
+    },
+    {
+      "label": "compile host c++14",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\g++.exe",
+        "-std=c++14",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-9gkjna0f\\abi_probe.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-9gkjna0f\\host_cpp14.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 243
+    },
+    {
+      "label": "objcopy .rdata",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\objcopy.exe",
+        "--dump-section",
+        ".rdata=C:\\Users\\26718\\AppData\\Local\\Temp\\tmpi7rkoipb.bin",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-9gkjna0f\\host_cpp14.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 0
+    },
+    {
+      "label": "compile arm c11",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe",
+        "-std=c11",
+        "-mcpu=cortex-m7",
+        "-mthumb",
+        "-mfpu=fpv5-d16",
+        "-mfloat-abi=hard",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fno-short-enums",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-yl9bu4wp\\abi_probe.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-yl9bu4wp\\arm_c11.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 331
+    },
+    {
+      "label": "objcopy .rodata",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-objcopy.exe",
+        "--dump-section",
+        ".rodata=C:\\Users\\26718\\AppData\\Local\\Temp\\tmpbmznlipr.bin",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-yl9bu4wp\\arm_c11.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 0
+    },
+    {
+      "label": "compile arm c++14",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-g++.exe",
+        "-std=c++14",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-mcpu=cortex-m7",
+        "-mthumb",
+        "-mfpu=fpv5-d16",
+        "-mfloat-abi=hard",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fno-short-enums",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-yl9bu4wp\\abi_probe.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-yl9bu4wp\\arm_cpp14.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 321
+    },
+    {
+      "label": "objcopy .rodata",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-objcopy.exe",
+        "--dump-section",
+        ".rodata=C:\\Users\\26718\\AppData\\Local\\Temp\\tmpoklftch8.bin",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-yl9bu4wp\\arm_cpp14.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 0
+    },
+    {
+      "label": "compile host c11",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\gcc.exe",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-yl9bu4wp\\abi_probe.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-yl9bu4wp\\host_c11.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 225
+    },
+    {
+      "label": "objcopy .rdata",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\objcopy.exe",
+        "--dump-section",
+        ".rdata=C:\\Users\\26718\\AppData\\Local\\Temp\\tmp_5rz_sp8.bin",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-yl9bu4wp\\host_c11.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 0
+    },
+    {
+      "label": "compile host c++14",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\g++.exe",
+        "-std=c++14",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-yl9bu4wp\\abi_probe.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-yl9bu4wp\\host_cpp14.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 236
+    },
+    {
+      "label": "objcopy .rdata",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\objcopy.exe",
+        "--dump-section",
+        ".rdata=C:\\Users\\26718\\AppData\\Local\\Temp\\tmp46915e1u.bin",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-yl9bu4wp\\host_cpp14.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 0
+    },
+    {
+      "label": "self-contained contract_version.h arm-c99",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe",
+        "-std=c99",
+        "-mcpu=cortex-m7",
+        "-mthumb",
+        "-mfpu=fpv5-d16",
+        "-mfloat-abi=hard",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fno-short-enums",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_contract_version.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_contract_version.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 242
+    },
+    {
+      "label": "self-contained contract_version.h host-c++14",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\g++.exe",
+        "-std=c++14",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_contract_version.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_contract_version.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 209
+    },
+    {
+      "label": "self-contained common_base.h arm-c99",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe",
+        "-std=c99",
+        "-mcpu=cortex-m7",
+        "-mthumb",
+        "-mfpu=fpv5-d16",
+        "-mfloat-abi=hard",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fno-short-enums",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_common_base.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_common_base.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 346
+    },
+    {
+      "label": "self-contained common_base.h host-c++14",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\g++.exe",
+        "-std=c++14",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_common_base.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_common_base.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 428
+    },
+    {
+      "label": "self-contained control_model_types.h arm-c99",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe",
+        "-std=c99",
+        "-mcpu=cortex-m7",
+        "-mthumb",
+        "-mfpu=fpv5-d16",
+        "-mfloat-abi=hard",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fno-short-enums",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_control_model_types.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_control_model_types.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 462
+    },
+    {
+      "label": "self-contained control_model_types.h host-c++14",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\g++.exe",
+        "-std=c++14",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_control_model_types.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_control_model_types.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 277
+    },
+    {
+      "label": "self-contained common_messages.h arm-c99",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe",
+        "-std=c99",
+        "-mcpu=cortex-m7",
+        "-mthumb",
+        "-mfpu=fpv5-d16",
+        "-mfloat-abi=hard",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fno-short-enums",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_common_messages.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_common_messages.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 323
+    },
+    {
+      "label": "self-contained common_messages.h host-c++14",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\g++.exe",
+        "-std=c++14",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_common_messages.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_common_messages.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 255
+    },
+    {
+      "label": "self-contained port_types.h arm-c99",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe",
+        "-std=c99",
+        "-mcpu=cortex-m7",
+        "-mthumb",
+        "-mfpu=fpv5-d16",
+        "-mfloat-abi=hard",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fno-short-enums",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_port_types.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_port_types.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 295
+    },
+    {
+      "label": "self-contained port_types.h host-c++14",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\g++.exe",
+        "-std=c++14",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_port_types.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_port_types.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 249
+    },
+    {
+      "label": "self-contained port_api.h arm-c99",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe",
+        "-std=c99",
+        "-mcpu=cortex-m7",
+        "-mthumb",
+        "-mfpu=fpv5-d16",
+        "-mfloat-abi=hard",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fno-short-enums",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_port_api.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_port_api.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 295
+    },
+    {
+      "label": "self-contained port_api.h host-c++14",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\g++.exe",
+        "-std=c++14",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_port_api.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_port_api.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 227
+    },
+    {
+      "label": "self-contained message_ids.h arm-c99",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe",
+        "-std=c99",
+        "-mcpu=cortex-m7",
+        "-mthumb",
+        "-mfpu=fpv5-d16",
+        "-mfloat-abi=hard",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fno-short-enums",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_message_ids.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_message_ids.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 314
+    },
+    {
+      "label": "self-contained message_ids.h host-c++14",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\g++.exe",
+        "-std=c++14",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_message_ids.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_message_ids.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 232
+    },
+    {
+      "label": "self-contained product_contract.h arm-c99",
+      "command": [
+        "D:\\STM32CubeCLT\\GNU-tools-for-STM32\\bin\\arm-none-eabi-gcc.exe",
+        "-std=c99",
+        "-mcpu=cortex-m7",
+        "-mthumb",
+        "-mfpu=fpv5-d16",
+        "-mfloat-abi=hard",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fno-short-enums",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_product_contract.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_product_contract.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 319
+    },
+    {
+      "label": "self-contained product_contract.h host-c++14",
+      "command": [
+        "D:\\STM32CubeCLT\\mingw64\\bin\\g++.exe",
+        "-std=c++14",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-ID:\\STM32Project\\FMT-Firmware-1.2.0\\Flight\\middleware\\contracts",
+        "-c",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_product_contract.c",
+        "-o",
+        "C:\\Users\\26718\\AppData\\Local\\Temp\\flight-abi-sc-tfycj6s4\\sc_product_contract.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "",
+      "duration_ms": 247
+    }
+  ]
+}

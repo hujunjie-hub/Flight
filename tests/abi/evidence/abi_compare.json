@@ -1,0 +1,148 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "status": "PASS",
+  "failures": [],
+  "abi_hashes": {
+    "arm": "12b64f6368aad4b96b5bdd21f382a1babc810a2df96680af7853273e2e7f66c4",
+    "host": "0edc9d8baaca7a826d9e807132f0cf232fd55f7a9b646d4d9a82aab4c288eacf"
+  },
+  "spec_layout_comparison": {
+    "spec_file": "spec/validation/abi_layout.json",
+    "spec_sha256": "c607b059bed20efa6ae5ffba19aecf6556765a46029c9c79e5d9dff13248f504",
+    "spec_compiler": "arm-none-eabi-gcc.exe (GNU Tools for STM32 14.3.rel1.20251027-0700) 14.3.1 20250623",
+    "compared_types": 143,
+    "compared_field_offsets": 981,
+    "excluded_private_types": [
+      "MpcOutputSnapshot"
+    ],
+    "missing_types": [],
+    "extra_types": [],
+    "mismatches": [],
+    "status": "PASS"
+  },
+  "warnings": [],
+  "host_arm_comparison": {
+    "identical_types": 139,
+    "differing_types": [
+      {
+        "type": "ControllerInput",
+        "arm_size": 64,
+        "host_size": 112,
+        "field_differences": [
+          "actuation_permit",
+          "actuator_capability",
+          "actuator_commit_receipt",
+          "actuator_status",
+          "authority_status",
+          "control_model_view",
+          "control_time_us",
+          "directive",
+          "evaluation_time_us",
+          "guidance_status",
+          "pilot_control_reference",
+          "reference",
+          "safety_envelope"
+        ],
+        "pointer_bearing": true
+      },
+      {
+        "type": "FmsInputSnapshot",
+        "arm_size": 200,
+        "host_size": 256,
+        "field_differences": [],
+        "pointer_bearing": true
+      },
+      {
+        "type": "FmsInputView",
+        "arm_size": 200,
+        "host_size": 256,
+        "field_differences": [
+          "actuator_capability",
+          "actuator_status",
+          "control_capability",
+          "evaluation_time_us",
+          "fault_summary",
+          "guidance_feasibility",
+          "guidance_status",
+          "link_status_count",
+          "link_statuses",
+          "mission_candidate",
+          "navigation",
+          "navigation_capability",
+          "operator_input",
+          "pending_request_count",
+          "presence_mask",
+          "product_extension",
+          "reserved0",
+          "reserved1"
+        ],
+        "pointer_bearing": true
+      },
+      {
+        "type": "GuidanceInput",
+        "arm_size": 72,
+        "host_size": 120,
+        "field_differences": [
+          "active_permit",
+          "authority_status",
+          "authorized_mission",
+          "authorized_operator_input",
+          "control_time_us",
+          "directive",
+          "environment",
+          "evaluation_time_us",
+          "geofence_count",
+          "geofences",
+          "landed_state",
+          "navigation_capability",
+          "observation_count",
+          "observations",
+          "safety_envelope"
+        ],
+        "pointer_bearing": true
+      }
+    ],
+    "unexpected_differences": [],
+    "status": "PASS"
+  },
+  "message_registry_check": {
+    "registry_file": "spec/contracts/message_registry.json",
+    "registry_sha256": "e2893aebd8c1121b1ede80591849730ec722c5f9e0616443507c2ff99179bf41",
+    "registered_messages": 55,
+    "macros_checked": 55,
+    "problems": [],
+    "status": "PASS"
+  },
+  "header_hygiene": {
+    "headers_checked": 8,
+    "forbidden_includes_or_void_pointers": [],
+    "messages_with_pointer_fields": [],
+    "status": "PASS"
+  },
+  "header_self_containment": {
+    "headers_checked": 8,
+    "failures": [],
+    "status": "PASS"
+  },
+  "firmware_build_flags": {
+    "file": "rtconfig.py",
+    "required_flags": [
+      "-mcpu=cortex-m7",
+      "-mthumb",
+      "-mfpu=fpv5-d16",
+      "-mfloat-abi=hard",
+      "-fno-short-enums"
+    ],
+    "missing": [],
+    "status": "PASS"
+  },
+  "abi_lock_check": {
+    "status": "PASS",
+    "problems": [],
+    "lock_file": "middleware/contracts/product_contract/abi_lock.h",
+    "lock_sha256": "b62c5991b9fd91c6c5e0a6b236b2ad7ee4c371ea0eaaf14c145cc3b245d04321"
+  },
+  "private_types_excluded": [
+    "MpcOutputSnapshot"
+  ]
+}

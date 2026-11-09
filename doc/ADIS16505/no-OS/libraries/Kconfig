@@ -1,0 +1,131 @@
+menu "External Libraries"
+
+config FREERTOS
+	bool "Enable FreeRTOS"
+	default n
+
+config FREERTOS_CONF_PATH
+	depends on FREERTOS
+	string "Path to the FreeRTOSConfig.h file"
+
+config FREERTOS_VERSION
+	string "FreeRTOS version tag"
+	default "03db672b8f45db24aa99f12051f7cf86746b9ed9"
+	depends on FREERTOS
+	help
+	  Git tag, branch or commit for FreeRTOS-Kernel.
+	  Examples: V11.2.0, V10.4.3, main
+	  Resolved via the NO_OS_DEP_FREERTOS_PATH override, else cloned in-tree
+	  (or into a version-keyed NO_OS_CACHE_DIR store when that is set).
+
+config FREERTOS_HEAP_ALLOCATOR
+	int "Select the FreeRTOS heap memory allocator implementation"
+	default 2
+	range 1 5
+	depends on FREERTOS
+
+config LWIP
+	bool "Enable LWIP"
+	default n
+
+config LWIP_VERSION
+	string "lwIP version tag"
+	default "e29870c15e8bf28eac9c811dd236c474f3f2008f"
+	depends on LWIP
+	help
+	  Git tag, branch or commit for lwIP.
+	  Examples: STABLE-2_2_1_RELEASE, STABLE-2_1_0_RELEASE, master
+	  Resolved via the NO_OS_DEP_LWIP_PATH override, else cloned in-tree
+	  (or into a version-keyed NO_OS_CACHE_DIR store when that is set).
+
+config CORDIO
+	bool "Enable CORDIO"
+	default n
+
+config MBEDTLS
+	bool "Enable mbedTLS"
+	default n
+
+config MBEDTLS_VERSION
+	string "mbedTLS version tag"
+	default "bdd5ba98e809c43c509770b39b787a3b00c67b55"
+	depends on MBEDTLS
+	help
+	  Git tag, branch or commit for mbedTLS.
+	  Examples: mbedtls-2.28.0, mbedtls-3.6.0, development
+	  Resolved via the NO_OS_DEP_MBEDTLS_PATH override, else cloned in-tree
+	  (or into a version-keyed NO_OS_CACHE_DIR store when that is set).
+
+config MBEDTLS_CONFIG_FILE
+	string "Path to project mbedTLS config header"
+	depends on MBEDTLS
+	help
+	  Path to a project-specific mbedTLS configuration header, wired up as
+	  MBEDTLS_CONFIG_FILE so mbedTLS includes it instead of its default
+	  config.h. Can be absolute or relative to CMAKE_SOURCE_DIR. Leave empty
+	  to use the stock configuration.
+
+config MQTT
+	bool "Enable MQTT (Paho Embedded-C)"
+	default n
+
+config MQTT_VERSION
+	string "Paho MQTT version tag"
+	default "29ab2aa29c5e47794284376d7f8386cfd54c3eed"
+	depends on MQTT
+	help
+	  Git tag, branch or commit for paho.mqtt.embedded-c.
+	  Examples: master, v1.1.0
+	  Resolved via the NO_OS_DEP_MQTT_PATH override, else cloned in-tree
+	  (or into a version-keyed NO_OS_CACHE_DIR store when that is set).
+
+config ESH
+	bool "Enable esh (Embedded Shell)"
+	default n
+
+config ESH_VERSION
+	string "esh version tag"
+	default "main"
+	depends on ESH
+	help
+	  Git tag, branch or commit for esh.
+	  Examples: main
+	  Resolved via the NO_OS_DEP_ESH_PATH override, else cloned in-tree
+	  (or into a version-keyed NO_OS_CACHE_DIR store when that is set).
+
+config LVGL
+	bool "Enable LVGL"
+	default n
+
+config LVGL_VERSION
+	string "LVGL version tag"
+	default "v9.3.0"
+	depends on LVGL
+	help
+	  Git tag, branch or commit for LVGL.
+	  Examples: v9.3.0, v8.3.0, master
+	  Resolved via the NO_OS_DEP_LVGL_PATH override, else cloned in-tree
+	  (or into a version-keyed NO_OS_CACHE_DIR store when that is set).
+
+config LVGL_CONF_PATH
+	string "Path to directory containing lv_conf.h"
+	depends on LVGL
+	help
+	  Directory containing the lv_conf.h configuration file.
+	  Can be absolute or relative to CMAKE_SOURCE_DIR.
+
+config AZURE
+	bool "Enable Azure SDK for C"
+	default n
+
+config AZURE_VERSION
+	string "Azure SDK version tag"
+	default "277a0f8c51a09bcaa3c4687a9665eb293eeca188"
+	depends on AZURE
+	help
+	  Git tag, branch or commit for azure-sdk-for-c.
+	  Examples: 1.5.0, 1.4.0, main
+	  Resolved via the NO_OS_DEP_AZURE_PATH override, else cloned in-tree
+	  (or into a version-keyed NO_OS_CACHE_DIR store when that is set).
+
+endmenu

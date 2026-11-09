@@ -1,0 +1,9 @@
+config CONTROLLER_ENABLE
+    bool "M6 QUAD controller (MPC/SO3/rate PID/allocation)"
+    default n
+    help
+      Builds the fixed 15-variable/190-row OSQP 1.0.0 embedded solver,
+      QUAD LTI ControlModelPort and ControllerPort. GNU Arm toolchain only.
+      The 50 Hz integrator calls control_outer_update separately from the 1 kHz
+      controller_update. This option does not create threads or enable motors.
+      Target WCET and board/vehicle calibration remain unverified.

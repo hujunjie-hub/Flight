@@ -1,0 +1,86 @@
+{
+  "generator": "pymavlink==2.4.49",
+  "input": "spec\\contracts\\FCU.xml",
+  "input_sha256": "1be7adc3b849bc89f812ad66353368ae2c8c6290f2ea97168ee710a7145446ed",
+  "output_sha256": "12302f339b8b535d57cc6222b6b0534a46bc57b93f2fd57563359e65a87fd88d",
+  "messages": [
+    {
+      "id": 43000,
+      "name": "FCU_OPERATION_STATUS",
+      "length": 51,
+      "crc_extra": 213
+    },
+    {
+      "id": 43001,
+      "name": "FCU_NAV_STATUS",
+      "length": 52,
+      "crc_extra": 119
+    },
+    {
+      "id": 43002,
+      "name": "FCU_SENSOR_HEALTH",
+      "length": 44,
+      "crc_extra": 121
+    },
+    {
+      "id": 43003,
+      "name": "FCU_CONTROL_STATUS",
+      "length": 50,
+      "crc_extra": 255
+    },
+    {
+      "id": 43004,
+      "name": "FCU_ACTUATOR_STATUS",
+      "length": 44,
+      "crc_extra": 42
+    },
+    {
+      "id": 43005,
+      "name": "FCU_LINK_STATUS",
+      "length": 48,
+      "crc_extra": 144
+    },
+    {
+      "id": 43006,
+      "name": "FCU_STORAGE_STATUS",
+      "length": 48,
+      "crc_extra": 162
+    },
+    {
+      "id": 43007,
+      "name": "FCU_RESOURCE_STATUS",
+      "length": 46,
+      "crc_extra": 45
+    },
+    {
+      "id": 43008,
+      "name": "FCU_TIME_STATUS",
+      "length": 49,
+      "crc_extra": 237
+    },
+    {
+      "id": 43009,
+      "name": "FCU_EVENT",
+      "length": 45,
+      "crc_extra": 223
+    },
+    {
+      "id": 43010,
+      "name": "FCU_PREARM_STATUS",
+      "length": 47,
+      "crc_extra": 201
+    },
+    {
+      "id": 43011,
+      "name": "FCU_RC_INPUT_STATUS",
+      "length": 46,
+      "crc_extra": 113
+    },
+    {
+      "id": 43012,
+      "name": "FCU_BUILD_INFO",
+      "length": 86,
+      "crc_extra": 182
+    }
+  ]
+}

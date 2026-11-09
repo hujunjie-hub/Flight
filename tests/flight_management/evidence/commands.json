@@ -1,0 +1,38 @@
+{
+  "task_id": "T191-C-FMS",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010903",
+  "workspace_root": "D:/STM32Project/FMT-Firmware-1.2.0/Flight",
+  "commands": [
+    {
+      "command": "wsl.exe -d Ubuntu-26.04 -- bash applications/core/m4/hosttest/run_host_tests.sh",
+      "cwd": "Flight/",
+      "exit_code": 0,
+      "result": "Host build gcc 16.0.1 -std=c11 -Wall -Wextra -Werror against production contracts; 17 tests, 240 checks, 0 failures (CR-C01/C02 paths covered)",
+      "log": "applications/core/m4/hosttest/evidence/host_tests.log"
+    },
+    {
+      "command": "pwsh -NoProfile -File applications/core/m4/hosttest/arm_build_check.ps1",
+      "cwd": "Flight/",
+      "exit_code": 0,
+      "result": "Cortex-M7 compile PASS (arm-none-eabi-gcc 14.3.1); text 25768 B; bss 7213 B; M5_ARM_COMPILE_OK",
+      "log": "applications/core/m4/hosttest/evidence/arm_build.log"
+    },
+    {
+      "command": "python -c \"compile() every new SConscript\"",
+      "cwd": "Flight/",
+      "exit_code": 0,
+      "result": "applications/core/SConscript, applications/core/m4/SConscript, applications/plugins/fms/SConscript, applications/plugins/fms/quad_x4/SConscript parse as Python 3; all groups are guarded by FMS_QUAD_X4_ENABLE (undefined by default) so the existing firmware source set is unchanged"
+    }
+  ],
+  "not_executed": [
+    "scons firmware build / ARM_TARGET_BUILD (needs the project Keil/GNU toolchain selection and a real target run)",
+    "SIL/HIL, target board, WCET/RTA, stack watermark, DMA/Timer evidence",
+    "MAVLink transport, M1 staging/authentication and M5/M6/M7 consumer integration",
+    "D independent review and 09 ledger registration"
+  ],
+  "environment": {
+    "host": "WSL2 Ubuntu 26.04, x86_64, gcc 16.0.1",
+    "arm": "GNU Tools for STM32 14.3.1 (arm-none-eabi-gcc 14.3.rel1)",
+    "baseline_read": "spec/AGENT_HANDOFF.md at 2026-11-04T22:10+08:00: T191-A-ABI and T191-B-ADAPTER were READY_FOR_ASSIGNMENT / NOT_RUN with acknowledgement=null"
+  }
+}

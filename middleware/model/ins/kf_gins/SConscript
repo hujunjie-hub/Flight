@@ -1,0 +1,14 @@
+"""Build the KF-GINS core, IMU adapter and private C port."""
+import os
+from building import *
+
+cwd = GetCurrentDir()
+
+src = Glob('trimmed_core/src/*.cpp') + ['backend_adapter/kf_gins_adapter.cpp', 'backend_adapter/kf_gins_quad_port.cpp']
+path = [cwd, os.path.join(cwd, 'trimmed_core', 'include')]
+
+group = DefineGroup('KF-GINS', src, depend=['INS_BACKEND_ENABLE'], LOCAL_CPPPATH=path,
+                    LOCAL_CXXFLAGS=' -std=c++14 -fno-exceptions -fno-rtti '
+                                    '-fno-threadsafe-statics -fno-short-enums')
+
+Return('group')

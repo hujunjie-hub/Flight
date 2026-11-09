@@ -1,0 +1,94 @@
+{
+  "task_id": "T191-C-M6",
+  "task_type": "IMPLEMENTATION",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / Schema 6.0 / Product-Port 0x00010903",
+  "update_sequence": 2,
+  "submission": {
+    "revision": 1,
+    "submitted_at": "2026-11-04T23:26:32+08:00",
+    "supersedes_sha256": null,
+    "reason": "Status notice for the C part of D-REV-04: no implementation has been started. C does not request ASSIGNED and does not claim any M6 code, test or evidence.",
+    "dedup_key": "T191-C-M6:1"
+  },
+  "state": "NOT_STARTED",
+  "requested_transition": "NO_CHANGE",
+  "transition_note": "T191-C-M6 remains READY_FOR_ASSIGNMENT. If D routes it, record ASSIGNED only after the blockers below are resolved; otherwise record BLOCKED with the blocked_by list.",
+  "assignee": "C",
+  "d_rev_04_c_part": {
+    "role": "C",
+    "status": "SUBMITTED_FOR_MERGE",
+    "tasks": [
+      "T191-C-FMS",
+      "T191-C-M5",
+      "T191-C-M6",
+      "T191-C-M7"
+    ],
+    "index": "applications/core/status_requests/index.json",
+    "note": "C submits all four status requests so D can close the C part of D-REV-04. C does not edit AGENT_HANDOFF; closure remains a D action."
+  },
+  "review_opinion": {
+    "task": "T191-D-REVIEW",
+    "path": "applications/core/m4/reviews/C_REVIEW_T191-D-REVIEW.md",
+    "machine_evidence": [
+      "applications/core/m4/reviews/c_review_checks.json",
+      "applications/core/m4/reviews/c_review_checks.py"
+    ],
+    "conclusion": "ACCEPT_WITH_CONDITIONS",
+    "summary": {
+      "checks": 21,
+      "pass": 14,
+      "fail": 1,
+      "obs": 6
+    },
+    "status": "SUBMITTED_ON_FILE",
+    "note": "C's non-author opinion is on file; D merges it when T191-D-REVIEW proceeds to closure. It is not an ACCEPTED state and does not replace B's opinion or user Gate A approval."
+  },
+  "blocked_by": [
+    "T191-C-M5",
+    "T191-B-REPLAY",
+    "MPC_SOLVER_PACKAGE_DECISION",
+    "CONTROL_MODEL_PORT_IMPLEMENTATION"
+  ],
+  "blockers": [
+    {
+      "id": "C-M6-B1",
+      "item": "T191-C-M5",
+      "fact": "C-M5 is delivered as an independent NONE-source slice but the record is READY_FOR_ASSIGNMENT/NOT_RUN and D has not reviewed it."
+    },
+    {
+      "id": "C-M6-B2",
+      "item": "T191-B-REPLAY",
+      "fact": "Record is READY_FOR_ASSIGNMENT/NOT_RUN. B artifacts exist under applications/core/m3/src/ins_replay.cpp but no accepted replay contract/evidence is available."
+    },
+    {
+      "id": "C-M6-B3",
+      "item": "MPC solver package",
+      "fact": "04 requires a 50 Hz LTI-MPC QP; packages/ contains only CMSIS-Core, KF-GINS and STM32H7 HAL/CMSIS packages. No OSQP/QP solver is baselined, and adding one changes dependencies/resources/ABI -> CR + A/D decision required before C can implement.",
+      "evidence": "packages/ directory listing"
+    },
+    {
+      "id": "C-M6-B4",
+      "item": "ControlModelPort implementation",
+      "fact": "M6 consumes ControlModelView/constraints; no selected control model implementation or Profile binding exists yet (C's M6 task lists packages/ and control_model plugin as its landing zone, but the model ABI is not frozen)."
+    }
+  ],
+  "deliverable_refs": [],
+  "actual_commands": [],
+  "verification": {
+    "scope": "IMPLEMENTATION",
+    "status": "NOT_RUN",
+    "note": "Nothing implemented; no test, build or evidence is claimed."
+  },
+  "not_run": [
+    "M6-01..M6-07 (MPC, SO(3), rate PID, allocator, fallback, anti-windup, controller Port)",
+    "ControlModel view/constraints binding",
+    "Host/SIL closed loop, target WCET and M7 integration"
+  ],
+  "reviewer": "D",
+  "resume_state": "READY_FOR_ASSIGNMENT",
+  "next_owner": "D",
+  "next_action": "D/A: decide the MPC solver package and freeze the ControlModelPort ABI; D: accept C-M5 and B-REPLAY; then route T191-C-M6 to C.",
+  "commit": null,
+  "commit_note": "No code changed; workspace has no Git metadata.",
+  "rollback": "No files added by this notice; nothing to roll back."
+}

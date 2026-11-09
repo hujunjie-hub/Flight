@@ -1,0 +1,170 @@
+{
+  "reviewer": "A",
+  "task_reviewed": "T191-D-REVIEW",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "scope": "DOCUMENT_STATIC / independent non-author review",
+  "production_validation": "NOT_RUN",
+  "reviewed_files": {
+    "spec/validation/T191-D-REVIEW/T191-D-REVIEW_report.md": "d1dd78c28a0263ae1392327bc3cf8eb91c2021a08d88e3befafdb16bd73d20aa",
+    "spec/validation/T191-D-REVIEW/review_checks.json": "9d77f532faabcbe9c34f33eee30a521812e12ec862ddce92877d416c9a53da2f",
+    "spec/AGENT_HANDOFF.md": "f5c11bca73b3c66578a1a23e307392f8e44d2cbd1e45ad024d660ef334e9357a",
+    "spec/07_实时调度与板级硬件资源设计.md": "aacf4ca90fcf71e92ab1934147e35d4f4fa9b1d94d3651040ef507b27e9a47ca"
+  },
+  "checks": [
+    {
+      "id": "handoff_count_and_unique_ids",
+      "status": "PASS",
+      "detail": {
+        "tasks": 15,
+        "unique": 15
+      }
+    },
+    {
+      "id": "handoff_owner_not_reviewer",
+      "status": "PASS",
+      "detail": {
+        "violations": []
+      }
+    },
+    {
+      "id": "handoff_dependencies_exist",
+      "status": "PASS",
+      "detail": {
+        "missing": []
+      }
+    },
+    {
+      "id": "handoff_dag_acyclic",
+      "status": "PASS",
+      "detail": {
+        "cyclic": []
+      }
+    },
+    {
+      "id": "handoff_states_legal",
+      "status": "PASS",
+      "detail": {
+        "bad": [],
+        "states": [
+          "READY_FOR_ASSIGNMENT",
+          "REVIEW"
+        ]
+      }
+    },
+    {
+      "id": "d_review_state_review_seq3",
+      "status": "PASS",
+      "detail": {
+        "status": "REVIEW",
+        "update_sequence": 3,
+        "ack_present": true
+      }
+    },
+    {
+      "id": "a_abi_record_ready_seq2",
+      "status": "PASS",
+      "detail": {
+        "status": "READY_FOR_ASSIGNMENT",
+        "update_sequence": 2
+      }
+    },
+    {
+      "id": "doc11_schema_6_no_current_5_claim",
+      "status": "PASS",
+      "detail": {
+        "violations": []
+      }
+    },
+    {
+      "id": "doc07_pipeline_single_limit_3000",
+      "status": "PASS",
+      "detail": {
+        "table_us": 3000,
+        "has_1900": false,
+        "prose_3000": true,
+        "sha256": "aacf4ca90fcf71e92ab1934147e35d4f4fa9b1d94d3651040ef507b27e9a47ca"
+      }
+    },
+    {
+      "id": "d_review_rerun_report_exists",
+      "status": "PASS",
+      "detail": {
+        "path": "spec/validation/t191-d-review_report.json",
+        "sha256": "ba3ccf1c572305043823ba14f1c32c45101571bc9eba620e8452eb4a6f9c0d81"
+      }
+    },
+    {
+      "id": "doc09_d_review_registered_in_progress",
+      "status": "PASS",
+      "detail": {
+        "row_present": true
+      }
+    },
+    {
+      "id": "arithmetic_spot_checks",
+      "status": "PASS",
+      "detail": {
+        "cpu_raw": 545705,
+        "cpu_percent": 54.5705,
+        "chain_us": 900,
+        "window_us": 4000,
+        "feedback_us": 7500
+      }
+    },
+    {
+      "id": "d_snapshot_counts_match_report",
+      "status": "PASS",
+      "detail": {
+        "counts": {
+          "PASS": 46,
+          "DRIFT": 5,
+          "FAIL": 2,
+          "OBS": 6
+        }
+      }
+    },
+    {
+      "id": "audit_spec_has_label_and_optional_outside_baseline",
+      "status": "PASS",
+      "detail": {
+        "label": true,
+        "outside_optional": true,
+        "outside_writer": true,
+        "state_check": true
+      }
+    }
+  ],
+  "observations": [
+    {
+      "id": "OBS-A-01",
+      "severity": "P3",
+      "title": "review_checks.json 是 D 修复前的快照，报告摘要仍按其计数",
+      "evidence": {
+        "ABI-02_status": "FAIL",
+        "ABI-02_detail": [
+          "11"
+        ],
+        "doc11_now": "公共字段/Port改变后Schema升为6.0，Product/Port revision为0x00010903；旧Major=5消费者必须一起迁移。用户授权范围为规范修改与打包，正式架构/ABI/职责冻结按09 Gate A真实会签。回滚"
+      },
+      "impact": "ABI-02 在快照中仍为 FAIL，但 11:9 已改为 Schema 6.0；读者可能误判 D-REV-01 未修复。"
+    },
+    {
+      "id": "OBS-A-02",
+      "severity": "P3",
+      "title": "TOOL-04 描述与 detail 矛盾",
+      "evidence": {
+        "description": "TEST-SPEC-DIALECT reproducible in this environment (pymavlink present)",
+        "detail_pymavlink": false,
+        "status": "OBS"
+      },
+      "impact": "描述声称“pymavlink present”，实际为 false；与报告 §2“未安装”一致，但检查文本自相矛盾。"
+    }
+  ],
+  "failed_checks": [],
+  "verdict": "ACCEPT_WITH_CONDITIONS",
+  "conditions": [
+    "D 需在修复后的树上重新生成 review_checks 快照（使用 --label），并更新报告摘要的计数/ABI-02 状态。",
+    "07 已由 A 修正为 3000us；D 需重跑 BUD-08/BUD-12 并重建 round3/inputs_sha256 证据。",
+    "A-ABI/B/C 的状态请求与工作区一致性（D-REV-04）由 D 合并；A 本轮补交 A-ABI。"
+  ]
+}

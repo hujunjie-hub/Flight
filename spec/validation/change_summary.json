@@ -1,0 +1,228 @@
+{
+  "change_set": "T191-D-REVIEW-POSTFIX",
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3 / POST-REVIEW-REBUILD 2026-11-04",
+  "supersedes": "spec/validation/T191-D-REVIEW/r3_archive/change_summary.json (R3 original)",
+  "issues": 78,
+  "rounds": [
+    {
+      "round": 1,
+      "status": "PASS",
+      "input_files": 18
+    },
+    {
+      "round": 2,
+      "status": "PASS",
+      "input_files": 18
+    },
+    {
+      "round": 3,
+      "status": "PASS",
+      "input_files": 21
+    }
+  ],
+  "scope": "SPEC_ONLY",
+  "production_firmware_build": "NOT_RUN",
+  "independent_human_review": "A/B/C opinions recorded; Gate A and user approval NOT_RUN",
+  "rebuild_note": "Rebuilt on the 07-corrected tree per user instruction; R3 original archived. File-level hashes only, line deltas not recomputed.",
+  "outside_spec": {
+    "scope": "OUTSIDE_SPEC_INTEGRITY",
+    "status": "PASS",
+    "baseline_files": 10372,
+    "current_files": 10372,
+    "tree_sha256": "b0ffb3c795e7abbf3a0627d01f0d2d453a97af2e26759dfa821a4638ec9576fe",
+    "note": "checkpoint at rebuild time; implementation work is ongoing"
+  },
+  "files": [
+    {
+      "path": "spec/00_工程基线与唯一权威规范.md",
+      "change": "MODIFIED",
+      "sha256": "b60d6dc6ca39dee35cc4da6a321230ab6edb6d70c3e9355d6462848ae299f7ea",
+      "r3_sha256": "3070adf91c9efdf67cf1b377ef824b617dbcfff284b0409313ac49c9613378ce",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": "line delta not recomputed (R3 content not retained)"
+    },
+    {
+      "path": "spec/01_系统总体架构与设计决议.md",
+      "change": "UNCHANGED",
+      "sha256": "37441fb42795f8195418653fea8794eaea089b23aec077a70738249ab6b3b409",
+      "r3_sha256": "37441fb42795f8195418653fea8794eaea089b23aec077a70738249ab6b3b409",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": ""
+    },
+    {
+      "path": "spec/02_接口契约与公共数据规范.md",
+      "change": "MODIFIED",
+      "sha256": "f903baabc1a8f42693142530c952bafab96fae19b0723530aa4b72037b8401c4",
+      "r3_sha256": "6ba2f52c14d369884703bde69548e4f274d0ad15d8238f78ad4ea904758c5da1",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": "line delta not recomputed (R3 content not retained)"
+    },
+    {
+      "path": "spec/03_平台软件架构与驱动设计.md",
+      "change": "UNCHANGED",
+      "sha256": "19ec41e940cfef05f572d200eb24d33642c3ee4e4ac8008a71b3f965eb1fa1af",
+      "r3_sha256": "19ec41e940cfef05f572d200eb24d33642c3ee4e4ac8008a71b3f965eb1fa1af",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": ""
+    },
+    {
+      "path": "spec/04_飞控核心模块与控制系统设计.md",
+      "change": "UNCHANGED",
+      "sha256": "5270517b172179674e390cccc00fcffa8208ea6484d4a315d9995aff4bb34ef2",
+      "r3_sha256": "5270517b172179674e390cccc00fcffa8208ea6484d4a315d9995aff4bb34ef2",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": ""
+    },
+    {
+      "path": "spec/05_传感器采集时间基准与GNSS独立运行.md",
+      "change": "MODIFIED",
+      "sha256": "deaaf0de274e19de57e3688c2a4a4df8cf1cc52a1181fa43c7574336be6b6d2b",
+      "r3_sha256": "14cf67a1c701f41605e073616dbd06e13f7977d7e894d4bf90e688cb7b55eea2",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": "line delta not recomputed (R3 content not retained)"
+    },
+    {
+      "path": "spec/06_FMS通信与系统安全设计.md",
+      "change": "MODIFIED",
+      "sha256": "eca2f1b91386be991f0b340ceb97aeae2a94f6310ac4e9cb995b4323b2636a8b",
+      "r3_sha256": "3952d3bf30e3a8c3e56e827d586edc68a8685fa7511f2d31b8fd7e6932991bd8",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": "line delta not recomputed (R3 content not retained)"
+    },
+    {
+      "path": "spec/07_实时调度与板级硬件资源设计.md",
+      "change": "MODIFIED",
+      "sha256": "332a80fd4dfe888af9a6eac9c1360204dfd128c021b344354823a12c8e28ea75",
+      "r3_sha256": "27b419c4121ff4b2a7799fcecd3186fa270212652708a591599575cee30b7dc4",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": "line delta not recomputed (R3 content not retained)"
+    },
+    {
+      "path": "spec/08_产品配置插件与参数管理.md",
+      "change": "MODIFIED",
+      "sha256": "eff26cfe3bb4e4e78dc9a2976c343a30097885f8a3a8656ca150ed6ca03d27f4",
+      "r3_sha256": "c7b85dd94e56f5d91a5ad8dbfd7f3d0fcfab15f8460df626f4978915f5e20f5c",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": "line delta not recomputed (R3 content not retained)"
+    },
+    {
+      "path": "spec/09_需求验证实施与发布管理.md",
+      "change": "MODIFIED",
+      "sha256": "77d068f91254d3f15abfe099895f5ab5a73198681e054e08e0b3ee2769471c28",
+      "r3_sha256": "6add2695fcac0d33347b2248af0eb389b5fdeb4538b83e6f337e687eae6fcdad",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": "line delta not recomputed (R3 content not retained)"
+    },
+    {
+      "path": "spec/10_Agent分工与工程执行规范.md",
+      "change": "UNCHANGED",
+      "sha256": "851a557db9476bcd86978dd3964aa80567df88db55d8f3a3d6b7efe829e321f3",
+      "r3_sha256": "851a557db9476bcd86978dd3964aa80567df88db55d8f3a3d6b7efe829e321f3",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": ""
+    },
+    {
+      "path": "spec/11_审核问题闭环与变更追踪.md",
+      "change": "MODIFIED",
+      "sha256": "198e4016206dfae7300291fc8d4189ca13bb7e477c196560af2fd74751d99326",
+      "r3_sha256": "68c78a33235ae71ee74f949e54a8ff40978ea8a47c63f1f8f666e2d7fcb3a073",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": "line delta not recomputed (R3 content not retained)"
+    },
+    {
+      "path": "spec/12_全量审查问题清单与落地边界.md",
+      "change": "UNCHANGED",
+      "sha256": "a161cc7bdedbca33f5d7c554f279e601662ea7b20f01f8533798ff809072e033",
+      "r3_sha256": "a161cc7bdedbca33f5d7c554f279e601662ea7b20f01f8533798ff809072e033",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": ""
+    },
+    {
+      "path": "spec/AGENT.md",
+      "change": "MODIFIED",
+      "sha256": "606f4c5fc0779e478c13f68a11f64a12cee638cb7168f120fd2af1da39b10790",
+      "r3_sha256": "6e174696573da1706ca22dd187ec57ce13bf3772e981f3f0762cea8ae7e7326b",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": "line delta not recomputed (R3 content not retained)"
+    },
+    {
+      "path": "spec/AGENT_HANDOFF.md",
+      "change": "MODIFIED",
+      "sha256": "29f2f852bf5e73b4728b314d09371dec86d22132da6fbf59e76513c4cccb3b72",
+      "r3_sha256": "e49ff231ae071da48287c2c473c9f53326f055230bd2fc36d8f65b17839ff2a8",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": "line delta not recomputed (R3 content not retained)"
+    },
+    {
+      "path": "spec/contracts/FCU.xml",
+      "change": "UNCHANGED",
+      "sha256": "1be7adc3b849bc89f812ad66353368ae2c8c6290f2ea97168ee710a7145446ed",
+      "r3_sha256": "1be7adc3b849bc89f812ad66353368ae2c8c6290f2ea97168ee710a7145446ed",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": ""
+    },
+    {
+      "path": "spec/contracts/message_registry.json",
+      "change": "UNCHANGED",
+      "sha256": "e2893aebd8c1121b1ede80591849730ec722c5f9e0616443507c2ff99179bf41",
+      "r3_sha256": "e2893aebd8c1121b1ede80591849730ec722c5f9e0616443507c2ff99179bf41",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": ""
+    },
+    {
+      "path": "spec/README.md",
+      "change": "MODIFIED",
+      "sha256": "b4c44ee2d301bcdaa3009ca00d5f8a80fd60bf2f597c197717ec8dc5d908c316",
+      "r3_sha256": "6ac165f80097a1237db414076616da8bb2d01ca48145db6c38539ea17ba3131b",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": "line delta not recomputed (R3 content not retained)"
+    },
+    {
+      "path": "spec/tools/audit_spec.py",
+      "change": "MODIFIED",
+      "sha256": "370e54a05472bbaaf002d71682ed3c6e70b525fe1b01846ec558967ebb456a1f",
+      "r3_sha256": "f405e0e7f74a82c3122050c6666f4e49284d0e4c372c46a347d5b7f6f6aa7b3a",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": "line delta not recomputed (R3 content not retained)"
+    },
+    {
+      "path": "spec/tools/check_dialect.py",
+      "change": "UNCHANGED",
+      "sha256": "cb201938235cd8ec6d5387470d2f21f5dc4a91bd414a9cfafc940da49a7ca025",
+      "r3_sha256": "cb201938235cd8ec6d5387470d2f21f5dc4a91bd414a9cfafc940da49a7ca025",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": ""
+    },
+    {
+      "path": "spec/tools/check_reference_models.py",
+      "change": "UNCHANGED",
+      "sha256": "116a1d95cc3b203b1567633a0a8dd85b5e6a2edb7f0dbc89ebf47ae820f38ad9",
+      "r3_sha256": "116a1d95cc3b203b1567633a0a8dd85b5e6a2edb7f0dbc89ebf47ae820f38ad9",
+      "added_lines": null,
+      "removed_lines": null,
+      "note": ""
+    }
+  ],
+  "added_since_r3": [],
+  "removed_since_r3": []
+}

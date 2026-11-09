@@ -1,0 +1,22 @@
+RUN  hold_reference_shape
+PASS hold_reference_shape
+RUN  mission_reference_token
+PASS mission_reference_token
+RUN  reference_epoch_rotate
+PASS reference_epoch_rotate
+RUN  permit_activation
+PASS permit_activation
+RUN  avoidance_rejected
+PASS avoidance_rejected
+RUN  geofence_violation
+PASS geofence_violation
+RUN  pilot_rate
+PASS pilot_rate
+RUN  pilot_altitude
+PASS pilot_altitude
+RUN  stale_time_epochs
+PASS stale_time_epochs
+RUN  extreme_target_rejected
+PASS extreme_target_rejected
+
+checks=72 failures=0

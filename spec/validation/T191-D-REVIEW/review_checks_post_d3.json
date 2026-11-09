@@ -1,0 +1,1517 @@
+{
+  "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
+  "scope": "DOCUMENT_STATIC",
+  "reviewer_role": "D",
+  "independent_non_author_review": "NOT_RUN",
+  "production_and_physical_validation": "NOT_RUN",
+  "workspace_root": "D:\\STM32Project\\FMT-Firmware-1.2.0\\Flight",
+  "note": "",
+  "results": [
+    {
+      "id": "EVID-01",
+      "area": "EVIDENCE",
+      "description": "change_summary per-file SHA256 matches current spec tree",
+      "status": "PASS",
+      "detail": {
+        "files": 21,
+        "mismatch": []
+      }
+    },
+    {
+      "id": "EVID-02",
+      "area": "EVIDENCE",
+      "description": "round3_report inputs_sha256 matches current spec inputs",
+      "status": "PASS",
+      "detail": {
+        "inputs": 21,
+        "current": 21,
+        "mismatch": [],
+        "not_listed": []
+      }
+    },
+    {
+      "id": "EVID-03",
+      "area": "EVIDENCE",
+      "description": "outside-spec tree matches the R3 protected snapshot",
+      "status": "DRIFT",
+      "detail": {
+        "tree_sha256": "399e06751114d0b38cbbc4935689eecc57b3d07b3eefe053e12c89c48780218f",
+        "recorded": "52ea636276dfbcd92e92908d6fff8c60ca72846b1fbcb7bfa3f3d9b9adc4bcd6",
+        "files": 10329,
+        "recorded_files": 10328,
+        "files_touched_after_r3_by_mtime": 4,
+        "areas": {
+          "build": 4
+        },
+        "sample": [
+          "build/m4_arm/m4_support.o",
+          "build/m4_arm/quad_x4_fms.o",
+          "build/m4_host/size_probe",
+          "build/m4_host/size_probe.c"
+        ]
+      }
+    },
+    {
+      "id": "EVID-06",
+      "area": "EVIDENCE",
+      "description": "documented round-3 command reflects the current tree",
+      "status": "PASS",
+      "detail": {
+        "command": "python spec/tools/audit_spec.py --round 3",
+        "round3_inputs_current": true,
+        "rebaseline": "python spec/tools/audit_spec.py --round 3 (rebuild) or --label <name> for a parallel baseline"
+      }
+    },
+    {
+      "id": "EVID-04",
+      "area": "EVIDENCE",
+      "description": "round1/round2 reports are historical (input drift quantified)",
+      "status": "PASS",
+      "detail": [
+        {
+          "report": "round1_report.json",
+          "inputs": 18,
+          "files_changed_since_that_round": 14,
+          "expected_historical": true
+        },
+        {
+          "report": "round2_report.json",
+          "inputs": 18,
+          "files_changed_since_that_round": 14,
+          "expected_historical": true
+        }
+      ]
+    },
+    {
+      "id": "EVID-05",
+      "area": "EVIDENCE",
+      "description": "R3 validation artifacts present",
+      "status": "PASS",
+      "detail": {
+        "missing": [],
+        "present": 16
+      }
+    },
+    {
+      "id": "ABI-01",
+      "area": "ABI",
+      "description": "02 C macros fix Schema 6.0 / Product-Port 0x00010903",
+      "status": "FAIL",
+      "detail": {
+        "FC_CONTRACT_SCHEMA_MAJOR": "6",
+        "FC_CONTRACT_SCHEMA_MINOR": "0",
+        "PORT_API_REVISION": "0x00010904",
+        "PRODUCT_CONTRACT_REVISION": "0x00010903"
+      }
+    },
+    {
+      "id": "ABI-02",
+      "area": "ABI",
+      "description": "no current document claims Schema 5.0 while baseline is 6.0",
+      "status": "PASS",
+      "detail": {
+        "claims": {
+          "00": [
+            "6.0"
+          ],
+          "02": [
+            "6.0"
+          ],
+          "10": [
+            "6.0"
+          ],
+          "11": [
+            "6.0"
+          ],
+          "12": [
+            "6.0"
+          ],
+          "RM": [],
+          "AG": [],
+          "HD": [
+            "6.0"
+          ]
+        },
+        "violations": [],
+        "lines": []
+      }
+    },
+    {
+      "id": "ABI-03",
+      "area": "ABI",
+      "description": "0x00010901 only in explicitly historical context",
+      "status": "PASS",
+      "detail": [
+        {
+          "doc": "00_工程基线与唯一权威规范.md",
+          "line": 12,
+          "historical": true,
+          "text": "本版继承历史R01～R22处置，按USER-20261104-GLOBAL-AUDIT完成逐文件技术修订与两轮追加复审；[12号清单](12_全量审查问题清单与落地边界.md)记录逐项问题。官方资料在doc、上层应用在application"
+        },
+        {
+          "doc": "11_审核问题闭环与变更追踪.md",
+          "line": 252,
+          "historical": true,
+          "text": "`change_set_id=USER-20261104-PROJECT-STRUCTURE`，当时修订标识 `V1.9.1-PROJECT-STRUCTURE-R2`。输入为用户当前工程目录与明确约定；本次只改 `spec/`，不新增驱动"
+        }
+      ]
+    },
+    {
+      "id": "ABI-04",
+      "area": "ABI",
+      "description": "ContractHeader 88B; 55 Header-bearing messages with unique IDs",
+      "status": "PASS",
+      "detail": {
+        "header": 88,
+        "messages": 55
+      }
+    },
+    {
+      "id": "ABI-05",
+      "area": "ABI",
+      "description": "07 slot table sizeof equals compiled spec layout",
+      "status": "PASS",
+      "detail": {
+        "compared": 29,
+        "mismatch": []
+      }
+    },
+    {
+      "id": "GOV-01",
+      "area": "GOVERNANCE",
+      "description": "10 file-owner table covers 00-12/AGENT/HANDOFF/README",
+      "status": "PASS",
+      "detail": {
+        "missing": []
+      }
+    },
+    {
+      "id": "GOV-02",
+      "area": "GOVERNANCE",
+      "description": "Gate A-F table defined only in 09",
+      "status": "PASS",
+      "detail": [
+        "09_需求验证实施与发布管理.md"
+      ]
+    },
+    {
+      "id": "GOV-03",
+      "area": "GOVERNANCE",
+      "description": "HANDOFF 15 tasks: schema, owner/reviewer independence, DAG, baseline",
+      "status": "PASS",
+      "detail": {
+        "tasks": 15,
+        "errors": []
+      }
+    },
+    {
+      "id": "GOV-04",
+      "area": "GOVERNANCE",
+      "description": "HANDOFF dependency order is acyclic (topological in file order)",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "id": "GOV-05",
+      "area": "GOVERNANCE",
+      "description": "10 defines the seven main task states used by HANDOFF",
+      "status": "PASS",
+      "detail": [
+        "READY_FOR_ASSIGNMENT、ASSIGNED、IN_PROGRESS、REVIEW、ACCEPTED、CLOSED、BLOCKED"
+      ]
+    },
+    {
+      "id": "GOV-06",
+      "area": "GOVERNANCE",
+      "description": "no non-normative main task state in HANDOFF",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "id": "GOV-07",
+      "area": "GOVERNANCE",
+      "description": "files under READY task source_paths changed after R3 (path-based attribution)",
+      "status": "PASS",
+      "detail": {
+        "tasks": {},
+        "note": "attribution by declared source_paths only; some paths are shared between tasks"
+      }
+    },
+    {
+      "id": "CLOS-01",
+      "area": "CLOSURE22",
+      "description": "11 lists R01-R22 with SPEC_RESOLVED and test IDs",
+      "status": "PASS",
+      "detail": {
+        "rows": 22,
+        "ids": [
+          "R01",
+          "R02",
+          "R03",
+          "R04",
+          "R05",
+          "R06",
+          "R07",
+          "R08",
+          "R09",
+          "R10",
+          "R11",
+          "R12",
+          "R13",
+          "R14",
+          "R15",
+          "R16",
+          "R17",
+          "R18",
+          "R19",
+          "R20",
+          "R21",
+          "R22"
+        ]
+      }
+    },
+    {
+      "id": "CLOS-02",
+      "area": "CLOSURE22",
+      "description": "09 4.7 has unique R01-R22 acceptance rows, all NOT_RUN",
+      "status": "PASS",
+      "detail": {
+        "rows": 22,
+        "statuses": [
+          "NOT_RUN"
+        ]
+      }
+    },
+    {
+      "id": "CLOS-03",
+      "area": "CLOSURE22",
+      "description": "owner of each R item matches between 11 and 09",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "id": "CLOS-04",
+      "area": "CLOSURE22",
+      "description": "11 has 22 per-item sections with authoritative locations",
+      "status": "PASS",
+      "detail": [
+        "R01",
+        "R02",
+        "R03",
+        "R04",
+        "R05",
+        "R06",
+        "R07",
+        "R08",
+        "R09",
+        "R10",
+        "R11",
+        "R12",
+        "R13",
+        "R14",
+        "R15",
+        "R16",
+        "R17",
+        "R18",
+        "R19",
+        "R20",
+        "R21",
+        "R22"
+      ]
+    },
+    {
+      "id": "CLOS-05",
+      "area": "CLOSURE22",
+      "description": "each closed R item has body evidence in its authoritative doc",
+      "status": "PASS",
+      "detail": {
+        "missing": [],
+        "evidence": [
+          {
+            "item": "R01",
+            "hits": [
+              {
+                "doc": "02_接口契约与公共数据规范.md",
+                "line": 1324,
+                "match": "actuation_permit"
+              },
+              {
+                "doc": "06_FMS通信与系统安全设计.md",
+                "line": 79,
+                "match": "permit"
+              },
+              {
+                "doc": "07_实时调度与板级硬件资源设计.md",
+                "line": 425,
+                "match": "PERMIT_LEASE_US"
+              }
+            ]
+          },
+          {
+            "item": "R02",
+            "hits": [
+              {
+                "doc": "02_接口契约与公共数据规范.md",
+                "line": 772,
+                "match": "AuthorizedMissionSnapshot"
+              },
+              {
+                "doc": "06_FMS通信与系统安全设计.md",
+                "line": 68,
+                "match": "MissionStatus"
+              }
+            ]
+          },
+          {
+            "item": "R03",
+            "hits": [
+              {
+                "doc": "02_接口契约与公共数据规范.md",
+                "line": 374,
+                "match": "ImuSample"
+              },
+              {
+                "doc": "07_实时调度与板级硬件资源设计.md",
+                "line": 318,
+                "match": "| ImuSample | 8 | 136"
+              }
+            ]
+          },
+          {
+            "item": "R04",
+            "hits": [
+              {
+                "doc": "07_实时调度与板级硬件资源设计.md",
+                "line": 647,
+                "match": "CNDTR=68"
+              },
+              {
+                "doc": "07_实时调度与板级硬件资源设计.md",
+                "line": 157,
+                "match": "zero-tail"
+              }
+            ]
+          },
+          {
+            "item": "R05",
+            "hits": [
+              {
+                "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+                "line": 1358,
+                "match": "fusion_revision"
+              },
+              {
+                "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+                "line": 1356,
+                "match": "journal"
+              }
+            ]
+          },
+          {
+            "item": "R06",
+            "hits": [
+              {
+                "doc": "07_实时调度与板级硬件资源设计.md",
+                "line": 421,
+                "match": "MAX_NAV_INPUT_AGE_US"
+              },
+              {
+                "doc": "07_实时调度与板级硬件资源设计.md",
+                "line": 422,
+                "match": "DRDY_TO_M7_READY_BUDGET_US"
+              }
+            ]
+          },
+          {
+            "item": "R07",
+            "hits": [
+              {
+                "doc": "02_接口契约与公共数据规范.md",
+                "line": 2497,
+                "match": "SimulatedMeasurementBatch"
+              },
+              {
+                "doc": "02_接口契约与公共数据规范.md",
+                "line": 374,
+                "match": "ImuSample"
+              }
+            ]
+          },
+          {
+            "item": "R08",
+            "hits": [
+              {
+                "doc": "07_实时调度与板级硬件资源设计.md",
+                "line": 695,
+                "match": "TIM1_UP_IRQn"
+              },
+              {
+                "doc": "07_实时调度与板级硬件资源设计.md",
+                "line": 639,
+                "match": "DMA1_Stream2_IRQn"
+              }
+            ]
+          },
+          {
+            "item": "R09",
+            "hits": [
+              {
+                "doc": "04_飞控核心模块与控制系统设计.md",
+                "line": 436,
+                "match": "Closed"
+              },
+              {
+                "doc": "04_飞控核心模块与控制系统设计.md",
+                "line": 436,
+                "match": "512"
+              }
+            ]
+          },
+          {
+            "item": "R10",
+            "hits": [
+              {
+                "doc": "02_接口契约与公共数据规范.md",
+                "line": 172,
+                "match": "MotionReference"
+              },
+              {
+                "doc": "04_飞控核心模块与控制系统设计.md",
+                "line": 444,
+                "match": "480"
+              }
+            ]
+          },
+          {
+            "item": "R11",
+            "hits": [
+              {
+                "doc": "02_接口契约与公共数据规范.md",
+                "line": 144,
+                "match": "RawIngressBatchDescriptor"
+              },
+              {
+                "doc": "02_接口契约与公共数据规范.md",
+                "line": 123,
+                "match": "TimerCaptureEvent"
+              },
+              {
+                "doc": "02_接口契约与公共数据规范.md",
+                "line": 809,
+                "match": "ActuatorCommitReceipt"
+              }
+            ]
+          },
+          {
+            "item": "R12",
+            "hits": [
+              {
+                "doc": "07_实时调度与板级硬件资源设计.md",
+                "line": 136,
+                "match": "52.5KiB"
+              }
+            ]
+          },
+          {
+            "item": "R13",
+            "hits": [
+              {
+                "doc": "07_实时调度与板级硬件资源设计.md",
+                "line": 181,
+                "match": "85%"
+              },
+              {
+                "doc": "07_实时调度与板级硬件资源设计.md",
+                "line": 117,
+                "match": "400us/5ms"
+              }
+            ]
+          },
+          {
+            "item": "R14",
+            "hits": [
+              {
+                "doc": "04_飞控核心模块与控制系统设计.md",
+                "line": 424,
+                "match": "NOT_APPLICABLE"
+              },
+              {
+                "doc": "04_飞控核心模块与控制系统设计.md",
+                "line": 356,
+                "match": "NONE"
+              }
+            ]
+          },
+          {
+            "item": "R15",
+            "hits": [
+              {
+                "doc": "02_接口契约与公共数据规范.md",
+                "line": 646,
+                "match": "SensorConsistencyEvidence"
+              },
+              {
+                "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+                "line": 790,
+                "match": "probation"
+              }
+            ]
+          },
+          {
+            "item": "R16",
+            "hits": [
+              {
+                "doc": "08_产品配置插件与参数管理.md",
+                "line": 277,
+                "match": "NonSafetySettings"
+              }
+            ]
+          },
+          {
+            "item": "R17",
+            "hits": [
+              {
+                "doc": "10_Agent分工与工程执行规范.md",
+                "line": 89,
+                "match": "REVIEW→IN_PROGRESS"
+              }
+            ]
+          },
+          {
+            "item": "R18",
+            "hits": [
+              {
+                "doc": "AGENT_HANDOFF.md",
+                "line": 18,
+                "match": "\"next_owner\""
+              }
+            ]
+          },
+          {
+            "item": "R19",
+            "hits": [
+              {
+                "doc": "09_需求验证实施与发布管理.md",
+                "line": 288,
+                "match": "| Gate |"
+              }
+            ]
+          },
+          {
+            "item": "R20",
+            "hits": [
+              {
+                "doc": "09_需求验证实施与发布管理.md",
+                "line": 221,
+                "match": "TEST-ACC-061"
+              }
+            ]
+          },
+          {
+            "item": "R21",
+            "hits": [
+              {
+                "doc": "00_工程基线与唯一权威规范.md",
+                "line": 101,
+                "match": "Major=5/4/3/2"
+              },
+              {
+                "doc": "01_系统总体架构与设计决议.md",
+                "line": 23,
+                "match": "DriverManager"
+              }
+            ]
+          },
+          {
+            "item": "R22",
+            "hits": [
+              {
+                "doc": "04_飞控核心模块与控制系统设计.md",
+                "line": 274,
+                "match": "sqrt(3)"
+              },
+              {
+                "doc": "02_接口契约与公共数据规范.md",
+                "line": 848,
+                "match": "0x0705"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "CLOS-06",
+      "area": "CLOSURE22",
+      "description": "document numbers referenced by 11/12 exist",
+      "status": "PASS",
+      "detail": {
+        "refs": [
+          "00",
+          "01",
+          "02",
+          "03",
+          "04",
+          "05",
+          "06",
+          "07",
+          "08",
+          "09",
+          "10"
+        ],
+        "unknown": []
+      }
+    },
+    {
+      "id": "AUD-10",
+      "area": "AUDIT78",
+      "description": "12 lists A01-A58, B01-B08, C01-C12 = 78 unique items",
+      "status": "PASS",
+      "detail": {
+        "A": 58,
+        "B": 8,
+        "C": 12,
+        "unique": 78
+      }
+    },
+    {
+      "id": "AUD-11",
+      "area": "AUDIT78",
+      "description": "each audit fix has a body-text evidence hit in the claimed doc",
+      "status": "PASS",
+      "detail": {
+        "hits": 78,
+        "missing": [],
+        "evidence": [
+          {
+            "item": "A01",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 2234,
+            "match": "} ProductFmsConfigPayload;"
+          },
+          {
+            "item": "A02",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 745,
+            "match": "reference_id"
+          },
+          {
+            "item": "A03",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 728,
+            "match": "update_permit"
+          },
+          {
+            "item": "A04",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 558,
+            "match": "NavigationCapability` 只描述姿态、航向、位置、速度、高度等估计能力、质量、数据年龄和使用源；不得包含 RETURN/LAND/ARM/DOCK 等操作建议。`StateResetEvent` 必须包含旧/新 state epoch、origin、reset 类型、状态跳变量和时间。  ```c t"
+          },
+          {
+            "item": "A05",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 386,
+            "match": "source_session_id"
+          },
+          {
+            "item": "A06",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 374,
+            "match": "Header.sequence"
+          },
+          {
+            "item": "A07",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 374,
+            "match": "Header.sequence"
+          },
+          {
+            "item": "A08",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 376,
+            "match": "比力"
+          },
+          {
+            "item": "A09",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 1107,
+            "match": "BURST32"
+          },
+          {
+            "item": "A10",
+            "doc": "03_平台软件架构与驱动设计.md",
+            "line": 503,
+            "match": "pin_count"
+          },
+          {
+            "item": "A11",
+            "doc": "04_飞控核心模块与控制系统设计.md",
+            "line": 428,
+            "match": "time_bin"
+          },
+          {
+            "item": "A12",
+            "doc": "04_飞控核心模块与控制系统设计.md",
+            "line": 432,
+            "match": "P00"
+          },
+          {
+            "item": "A13",
+            "doc": "04_飞控核心模块与控制系统设计.md",
+            "line": 444,
+            "match": "480ms"
+          },
+          {
+            "item": "A14",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 2335,
+            "match": "const LandedStateSnapshot *landed_state"
+          },
+          {
+            "item": "A15",
+            "doc": "04_飞控核心模块与控制系统设计.md",
+            "line": 21,
+            "match": "Rate PID"
+          },
+          {
+            "item": "A16",
+            "doc": "04_飞控核心模块与控制系统设计.md",
+            "line": 345,
+            "match": "ω_sp"
+          },
+          {
+            "item": "A17",
+            "doc": "04_飞控核心模块与控制系统设计.md",
+            "line": 301,
+            "match": "MpcOutputSnapshot"
+          },
+          {
+            "item": "A18",
+            "doc": "07_实时调度与板级硬件资源设计.md",
+            "line": 110,
+            "match": "1053"
+          },
+          {
+            "item": "A19",
+            "doc": "07_实时调度与板级硬件资源设计.md",
+            "line": 114,
+            "match": "2053"
+          },
+          {
+            "item": "A20",
+            "doc": "04_飞控核心模块与控制系统设计.md",
+            "line": 397,
+            "match": "BENCH_INHIBIT"
+          },
+          {
+            "item": "A21",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 1078,
+            "match": "get_health"
+          },
+          {
+            "item": "A22",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 333,
+            "match": "ClockInstant"
+          },
+          {
+            "item": "A23",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 864,
+            "match": "FaultEvidenceEvent"
+          },
+          {
+            "item": "A24",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 1575,
+            "match": "非规范性设计草案"
+          },
+          {
+            "item": "A25",
+            "doc": "00_工程基线与唯一权威规范.md",
+            "line": 490,
+            "match": "本地14.3.1"
+          },
+          {
+            "item": "A26",
+            "doc": "04_飞控核心模块与控制系统设计.md",
+            "line": 282,
+            "match": "190行"
+          },
+          {
+            "item": "A27",
+            "doc": "07_实时调度与板级硬件资源设计.md",
+            "line": 394,
+            "match": "293"
+          },
+          {
+            "item": "A28",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 1365,
+            "match": "N-1"
+          },
+          {
+            "item": "A29",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 1219,
+            "match": "Qc"
+          },
+          {
+            "item": "A30",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 1518,
+            "match": "error retraction"
+          },
+          {
+            "item": "A31",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 1209,
+            "match": "Phi-angle"
+          },
+          {
+            "item": "A32",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 1156,
+            "match": "天线速度杆臂"
+          },
+          {
+            "item": "A33",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 1262,
+            "match": "GNSS_BACKEND=DISABLED"
+          },
+          {
+            "item": "A34",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 1277,
+            "match": "压力高度"
+          },
+          {
+            "item": "A35",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 793,
+            "match": "4倍"
+          },
+          {
+            "item": "A36",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 729,
+            "match": "DATA_CNTR递增不能单独判卡死"
+          },
+          {
+            "item": "A37",
+            "doc": "06_FMS通信与系统安全设计.md",
+            "line": 638,
+            "match": "PreArm ID"
+          },
+          {
+            "item": "A38",
+            "doc": "06_FMS通信与系统安全设计.md",
+            "line": 482,
+            "match": "绝对100ms"
+          },
+          {
+            "item": "A39",
+            "doc": "06_FMS通信与系统安全设计.md",
+            "line": 451,
+            "match": "只有引用相对Home高度"
+          },
+          {
+            "item": "A40",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 1196,
+            "match": "NavigationOriginSnapshot"
+          },
+          {
+            "item": "A41",
+            "doc": "06_FMS通信与系统安全设计.md",
+            "line": 410,
+            "match": "LandDetector"
+          },
+          {
+            "item": "A42",
+            "doc": "06_FMS通信与系统安全设计.md",
+            "line": 636,
+            "match": "4个长操作tracker"
+          },
+          {
+            "item": "A43",
+            "doc": "06_FMS通信与系统安全设计.md",
+            "line": 10,
+            "match": "FCU.xml"
+          },
+          {
+            "item": "A44",
+            "doc": "06_FMS通信与系统安全设计.md",
+            "line": 593,
+            "match": "轮换"
+          },
+          {
+            "item": "A45",
+            "doc": "08_产品配置插件与参数管理.md",
+            "line": 279,
+            "match": "HEALTH_CONFIRMED"
+          },
+          {
+            "item": "A46",
+            "doc": "08_产品配置插件与参数管理.md",
+            "line": 281,
+            "match": "maintenance_epoch"
+          },
+          {
+            "item": "A47",
+            "doc": "08_产品配置插件与参数管理.md",
+            "line": 257,
+            "match": "SHA256"
+          },
+          {
+            "item": "A48",
+            "doc": "03_平台软件架构与驱动设计.md",
+            "line": 325,
+            "match": "DIRECT_BSP"
+          },
+          {
+            "item": "A49",
+            "doc": "07_实时调度与板级硬件资源设计.md",
+            "line": 647,
+            "match": "active零"
+          },
+          {
+            "item": "A50",
+            "doc": "07_实时调度与板级硬件资源设计.md",
+            "line": 655,
+            "match": "受控RCC读回"
+          },
+          {
+            "item": "A51",
+            "doc": "07_实时调度与板级硬件资源设计.md",
+            "line": 639,
+            "match": "HT/TC"
+          },
+          {
+            "item": "A52",
+            "doc": "07_实时调度与板级硬件资源设计.md",
+            "line": 316,
+            "match": "8项capture池"
+          },
+          {
+            "item": "A53",
+            "doc": "07_实时调度与板级硬件资源设计.md",
+            "line": 62,
+            "match": "1152"
+          },
+          {
+            "item": "A54",
+            "doc": "10_Agent分工与工程执行规范.md",
+            "line": 96,
+            "match": "READY_FOR_ASSIGNMENT→CLOSED"
+          },
+          {
+            "item": "A55",
+            "doc": "09_需求验证实施与发布管理.md",
+            "line": 389,
+            "match": "不继承"
+          },
+          {
+            "item": "A56",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 1133,
+            "match": "8291a93"
+          },
+          {
+            "item": "A57",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 1454,
+            "match": "不能预填"
+          },
+          {
+            "item": "A58",
+            "doc": "00_工程基线与唯一权威规范.md",
+            "line": 8,
+            "match": "V1.8"
+          },
+          {
+            "item": "B01",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 366,
+            "match": "ALTITUDE_ATTITUDE"
+          },
+          {
+            "item": "B02",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 477,
+            "match": "100ms..1s"
+          },
+          {
+            "item": "B03",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 1062,
+            "match": "EstimatorHealth"
+          },
+          {
+            "item": "B04",
+            "doc": "07_实时调度与板级硬件资源设计.md",
+            "line": 348,
+            "match": "48KiB"
+          },
+          {
+            "item": "B05",
+            "doc": "04_飞控核心模块与控制系统设计.md",
+            "line": 485,
+            "match": "512B"
+          },
+          {
+            "item": "B06",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 1354,
+            "match": "2304"
+          },
+          {
+            "item": "B07",
+            "doc": "04_飞控核心模块与控制系统设计.md",
+            "line": 481,
+            "match": "旋转向量"
+          },
+          {
+            "item": "B08",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 1255,
+            "match": "1100"
+          },
+          {
+            "item": "C01",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 374,
+            "match": "外层message_type固定SensorMeasurement(13)"
+          },
+          {
+            "item": "C02",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 463,
+            "match": "quality_flags bit"
+          },
+          {
+            "item": "C03",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 2650,
+            "match": "QuadSensorProcessingConfig"
+          },
+          {
+            "item": "C04",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 2657,
+            "match": "同一发布世代"
+          },
+          {
+            "item": "C05",
+            "doc": "04_飞控核心模块与控制系统设计.md",
+            "line": 304,
+            "match": "25ms"
+          },
+          {
+            "item": "C06",
+            "doc": "05_传感器采集时间基准与GNSS独立运行.md",
+            "line": 481,
+            "match": "mapping_epoch"
+          },
+          {
+            "item": "C07",
+            "doc": "04_飞控核心模块与控制系统设计.md",
+            "line": 428,
+            "match": "time_bin"
+          },
+          {
+            "item": "C08",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 2674,
+            "match": "extern \"C\""
+          },
+          {
+            "item": "C09",
+            "doc": "07_实时调度与板级硬件资源设计.md",
+            "line": 348,
+            "match": "20B"
+          },
+          {
+            "item": "C10",
+            "doc": "09_需求验证实施与发布管理.md",
+            "line": 381,
+            "match": "project_structure_report"
+          },
+          {
+            "item": "C11",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 2662,
+            "match": "17个"
+          },
+          {
+            "item": "C12",
+            "doc": "02_接口契约与公共数据规范.md",
+            "line": 2676,
+            "match": "参考点固定为机体重心CG"
+          }
+        ]
+      }
+    },
+    {
+      "id": "BUD-01",
+      "area": "BUDGET",
+      "description": "07 task stacks sum to 52.5KiB excluding dev FinSH",
+      "status": "PASS",
+      "detail": {
+        "tasks": 25,
+        "total": 57856,
+        "excl_finsh": 53760,
+        "excl_finsh_timer": 52736
+      }
+    },
+    {
+      "id": "BUD-02",
+      "area": "BUDGET",
+      "description": "07 AXI table sums to 232KiB with 88KiB unallocated",
+      "status": "PASS",
+      "detail": {
+        "sum": 232,
+        "items": {
+          "M5 NONE直接轨迹/validator arena": 16,
+          "KF-GINS IMU/checkpoint/ObservationJournal": 88,
+          "ProductObstacleObservation ring（NONE不创建）": 0,
+          "ICD_AND_M4_ARENA（全部指定快照/标准样本/ring/M4 scratch）": 48,
+          "MPC OSQP静态workspace/快照": 32,
+          "SD write staging": 16,
+          "Logger record ring": 4,
+          "SDMMC IDMA blocks": 4,
+          "M1 gateway/去重/操作tracker/协议workspace": 8,
+          "RTOS TCB/Clock映射/服务索引/平台静态数据": 16
+        }
+      }
+    },
+    {
+      "id": "BUD-03",
+      "area": "BUDGET",
+      "description": "DTCM 92.5KiB and >=32KiB protection",
+      "status": "PASS",
+      "detail": 92.5
+    },
+    {
+      "id": "BUD-04",
+      "area": "BUDGET",
+      "description": "M5 planner 62,016B < 64KiB (itemized 61,952B + 64B primitive capacity)",
+      "status": "PASS",
+      "detail": {
+        "capacity_sum": 62016,
+        "itemized_sum": 61952,
+        "reserve": 3520
+      }
+    },
+    {
+      "id": "BUD-05",
+      "area": "BUDGET",
+      "description": "ICD arena 42,400B <= 48KiB per compiled spec layout",
+      "status": "PASS",
+      "detail": {
+        "arena": 42400
+      }
+    },
+    {
+      "id": "BUD-06",
+      "area": "BUDGET",
+      "description": "critical CPU 54.5705% (450us*1053 + 35us*2053)",
+      "status": "PASS",
+      "detail": {
+        "cpu_us": 545705,
+        "percent": 54.5705
+      }
+    },
+    {
+      "id": "BUD-07",
+      "area": "BUDGET",
+      "description": "900us chain = 810us stages + 90us margin",
+      "status": "PASS",
+      "detail": 810
+    },
+    {
+      "id": "BUD-08",
+      "area": "BUDGET",
+      "description": "physical window 3000+900+100 = 4000us < 5000us input age",
+      "status": "PASS",
+      "detail": 4000
+    },
+    {
+      "id": "BUD-09",
+      "area": "BUDGET",
+      "description": "frame feedback age 5000+2500 = 7500us",
+      "status": "PASS",
+      "detail": 7500
+    },
+    {
+      "id": "BUD-10",
+      "area": "BUDGET",
+      "description": "DShot 275MHz N/ARR/T0H/T1H values match 07 and TEST-ACC-061",
+      "status": "PASS",
+      "detail": {
+        "300k": [
+          917,
+          916,
+          344,
+          688
+        ],
+        "600k": [
+          458,
+          457,
+          172,
+          344
+        ]
+      }
+    },
+    {
+      "id": "BUD-11",
+      "area": "BUDGET",
+      "description": "burst byte times 184.3us(22B) / 284.9us(34B) verified",
+      "status": "PASS",
+      "detail": {
+        "22B_us": 184.32,
+        "34B_us": 284.86
+      }
+    },
+    {
+      "id": "BUD-12",
+      "area": "BUDGET",
+      "description": "07 defines one pipeline limit (table vs 7.2 prose vs 00/05/11)",
+      "status": "PASS",
+      "detail": {
+        "MAX_IMU_PIPELINE_DELAY_US": 3000,
+        "prose_07_7_2_us": 3000,
+        "00_05_11": "3ms pipeline"
+      }
+    },
+    {
+      "id": "BUD-13",
+      "area": "BUDGET",
+      "description": "07 10 states ICD reference 41,376B while current compiled layout is 42,400B",
+      "status": "OBS",
+      "detail": {
+        "doc_07_section_10": 41376,
+        "abi_layout_arena": 42400,
+        "both_below_48KiB": true
+      }
+    },
+    {
+      "id": "BLD-01",
+      "area": "BUILD",
+      "description": "root SConstruct keeps RT-Thread PrepareBuilding/DoBuilding and HAL_Drivers group",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "id": "BLD-02",
+      "area": "BUILD",
+      "description": "root and applications SConscript recurse only registered subdirectories",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "id": "BLD-03",
+      "area": "BUILD",
+      "description": "no top-level/project CMake entry outside doc/ and rt-thread/",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "id": "BLD-04",
+      "area": "BUILD",
+      "description": "applications/ still matches the R3 baseline (only main.c and SConscript)",
+      "status": "DRIFT",
+      "detail": {
+        "entries": [
+          "Kconfig",
+          "SConscript",
+          "calibration",
+          "config",
+          "contracts",
+          "core",
+          "main.c",
+          "platform",
+          "plugins",
+          "products",
+          "services",
+          "sim",
+          "tests"
+        ],
+        "note": "planned implementation directories appeared after R3; see EVIDENCE drift"
+      }
+    },
+    {
+      "id": "BLD-05",
+      "area": "BUILD",
+      "description": "root Kconfig sources rt-thread, packages, libraries, board",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "id": "BLD-06",
+      "area": "BUILD",
+      "description": "rtconfig.py default Keil with RTT_CC/RTT_EXEC_PATH and GCC path",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "id": "BLD-07",
+      "area": "BUILD",
+      "description": "rtconfig.h confirms 32 priorities, 1kHz tick, GPIO/UART1/FinSH as 03 states",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "id": "BLD-08",
+      "area": "BUILD",
+      "description": "packages/pkgs.json keeps three -latest packages (not silently upgraded)",
+      "status": "PASS",
+      "detail": {
+        "names": [
+          "CMSIS_CORE",
+          "STM32H7_HAL_DRIVER",
+          "STM32H7_CMSIS_DRIVER"
+        ],
+        "versions": [
+          "latest"
+        ]
+      }
+    },
+    {
+      "id": "BLD-09",
+      "area": "BUILD",
+      "description": "no planned applications subdirectory existed at the R3 baseline",
+      "status": "DRIFT",
+      "detail": {
+        "entries": [
+          "Kconfig",
+          "SConscript",
+          "calibration",
+          "config",
+          "contracts",
+          "core",
+          "main.c",
+          "platform",
+          "plugins",
+          "products",
+          "services",
+          "sim",
+          "tests"
+        ]
+      }
+    },
+    {
+      "id": "TOOL-01",
+      "area": "TOOLING",
+      "description": "audit_spec.py asserts every HANDOFF task is READY/ack=null (breaks on legal transition)",
+      "status": "OBS",
+      "detail": {
+        "line": 145,
+        "assert": "t['task_status'] == 'READY_FOR_ASSIGNMENT'"
+      }
+    },
+    {
+      "id": "TOOL-02",
+      "area": "TOOLING",
+      "description": "no delivered generator rebuilds protected_sources_report.json / change_summary.json",
+      "status": "OBS",
+      "detail": {
+        "writers": [
+          "audit_spec.py"
+        ]
+      }
+    },
+    {
+      "id": "TOOL-03",
+      "area": "TOOLING",
+      "description": "audit_spec.py --round always rewrites roundN artifacts (no verify-only mode)",
+      "status": "OBS",
+      "detail": {
+        "writes": "round{n}_report.json / round{n}_abi_layout.json / abi_layout.json / project_structure_report.json"
+      }
+    },
+    {
+      "id": "TOOL-04",
+      "area": "TOOLING",
+      "description": "TEST-SPEC-DIALECT reproducible in this environment",
+      "status": "OBS",
+      "detail": {
+        "pymavlink_present": false
+      }
+    },
+    {
+      "id": "TOOL-05",
+      "area": "TOOLING",
+      "description": "audit_spec.py ARM compiler default path is machine-specific (documented --cc override)",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "id": "TOOL-06",
+      "area": "TOOLING",
+      "description": "TEST-V191-AGENT acceptance (state transition legality) has no checking tool beyond READY snapshot",
+      "status": "OBS",
+      "detail": {
+        "claimed": "09 4.4 TEST-V191-AGENT",
+        "tool": "audit_spec.py document_checks"
+      }
+    },
+    {
+      "id": "TRC-01",
+      "area": "TRACE",
+      "description": "09 table primary IDs unique",
+      "status": "PASS",
+      "detail": {
+        "ids": 178,
+        "duplicates": []
+      }
+    },
+    {
+      "id": "TRC-02",
+      "area": "TRACE",
+      "description": "09 table result cells use only the five allowed statuses",
+      "status": "PASS",
+      "detail": []
+    },
+    {
+      "id": "TRC-03",
+      "area": "TRACE",
+      "description": "PASS rows are limited to reviewed document/reference/host-ABI evidence",
+      "status": "PASS",
+      "detail": {
+        "pass_rows": [
+          "TEST-PROJECT-STRUCTURE",
+          "TEST-T191-D-REVIEW"
+        ],
+        "unauthorized": []
+      }
+    },
+    {
+      "id": "TRC-04",
+      "area": "TRACE",
+      "description": "TEST-PROJECT-STRUCTURE evidence file exists and is cited",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "id": "TRC-05",
+      "area": "TRACE",
+      "description": "every TEST-V191-Rxx cited by 11 exists in 09",
+      "status": "PASS",
+      "detail": []
+    }
+  ],
+  "failed_checks": [
+    "ABI-01"
+  ],
+  "observations": [
+    "BUD-13",
+    "TOOL-01",
+    "TOOL-02",
+    "TOOL-03",
+    "TOOL-04",
+    "TOOL-06"
+  ]
+}

@@ -1,0 +1,90 @@
+# QUAD_X4 sensor alignment and timing extrinsics
+#
+# Owner: Agent B (spec 08 section 3; spec 05 section 7.1).
+# This is the ONLY runtime source of the geometric/time extrinsics.  Raw
+# measurement reports and data sets belong in doc/calibration/ and
+# must not be copied into this file or into the estimator source.
+#
+# Status: DRAFT_PENDING_CALIBRATION.  Every "TBD" below blocks a Release build
+# (spec 08 section 4) and must be replaced by a measured value with a report
+# reference.  Nothing here is a measured fact yet: the aircraft has not been
+# characterised in this session.
+
+schema_version: 1
+profile_id: 0x00010001
+profile: QUAD_X4
+baseline: V1.9.1-GLOBAL-AUDIT-R3
+status: DRAFT_PENDING_CALIBRATION
+generated_by: manual          # replace with tools/config_validate.py output hash
+calibration_dataset_hash: TBD # sha256 of the report under doc/calibration/
+
+units:
+  translation: m
+  rotation: quaternion_wxyz      # body FRD <- sensor frame
+  time: s
+
+sensors:
+
+  imu:
+    part: ADIS16505-2
+    bus: SPI1
+    odr_hz: 1000
+    data_ready: PA3 / TIM2_CH4
+    # Sensor frame -> body FRD.  Identity means "sensor axes are the body
+    # axes"; this is an assumption until verified with the static gravity test
+    # of spec 05 section 4.2, so it is explicitly marked unverified.
+    installation_rotation_wxyz: [1.0, 0.0, 0.0, 0.0]
+    installation_status: TBD
+    # Remaining sample-time/group delay after the datasheet value.  The
+    # datasheet pipeline is not a measured fact for this board.
+    pipeline_delay_s: TBD
+    pipeline_delay_uncertainty_s: TBD
+    # Calibration (bias/scale/misalignment) is versioned with the estimator;
+    # raw values live in doc/calibration/, only the version id here.
+    calibration_version: 0
+
+  gnss:
+    part: UM982
+    bus: UART4
+    baud: 460800
+    rate_hz: 10
+    pps: PA2 / TIM2_CH3
+    # IMU measurement centre -> antenna phase centre, body FRD.
+    antenna_lever_m: [TBD, TBD, TBD]
+    # Residual sample-time offset of the PVT epoch against the PPS mapping.
+    epoch_offset_s: TBD
+    epoch_offset_uncertainty_s: TBD
+    # Backend decision of the first release (spec 05 section 3.2).
+    native_backend: DISABLED
+    calibration_version: 0
+
+  baro:
+    part: BMP585
+    bus: I2C4
+    rate_hz: 100
+    data_ready: PE1 / EXTI1
+    # Mounting position relative to the IMU measurement centre, body FRD.
+    mounting_position_m: [TBD, TBD, TBD]
+    # Pressure reference used by M2 before M3 latches h_baro0 (spec 05 §3.3).
+    reference_pressure_pa: 101325.0
+    calibration_version: 0
+
+  mag:
+    part: BMM350
+    bus: I2C1
+    rate_hz: 100
+    data_ready: PB5 / EXTI5
+    installation_rotation_wxyz: [1.0, 0.0, 0.0, 0.0]
+    installation_status: TBD
+    hard_iron_ut: [TBD, TBD, TBD]
+    soft_iron_matrix: [[TBD, TBD, TBD], [TBD, TBD, TBD], [TBD, TBD, TBD]]
+    calibration_version: 0
+    # MAG_AIDING stays DISABLED until the motor-off/motor-on disturbance data
+    # of spec 05 section 3.4 exists.
+    aiding: DISABLED
+
+# Fields that must be present but are owned by another profile/agent.
+references:
+  body_frame: "FRD (x forward, y right, z down), origin at CG"
+  nav_frame: "NED at the M3 local origin"
+  contract: "middleware/contracts/base_types/common_base.h (Schema 6.0)"

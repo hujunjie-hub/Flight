@@ -1,0 +1,5 @@
+menu "Flight models"
+rsource "ins/Kconfig"
+rsource "fms/Kconfig"
+rsource "control/Kconfig"
+endmenu

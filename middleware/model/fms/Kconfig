@@ -1,0 +1,8 @@
+config FMS_ENABLE
+    bool "QUAD_X4 AERIAL_FMS (M4)"
+    default n
+    help
+        Build the QUAD_X4 M4/FMS core and the AERIAL_FMS product binding.
+        Uses the production Schema 6.0 / Product-Port 0x00010906 contract.
+        Call the serialized FmsPolicyPort from the application dispatcher;
+        this option alone does not install a runtime thread or arm outputs.

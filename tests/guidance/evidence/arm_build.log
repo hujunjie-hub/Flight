@@ -1,0 +1,5 @@
+   text	   data	    bss	    dec	    hex	filename
+   4972	      0	      0	   4972	   136c	D:\STM32Project\FMT-Firmware-1.2.0\Flight\build\m5_arm\m5_math.o
+   8156	      0	    304	   8460	   210c	D:\STM32Project\FMT-Firmware-1.2.0\Flight\build\m5_arm\m5_update.o
+    192	      0	      0	    192	     c0	D:\STM32Project\FMT-Firmware-1.2.0\Flight\build\m5_arm\quad_x4_guidance.o
+M5_ARM_COMPILE_OK

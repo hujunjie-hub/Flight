@@ -1,0 +1,11 @@
+{
+  "scope": "OUTSIDE_SPEC_INTEGRITY",
+  "status": "PASS",
+  "baseline_files": 10372,
+  "current_files": 10372,
+  "changed": [],
+  "added": [],
+  "removed": [],
+  "baseline_sha256": "b0ffb3c795e7abbf3a0627d01f0d2d453a97af2e26759dfa821a4638ec9576fe",
+  "tree_sha256": "b0ffb3c795e7abbf3a0627d01f0d2d453a97af2e26759dfa821a4638ec9576fe"
+}

@@ -1,0 +1,517 @@
+# QUAD_X4 runtime calibration values
+#
+# These parameters are stored in the same session catalog as the controller
+# tuning values, but they are not part of ProductControllerConfig.  The sensor
+# calibration service applies them to the IMU / magnetometer / RC pipeline.
+#
+# Defaults describe "no correction" (zero bias, unit scale).  A value becomes
+# meaningful only after the corresponding QGC calibration page completed and
+# set the matching CAL_*_OK flag.  Values are session-only; a reboot restores
+# the defaults and runs the bench with the compiled identity calibration.
+#
+# The magnetometer is currently diagnostic-only (MAG_AIDING is disabled on the
+# flight image).  Its calibration is still stored so the heading can be checked
+# on the bench and enabling aiding later does not require a new parameter set.
+
+schema_version: 1
+profile: QUAD_X4
+status: RUNTIME_SESSION
+generated_by: manual
+
+parameters:
+
+  - name: CAL_GYRO_X
+    title: 陀螺零偏 X
+    group: 传感器校准
+    units: dps
+    value: 0.0
+    minimum: -20.0
+    maximum: 20.0
+    description: 静止时角速度零偏，绕机体 X 轴。由陀螺校准写入。
+
+  - name: CAL_GYRO_Y
+    title: 陀螺零偏 Y
+    group: 传感器校准
+    units: dps
+    value: 0.0
+    minimum: -20.0
+    maximum: 20.0
+    description: 静止时角速度零偏，绕机体 Y 轴。由陀螺校准写入。
+
+  - name: CAL_GYRO_Z
+    title: 陀螺零偏 Z
+    group: 传感器校准
+    units: dps
+    value: 0.0
+    minimum: -20.0
+    maximum: 20.0
+    description: 静止时角速度零偏，绕机体 Z 轴。由陀螺校准写入。
+
+  - name: CAL_GYRO_OK
+    title: 陀螺校准有效
+    group: 传感器校准
+    units: flag
+    value: 0.0
+    minimum: 0.0
+    maximum: 1.0
+    description: 1 表示本次上电已完成陀螺零偏校准。
+
+  - name: CAL_ACC_X
+    title: 加速度零偏 X
+    group: 传感器校准
+    units: m/s²
+    value: 0.0
+    minimum: -5.0
+    maximum: 5.0
+    description: 加速度计零偏，机体 X 轴。六面校准写入。
+
+  - name: CAL_ACC_Y
+    title: 加速度零偏 Y
+    group: 传感器校准
+    units: m/s²
+    value: 0.0
+    minimum: -5.0
+    maximum: 5.0
+    description: 加速度计零偏，机体 Y 轴。六面校准写入。
+
+  - name: CAL_ACC_Z
+    title: 加速度零偏 Z
+    group: 传感器校准
+    units: m/s²
+    value: 0.0
+    minimum: -5.0
+    maximum: 5.0
+    description: 加速度计零偏，机体 Z 轴。六面校准写入。
+
+  - name: CAL_ACC_SX
+    title: 加速度比例 X
+    group: 传感器校准
+    units: scale
+    value: 1.0
+    minimum: 0.8
+    maximum: 1.2
+    description: 加速度计 X 轴比例修正。1.0 表示不修正。
+
+  - name: CAL_ACC_SY
+    title: 加速度比例 Y
+    group: 传感器校准
+    units: scale
+    value: 1.0
+    minimum: 0.8
+    maximum: 1.2
+    description: 加速度计 Y 轴比例修正。1.0 表示不修正。
+
+  - name: CAL_ACC_SZ
+    title: 加速度比例 Z
+    group: 传感器校准
+    units: scale
+    value: 1.0
+    minimum: 0.8
+    maximum: 1.2
+    description: 加速度计 Z 轴比例修正。1.0 表示不修正。
+
+  - name: CAL_ACC_OK
+    title: 加速度校准有效
+    group: 传感器校准
+    units: flag
+    value: 0.0
+    minimum: 0.0
+    maximum: 1.0
+    description: 1 表示本次上电已完成加速度六面校准。
+
+  - name: CAL_MAG_X
+    title: 磁力计硬铁 X
+    group: 传感器校准
+    units: µT
+    value: 0.0
+    minimum: -500.0
+    maximum: 500.0
+    description: 磁力计硬铁偏移，机体 X 轴。磁罗盘校准写入。
+
+  - name: CAL_MAG_Y
+    title: 磁力计硬铁 Y
+    group: 传感器校准
+    units: µT
+    value: 0.0
+    minimum: -500.0
+    maximum: 500.0
+    description: 磁力计硬铁偏移，机体 Y 轴。磁罗盘校准写入。
+
+  - name: CAL_MAG_Z
+    title: 磁力计硬铁 Z
+    group: 传感器校准
+    units: µT
+    value: 0.0
+    minimum: -500.0
+    maximum: 500.0
+    description: 磁力计硬铁偏移，机体 Z 轴。磁罗盘校准写入。
+
+  - name: CAL_MAG_SX
+    title: 磁力计软铁 X
+    group: 传感器校准
+    units: scale
+    value: 1.0
+    minimum: 0.5
+    maximum: 2.0
+    description: 磁力计 X 轴软铁比例。1.0 表示不修正。
+
+  - name: CAL_MAG_SY
+    title: 磁力计软铁 Y
+    group: 传感器校准
+    units: scale
+    value: 1.0
+    minimum: 0.5
+    maximum: 2.0
+    description: 磁力计 Y 轴软铁比例。1.0 表示不修正。
+
+  - name: CAL_MAG_SZ
+    title: 磁力计软铁 Z
+    group: 传感器校准
+    units: scale
+    value: 1.0
+    minimum: 0.5
+    maximum: 2.0
+    description: 磁力计 Z 轴软铁比例。1.0 表示不修正。
+
+  - name: CAL_MAG_OK
+    title: 磁罗盘校准有效
+    group: 传感器校准
+    units: flag
+    value: 0.0
+    minimum: 0.0
+    maximum: 1.0
+    description: 1 表示本次上电已完成磁罗盘校准。
+
+  - name: CAL_LVL_ROLL
+    title: 水平校准滚转
+    group: 传感器校准
+    units: deg
+    value: 0.0
+    minimum: -10.0
+    maximum: 10.0
+    description: 载体水平放置时姿态应显示的滚转角修正量。
+
+  - name: CAL_LVL_PITCH
+    title: 水平校准俯仰
+    group: 传感器校准
+    units: deg
+    value: 0.0
+    minimum: -10.0
+    maximum: 10.0
+    description: 载体水平放置时姿态应显示的俯仰角修正量。
+
+  - name: CAL_LVL_OK
+    title: 水平校准有效
+    group: 传感器校准
+    units: flag
+    value: 0.0
+    minimum: 0.0
+    maximum: 1.0
+    description: 1 表示本次上电已完成水平校准。
+
+  - name: CAL_BARO_P0
+    title: 气压基准压力
+    group: 传感器校准
+    units: Pa
+    value: 101325.0
+    minimum: 80000.0
+    maximum: 110000.0
+    description: 气压高度零点使用的海平面压力。地面气压校准写入。
+
+  - name: RC_MIN_1
+    title: 遥控通道 1 最小值
+    group: 遥控校准
+    units: raw
+    value: 172.0
+    minimum: 0.0
+    maximum: 2047.0
+    description: 横滚通道行程最小值（CRSF 原始计数）。
+
+  - name: RC_MAX_1
+    title: 遥控通道 1 最大值
+    group: 遥控校准
+    units: raw
+    value: 1811.0
+    minimum: 0.0
+    maximum: 2047.0
+    description: 横滚通道行程最大值（CRSF 原始计数）。
+
+  - name: RC_TRIM_1
+    title: 遥控通道 1 中位
+    group: 遥控校准
+    units: raw
+    value: 992.0
+    minimum: 0.0
+    maximum: 2047.0
+    description: 横滚通道回中值（CRSF 原始计数）。
+
+  - name: RC_MIN_2
+    title: 遥控通道 2 最小值
+    group: 遥控校准
+    units: raw
+    value: 172.0
+    minimum: 0.0
+    maximum: 2047.0
+    description: 俯仰通道行程最小值（CRSF 原始计数）。
+
+  - name: RC_MAX_2
+    title: 遥控通道 2 最大值
+    group: 遥控校准
+    units: raw
+    value: 1811.0
+    minimum: 0.0
+    maximum: 2047.0
+    description: 俯仰通道行程最大值（CRSF 原始计数）。
+
+  - name: RC_TRIM_2
+    title: 遥控通道 2 中位
+    group: 遥控校准
+    units: raw
+    value: 992.0
+    minimum: 0.0
+    maximum: 2047.0
+    description: 俯仰通道回中值（CRSF 原始计数）。
+
+  - name: RC_MIN_3
+    title: 遥控通道 3 最小值
+    group: 遥控校准
+    units: raw
+    value: 172.0
+    minimum: 0.0
+    maximum: 2047.0
+    description: 油门通道行程最小值（CRSF 原始计数）。
+
+  - name: RC_MAX_3
+    title: 遥控通道 3 最大值
+    group: 遥控校准
+    units: raw
+    value: 1811.0
+    minimum: 0.0
+    maximum: 2047.0
+    description: 油门通道行程最大值（CRSF 原始计数）。
+
+  - name: RC_TRIM_3
+    title: 遥控通道 3 中位
+    group: 遥控校准
+    units: raw
+    value: 172.0
+    minimum: 0.0
+    maximum: 2047.0
+    description: 油门通道低位值（CRSF 原始计数）。
+
+  - name: RC_MIN_4
+    title: 遥控通道 4 最小值
+    group: 遥控校准
+    units: raw
+    value: 172.0
+    minimum: 0.0
+    maximum: 2047.0
+    description: 偏航通道行程最小值（CRSF 原始计数）。
+
+  - name: RC_MAX_4
+    title: 遥控通道 4 最大值
+    group: 遥控校准
+    units: raw
+    value: 1811.0
+    minimum: 0.0
+    maximum: 2047.0
+    description: 偏航通道行程最大值（CRSF 原始计数）。
+
+  - name: RC_TRIM_4
+    title: 遥控通道 4 中位
+    group: 遥控校准
+    units: raw
+    value: 992.0
+    minimum: 0.0
+    maximum: 2047.0
+    description: 偏航通道回中值（CRSF 原始计数）。
+
+  - name: RC_REV_1
+    title: 遥控通道 1 反向
+    group: 遥控校准
+    units: flag
+    value: 0.0
+    minimum: 0.0
+    maximum: 1.0
+    description: 1 表示横滚通道反向。
+
+  - name: RC_REV_2
+    title: 遥控通道 2 反向
+    group: 遥控校准
+    units: flag
+    value: 0.0
+    minimum: 0.0
+    maximum: 1.0
+    description: 1 表示俯仰通道反向。
+
+  - name: RC_REV_3
+    title: 遥控通道 3 反向
+    group: 遥控校准
+    units: flag
+    value: 0.0
+    minimum: 0.0
+    maximum: 1.0
+    description: 1 表示油门通道反向。
+
+  - name: RC_REV_4
+    title: 遥控通道 4 反向
+    group: 遥控校准
+    units: flag
+    value: 0.0
+    minimum: 0.0
+    maximum: 1.0
+    description: 1 表示偏航通道反向。
+
+  - name: RC_CAL_OK
+    title: 遥控校准有效
+    group: 遥控校准
+    units: flag
+    value: 0.0
+    minimum: 0.0
+    maximum: 1.0
+    description: 1 表示本次上电已完成遥控行程校准。
+
+  - name: RC_MODE_CH
+    title: 飞行模式开关通道
+    group: 遥控飞行模式
+    units: channel
+    value: 0
+    minimum: 0
+    maximum: 16
+    description: 0 停用，5 到 16 选择辅助通道。
+
+  - name: RC_MODE_1
+    title: 飞行模式档位 1
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 0 保持当前模式，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_MODE_2
+    title: 飞行模式档位 2
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 0 保持当前模式，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_MODE_3
+    title: 飞行模式档位 3
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 0 保持当前模式，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_MODE_4
+    title: 飞行模式档位 4
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 0 保持当前模式，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_MODE_5
+    title: 飞行模式档位 5
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 0 保持当前模式，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_MODE_6
+    title: 飞行模式档位 6
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 0 保持当前模式，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_AUX_6
+    title: 辅助开关 6
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_AUX_7
+    title: 辅助开关 7
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_AUX_8
+    title: 辅助开关 8
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_AUX_9
+    title: 辅助开关 9
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_AUX_10
+    title: 辅助开关 10
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_AUX_11
+    title: 辅助开关 11
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_AUX_12
+    title: 辅助开关 12
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_AUX_13
+    title: 辅助开关 13
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_AUX_14
+    title: 辅助开关 14
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_AUX_15
+    title: 辅助开关 15
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。
+
+  - name: RC_AUX_16
+    title: 辅助开关 16
+    group: 遥控飞行模式
+    value: 0
+    minimum: 0
+    maximum: 4
+    description: 高档触发，0 无，1 角速度，2 姿态，3 定高，4 定点。
