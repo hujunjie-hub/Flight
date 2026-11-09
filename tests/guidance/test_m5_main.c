@@ -351,6 +351,7 @@ static void test_mission_uses_final_time_bin_before_rejecting(void)
   fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
   fx_mission(&fx, 1u, 1u, 0u);
   fx.mission.mission.waypoints[0].position_ned_m[0] = 3.25f;
+  fx.mission.mission.waypoints[0].position_ned_m[2] = 0.0f;
   fx.mission.mission.waypoints[0].speed_limit_mps = 1.0f;
   CHECK(fx_step(&fx) == STATUS_OK);
   CHECK(fx.out.feasibility.feasible == 1u);
