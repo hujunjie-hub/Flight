@@ -9,13 +9,13 @@
 当前固件基线为 H723、OBSTACLE_SOURCE_MODE=NONE、BENCH_INHIBIT。必须区分以下两条验证路径：
 
 - **H723 / NONE：** 使用有界五次轨迹和围栏验证；不分配局部地图或 A* arena。任务若要求障碍避让保证，必须拒绝并报告障碍保证不可用。不得生成全 FREE 地图，也不得把障碍几何检查记为 PASS。
-- **Host / SIL：** 已增加 M5-02 车辆中心滚动局部地图、M5-03 固定容量 Kinodynamic A*、M5-04 minimum-jerk 路径平滑候选接口及独立数学内核。A* 对动态 track 做有限预测窗口内的边级保守检查；这不等于 M5-06 独立连续碰撞证明。M5-05 有界时标器、M5-06 独立轨迹/连续碰撞验证、M5→M6 发布集成仍待实现。Host 合成数据只能证明算法在模型假设下的行为，不能证明 H723 实时性或真实传感器能力。
+- **Host / SIL：** 已增加 M5-02 车辆中心滚动局部地图、M5-03 固定容量 Kinodynamic A*、M5-04 有界时间参数化、M5-05 minimum-jerk 路径平滑及对应回归用例。A* 对动态 track 做有限预测窗口内的边级保守检查；这不等于 M5-06 独立连续碰撞证明。M5-06 独立轨迹/连续碰撞验证、M5→M6 发布集成仍待实现。Host 合成数据只能证明算法在模型假设下的行为，不能证明 H723 实时性或真实传感器能力。
 - **ONBOARD_SENSOR：** 当前不支持；没有用户批准的传感器、安装、时间/坐标和质量证据前，不得开启在线避障。
 - **Companion：** 只能作为可选地图/障碍/路径建议来源；不能成为基础任务依赖，也不能直通 M6/M7。
 
-当前代码已覆盖基础参考生成、输入授权/时效、Epoch、连续围栏、Bernstein 动力学边界和 NONE 模式避障任务拒绝；Host/SIL 另有 M5-02/03/04 内核及对应回归用例。H723/NONE 生产切片仍不包含地图/A*/平滑器 arena，也没有完整 M4→M5→M6→M7→Plant 运行期闭环。M5-06 未完成前，Host A* 的边级地图检查不能记作独立连续碰撞 PASS。对应测试不得因接口或文档存在而标记通过。
+当前代码已覆盖基础参考生成、输入授权/时效、Epoch、连续围栏、Bernstein 动力学边界和 NONE 模式避障任务拒绝；Host/SIL 另有 M5-02/03/04/05 内核及对应回归用例。H723/NONE 生产切片仍不包含地图/A*/时标器/平滑器 arena，也没有完整 M4→M5→M6→M7→Plant 运行期闭环。M5-06 未完成前，Host A* 的边级地图检查不能记作独立连续碰撞 PASS。对应测试不得因接口或文档存在而标记通过。
 
-当前 tests/guidance/test_m5_main.c 登记 52 个 Host 场景。其实际执行结果以对应 commit 的 CI 日志为准；历史交付报告不能替代当前分支复跑。
+当前 tests/guidance/test_m5_main.c 登记 56 个 Host 场景。其实际执行结果以对应 commit 的 CI 日志为准；历史交付报告不能替代当前分支复跑。
 
 ## 2. 状态与证据规则
 
@@ -204,29 +204,29 @@ Host/SIL 高级 A*/地图/动态障碍测试入口须随对应实现一并提交
 - 每条边执行五次动力学边界和保守swept voxel/动态track检查；地图cell按边绝对到达时间检查有效性。超时、容量、NO_PATH、输入过期分开返回。
 - 仅Host/SIL；A*边级检查不是M5-06独立连续碰撞证明，不改变H723/NONE生产能力。
 
-### M5-04：Host/SIL minimum-jerk path smoother
+### M5-04：Host/SIL bounded time parameterization
 
-- 新增m5_path_smoother.c/h，消费M5-03路径；map_revision、地图有效性、knot自由状态、primitive索引和段时长必须一致。
-- 使用现有minimum_jerk_optimizer.c固定8段/2304B workspace数学内核，内部knot位置固定，优化内部速度/加速度；yaw单独用连续五次边界条件构造。
-- 优化失败时只可输出同一路径初始quintic并标记FALLBACK；输出是候选，不是MotionReference，必须通过M5-06后才能交给M5 Publisher/M6。
-- 当前直接使用A* primitive时长；正式有界时标器仍属M5-05。
+- 新增m5_time_scaler.c/h；输入完整M5AstarPath、当前导航、GuidanceConfig和有效SafetyEnvelope，验证原始primitive时长/索引。
+- 每段按200ms格向上取整，初始时长考虑逐轴v/a/jerk、三维速度/加速度范数和yaw rate；对五次曲线执行Bernstein界检查，不满足时T*=1.25，最多16次，总时长≤6.2s。
+- 输出M5TimeScaledPath及每段attempts；输出仅供M5-05消费，不是MotionReference。H723/NONE不编入。
 
-### M5-05：有界时间参数化（待实现）
+### M5-05：Host/SIL minimum-jerk path smoother
 
-- 所有M5单次规划请求统一使用200ms时间格，最多31格、总时长不超过6.2s；最多16次有界可行性尝试。
-- 不再为Mission/Return设置240s特例。超出局部规划窗口的请求fail-closed；M4自动分段尚未实现，长航段能力仍受限。
+- 新增m5_path_smoother.c/h，消费M5-04的M5TimeScaledPath；检查map_revision、地图有效性、knot自由状态、段时长、primitive索引和attempts。
+- 使用minimum_jerk_optimizer.c固定8段/2304B workspace数学内核，内部knot位置固定，优化内部速度/加速度；yaw单独用连续五次边界条件构造。
+- 优化失败时只可输出同一路径初始quintic并标记FALLBACK；输出是候选，不是MotionReference，必须通过M5-06后才能交给M5 Publisher/M6。H723/NONE不编入。
 
 ### M5-06：独立轨迹/连续碰撞验证（待实现）
 
 - 对最终实际消费的anchor+24 Hermite曲线执行独立动力学、围栏、静态/动态障碍和不确定度/延迟验证。
-- UNKNOWN、过期、预算耗尽或无法证明安全均拒绝；M5-04优化结果和fallback初始曲线都必须重新验证，未验证候选不得发布。
+- UNKNOWN、过期、预算耗尽或无法证明安全均拒绝；M5-05优化结果和fallback初始曲线都必须重新验证，未验证候选不得发布。
 
 ### 已增加的 Host 用例
 
-当前登记52个命名场景，覆盖基础轨迹/授权/围栏、minimum-jerk数学内核、滚动地图/源租约/epoch/批次拒绝、primitive/key校验、A*确定性/地图过期/障碍屏障/截止时间，以及M5-04平滑连续性和stale/invalid输入。具体通过状态以对应commit的CI日志和spec/09证据台账为准。
+当前登记52个命名场景，覆盖基础轨迹/授权/围栏、minimum-jerk数学内核、滚动地图/源租约/epoch/批次拒绝、primitive/key校验、A*确定性/地图过期/障碍屏障/截止时间，以及M5-04时标器增长/yaw-rate/全局向量限值和M5-05平滑连续性、stale/invalid输入。具体通过状态以对应commit的CI日志和spec/09证据台账为准。
 
 ### 验收边界
 
-- M5-04 的局部时标器回归和 M5-05 数学内核单测属于 IMPLEMENTATION/Host 范围；不能把它们记作完整 M5-03、M5-05 或 M5-06 通过。
+- M5-04 的局部时标器回归和 M5-05 minimum-jerk 数学内核单测属于 IMPLEMENTATION/Host 范围；不能把它们记作完整 M5-03、M5-05 或 M5-06 通过。
 - A*、局部地图、动态障碍、连续碰撞、M5-06、优化失败原子回退、M5→M6 完整消费、H723 WCET/栈/RAM、PIL/HIL 与飞行放行仍需独立证据。
 - 具体状态只登记在 \`spec/09_需求验证实施与发布管理.md\`；本矩阵不建立第二套验收状态台账。
