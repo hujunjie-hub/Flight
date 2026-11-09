@@ -313,15 +313,15 @@ static void check_mpc_snapshot_feasible(const Fixture &f) {
   }
 
   const auto &e = f.envelope.vehicle_extension;
-  const float tangent = std::tanf(e.max_tilt_rad) * .92387953251f;
+  const float tangent = std::tan(e.max_tilt_rad) * .92387953251f;
   for (int side = 0; side < 8; ++side) {
-    const float nx = std::cosf(side * .785398163397f);
-    const float ny = std::sinf(side * .785398163397f);
+    const float nx = std::cos(side * .785398163397f);
+    const float ny = std::sin(side * .785398163397f);
     CHECK(nx * snapshot.acceleration[0] + ny * snapshot.acceleration[1] <=
           tangent * (CONTROL_GRAVITY_MPS2 - snapshot.acceleration[2]) + 1e-3f);
   }
   const float thrust = m6.config.payload.mass_kg *
-      std::sqrtf(snapshot.acceleration[0] * snapshot.acceleration[0] +
+      std::sqrt(snapshot.acceleration[0] * snapshot.acceleration[0] +
                  snapshot.acceleration[1] * snapshot.acceleration[1] +
                  (CONTROL_GRAVITY_MPS2 - snapshot.acceleration[2]) *
                  (CONTROL_GRAVITY_MPS2 - snapshot.acceleration[2]));
