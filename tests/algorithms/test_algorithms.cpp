@@ -297,6 +297,87 @@ static void test_mpc_and_modes() {
   CHECK(control_outer_update(&deadline.in) == STATUS_DEADLINE_MISSED);
   clock_step = 0;
 }
+static void check_mpc_snapshot_feasible(const Fixture &f) {
+  MpcSnapshot snapshot{};
+  CHECK(mpc_read(&snapshot));
+  CHECK(snapshot.header.boot_id == clock_value.boot_id);
+  CHECK(snapshot.solver_status == CONTROL_SOLVER_SOLVED ||
+        snapshot.solver_status == CONTROL_SOLVER_SOLVED_INACCURATE);
+  for (int axis = 0; axis < 3; ++axis) {
+    const float a = snapshot.acceleration[axis];
+    CHECK(std::isfinite(a));
+    CHECK(a >= f.model.bounds.input_min[axis] - 1e-3f);
+    CHECK(a <= f.model.bounds.input_max[axis] + 1e-3f);
+    /* The MPC worker runs at 50 Hz; the first seed is zero after reset. */
+    CHECK(std::fabs(a) <= f.model.bounds.input_slew_max[axis] * .02f + 1e-3f);
+  }
+
+  const auto &e = f.envelope.vehicle_extension;
+  const float tangent = std::tanf(e.max_tilt_rad) * .92387953251f;
+  for (int side = 0; side < 8; ++side) {
+    const float nx = std::cosf(side * .785398163397f);
+    const float ny = std::sinf(side * .785398163397f);
+    CHECK(nx * snapshot.acceleration[0] + ny * snapshot.acceleration[1] <=
+          tangent * (CONTROL_GRAVITY_MPS2 - snapshot.acceleration[2]) + 1e-3f);
+  }
+  const float thrust = m6.config.payload.mass_kg *
+      std::sqrtf(snapshot.acceleration[0] * snapshot.acceleration[0] +
+                 snapshot.acceleration[1] * snapshot.acceleration[1] +
+                 (CONTROL_GRAVITY_MPS2 - snapshot.acceleration[2]) *
+                 (CONTROL_GRAVITY_MPS2 - snapshot.acceleration[2]));
+  CHECK(thrust >= e.min_total_thrust_n - 1e-3f);
+  CHECK(thrust <= e.max_total_thrust_n + 1e-3f);
+}
+
+static void test_mpc_axis_and_failure_regressions() {
+  for (int axis = 0; axis < 3; ++axis) {
+    clock_value.monotonic_us += 100000;
+    init_control();
+    Fixture f;
+    const float target = axis == 1 ? -0.1f : 0.1f;
+    f.ref.anchor.point.position_ned_m[axis] = target;
+    for (auto &point : f.ref.points)
+      point.point.position_ned_m[axis] = target;
+    CHECK(control_outer_update(&f.in) == STATUS_OK);
+    check_mpc_snapshot_feasible(f);
+    MpcSnapshot snapshot{};
+    CHECK(mpc_read(&snapshot));
+    CHECK(snapshot.acceleration[axis] * target > 0.0f);
+  }
+
+  /* The approximate thrust polytope must admit hover at its declared edge. */
+  clock_value.monotonic_us += 100000;
+  init_control();
+  Fixture edge;
+  edge.envelope.vehicle_extension.max_total_thrust_n =
+      1.73205080757f * m6.config.payload.mass_kg * CONTROL_GRAVITY_MPS2 + .01f;
+  CHECK(control_outer_update(&edge.in) == STATUS_OK);
+  check_mpc_snapshot_feasible(edge);
+
+  /* Below that approximation boundary, reject before entering OSQP. */
+  clock_value.monotonic_us += 100000;
+  init_control();
+  Fixture low_thrust;
+  low_thrust.envelope.vehicle_extension.max_total_thrust_n = 20.0f;
+  CHECK(control_outer_update(&low_thrust.in) == STATUS_MODEL_OUT_OF_DOMAIN);
+  MpcSnapshot failed{};
+  CHECK(mpc_read(&failed));
+  CHECK(failed.expires_at_us == 0);
+  CHECK(failed.solver_status == CONTROL_SOLVER_NUMERICAL_FAILURE);
+
+  /* A non-finite point anywhere in the prediction horizon must not publish
+     an executable solution. */
+  clock_value.monotonic_us += 100000;
+  init_control();
+  Fixture invalid_reference;
+  invalid_reference.ref.points[10].point.position_ned_m[0] =
+      std::numeric_limits<float>::quiet_NaN();
+  CHECK(control_outer_update(&invalid_reference.in) == STATUS_NUMERIC_ERROR);
+  CHECK(mpc_read(&failed));
+  CHECK(failed.expires_at_us == 0);
+  CHECK(failed.solver_status == CONTROL_SOLVER_NUMERICAL_FAILURE);
+}
+
 static void test_math_allocator() {
   init_control();
   const float pi = 3.14159265358979f;
@@ -635,6 +716,7 @@ int main() {
   test_control_guards();
   test_rearm_clears_motor_history();
   test_mpc_and_modes();
+  test_mpc_axis_and_failure_regressions();
   test_navigation();
   test_shadow_probation();
   std::printf("controller_navigation: %u checks, %u failures\n", checks,
