@@ -24,12 +24,12 @@
 
 - 新增 S06-064..067 凹多边形/边界/退化几何用例已在新 Head 完整通过。
 
-- GitHub Actions：[Host validation #408](https://github.com/hujunjie-hub/Flight/actions/runs/42653409753)
-- Commit：`f3c9f79e50ab94b46a13ea04da4bc78e24caf608`
+- GitHub Actions：[Host validation #412](https://github.com/hujunjie-hub/Flight/actions/runs/42656744088)
+- Commit：`abcdf901fcb6654880d1b55641a5d660aabf7084`
 - M4 Host：927 checks / 0 failures
-- M5 Host：12,945 checks / 0 failures
+- M5 Host：53,903 checks / 0 failures
 - M4/M5 Integration：1,000 checks / 0 failures
-- M5 ASan/UBSan：12,945 checks / 0 failures
+- M5 ASan/UBSan：53,903 checks / 0 failures
 - M4/M5 Integration ASan/UBSan：1,000 checks / 0 failures
 - Cortex-M7 编译及 MPC RAM 检查：PASS
 - M4/M5 production-source Cortex-M7 compile：PASS
@@ -42,14 +42,14 @@ max_dynamic_obstacle_accel_mps2 是独立输入，必须由产品安全配置批
 
 response_delay_us 必须覆盖感知数据年龄、验证/调度延迟和控制/执行器响应延迟的批准上界。当前接口限制在 200ms 内，超过即拒绝；这不是实测响应时间。
 
-## 本轮追加边界测试（S06-053..067 已通过）
+## 本轮追加边界测试（S06-053..070 已通过）
 
-新增动态时间边界、围栏上下高度 margin/退化高度、uint64 proof horizon 溢出、有限极大动态不确定度数值溢出、32 组动态 track 属性测试、凹多边形独立 clearance oracle、16 组随机凹多边形 + 动态 track 联合测试，以及重复/回折顶点拒绝。S06-053..067 已在 run `42653409753` 的 Host、ASan/UBSan 与 Cortex-M7 编译工作流通过。具体见验证矩阵。
+新增动态时间边界、围栏上下高度 margin/退化高度、uint64 proof horizon 溢出、有限极大动态不确定度数值溢出、32 组动态 track 属性测试、凹多边形独立 clearance oracle、16 组随机凹多边形 + 动态 track 联合测试、重复/回折顶点拒绝、48 组 Hermite→Bernstein 随机子区间 bounds/evaluation 差分，以及 1..8 track 多目标组合。S06-053..070 已在 run `42656744088` 的 Host、ASan/UBSan 与 Cortex-M7 编译工作流通过。具体见验证矩阵。
 
 ## 未完成项
 
-1. 对 Bernstein 转换与 position/velocity/acceleration 凸包界建立独立多项式参考实现，覆盖随机端点状态和子区间映射。
-2. 对外向舍入、距离下界、边界擦边与 epsilon 选择做独立数值审查；当前几何 oracle 不构成形式化证明。
+1. 独立复核 Bernstein control-hull bounds 的数学推导、浮点运算误差和 `nextafterf` 外向舍入策略；当前随机采样 oracle 不是穷尽证明。
+2. 对连续距离下界、扫掠半径、静态 voxel AABB 距离和动态相对运动下界建立独立参考实现/差分测试。
 3. 扩大多 track 时间戳、预测 lease、source identity、速度/加速度不确定度和相对运动组合 Fuzz。
 2. 对动态加速度上界开展更多参数敏感性分析；完成边界 fuzz。
 3. 独立复核 Bernstein 变换、浮点舍入误差、几何距离下界和所有连续性证明；当前不能宣称形式化证明。
