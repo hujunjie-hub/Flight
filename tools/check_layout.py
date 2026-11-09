@@ -123,8 +123,8 @@ config = ROOT / 'config'
 check(not directories(config), 'keep the selected product parameters directly in config')
 check({p.stem for p in config.glob('*.yaml')} ==
       {'vehicle_model', 'sensor_alignment', 'estimator_tuning', 'controller_tuning',
-       'calibration'},
-      'expected the five CORE configuration files under config')
+       'calibration', 'kinodynamic_primitives'},
+      'expected five CORE configuration files plus the M5 primitive manifest under config')
 
 app_headers = headers(application)
 sensor_headers = headers(sensor)
