@@ -143,8 +143,10 @@ static uint8_t nearest_voxel(const M5LocalMap *map, const float p[3], uint16_t *
   for (axis = 0u; axis < 3u; ++axis) {
     float relative = p[axis] - map->center_ned_m[axis];
     float coordinate;
-    if (!isfinite(relative) || relative < -4.0f || relative >= 4.0f) return 0u;
-    coordinate = (relative + 3.75f) / 0.5f;
+    if (!isfinite(relative) || relative < -M5_MAP_HALF_EXTENT_M ||
+        relative >= M5_MAP_HALF_EXTENT_M) return 0u;
+    coordinate = (relative + M5_MAP_HALF_EXTENT_M -
+                   0.5f * M5_MAP_CELL_SIZE_M) / M5_MAP_CELL_SIZE_M;
     /* Exact half-cell ties choose the smaller voxel index. */
     index[axis] = (int)ceilf(coordinate - 0.5f - 1e-7f);
     if (index[axis] < 0) index[axis] = 0;
