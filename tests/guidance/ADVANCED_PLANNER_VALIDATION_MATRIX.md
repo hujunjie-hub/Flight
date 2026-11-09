@@ -223,7 +223,7 @@ Host/SIL 高级 A*/地图/动态障碍测试入口须随对应实现一并提交
 
 ### 已增加的 Host 用例
 
-当前登记52个命名场景，覆盖基础轨迹/授权/围栏、minimum-jerk数学内核、滚动地图/源租约/epoch/批次拒绝、primitive/key校验、A*确定性/地图过期/障碍屏障/截止时间，以及M5-04时标器增长/yaw-rate/全局向量限值和M5-05平滑连续性、stale/invalid输入。具体通过状态以对应commit的CI日志和spec/09证据台账为准。
+当前登记56个命名场景，覆盖基础轨迹/授权/围栏、minimum-jerk数学内核、滚动地图/源租约/epoch/批次拒绝、primitive/key校验、A*确定性/地图过期/障碍屏障/截止时间，以及M5-04时标器增长/yaw-rate/全局向量限值和M5-05平滑连续性、stale/invalid输入。具体通过状态以对应commit的CI日志和spec/09证据台账为准。
 
 ### 验收边界
 
