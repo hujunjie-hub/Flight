@@ -2294,6 +2294,46 @@ static void test_m5_safety_duplicate_dynamic_track_rejected(void)
   CHECK(fx.result.passed == 0u);
 }
 
+static void test_m5_safety_dynamic_track_invalid_metadata_fails_closed(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+  safety_fx_init(&fx, 33500000u);
+  track = &fx.map.tracks[0];
+  track->id = 26u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now;
+  track->expires_us = fx.base.now + 1000000u;
+  track->radius_m = 0.05f;
+  track->flags = 1u;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STALE);
+  CHECK(fx.result.passed == 0u);
+
+  track->flags = 0u;
+  track->source_id = 0u;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STALE);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_dynamic_track_requires_acceleration_bound(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+  safety_fx_init(&fx, 33600000u);
+  track = &fx.map.tracks[0];
+  track->id = 27u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now;
+  track->expires_us = fx.base.now + 1000000u;
+  track->radius_m = 0.05f;
+  fx.input.max_dynamic_obstacle_accel_mps2 = 0.0f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
 static void test_m5_safety_response_delay_limit_rejected(void)
 {
   SafetyFx fx;
@@ -2697,6 +2737,8 @@ int main(void)
     {"m5_safety_keepin_excursion", test_m5_safety_keep_in_curve_excursion_rejected},
     {"m5_safety_dynamic_expiry", test_m5_safety_dynamic_track_expiry_rejected},
     {"m5_safety_duplicate_track", test_m5_safety_duplicate_dynamic_track_rejected},
+    {"m5_safety_track_metadata", test_m5_safety_dynamic_track_invalid_metadata_fails_closed},
+    {"m5_safety_track_accel_bound_required", test_m5_safety_dynamic_track_requires_acceleration_bound},
     {"m5_safety_response_limit", test_m5_safety_response_delay_limit_rejected},
     {"m5_safety_preview_count", test_m5_safety_preview_count_mismatch_rejected},
     {"m5_safety_inf_reject", test_m5_safety_infinite_preview_rejected},
