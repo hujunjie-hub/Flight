@@ -9,15 +9,15 @@
 3. 修正导航不确定度传播时域：静态障碍和围栏膨胀采用子区间远端时间，再叠加 response delay，避免只按区间中点估计不确定度。
 4. 临时诊断输出已移除；测试辅助函数不引用生产 C 文件私有宏。
 
-## 本轮新增属性/差分用例（S06-064..066 源码已加入，等待新 Head CI）
+## 本轮新增属性/差分用例（S06-064..067 已通过新 Head CI）
 
 | ID | 场景 | 期望 | 状态 |
 |---|---|---|---|
-| S06-064 | 多边形解析距离 oracle：L/C 凹多边形、CW/CCW、共线边、近共线边；随机点/顶点/边中点/边两侧，KEEP_IN/KEEP_OUT | 误差≤2e-5m | 已扩展源码，CI 待验证 |
-| S06-065 | 16 组 8 顶点交替半径凹多边形 + 动态 track 联合验证，并对每组随机点做 oracle 差分 | PASS / 误差≤2e-5m | 已扩展源码，CI 待验证 |
-| S06-066 | 32 组随机轨迹 + 动态 track，按时间/epoch/offset/数值字段单点破坏 | PASS invariant / fail-closed | 已扩展源码，CI 待验证 |
+| S06-064 | 多边形解析距离 oracle：L/C 凹多边形、CW/CCW、共线边、近共线边；随机点/顶点/边中点/边两侧，KEEP_IN/KEEP_OUT | 误差≤2e-5m | Host + ASan/UBSan PASS；run 42653409753 |
+| S06-065 | 16 组 8 顶点交替半径凹多边形 + 动态 track 联合验证，并对每组随机点做 oracle 差分 | PASS / 误差≤2e-5m | Host + ASan/UBSan PASS；run 42653409753 |
+| S06-066 | 32 组随机轨迹 + 动态 track，按时间/epoch/offset/数值字段单点破坏 | PASS invariant / fail-closed | Host + ASan/UBSan PASS；run 42653409753 |
 
-| S06-067 | 相邻边共线回折（重叠边）与非相邻重复顶点 | INVALID | 已加入源码，CI 待验证 |
+| S06-067 | 相邻边共线回折（重叠边）与非相邻重复顶点 | INVALID | Host + ASan/UBSan PASS；run 42653409753 |
 
 ## 最新 CI 证据
 
@@ -71,7 +71,7 @@
 | S06-042 | 动态 track 半径为负值 | STALE | Host PASS |
 | S06-016 | KEEP_IN 连续轨迹越界，端点在围栏内 | GEOFENCE_VIOLATION | Host PASS |
 | S06-017 | KEEP_OUT 连续穿越，端点安全 | GEOFENCE_VIOLATION | Host PASS |
-| S06-018 | 围栏自交几何 | INVALID | Host PASS；重复顶点/边界退化待补 |
+| S06-018 | 围栏自交几何 | INVALID | Host PASS；S06-067 补充非相邻重复顶点、相邻共线回折拒绝 |
 | S06-019 | 导航缺少所需 valid bit、state/time epoch/origin/frame；directive frame 失配 | INVALID | Host PASS：S06-019、034-036、053-055；run 42650028230 |
 | S06-020 | response delay 超过配置上限 | INVALID | Host PASS |
 | S06-021 | 静态地图 cell-check 预算超过 8192 | BUDGET_EXCEEDED | Host PASS：8193 次时 fail-closed |
@@ -109,12 +109,12 @@
 
 ## 最新 CI 证据
 
-- Run: [42650028230](https://github.com/hujunjie-hub/Flight/actions/runs/42650028230)
-- Commit: `5a728593fbd597b63c453b628598daa6428a481f`
+- Run: [42653409753](https://github.com/hujunjie-hub/Flight/actions/runs/42653409753)
+- Commit: `f3c9f79e50ab94b46a13ea04da4bc78e24caf608`
 - M4 Host: 927 checks / 0 failures
-- M5 Host: 8,837 checks / 0 failures
+- M5 Host: 12,945 checks / 0 failures
 - M4/M5 Integration: 1,000 checks / 0 failures
-- M5 ASan/UBSan: 8,837 checks / 0 failures
+- M5 ASan/UBSan: 12,945 checks / 0 failures
 - M4/M5 Integration ASan/UBSan: 1,000 checks / 0 failures
 - Source/time, Navigation/Control, Cortex-M7 compile and M4/M5 production-source compile: PASS
 - All workflow jobs: success
@@ -122,7 +122,7 @@
 ## 仍未关闭的审查项
 
 1. 独立复核 Bernstein 变换、浮点外向舍入和连续几何距离下界；当前不是形式化证明。
-2. 运行并关闭新增 S06-064..067 的 Host/ASan/UBSan/ARM CI；进一步扩大多障碍 track 组合 Fuzz。
+2. 扩大多障碍 track 组合 Fuzz，并建立 Bernstein bounds、浮点外向舍入与连续距离下界的独立参考测试。
 3. 对动态障碍物加速度上界进行更多目标类别/传感器标定和参数敏感性分析。
 4. M5-07 尚未完成，M5-06 PASS 尚未成为 M6 不可绕过的发布门禁。
 5. H723 实机仍需真实传感器标定、WCET/RTA、RAM/栈、HIL 和逐级场地安全验证。

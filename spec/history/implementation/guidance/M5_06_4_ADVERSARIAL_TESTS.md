@@ -49,7 +49,7 @@
 
 使膨胀覆盖整个子区间最远时刻及响应延迟。动态 track 预测原本已包含子区间半宽。
 
-## 新增几何差分与组合 Fuzz（扩展至凹多边形，等待新 Head CI）
+## 新增几何差分与组合 Fuzz（S06-064..067 已通过）
 
 - 独立参考实现使用 winding-number 分类和双精度点到线段距离，与生产实现的 ray-parity 分类进行差分。
 - L/C 凹多边形、CW/CCW 绕序、共线边和近共线边；随机点、顶点、边中点及边两侧；KEEP_IN/KEEP_OUT 均做差分，阈值 2e-5m。
@@ -58,17 +58,20 @@
 - 32 组动态 track 属性测试扩展：在有效 PASS 基线上分别破坏速度不确定度、预览 offset、map time_epoch、track sample timestamp，必须 fail-closed。
 - DFS 栈保护测试明确断言 29 项容量、最大深度 5、workspace≤512B，并保留前后 canary。
 
-以上为新增测试源码，待新 Head CI 执行。
+以上用例已在 Host、ASan/UBSan 与 Cortex-M7 编译工作流通过，详见最新证据。
 
 ## 最新证据
 
-- CI：[Host validation #405](https://github.com/hujunjie-hub/Flight/actions/runs/42650028230)
-- Commit：`5a728593fbd597b63c453b628598daa6428a481f`
+- CI：[Host validation #408](https://github.com/hujunjie-hub/Flight/actions/runs/42653409753)
+- Commit：`f3c9f79e50ab94b46a13ea04da4bc78e24caf608`
 - M4 Host：927 / 0 failures
-- M5 Host：8,837 / 0 failures
+- M5 Host：12,945 / 0 failures
 - M4/M5 Integration：1,000 / 0 failures
-- M5 ASan/UBSan：8,837 / 0 failures
+- M5 ASan/UBSan：12,945 / 0 failures
 - M4/M5 Integration ASan/UBSan：1,000 / 0 failures
+- Cortex-M7 compile/RAM and M4/M5 production-source compile：PASS
+- Source/time and Navigation/Control：PASS
+- All workflow jobs：success
 - Cortex-M7 compile and MPC RAM checks：PASS
 - Source/time and Navigation/Control host jobs：PASS
 - All workflow jobs：success
@@ -79,15 +82,14 @@ S06-053..063 已在新 Head 执行通过：reference/map time_epoch、directive 
 
 ## 下一批必须补齐
 
-1. 执行并关闭 S06-064..067 的 Host/ASan/UBSan/ARM CI。
-2. 将解析 oracle 扩展到随机凹多边形、边界点/共线点，并保存失败 seed 与最小反例。
-3. 对 Bernstein bounds、浮点外向舍入和连续距离下界建立独立参考实现/差分测试。
-4. 扩大多 track 时间戳、预测 lease、source identity 与相对运动组合 Fuzz。
+1. 对 Bernstein 转换与 position/velocity/acceleration 凸包界建立独立多项式参考实现，覆盖随机端点状态和子区间映射。
+2. 对外向舍入、距离下界、边界擦边与 epsilon 选择做独立数值审查；当前几何 oracle 只覆盖平面围栏距离，不构成形式化证明。
+3. 扩大多 track 时间戳、预测 lease、source identity、速度/加速度不确定度和相对运动组合 Fuzz，保存 seed 与最小反例。
 4. 动态障碍物加速度上界的传感器/目标类别标定与参数敏感性分析。
 5. DFS 深度与最大工作栈压力；两个独立预算（work-unit、cell-check）均已由可达用例验证。
 6. 随机/属性 fuzz，并对关键几何边界建立可复现最小反例。
 
-## 本轮追加用例（新 Head CI 待验证）
+## 本轮追加用例（S06-053..067 已在新 Head CI 通过）
 
 - 动态 track 样本年龄 500ms 等值与超 1us；预测租约 1s 等值与超 1us；地图预测时域不足拒绝。
 - KEEP_IN 围栏上下高度 margin 内外侧；精确下边界保守拒绝；零高度区间 INVALID。
