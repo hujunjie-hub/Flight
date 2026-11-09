@@ -343,7 +343,7 @@ static void test_mission_reference_and_token(void)
   CHECK(guidance_stop() == STATUS_OK);
 }
 
-static void test_mission_leg_beyond_short_duration(void)
+static void test_mission_leg_beyond_time_window_rejected(void)
 {
   Fx fx;
   CHECK(fx_init(&fx));
@@ -353,19 +353,13 @@ static void test_mission_leg_beyond_short_duration(void)
   fx.mission.mission.waypoints[0].position_ned_m[0] = 18.0f;
   fx.mission.mission.waypoints[0].speed_limit_mps = 2.0f;
   CHECK(fx_step(&fx) == STATUS_OK);
-  CHECK(fx.out.feasibility.feasible == 1u);
-  CHECK(fx.out.reference.points[23].point.position_ned_m[0] > 0.0f);
-  CHECK(fx.out.reference.points[23].point.velocity_ned_mps[0] <= 2.0f);
-  for (unsigned step = 0; step < 1800u; ++step) {
-    fx.now += 10000u;
-    if (fx_step(&fx) != STATUS_OK || !fx.out.feasibility.feasible) break;
-  }
-  CHECK(fx.out.feasibility.feasible == 1u);
-  CHECK(fx.out.reference.anchor.point.position_ned_m[0] >= 17.99f);
+  CHECK(fx.out.feasibility.feasible == 0u);
+  CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_REJECTED);
+  CHECK(fx.out.feasibility.violated_constraint_id == GUIDANCE_PLAN_CONSTRAINT_TIME);
+  CHECK(fx.out.reference.header.validity_flags == 0u);
   CHECK(guidance_stop() == STATUS_OK);
 }
-
-static void test_return_from_long_mission_leg(void)
+static void test_return_leg_beyond_time_window_rejected(void)
 {
   Fx fx;
   CHECK(fx_init(&fx));
@@ -374,16 +368,11 @@ static void test_return_from_long_mission_leg(void)
   fx.nav.core.position_ned_m[0] = 18.0f;
   fx.nav.core.position_ned_m[2] = -2.0f;
   CHECK(fx_step(&fx) == STATUS_OK);
-  CHECK(fx.out.feasibility.feasible == 1u);
-  for (unsigned step = 0; step < 1400u; ++step) {
-    fx.now += 10000u;
-    if (fx_step(&fx) != STATUS_OK || !fx.out.feasibility.feasible) break;
-  }
-  CHECK(fx.out.feasibility.feasible == 1u);
-  CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[0]) < 0.01f);
+  CHECK(fx.out.feasibility.feasible == 0u);
+  CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_REJECTED);
+  CHECK(fx.out.reference.header.validity_flags == 0u);
   CHECK(guidance_stop() == STATUS_OK);
 }
-
 static void test_hold_at_end_of_long_leg(void)
 {
   Fx fx;
@@ -848,6 +837,136 @@ static void test_pilot_yaw_integrates_and_altitude_centre_holds(void)
   CHECK(guidance_stop() == STATUS_OK);
 }
 
+
+static void test_minimum_jerk_single_segment_boundary(void)
+{
+  GuidanceMinimumJerkWorkspace workspace;
+  GuidanceQuintic output[GUIDANCE_MIN_JERK_MAX_SEGMENTS][3];
+  float positions[GUIDANCE_MIN_JERK_MAX_SEGMENTS + 1u][3] = {{0}};
+  float durations[GUIDANCE_MIN_JERK_MAX_SEGMENTS] = {0.6f};
+  float zero[3] = {0};
+  double initial_cost = 0.0, optimized_cost = 0.0;
+
+  positions[1][0] = 1.0f;
+  CHECK(guidance_minimum_jerk_optimize(positions, durations, 1u,
+      zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
+  CHECK(fabs(guidance_quintic_eval(&output[0][0], 0.0f, 0u)) < 1e-6);
+  CHECK(fabs(guidance_quintic_eval(&output[0][0], 0.6f, 0u) - 1.0f) < 1e-5);
+  CHECK(fabs(initial_cost - optimized_cost) < 1e-7);
+}
+
+static void test_minimum_jerk_two_segment_continuity_and_cost(void)
+{
+  GuidanceMinimumJerkWorkspace workspace;
+  GuidanceQuintic output[GUIDANCE_MIN_JERK_MAX_SEGMENTS][3];
+  float positions[GUIDANCE_MIN_JERK_MAX_SEGMENTS + 1u][3] = {{0}};
+  float durations[GUIDANCE_MIN_JERK_MAX_SEGMENTS] = {1.0f, 1.0f};
+  float zero[3] = {0};
+  double initial_cost = 0.0, optimized_cost = 0.0;
+  float left_velocity, right_velocity, left_acceleration, right_acceleration;
+
+  positions[1][0] = 1.0f;
+  positions[2][0] = 2.0f;
+  CHECK(guidance_minimum_jerk_optimize(positions, durations, 2u,
+      zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
+  CHECK(optimized_cost < initial_cost);
+  CHECK(fabs(initial_cost - 1440.0) < 1e-6);
+  CHECK(fabs(optimized_cost - 90.0) < 1e-6);
+
+  CHECK(fabs(guidance_quintic_eval(&output[0][0], 1.0f, 0u) - 1.0f) < 1e-5);
+  CHECK(fabs(guidance_quintic_eval(&output[1][0], 0.0f, 0u) - 1.0f) < 1e-5);
+  left_velocity = guidance_quintic_eval(&output[0][0], 1.0f, 1u);
+  right_velocity = guidance_quintic_eval(&output[1][0], 0.0f, 1u);
+  left_acceleration = guidance_quintic_eval(&output[0][0], 1.0f, 2u);
+  right_acceleration = guidance_quintic_eval(&output[1][0], 0.0f, 2u);
+  CHECK(fabsf(left_velocity - right_velocity) < 1e-5f);
+  CHECK(fabsf(left_acceleration - right_acceleration) < 1e-4f);
+  CHECK(left_velocity > 1.8f && left_velocity < 1.95f);
+}
+
+static void test_minimum_jerk_nonuniform_multiaxis(void)
+{
+  GuidanceMinimumJerkWorkspace workspace;
+  GuidanceQuintic output[GUIDANCE_MIN_JERK_MAX_SEGMENTS][3];
+  float positions[GUIDANCE_MIN_JERK_MAX_SEGMENTS + 1u][3] = {{0}};
+  float durations[GUIDANCE_MIN_JERK_MAX_SEGMENTS] = {0.4f, 0.8f};
+  float zero[3] = {0};
+  double initial_cost = 0.0, optimized_cost = 0.0;
+
+  positions[1][0] = 0.5f; positions[2][0] = 2.0f;
+  positions[1][1] = 0.2f; positions[2][1] = 0.4f;
+  positions[1][2] = -0.1f; positions[2][2] = -0.2f;
+  CHECK(guidance_minimum_jerk_optimize(positions, durations, 2u,
+      zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
+  CHECK(isfinite(initial_cost) && isfinite(optimized_cost));
+  CHECK(optimized_cost < initial_cost);
+  for (unsigned axis = 0u; axis < 3u; ++axis) {
+    CHECK(fabs(guidance_quintic_eval(&output[0][axis], 0.4f, 0u) -
+               positions[1][axis]) < 2e-5);
+    CHECK(fabs(guidance_quintic_eval(&output[1][axis], 0.0f, 0u) -
+               positions[1][axis]) < 2e-5);
+    CHECK(fabs(guidance_quintic_eval(&output[0][axis], 0.4f, 1u) -
+               guidance_quintic_eval(&output[1][axis], 0.0f, 1u)) < 2e-4);
+    CHECK(fabs(guidance_quintic_eval(&output[0][axis], 0.4f, 2u) -
+               guidance_quintic_eval(&output[1][axis], 0.0f, 2u)) < 2e-3);
+  }
+}
+
+static void test_minimum_jerk_eight_segments_deterministic(void)
+{
+  GuidanceMinimumJerkWorkspace workspace_a, workspace_b;
+  GuidanceQuintic output_a[GUIDANCE_MIN_JERK_MAX_SEGMENTS][3];
+  GuidanceQuintic output_b[GUIDANCE_MIN_JERK_MAX_SEGMENTS][3];
+  float positions[GUIDANCE_MIN_JERK_MAX_SEGMENTS + 1u][3] = {{0}};
+  float durations[GUIDANCE_MIN_JERK_MAX_SEGMENTS];
+  float zero[3] = {0};
+  double initial_a = 0.0, optimized_a = 0.0, initial_b = 0.0, optimized_b = 0.0;
+
+  for (unsigned i = 0u; i < GUIDANCE_MIN_JERK_MAX_SEGMENTS; ++i) {
+    durations[i] = 0.2f;
+    positions[i + 1u][0] = 0.1f * (float)(i + 1u);
+    positions[i + 1u][1] = 0.02f * (float)((i + 1u) % 3u);
+    positions[i + 1u][2] = -0.01f * (float)(i + 1u);
+  }
+  CHECK(guidance_minimum_jerk_optimize(positions, durations, 8u,
+      zero, zero, zero, zero, &workspace_a, output_a, &initial_a, &optimized_a));
+  CHECK(guidance_minimum_jerk_optimize(positions, durations, 8u,
+      zero, zero, zero, zero, &workspace_b, output_b, &initial_b, &optimized_b));
+  CHECK(memcmp(output_a, output_b, sizeof(output_a)) == 0);
+  CHECK(initial_a == initial_b && optimized_a == optimized_b);
+  CHECK(optimized_a < initial_a);
+}
+
+static void test_minimum_jerk_rejects_invalid_inputs_atomically(void)
+{
+  GuidanceMinimumJerkWorkspace workspace;
+  GuidanceQuintic output[GUIDANCE_MIN_JERK_MAX_SEGMENTS][3];
+  float positions[GUIDANCE_MIN_JERK_MAX_SEGMENTS + 1u][3] = {{0}};
+  float durations[GUIDANCE_MIN_JERK_MAX_SEGMENTS] = {0.2f, 0.2f, 0.2f, 0.2f,
+      0.2f, 0.2f, 0.2f, 0.2f};
+  float zero[3] = {0};
+  double initial_cost = 1.0, optimized_cost = 1.0;
+
+  memset(output, 0xA5, sizeof(output));
+  CHECK(!guidance_minimum_jerk_optimize(positions, durations, 0u,
+      zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
+  CHECK(output[0][0].c[0] == 0.0 && initial_cost == 0.0 && optimized_cost == 0.0);
+
+  durations[0] = 0.3f;
+  CHECK(!guidance_minimum_jerk_optimize(positions, durations, 2u,
+      zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
+  durations[0] = 0.2f;
+  for (unsigned i = 0u; i < 8u; ++i) durations[i] = 0.8f;
+  CHECK(!guidance_minimum_jerk_optimize(positions, durations, 8u,
+      zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
+
+  durations[0] = 0.2f;
+  positions[1][0] = NAN;
+  CHECK(!guidance_minimum_jerk_optimize(positions, durations, 1u,
+      zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
+  CHECK(output[0][0].c[0] == 0.0);
+}
+
 int main(void)
 {
   struct {
@@ -858,8 +977,8 @@ int main(void)
     {"landing_alignment_and_speed", test_landing_aligns_and_limits_final_descent},
     {"trajectory_handoff_acceleration", test_trajectory_handoff_uses_active_reference_acceleration},
     {"mission_reference_token", test_mission_reference_and_token},
-    {"mission_leg_beyond_short_duration", test_mission_leg_beyond_short_duration},
-    {"return_from_long_mission_leg", test_return_from_long_mission_leg},
+    {"mission_leg_time_window_reject", test_mission_leg_beyond_time_window_rejected},
+    {"return_time_window_reject", test_return_leg_beyond_time_window_rejected},
     {"hold_at_end_of_long_leg", test_hold_at_end_of_long_leg},
     {"reference_epoch_rotate", test_reference_epoch_stable_and_rotates},
     {"permit_activation", test_permit_matching_activates},
@@ -879,6 +998,11 @@ int main(void)
     {"consumed_speed_spike_thrust", test_consumed_curve_speed_spike_and_thrust},
     {"bernstein_analytic_bounds", test_bernstein_bounds_cover_analytic_extrema},
     {"pilot_yaw_altitude_hold", test_pilot_yaw_integrates_and_altitude_centre_holds},
+    {"minimum_jerk_single_segment", test_minimum_jerk_single_segment_boundary},
+    {"minimum_jerk_two_segment", test_minimum_jerk_two_segment_continuity_and_cost},
+    {"minimum_jerk_nonuniform_multiaxis", test_minimum_jerk_nonuniform_multiaxis},
+    {"minimum_jerk_eight_segments", test_minimum_jerk_eight_segments_deterministic},
+    {"minimum_jerk_invalid_inputs", test_minimum_jerk_rejects_invalid_inputs_atomically},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
