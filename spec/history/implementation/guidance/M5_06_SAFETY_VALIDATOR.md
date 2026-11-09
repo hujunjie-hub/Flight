@@ -22,16 +22,18 @@
 
 ## 最新 Host/SIL 证据
 
-- 最新新增边界测试首次运行 `42648938161`：Source/time、Navigation/Control、M4 Host、Cortex-M7 编译均通过；M5 Host 因本轮新增围栏/属性 Fuzz/极值测试夹具设计问题失败，Integration 与 ASan/UBSan 因 M5 Host 失败而被跳过。修正提交后的 CI 必须重新验证。
+- 新增边界用例首次 CI 暴露 fixture 问题，修正后由 `42650028230` 完整复验通过。
 
-- GitHub Actions：[Host validation latest](https://github.com/hujunjie-hub/Flight/actions/runs/42638931948)
-- Commit：`c35e6497e483ff2c0925612786d4ca8eb6acb851`
+- GitHub Actions：[Host validation #405](https://github.com/hujunjie-hub/Flight/actions/runs/42650028230)
+- Commit：`5a728593fbd597b63c453b628598daa6428a481f`
 - M4 Host：927 checks / 0 failures
-- M5 Host：8,458 checks / 0 failures
+- M5 Host：8,837 checks / 0 failures
 - M4/M5 Integration：1,000 checks / 0 failures
-- M5 ASan/UBSan：8,458 checks / 0 failures
+- M5 ASan/UBSan：8,837 checks / 0 failures
 - M4/M5 Integration ASan/UBSan：1,000 checks / 0 failures
 - Cortex-M7 编译及 MPC RAM 检查：PASS
+- Source/time、Navigation/Control：PASS
+- All workflow jobs：success
 - 导航/控制、源码布局和时间服务回归：PASS
 
 ## 产品参数要求
@@ -42,11 +44,12 @@ response_delay_us 必须覆盖感知数据年龄、验证/调度延迟和控制/
 
 ## 本轮追加边界测试（新 Head CI 待验证）
 
-新增动态时间边界、围栏上下高度 margin/退化高度、uint64 proof horizon 溢出、有限极大动态不确定度数值溢出，以及固定 seed 32 组属性测试。首轮 CI 已暴露测试夹具问题：围栏高度测试需要随高度重置地图中心以满足 map readiness；随机轨迹须保持在 map readiness 半径内；已修正并等待新 Head CI 复验。具体见验证矩阵 S06-056..063。
+新增动态时间边界、围栏上下高度 margin/退化高度、uint64 proof horizon 溢出、有限极大动态不确定度数值溢出，以及固定 seed 32 组属性测试。首轮 CI 暴露的地图中心 fixture 问题已修复，S06-053..063 在 run `42650028230` 全部通过。具体见验证矩阵。
 
 ## 未完成项
 
-1. 执行并关闭新增 S06-053..063 的 Host/ASan/UBSan/ARM CI；继续扩大动态 track 与随机多边形组合 Fuzz，并做独立几何差分验证。
+1. 扩大随机多边形与动态 track 组合 Fuzz，并做独立几何差分验证；当前 32 组常量轨迹属性测试覆盖有限。
+2. 独立复核 Bernstein 变换、浮点外向舍入与连续几何距离下界；当前仍不是形式化证明。
 2. 对动态加速度上界开展更多参数敏感性分析；完成边界 fuzz。
 3. 独立复核 Bernstein 变换、浮点舍入误差、几何距离下界和所有连续性证明；当前不能宣称形式化证明。
 4. M5-07 接入 M5-05 candidate、M5-06 result、FMS Permit 和 M6 消费端，保证候选无法绕过验证器。

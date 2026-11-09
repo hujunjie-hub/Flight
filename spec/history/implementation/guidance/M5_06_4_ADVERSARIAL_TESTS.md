@@ -1,6 +1,6 @@
 # M5-06.4 对抗性安全验证与边界测试
 
-状态：**本轮 Host/SIL 对抗性测试通过；M5-06 整体仍未验收。**
+状态：**新增边界用例已通过 Host/SIL、ASan/UBSan 与 Cortex-M7 编译回归；M5-06 整体仍未验收。**
 
 ## 目的
 
@@ -51,28 +51,27 @@
 
 ## 最新证据
 
-- CI：[最新 Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42638931948)
-- Commit：`c35e6497e483ff2c0925612786d4ca8eb6acb851`
+- CI：[Host validation #405](https://github.com/hujunjie-hub/Flight/actions/runs/42650028230)
+- Commit：`5a728593fbd597b63c453b628598daa6428a481f`
 - M4 Host：927 / 0 failures
-- M5 Host：8,458 / 0 failures
+- M5 Host：8,837 / 0 failures
 - M4/M5 Integration：1,000 / 0 failures
-- M5 ASan/UBSan：8,458 / 0 failures
+- M5 ASan/UBSan：8,837 / 0 failures
 - M4/M5 Integration ASan/UBSan：1,000 / 0 failures
 - Cortex-M7 compile and MPC RAM checks：PASS
-- 全部 workflow jobs：success
+- Source/time and Navigation/Control host jobs：PASS
+- All workflow jobs：success
 
-## 本轮追加测试源（新 Head CI 待验证）
+## 本轮新增测试结果
 
-新增 MotionReference time_epoch、LocalMap time_epoch、Directive frame_id 三个失配用例，均要求 INVALID 且 passed=0。测试源码已登记；新 Head 的 Host、ASan/UBSan 结果尚未取得。
+S06-053..063 已在新 Head 执行通过：reference/map time_epoch、directive frame、动态 sample age/预测租约、地图预测时域、围栏高度边界/退化高度、uint64 proof horizon 溢出、有限极值计算溢出及固定 seed 32 组属性测试。首轮 fixture 缺陷已修正；以上结果仅代表 Host/SIL 与 Cortex-M7 编译检查，不是 H723 实机避障放行。
 
 ## 下一批必须补齐
 
-1. 工作栈容量压力与最大细分树边界用例（DFS work-unit 256 和 cell-check 8192 两个预算均已覆盖）。
-
-1. 导航及围栏 frame/origin/state epoch 交叉组合；当前已覆盖导航三项独立失配与围栏 origin 失配。
-2. 围栏重复顶点、退化边、边界擦边和垂直高度边界。
-3. 地图外边界、障碍物膨胀临界值和 cell 状态组合。
-4. 动态 track 非有限速度、零半径、最大预测时域边界及时间戳整数极值。
+1. 随机凸/凹多边形与动态 track 的组合 Fuzz，保存 seed 与最小反例。
+2. 独立几何参考实现/差分测试，复核 fence clearance、Bernstein bounds、浮点外向舍入和连续距离下界。
+3. 更大规模的动态 track 状态/时间戳组合属性测试。
+4. 动态障碍物加速度上界的传感器/目标类别标定与参数敏感性分析。
 5. DFS 深度与最大工作栈压力；两个独立预算（work-unit、cell-check）均已由可达用例验证。
 6. 随机/属性 fuzz，并对关键几何边界建立可复现最小反例。
 
