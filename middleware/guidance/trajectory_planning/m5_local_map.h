@@ -33,7 +33,7 @@ typedef enum {
 typedef struct {
   int8_t log_odds;
   uint8_t state;
-  uint16_t source_mask;
+  uint16_t source_mask; /* folded diagnostic buckets; never used as source identity */
   uint32_t last_update_ms;
 } M5MapCell;
 
