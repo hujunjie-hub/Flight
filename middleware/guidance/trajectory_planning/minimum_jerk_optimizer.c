@@ -9,13 +9,13 @@
  * are fixed; only internal knot velocity/acceleration are optimized. The normal
  * matrix is block-tridiagonal (bandwidth 3) and solved by bounded Cholesky.
  */
+#include "guidance_update/guidance_internal.h"
+
 #if defined(FLIGHT_M5_HOST_PLANNER)
 
 #include <float.h>
 #include <math.h>
 #include <string.h>
-
-#include "guidance_update/guidance_internal.h"
 
 static uint8_t solve_coefficients(double p0, double v0, double a0,
                                   double p1, double v1, double a1,
