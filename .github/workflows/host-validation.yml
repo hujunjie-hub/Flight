@@ -37,11 +37,7 @@ jobs:
         run: python tests/algorithms/test_source_lock.py
 
       - name: Build time-service host test
-        run: |
-          gcc -std=c99 -O2 -Wall -Wextra -Werror \
-            -Imiddleware/contracts -Isensor_device/time_base \
-            sensor_device/time_base/systime.c tests/time/test_time_service.c \
-            -o /tmp/test_time_service
+        run: gcc -std=c99 -O2 -Wall -Wextra -Werror -Imiddleware/contracts -Isensor_device/time_base sensor_device/time_base/systime.c tests/time/test_time_service.c -o /tmp/test_time_service
 
       - name: Run time-service host test
         run: /tmp/test_time_service
@@ -66,6 +62,16 @@ jobs:
       - name: Compile and inspect Cortex-M7 objects
         run: python tests/algorithms/run_tests.py --target arm
 
+      - name: Compile M4/M5 production sources for Cortex-M7
+        run: bash tests/guidance/arm_build_check.sh
+
+      - name: Upload M5 ARM compile evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m5-cortex-m7-compile
+          path: build/m5_arm/
+
   algorithm-host:
     name: Navigation and control host tests
     runs-on: ubuntu-latest
@@ -83,3 +89,54 @@ jobs:
 
       - name: Run algorithm and M3 bridge tests
         run: python tests/algorithms/run_tests.py --target host
+
+  m4-m5-regression:
+    name: M4/M5 host, integration and sanitizer regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Prepare evidence directory
+        run: mkdir -p build/ci/m4-m5
+
+      - name: Run M4 host regression
+        run: |
+          set -o pipefail
+          bash tests/flight_management/run_host_tests.sh | tee build/ci/m4-m5/m4_host.log
+
+      - name: Run M5 host regression
+        run: |
+          set -o pipefail
+          bash tests/guidance/run_host_tests.sh | tee build/ci/m4-m5/m5_host.log
+
+      - name: Run M4/M5 integration regression
+        run: |
+          set -o pipefail
+          bash tests/guidance/run_integration_tests.sh | tee build/ci/m4-m5/m4_m5_integration.log
+
+      - name: Run M5 AddressSanitizer and UndefinedBehaviorSanitizer
+        env:
+          EXTRA_CFLAGS: "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+        run: |
+          set -o pipefail
+          bash tests/guidance/run_host_tests.sh | tee build/ci/m4-m5/m5_sanitizer.log
+
+      - name: Run M4/M5 integration sanitizers
+        env:
+          EXTRA_CFLAGS: "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+        run: |
+          set -o pipefail
+          bash tests/guidance/run_integration_tests.sh | tee build/ci/m4-m5/m4_m5_sanitizer.log
+
+      - name: Upload M4/M5 regression evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m4-m5-host-regression
+          path: |
+            build/ci/m4-m5/
+            build/m4_host/
+            build/m5_host/
+            build/m4_m5_host/
