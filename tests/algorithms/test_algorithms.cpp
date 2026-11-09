@@ -395,6 +395,18 @@ static void test_mpc_axis_and_failure_regressions() {
   uint16_t invalid_mode = 0;
   const Status validation_status = controller_validate_input(
       &invalid_reference.in, &invalid_epoch, &invalid_mode);
+  for (unsigned sample_index = 0; sample_index < 20; ++sample_index) {
+    ProductMotionPoint sampled{};
+    const uint64_t sample_time = invalid_reference.in.control_time_us +
+        (sample_index + 1u) * 20000u +
+        static_cast<uint64_t>(m6.config.payload.actuation_preview_delay_s * 1e6f);
+    const Status sample_status =
+        control_sample_reference(&invalid_reference.ref, sample_time, &sampled);
+    if (sample_status != STATUS_OK)
+      std::printf("MPC horizon sample index=%u status=%u time=%llu\\n",
+                  sample_index, static_cast<unsigned>(sample_status),
+                  static_cast<unsigned long long>(sample_time));
+  }
   const Status invalid_status = control_outer_update(&invalid_reference.in);
   if (invalid_status != STATUS_NUMERIC_ERROR) {
     ProductMotionPoint sampled{};
