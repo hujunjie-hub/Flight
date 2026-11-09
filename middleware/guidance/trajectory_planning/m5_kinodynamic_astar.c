@@ -392,15 +392,16 @@ static uint8_t make_edge(const M5AstarRequest *r, const M5AstarNode *node,
 }
 
 static uint8_t dynamic_track_clear(const M5AstarRequest *r, const M5DynamicTrack *track,
-                                   const GuidanceQuintic q[4], float t0, float t1)
+                                   const GuidanceQuintic q[4], float curve_t0,
+                                   float curve_t1, float elapsed_start_s)
 {
   float lo[3], hi[3], center[3], distance2 = 0.0f, speed2 = 0.0f;
   float dt_mid, half_dt, radius;
   uint64_t abs_start, abs_end, abs_mid;
   unsigned axis;
   if (track->id == 0u) return 1u;
-  abs_start = r->evaluation_time_us + (uint64_t)(t0 * 1e6f);
-  abs_end = r->evaluation_time_us + (uint64_t)(t1 * 1e6f);
+  abs_start = r->evaluation_time_us + (uint64_t)((elapsed_start_s + curve_t0) * 1e6f);
+  abs_end = r->evaluation_time_us + (uint64_t)((elapsed_start_s + curve_t1) * 1e6f);
   if (abs_end > track->expires_us ||
       abs_end < track->sample_us ||
       abs_end - track->sample_us > r->map->max_dynamic_prediction_us) return 0u;
@@ -414,7 +415,7 @@ static uint8_t dynamic_track_clear(const M5AstarRequest *r, const M5DynamicTrack
     float v = track->velocity_ned_mps[axis];
     center[axis] = track->position_ned_m[axis] + v * dt_mid;
     speed2 += v * v;
-    if (!guidance_quintic_bounds(&q[axis], t0, t1, 0u, &lo[axis], &hi[axis]))
+    if (!guidance_quintic_bounds(&q[axis], curve_t0, curve_t1, 0u, &lo[axis], &hi[axis]))
       return 0u;
     if (center[axis] < lo[axis]) {
       float d = lo[axis] - center[axis];
@@ -481,7 +482,7 @@ static int edge_map_clear(const M5AstarRequest *r, const GuidanceQuintic q[4],
     }
     for (track_id = 0u; track_id < M5_MAP_MAX_TRACKS; ++track_id)
       if (!dynamic_track_clear(r, &r->map->tracks[track_id], q,
-            edge_start_s + t0, edge_start_s + t1)) return 0;
+            t0, t1, edge_start_s)) return 0;
   }
   return 1;
 }
@@ -510,7 +511,8 @@ static M5PlannerResult validate_request(const M5AstarRequest *r)
       r->terminal_speed_max_mps < 0.0f || !isfinite(r->yaw_tolerance_rad) ||
       r->yaw_tolerance_rad < 0.0f || r->yaw_tolerance_rad > M5_ASTAR_PI)
     return M5_PLANNER_INVALID_INPUT;
-  if (r->navigation->header.message_type != MSG_NAVIGATION_SNAPSHOT ||
+  if (r->evaluation_time_us > UINT64_MAX - GUIDANCE_MAX_DURATION_US ||
+      r->navigation->header.message_type != MSG_NAVIGATION_SNAPSHOT ||
       r->navigation->header.profile_id != PRODUCT_PROFILE_ID ||
       r->navigation->header.boot_id == 0u ||
       r->navigation->header.time_epoch == 0u ||
@@ -526,6 +528,12 @@ static M5PlannerResult validate_request(const M5AstarRequest *r)
       r->guidance_config->payload.max_dynamic_prediction_us <
           M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US ||
       r->map->max_dynamic_prediction_us < M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US ||
+      !isfinite(r->guidance_config->payload.vehicle_radius_m) ||
+      r->guidance_config->payload.vehicle_radius_m <= 0.0f ||
+      !isfinite(r->guidance_config->payload.clearance_margin_m) ||
+      r->guidance_config->payload.clearance_margin_m < 0.0f ||
+      !isfinite(r->guidance_config->payload.uncertainty_inflation_factor) ||
+      r->guidance_config->payload.uncertainty_inflation_factor < 0.0f ||
       fabsf(r->map->vehicle_radius_m - r->guidance_config->payload.vehicle_radius_m) > 1e-5f ||
       fabsf(r->map->clearance_margin_m - r->guidance_config->payload.clearance_margin_m) > 1e-5f ||
       fabsf(r->map->uncertainty_inflation_factor -
@@ -689,7 +697,10 @@ M5PlannerResult m5_kinodynamic_astar_plan(const M5AstarRequest *r,
   uint64_t last_now;
   const M5KinodynamicPrimitive *primitives;
   if (path != NULL) memset(path, 0, sizeof(*path));
-  if (stats != NULL) memset(stats, 0, sizeof(*stats));
+  if (stats != NULL) {
+    memset(stats, 0, sizeof(*stats));
+    stats->goal_node_id = M5_ASTAR_EMPTY_NODE;
+  }
   if (w == NULL || path == NULL || stats == NULL) return M5_PLANNER_INVALID_INPUT;
   result = validate_request(r);
   if (result != M5_PLANNER_OK) {
@@ -713,7 +724,7 @@ M5PlannerResult m5_kinodynamic_astar_plan(const M5AstarRequest *r,
     return M5_PLANNER_OUT_OF_RANGE;
   }
   (void)nearest_velocity_bin(r->start_velocity_ned_mps,
-                             (uint8_t *)&start_velocity_bin, &velocity_lattice);
+                             &start_velocity_bin, &velocity_lattice);
   yaw_bin = nearest_yaw_bin(r->start_yaw_rad);
   root_key = m5_kinodynamic_encode_key(root_voxel, (uint8_t)start_velocity_bin,
                                        yaw_bin, 0u);
