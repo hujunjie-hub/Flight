@@ -13,6 +13,7 @@
 #include "guidance_update/guidance_internal.h"
 #include "trajectory_planning/m5_local_map.h"
 #include "trajectory_planning/m5_kinodynamic_astar.h"
+#include "trajectory_planning/m5_path_smoother.h"
 
 #define T_BOOT 0x1122334455667788ull
 #define T_EPOCH 3u
@@ -1452,6 +1453,81 @@ static void planner_fx_init(PlannerFx *fx, uint64_t now_us)
   fx->request.clock_context = &fx->clock_us;
 }
 
+static void smoother_fx_path_init(PlannerFx *fx, uint64_t now_us)
+{
+  planner_fx_init(fx, now_us);
+  fx->path.segment_count = 2u;
+  fx->path.map_revision = fx->map.map_revision;
+  fx->path.total_cost_s = 0.8f;
+  fx->path.offset_us[0] = 0u;
+  fx->path.offset_us[1] = 400000u;
+  fx->path.offset_us[2] = 800000u;
+  fx->path.position_ned_m[0][0] = -1.75f;
+  fx->path.position_ned_m[1][0] = -1.35f;
+  fx->path.position_ned_m[2][0] = -0.95f;
+  for (unsigned knot = 0u; knot < 3u; ++knot) {
+    fx->path.position_ned_m[knot][1] = -1.75f;
+    fx->path.position_ned_m[knot][2] = -1.75f;
+    fx->path.velocity_ned_mps[knot][0] = 1.0f;
+    fx->path.velocity_ned_mps[knot][1] = 0.0f;
+    fx->path.velocity_ned_mps[knot][2] = 0.0f;
+    fx->path.acceleration_ned_mps2[knot][0] = 0.0f;
+    fx->path.acceleration_ned_mps2[knot][1] = 0.0f;
+    fx->path.acceleration_ned_mps2[knot][2] = 0.0f;
+    fx->path.yaw_rad[knot] = 0.0f;
+    fx->path.yaw_rate_radps[knot] = 0.0f;
+  }
+  fx->path.primitive_index[0] = 0u;
+  fx->path.primitive_index[1] = 1u;
+}
+
+static void test_m5_smoother_minimum_jerk_continuity(void)
+{
+  PlannerFx fx;
+  GuidanceMinimumJerkWorkspace workspace;
+  M5SmoothedTrajectory output;
+  const uint64_t now = 9500000u;
+  smoother_fx_path_init(&fx, now);
+  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+      &workspace, &output) == M5_SMOOTHER_OK);
+  CHECK(output.segment_count == 2u);
+  CHECK(output.fallback_used == 0u);
+  CHECK(output.map_revision == fx.map.map_revision);
+  CHECK(output.total_duration_us == 800000u);
+  CHECK(output.segment_duration_us[0] == 400000u);
+  CHECK(output.segment_duration_us[1] == 400000u);
+  CHECK(output.optimized_cost <= output.initial_cost + 1e-8);
+  CHECK(fabs(guidance_quintic_eval(&output.position[0][0], 0.0f, 0u) + 1.75f) < 1e-5);
+  CHECK(fabs(guidance_quintic_eval(&output.position[0][0], 0.4f, 0u) + 1.35f) < 1e-5);
+  CHECK(fabs(guidance_quintic_eval(&output.position[1][0], 0.0f, 0u) + 1.35f) < 1e-5);
+  CHECK(fabs(guidance_quintic_eval(&output.position[1][0], 0.4f, 0u) + 0.95f) < 1e-5);
+  CHECK(fabs(guidance_quintic_eval(&output.position[0][0], 0.4f, 1u) -
+             guidance_quintic_eval(&output.position[1][0], 0.0f, 1u)) < 1e-5);
+  CHECK(fabs(guidance_quintic_eval(&output.position[0][0], 0.4f, 2u) -
+             guidance_quintic_eval(&output.position[1][0], 0.0f, 2u)) < 1e-4);
+}
+
+static void test_m5_smoother_rejects_stale_and_invalid_path(void)
+{
+  PlannerFx fx;
+  GuidanceMinimumJerkWorkspace workspace;
+  M5SmoothedTrajectory output;
+  const uint64_t now = 9600000u;
+  smoother_fx_path_init(&fx, now);
+  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+      &workspace, &output) == M5_SMOOTHER_OK);
+  fx.map.map_revision++;
+  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+      &workspace, &output) == M5_SMOOTHER_INPUT_STALE);
+  CHECK(output.segment_count == 0u);
+
+  smoother_fx_path_init(&fx, now);
+  fx.path.offset_us[1] = 450000u;
+  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+      &workspace, &output) == M5_SMOOTHER_CAPACITY_EXCEEDED);
+  CHECK(output.segment_count == 0u);
+}
+
 static void test_m5_astar_finds_deterministic_one_edge_path(void)
 {
   PlannerFx fx;
@@ -1628,6 +1704,8 @@ int main(void)
     {"m5_map_epoch_reject", test_m5_map_epoch_reset_and_reject_source},
     {"m5_map_batch_fail_closed", test_m5_map_batch_validation_is_fail_closed},
     {"m5_astar_key_primitives", test_m5_kinodynamic_key_and_primitive_manifest},
+    {"m5_smoother_minimum_jerk_continuity", test_m5_smoother_minimum_jerk_continuity},
+    {"m5_smoother_stale_invalid", test_m5_smoother_rejects_stale_and_invalid_path},
     {"m5_astar_one_edge_deterministic", test_m5_astar_finds_deterministic_one_edge_path},
     {"m5_astar_rolling_world_coordinates", test_m5_astar_uses_rolling_world_coordinates},
     {"m5_astar_unknown_deadline", test_m5_astar_unknown_space_and_deadline_fail_closed},
