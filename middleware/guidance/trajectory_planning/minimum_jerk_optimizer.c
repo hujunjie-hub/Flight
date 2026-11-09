@@ -374,7 +374,7 @@ uint8_t guidance_minimum_jerk_optimize(
       double optimized_axis = axis_total_cost(knot_position, segment_duration_s,
           segment_count, axis, workspace);
       double tolerance = 1e-9 * fmax(1.0, axis_initial);
-      if (!isfinite(optimized_axis) || optimized_axis > total_initial + tolerance) {
+      if (!isfinite(optimized_axis) || optimized_axis > axis_initial + tolerance) {
         return 0u;
       }
       axis_optimized = optimized_axis;
