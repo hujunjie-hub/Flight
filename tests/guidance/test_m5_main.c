@@ -17,6 +17,7 @@
 #include "trajectory_planning/m5_path_smoother.h"
 #include "trajectory_planning/m5_time_scaler.h"
 #include "trajectory_planning/m5_trajectory_safety.h"
+#include "m5_trajectory_safety_test_api.h"
 
 #define T_BOOT 0x1122334455667788ull
 #define T_EPOCH 3u
@@ -2052,6 +2053,136 @@ static float safety_fuzz_signed_unit(uint32_t *state)
   return (float)scaled * 0.0004f;
 }
 
+static float safety_fuzz_unit(uint32_t *state)
+{
+  return (float)(safety_fuzz_next(state) % 10001u) * 0.0001f;
+}
+
+static float safety_fuzz_between(uint32_t *state, float low, float high)
+{
+  return low + (high - low) * safety_fuzz_unit(state);
+}
+
+static void safety_reference_quintic(
+    const float p0[3], const float v0[3], const float a0[3],
+    const float p1[3], const float v1[3], const float a1[3],
+    double duration, double time_s,
+    double position[3], double velocity[3], double acceleration[3])
+{
+  double s = time_s / duration;
+  double s2 = s * s, s3 = s2 * s, s4 = s3 * s, s5 = s4 * s;
+  double h[6] = {
+    1.0 - 10.0*s3 + 15.0*s4 - 6.0*s5,
+    s - 6.0*s3 + 8.0*s4 - 3.0*s5,
+    0.5*s2 - 1.5*s3 + 1.5*s4 - 0.5*s5,
+    10.0*s3 - 15.0*s4 + 6.0*s5,
+    -4.0*s3 + 7.0*s4 - 3.0*s5,
+    0.5*s3 - s4 + 0.5*s5
+  };
+  double dh[6] = {
+    -30.0*s2 + 60.0*s3 - 30.0*s4,
+    1.0 - 18.0*s2 + 32.0*s3 - 15.0*s4,
+    s - 4.5*s2 + 6.0*s3 - 2.5*s4,
+    30.0*s2 - 60.0*s3 + 30.0*s4,
+    -12.0*s2 + 28.0*s3 - 15.0*s4,
+    1.5*s2 - 4.0*s3 + 2.5*s4
+  };
+  double ddh[6] = {
+    -60.0*s + 180.0*s2 - 120.0*s3,
+    -36.0*s + 96.0*s2 - 60.0*s3,
+    1.0 - 9.0*s + 18.0*s2 - 10.0*s3,
+    60.0*s - 180.0*s2 + 120.0*s3,
+    -24.0*s + 84.0*s2 - 60.0*s3,
+    3.0*s - 12.0*s2 + 10.0*s3
+  };
+  unsigned axis;
+  for (axis = 0u; axis < 3u; ++axis) {
+    double terms[6] = {
+      p0[axis], duration * v0[axis],
+      duration * duration * a0[axis],
+      p1[axis], duration * v1[axis],
+      duration * duration * a1[axis]
+    };
+    double p = 0.0, v = 0.0, a = 0.0;
+    unsigned k;
+    for (k = 0u; k < 6u; ++k) {
+      p += terms[k] * h[k];
+      v += terms[k] * dh[k];
+      a += terms[k] * ddh[k];
+    }
+    position[axis] = p;
+    velocity[axis] = v / duration;
+    acceleration[axis] = a / (duration * duration);
+  }
+}
+
+static void test_m5_safety_bernstein_bounds_randomized(void)
+{
+  uint32_t seed = 0xB37A1155u;
+  unsigned trial;
+
+  for (trial = 0u; trial < 48u; ++trial) {
+    float p0[3], v0[3], a0[3], p1[3], v1[3], a1[3];
+    float position_low[3], position_high[3];
+    float speed_bound = 0.0f, acceleration_bound = 0.0f;
+    float duration = safety_fuzz_between(&seed, 0.08f, 1.5f);
+    float u0 = safety_fuzz_between(&seed, 0.0f, 0.75f);
+    float u1 = safety_fuzz_between(&seed, u0 + 0.05f, 1.0f);
+    unsigned axis, sample;
+
+    for (axis = 0u; axis < 3u; ++axis) {
+      p0[axis] = safety_fuzz_between(&seed, -2.0f, 2.0f);
+      p1[axis] = safety_fuzz_between(&seed, -2.0f, 2.0f);
+      v0[axis] = safety_fuzz_between(&seed, -3.0f, 3.0f);
+      v1[axis] = safety_fuzz_between(&seed, -3.0f, 3.0f);
+      a0[axis] = safety_fuzz_between(&seed, -8.0f, 8.0f);
+      a1[axis] = safety_fuzz_between(&seed, -8.0f, 8.0f);
+    }
+
+    CHECK(m5_trajectory_safety_test_curve_bounds(
+        p0, v0, a0, p1, v1, a1, duration, u0, u1,
+        position_low, position_high, &speed_bound, &acceleration_bound));
+
+    for (sample = 0u; sample <= 64u; ++sample) {
+      double fraction = (double)sample / 64.0;
+      double t = (double)duration *
+          ((double)u0 + ((double)u1 - (double)u0) * fraction);
+      double position[3], velocity[3], acceleration[3];
+      double speed2 = 0.0, acceleration2 = 0.0;
+      safety_reference_quintic(p0, v0, a0, p1, v1, a1,
+          (double)duration, t, position, velocity, acceleration);
+      for (axis = 0u; axis < 3u; ++axis) {
+        CHECK(position[axis] >= (double)position_low[axis] - 0.000002);
+        CHECK(position[axis] <= (double)position_high[axis] + 0.000002);
+        speed2 += velocity[axis] * velocity[axis];
+        acceleration2 += acceleration[axis] * acceleration[axis];
+      }
+      CHECK(sqrt(speed2) <= (double)speed_bound + 0.0002);
+      CHECK(sqrt(acceleration2) <= (double)acceleration_bound + 0.002);
+    }
+  }
+}
+
+static void test_m5_safety_bernstein_bounds_invalid_inputs(void)
+{
+  const float p0[3] = {0.0f, 0.0f, 0.0f};
+  const float v0[3] = {0.0f, 0.0f, 0.0f};
+  const float a0[3] = {0.0f, 0.0f, 0.0f};
+  float low[3], high[3], speed, acceleration;
+  CHECK(!m5_trajectory_safety_test_curve_bounds(
+      p0, v0, a0, p0, v0, a0, 1.0f, 0.5f, 0.5f,
+      low, high, &speed, &acceleration));
+  CHECK(!m5_trajectory_safety_test_curve_bounds(
+      p0, v0, a0, p0, v0, a0, 0.0f, 0.0f, 1.0f,
+      low, high, &speed, &acceleration));
+  CHECK(!m5_trajectory_safety_test_curve_bounds(
+      p0, v0, a0, p0, v0, a0, 1.0f, -0.1f, 0.5f,
+      low, high, &speed, &acceleration));
+  CHECK(!m5_trajectory_safety_test_curve_bounds(
+      p0, v0, a0, p0, v0, a0, 1.0f, 0.0f, 1.1f,
+      low, high, &speed, &acceleration));
+}
+
 static void test_m5_safety_dynamic_prediction_time_boundaries(void)
 {
   SafetyFx fx;
@@ -3565,6 +3696,8 @@ int main(void)
     {"m5_safety_geometry_clearance_reference", test_m5_safety_geometry_clearance_reference},
     {"m5_safety_random_polygon_dynamic_track_fuzz", test_m5_safety_random_polygon_dynamic_track_fuzz},
     {"m5_safety_geofence_adversarial_vertices", test_m5_safety_geofence_adversarial_vertices_rejected},
+    {"m5_safety_bernstein_bounds_randomized", test_m5_safety_bernstein_bounds_randomized},
+    {"m5_safety_bernstein_bounds_invalid", test_m5_safety_bernstein_bounds_invalid_inputs},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
