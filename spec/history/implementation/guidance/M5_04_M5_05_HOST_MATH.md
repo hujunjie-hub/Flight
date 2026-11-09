@@ -65,7 +65,7 @@
 
 ## 3. Host 回归覆盖
 
-`tests/guidance/test_m5_main.c` 当前包含 32 个命名场景。minimum-jerk 新增覆盖：
+`tests/guidance/test_m5_main.c` 当前包含 33 个命名场景。minimum-jerk 新增覆盖：
 
 - 单段边界条件；
 - 双段连续位置/速度/加速度及目标函数下降；
@@ -75,7 +75,7 @@
 - 三轴目标函数正确求和；
 - 非零起止速度/加速度边界。
 
-M5 时标回归包括超出 6.2 s 的 Mission/Return 拒绝。
+M5 时标回归包括超出 6.2 s 的 Mission/Return 拒绝，以及 1.25 倍时长增长越过上限时仍尝试最终 6.2 s 时间格。
 
 从仓库根目录执行：
 
