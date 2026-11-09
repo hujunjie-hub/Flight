@@ -1436,7 +1436,7 @@ uint8_t m5_trajectory_safety_test_curve_eval(
 {
   MotionReferencePoint start, end;
   M5SafetyBezier bezier;
-  float local_duration;
+  double local_duration;
   unsigned axis, i;
 
   if (start_position == NULL || start_velocity == NULL ||
@@ -1463,8 +1463,8 @@ uint8_t m5_trajectory_safety_test_curve_eval(
   }
   if (!build_curve(&start, &end, (double)duration_s,
                    (float)u0, (float)u1, &bezier)) return 0u;
-  local_duration = duration_s * (u1 - u0);
-  if (!(local_duration > 0.0f) || !isfinite(local_duration)) return 0u;
+  local_duration = (double)duration_s * ((double)u1 - (double)u0);
+  if (!(local_duration > 0.0) || !isfinite(local_duration)) return 0u;
 
   for (axis = 0u; axis < 3u; ++axis) {
     double velocity_control[5], acceleration_control[4];
