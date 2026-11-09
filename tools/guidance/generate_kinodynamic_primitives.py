@@ -42,7 +42,8 @@ def build_rows(spec: dict) -> list[tuple[str, int, int, int, float, float, int]]
         if kind in ("TRANSLATE", "CARDINAL_FAST", "VERTICAL"):
             speeds = group["speeds_mps"]
             for direction in group["dirs"]:
-                for speed_id, speed in enumerate(speeds):
+                for speed_index, speed in enumerate(speeds):
+                    speed_id = 2 if kind == "CARDINAL_FAST" else speed_index
                     for duration_id, duration in enumerate(durations):
                         rows.append((KINDS[kind], int(direction), speed_id, duration_id,
                                      float(speed), 0.0, int(duration)))
