@@ -14,6 +14,7 @@
 #include "trajectory_planning/m5_local_map.h"
 #include "trajectory_planning/m5_kinodynamic_astar.h"
 #include "trajectory_planning/m5_path_smoother.h"
+#include "trajectory_planning/m5_path_smoother.h"
 
 #define T_BOOT 0x1122334455667788ull
 #define T_EPOCH 3u
@@ -1656,6 +1657,95 @@ static void test_m5_astar_rejects_stale_map_and_obstacle_barrier(void)
 }
 
 
+
+static void test_m5_smoother_builds_single_edge_candidate(void)
+{
+  PlannerFx fx;
+  GuidanceMinimumJerkWorkspace workspace;
+  M5SmoothedTrajectory output;
+  const uint64_t now = 10000000u;
+  planner_fx_init(&fx, now);
+  CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
+      &fx.path, &fx.stats) == M5_PLANNER_OK);
+  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+      &workspace, &output) == M5_SMOOTHER_OK);
+  CHECK(output.segment_count == 1u);
+  CHECK(output.fallback_used == 0u);
+  CHECK(output.map_revision == fx.map.map_revision);
+  CHECK(output.total_duration_us == 400000u);
+  CHECK(output.segment_duration_us[0] == 400000u);
+  CHECK(isfinite(output.initial_cost) && isfinite(output.optimized_cost));
+  CHECK(output.optimized_cost <= output.initial_cost + 1e-6);
+  CHECK(fabsf(guidance_quintic_eval(&output.position[0][0], 0.0f, 0u) -
+              fx.path.position_ned_m[0][0]) < 1e-5f);
+  CHECK(fabsf(guidance_quintic_eval(&output.position[0][0], 0.4f, 0u) -
+              fx.path.position_ned_m[1][0]) < 1e-4f);
+  CHECK(quintic_finite(&output.yaw[0]));
+}
+
+static void test_m5_smoother_optimizes_two_segment_path_continuously(void)
+{
+  PlannerFx fx;
+  GuidanceMinimumJerkWorkspace workspace;
+  M5SmoothedTrajectory output;
+  const uint64_t now = 11000000u;
+  float left_velocity, right_velocity, left_acceleration, right_acceleration;
+  planner_fx_init(&fx, now);
+  memset(&fx.path, 0, sizeof(fx.path));
+  fx.path.segment_count = 2u;
+  fx.path.map_revision = fx.map.map_revision;
+  fx.path.total_cost_s = 0.8f;
+  fx.path.offset_us[1] = 400000u;
+  fx.path.offset_us[2] = 800000u;
+  fx.path.position_ned_m[0][0] = -1.75f;
+  fx.path.position_ned_m[1][0] = -1.25f;
+  fx.path.position_ned_m[2][0] = -0.75f;
+  fx.path.velocity_ned_mps[0][0] = 1.0f;
+  fx.path.velocity_ned_mps[1][0] = 0.5f;
+  fx.path.velocity_ned_mps[2][0] = 0.0f;
+  fx.path.primitive_index[0] = 1u;
+  fx.path.primitive_index[1] = 1u;
+  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+      &workspace, &output) == M5_SMOOTHER_OK);
+  CHECK(output.segment_count == 2u && output.fallback_used == 0u);
+  CHECK(output.total_duration_us == 800000u);
+  CHECK(output.optimized_cost < output.initial_cost);
+  CHECK(fabs(guidance_quintic_eval(&output.position[0][0], 0.4f, 0u) + 1.25) < 1e-5);
+  CHECK(fabs(guidance_quintic_eval(&output.position[1][0], 0.0f, 0u) + 1.25) < 1e-5);
+  left_velocity = guidance_quintic_eval(&output.position[0][0], 0.4f, 1u);
+  right_velocity = guidance_quintic_eval(&output.position[1][0], 0.0f, 1u);
+  left_acceleration = guidance_quintic_eval(&output.position[0][0], 0.4f, 2u);
+  right_acceleration = guidance_quintic_eval(&output.position[1][0], 0.0f, 2u);
+  CHECK(fabsf(left_velocity - right_velocity) < 1e-4f);
+  CHECK(fabsf(left_acceleration - right_acceleration) < 1e-3f);
+}
+
+static void test_m5_smoother_rejects_stale_and_mismatched_paths(void)
+{
+  PlannerFx fx;
+  GuidanceMinimumJerkWorkspace workspace;
+  M5SmoothedTrajectory output;
+  const uint64_t now = 12000000u;
+  planner_fx_init(&fx, now);
+  CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
+      &fx.path, &fx.stats) == M5_PLANNER_OK);
+  fx.map.map_revision++;
+  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+      &workspace, &output) == M5_SMOOTHER_INPUT_STALE);
+  CHECK(output.segment_count == 0u);
+  fx.map.map_revision = fx.path.map_revision;
+  fx.path.offset_us[1] += 200000u;
+  fx.path.total_cost_s += 0.2f;
+  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+      &workspace, &output) == M5_SMOOTHER_INVALID_INPUT);
+  CHECK(output.segment_count == 0u);
+  fx.path.segment_count = (uint8_t)(M5_SMOOTHER_MAX_SEGMENTS + 1u);
+  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+      &workspace, &output) == M5_SMOOTHER_CAPACITY_EXCEEDED);
+  CHECK(output.segment_count == 0u);
+}
+
+
 int main(void)
 {
   struct {
@@ -1711,6 +1801,9 @@ int main(void)
     {"m5_astar_unknown_deadline", test_m5_astar_unknown_space_and_deadline_fail_closed},
     {"m5_astar_future_stale_map", test_m5_astar_rejects_future_stale_map_cells},
     {"m5_astar_stale_obstacle_barrier", test_m5_astar_rejects_stale_map_and_obstacle_barrier},
+    {"m5_smoother_single_edge", test_m5_smoother_builds_single_edge_candidate},
+    {"m5_smoother_two_segment", test_m5_smoother_optimizes_two_segment_path_continuously},
+    {"m5_smoother_fail_closed", test_m5_smoother_rejects_stale_and_mismatched_paths},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
