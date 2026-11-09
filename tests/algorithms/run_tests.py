@@ -239,6 +239,41 @@ for target in targets:
         if not stack_match:
             raise SystemExit('Cannot determine the statically allocated MPC worker stack')
         worker_stack = int(stack_match.group(1))
+        stack_reports = sorted(objdir.rglob('*.su'))
+        if not stack_reports:
+            raise SystemExit('ARM compiler emitted no -fstack-usage reports')
+        stack_records = []
+        for report in stack_reports:
+            # The MPC worker executes the controller and the embedded OSQP
+            # solver. Other estimator/replay functions may use different task
+            # stacks, so scope this report to the MPC/control call path.
+            if not any(token in report.name for token in (
+                'mpc_solver', 'position_tracking', 'attitude_rate_control',
+                'control_backend',
+            )):
+                continue
+            for line in report.read_text(errors='replace').splitlines():
+                fields = line.rsplit('\\t', 2)
+                if len(fields) != 3:
+                    continue
+                try:
+                    frame_bytes = int(fields[1])
+                except ValueError:
+                    continue
+                stack_records.append((frame_bytes, fields[0], fields[2]))
+        if not stack_records:
+            raise SystemExit('No MPC/control stack-usage records were found')
+        max_frame, max_frame_function, max_frame_kind = max(
+            stack_records, key=lambda item: item[0]
+        )
+        if max_frame >= worker_stack:
+            raise SystemExit(
+                f'MPC function frame {max_frame} bytes exceeds worker stack '
+                f'budget {worker_stack} bytes: {max_frame_function}'
+            )
+        dynamic_frames = sum(
+            1 for _, _, kind in stack_records if kind.startswith('dynamic')
+        )
         results.update(
             arm_compile_link='PASS',
             mpc_static_ram_bytes=ram,  # Backwards-compatible report key.
@@ -246,6 +281,16 @@ for target in targets:
             mpc_static_ram_budget_bytes=32768,
             mpc_worker_stack_bytes=worker_stack,
             mpc_solver_plus_worker_stack_bytes=ram + worker_stack,
+            mpc_stack_usage_function_count=len(stack_records),
+            mpc_max_function_stack_bytes=max_frame,
+            mpc_max_function_stack_symbol=max_frame_function,
+            mpc_max_function_stack_kind=max_frame_kind,
+            mpc_dynamic_stack_function_count=dynamic_frames,
+        )
+        print(
+            f'MPC RAM: {ram} bytes; worker stack: {worker_stack} bytes; '
+            f'max MPC function frame: {max_frame} bytes '
+            f'({max_frame_function}, {max_frame_kind})'
         )
 
 (OUT / 'commands.json').write_text(json.dumps(commands, indent=2))
