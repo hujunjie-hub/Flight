@@ -247,7 +247,7 @@ static void update_track(M5LocalMap *map, const ProductObstacleObservation *o, i
   memset(track, 0, sizeof(*track));
   track->id = o->observation_id;
   track->source_id = o->sensor_instance_id;
-  track->flags = (uint16_t)(o->source_health == PRODUCT_OBS_SOURCE_DEGRADED ? 1u : 0u);
+  track->flags = (uint32_t)(o->source_health == PRODUCT_OBS_SOURCE_DEGRADED ? 1u : 0u);
   track->sample_us = o->header.timestamp_sample_us;
   track->expires_us = o->header.valid_until_us;
   if (track->expires_us - track->sample_us > map->max_dynamic_prediction_us)
