@@ -22,14 +22,14 @@
 
 ## 最新 Host/SIL 证据
 
-- 新增 S06-064..078 凹多边形、Bernstein、AABB 距离下界、动态相对扫掠界、严格 outward interval bounds、静态/动态端到端连续距离差分和预览接缝用例已在新 Head 完整通过。
+- 新增 S06-064..079 凹多边形、Bernstein、AABB 距离下界、动态相对扫掠界、严格 outward interval bounds、静态/动态端到端连续距离差分、预览接缝和全时域五次 Hermite 轨迹扫掠用例已在新 Head 完整通过。
 
-- GitHub Actions：[Host validation #433](https://github.com/hujunjie-hub/Flight/actions/runs/42718861676)
-- Docs HEAD：`595a87909b484c8c33b03c44f8d933dcff05b41f`；validated code commit：`d06920f254611732fe971d5f60bfeb6431b8d6f6`
+- GitHub Actions：[Host validation #438](https://github.com/hujunjie-hub/Flight/actions/runs/42720186326)
+- Validated code commit：`cfbb6b6b6c9ec484b83c5ab36a4b3e3da5050d2d`
 - M4 Host：927 checks / 0 failures
-- M5 Host：261,285 checks / 0 failures
+- M5 Host：261,669 checks / 0 failures
 - M4/M5 Integration：1,000 checks / 0 failures
-- M5 ASan/UBSan：261,285 checks / 0 failures
+- M5 ASan/UBSan：261,669 checks / 0 failures
 - M4/M5 Integration ASan/UBSan：1,000 checks / 0 failures
 - Cortex-M7 编译及 MPC RAM 检查：PASS
 - M4/M5 production-source Cortex-M7 compile：PASS
@@ -43,7 +43,7 @@ max_dynamic_obstacle_accel_mps2 是独立输入，必须由产品安全配置批
 
 response_delay_us 必须覆盖感知数据年龄、验证/调度延迟和控制/执行器响应延迟的批准上界。当前接口限制在 200ms 内，超过即拒绝；这不是实测响应时间。
 
-## 本轮追加边界测试（S06-053..078 已通过）
+## 本轮追加边界测试（S06-053..079 已通过）
 
 新增动态时间边界、围栏上下高度 margin/退化高度、uint64 proof horizon 溢出、有限极大动态不确定度数值溢出、32 组动态 track 属性测试、凹多边形 clearance oracle、16 组随机凹多边形 + 动态 track 联合测试、重复/回折顶点拒绝、256 组 Hermite→Bernstein 随机子区间严格 bounds 差分、1..8 track 多目标组合、2,048 组 point-to-AABB 距离下界 oracle、512 组动态相对运动扫掠上界测试，以及零曲线区间包含性。S06-053..078 已在 run `42718861676` 的 Host、ASan/UBSan 与 Cortex-M7 编译工作流通过。具体见验证矩阵。
 
@@ -57,7 +57,7 @@ response_delay_us 必须覆盖感知数据年龄、验证/调度延迟和控制/
 4. M5-07 接入 M5-05 candidate、M5-06 result、FMS Permit 和 M6 消费端，保证候选无法绕过验证器。
 5. H723 实机仍需真实障碍传感器、标定、WCET/RTA、RAM/栈、HIL 和逐级安全测试。
 
-## S06-074..078 新增连续碰撞差分
+## S06-074..079 新增连续碰撞差分
 
 - S06-074：64 组静态 voxel 线性扫掠（32 碰撞、32 安全近失），独立 AABB 距离 oracle。
 - S06-075：64 组动态恒速相对运动（32 碰撞、32 安全），解析最近接近时刻 oracle。

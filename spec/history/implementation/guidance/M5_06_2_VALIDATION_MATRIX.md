@@ -30,20 +30,21 @@
 | S06-076 | 64 组动态障碍物有界加速度差分；实际加速度≤0.45m/s²、批准测试上界0.5m/s²；每组257个时刻独立采样 | 32 组碰撞拒绝，32 组安全轨迹 PASS | Host + ASan/UBSan PASS；run 42718861676 |
 | S06-077 | 静态占用 voxel 位于相邻 20ms 预览区间接缝；高速轨迹触发自适应细分 | STATIC_COLLISION；工作量统计包含细分工作单元 | Host + ASan/UBSan PASS；run 42718861676 |
 | S06-078 | 动态障碍物分别在自适应细分内部及 20ms 预览接缝穿越车辆轨迹 | DYNAMIC_COLLISION；不得因区间分段漏检 | Host + ASan/UBSan PASS；run 42718861676 |
+| S06-079 | 64 组全时域五次 Hermite 轨迹，按 24 个消费者 knot 构造；独立 Hermite 基函数 oracle 每组 1,025 个时刻检查占用 AABB；32 碰撞、32 安全近失 | 碰撞返回 STATIC_COLLISION；安全组返回 PASS，独立 AABB 净空 >0.70m | Host + ASan/UBSan PASS；run 42720186326 |
 
 ## 最新 CI 证据
 
 - Workflow：Host validation
-- Run：[Host validation #433](https://github.com/hujunjie-hub/Flight/actions/runs/42718861676)
-- Commit：`d06920f254611732fe971d5f60bfeb6431b8d6f6`
+- Run：[Host validation #438](https://github.com/hujunjie-hub/Flight/actions/runs/42720186326)
+- Commit：`cfbb6b6b6c9ec484b83c5ab36a4b3e3da5050d2d`
 - 结果：**全部 jobs success**
 
 | CI 项目 | 实际结果 |
 |---|---:|
 | M4 Host | 927 checks / 0 failures |
-| M5 Host | 261,285 checks / 0 failures |
+| M5 Host | 261,669 checks / 0 failures |
 | M4/M5 Integration | 1,000 checks / 0 failures |
-| M5 ASan/UBSan | 261,285 checks / 0 failures |
+| M5 ASan/UBSan | 261,669 checks / 0 failures |
 | M4/M5 Integration ASan/UBSan | 1,000 checks / 0 failures |
 | Cortex-M7 compile and MPC RAM checks | PASS |
 | M4/M5 production-source Cortex-M7 compile | PASS |

@@ -49,7 +49,7 @@
 
 使膨胀覆盖整个子区间最远时刻及响应延迟。动态 track 预测原本已包含子区间半宽。
 
-## 新增几何差分、Bernstein 数值 oracle、多 track 与连续距离界 Fuzz（S06-064..078 已通过）
+## 新增几何差分、Bernstein 数值 oracle、多 track 与连续距离界 Fuzz（S06-064..079 已通过）
 
 - 独立参考实现使用 winding-number 分类和双精度点到线段距离，与生产实现的 ray-parity 分类进行差分。
 - L/C 凹多边形、CW/CCW 绕序、共线边和近共线边；随机点、顶点、边中点及边两侧；KEEP_IN/KEEP_OUT 均做差分，阈值 2e-5m。
@@ -73,15 +73,16 @@
 - S06-075：64 组动态恒速相对运动端到端差分，独立解析相对运动最近接近时刻，32 组碰撞和 32 组安全近失；分别要求 DYNAMIC_COLLISION / PASS。
 - S06-076：64 组动态障碍物有界加速度差分；实际障碍物加速度不超过 0.45m/s²，输入批准测试上界为 0.5m/s²，每组用 257 个时间样本建立独立参考，32 组碰撞拒绝、32 组安全场景通过。
 - S06-077/078：静态障碍物在 20ms 预览区间接缝，以及动态障碍物在自适应细分区间和预览接缝穿越；要求分别返回 STATIC_COLLISION / DYNAMIC_COLLISION。
+- S06-079：64 组全时域五次 Hermite 轨迹，使用独立 Hermite 基函数构造 24 个消费者 knot；每组对轨迹/AABB 距离采样 1,025 个时刻，32 组路径穿过占用 voxel、32 组保持大于 0.70m 的 AABB 净空，分别要求 STATIC_COLLISION / PASS。
 
 ## 最新证据
 
-- CI：[Host validation #433](https://github.com/hujunjie-hub/Flight/actions/runs/42718861676)
-- Docs HEAD：`595a87909b484c8c33b03c44f8d933dcff05b41f`；validated code commit：`d06920f254611732fe971d5f60bfeb6431b8d6f6`
+- CI：[Host validation #438](https://github.com/hujunjie-hub/Flight/actions/runs/42720186326)
+- Validated code commit：`cfbb6b6b6c9ec484b83c5ab36a4b3e3da5050d2d`
 - M4 Host：927 / 0 failures
-- M5 Host：261,285 / 0 failures
+- M5 Host：261,669 / 0 failures
 - M4/M5 Integration：1,000 / 0 failures
-- M5 ASan/UBSan：261,285 / 0 failures
+- M5 ASan/UBSan：261,669 / 0 failures
 - M4/M5 Integration ASan/UBSan：1,000 / 0 failures
 - Cortex-M7 compile/RAM and M4/M5 production-source compile：PASS
 - MPC RAM：29,252 bytes；worker stack：8,192 bytes；largest single frame：2,024 bytes
@@ -93,7 +94,7 @@
 
 ## 本轮新增测试结果
 
-S06-074..078 静态/动态端到端扫掠差分、加速度包络、预览接缝与自适应细分用例均在 run `42718861676` 的 Host/ASan/UBSan 回归通过。S06-053..063 已在新 Head 执行通过：reference/map time_epoch、directive frame、动态 sample age/预测租约、地图预测时域、围栏高度边界/退化高度、uint64 proof horizon 溢出、有限极值计算溢出及固定 seed 32 组属性测试。首轮 fixture 缺陷已修正；以上结果仅代表 Host/SIL 与 Cortex-M7 编译检查，不是 H723 实机避障放行。
+S06-074..079 静态/动态端到端扫掠差分、加速度包络、预览接缝、自适应细分和全时域五次 Hermite 轨迹扫掠用例均在 run `42720186326` 的 Host/ASan/UBSan 回归通过。S06-053..063 已在新 Head 执行通过：reference/map time_epoch、directive frame、动态 sample age/预测租约、地图预测时域、围栏高度边界/退化高度、uint64 proof horizon 溢出、有限极值计算溢出及固定 seed 32 组属性测试。首轮 fixture 缺陷已修正；以上结果仅代表 Host/SIL 与 Cortex-M7 编译检查，不是 H723 实机避障放行。
 
 ## 下一批必须补齐
 
