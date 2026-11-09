@@ -176,7 +176,7 @@ static uint8_t update_free_ray(M5LocalMap *map, const ProductObstacleObservation
   for (axis = 0u; axis < 3u; ++axis)
     delta[axis] = o->ray_end_ned_m[axis] - o->ray_start_ned_m[axis];
   length = sqrtf(delta[0]*delta[0] + delta[1]*delta[1] + delta[2]*delta[2]);
-  if (!isfinite(length)) return 0u;
+  if (!isfinite(length) || length <= 1e-6f) return 0u;
   count = (unsigned)ceilf(length / (M5_MAP_CELL_SIZE_M * 0.5f));
   if (count < 1u) count = 1u;
   if (count > 64u) return 0u;
@@ -269,7 +269,7 @@ Status m5_local_map_ingest(M5LocalMap *map, const NavigationSnapshot *nav,
 {
   uint8_t used[M5_MAP_MAX_TRACKS] = {0};
   int8_t track_slot[M5_MAP_MAX_OBSERVATIONS];
-  uint64_t latest_deadline = now_us;
+  uint64_t earliest_deadline = UINT64_MAX;
   unsigned i, j;
   if (map == NULL || map->initialized == 0u) return STATUS_NOT_READY;
   if (!nav_context_valid(nav, now_us)) {
@@ -289,6 +289,17 @@ Status m5_local_map_ingest(M5LocalMap *map, const NavigationSnapshot *nav,
     return STATUS_BUFFER_FULL;
   }
   if (count == 0u) return STATUS_OK;
+  /* A map cannot outlive any source that contributed to its current cells.
+     Once that lease expires, discard the old map before accepting a fresh batch. */
+  if (map->source_deadline_us != 0u && map->source_deadline_us <= now_us) {
+    memset(map->cells, 0, sizeof(map->cells));
+    memset(map->tracks, 0, sizeof(map->tracks));
+    map->degraded = 0u;
+    map->last_ingest_us = 0u;
+    map->source_deadline_us = 0u;
+    map->map_revision++;
+    if (map->map_revision == 0u) map->map_revision = 1u;
+  }
 
   for (i = 0u; i < count; ++i) {
     const ProductObstacleObservation *o = &observations[i];
@@ -304,7 +315,7 @@ Status m5_local_map_ingest(M5LocalMap *map, const NavigationSnapshot *nav,
         map->valid = 0u;
         return STATUS_INVALID_ARGUMENT;
       }
-    if (o->header.valid_until_us > latest_deadline) latest_deadline = o->header.valid_until_us;
+    if (o->header.valid_until_us < earliest_deadline) earliest_deadline = o->header.valid_until_us;
     if (o->observation_kind == PRODUCT_OBS_OCCUPIED_PRIMITIVE) {
       for (j = 0u; j < 3u; ++j)
         speed2 += o->obstacle_velocity_ned_mps[j] * o->obstacle_velocity_ned_mps[j];
@@ -344,7 +355,8 @@ Status m5_local_map_ingest(M5LocalMap *map, const NavigationSnapshot *nav,
     }
   }
   map->last_ingest_us = now_us;
-  map->source_deadline_us = latest_deadline;
+  if (map->source_deadline_us == 0u || earliest_deadline < map->source_deadline_us)
+    map->source_deadline_us = earliest_deadline;
   map->map_revision++;
   if (map->map_revision == 0u) map->map_revision = 1u;
   return STATUS_OK;
