@@ -670,15 +670,19 @@ static uint8_t build_curve(
 
 static uint8_t curve_bounds(
     const M5SafetyBezier *curve,
-    float duration_s,
+    double duration_s,
     M5SafetyCurveBounds *bounds)
 {
   double speed2 = 0.0, acceleration2 = 0.0, velocity_mid2 = 0.0;
   double position_rounding2 = 0.0, velocity_rounding2 = 0.0;
+  M5SafetyInterval duration_interval;
   unsigned axis, i;
 
   if (curve == NULL || bounds == NULL ||
-      !(duration_s > 0.0f) || !isfinite(duration_s)) return 0u;
+      !(duration_s > 0.0) || !isfinite(duration_s)) return 0u;
+  duration_interval = interval_bounds(
+      nextafter(duration_s, -INFINITY), nextafter(duration_s, INFINITY));
+  if (duration_interval.valid == 0u) return 0u;
 
   for (axis = 0u; axis < 3u; ++axis) {
     M5SafetyInterval position_control[6];
@@ -704,7 +708,7 @@ static uint8_t curve_bounds(
       M5SafetyInterval difference = interval_sub(
           position_control[i + 1u], position_control[i]);
       velocity_control[i] = interval_div(
-          interval_scale(difference, 5.0), interval_exact(duration_s));
+          interval_scale(difference, 5.0), duration_interval);
       if (velocity_control[i].valid == 0u) return 0u;
       velocity_abs = fmax(velocity_abs,
                           interval_abs_max(velocity_control[i]));
@@ -718,7 +722,7 @@ static uint8_t curve_bounds(
       M5SafetyInterval difference = interval_sub(
           velocity_control[i + 1u], velocity_control[i]);
       acceleration_control[i] = interval_div(
-          interval_scale(difference, 4.0), interval_exact(duration_s));
+          interval_scale(difference, 4.0), duration_interval);
       if (acceleration_control[i].valid == 0u) return 0u;
       acceleration_abs = fmax(acceleration_abs,
                               interval_abs_max(acceleration_control[i]));
@@ -774,7 +778,7 @@ static uint8_t curve_bounds(
       round_up_float(nextafter(sqrt(position_rounding2), INFINITY));
   bounds->velocity_rounding_error_mps =
       round_up_float(nextafter(sqrt(velocity_rounding2), INFINITY));
-  bounds->half_duration_s = 0.5f * duration_s;
+  bounds->half_duration_s = round_up_float(0.5 * duration_s);
   return (uint8_t)(isfinite(bounds->speed_bound) &&
       isfinite(bounds->acceleration_bound) &&
       isfinite(bounds->velocity_mid_norm) &&
@@ -1238,9 +1242,10 @@ M5TrajectorySafetyStatus m5_trajectory_safety_validate(
     M5SafetyCheck check = {0u, M5_SAFETY_PASS, 0u};
     M5TrajectorySafetyStatus status;
     float h = (float)step_us * 1e-6f;
-    float local_mid = ((float)item.interval +
-        0.5f * (item.u0 + item.u1)) * h;
-    float local_duration = (item.u1 - item.u0) * h;
+    float local_mid = round_up_float(((double)item.interval +
+        0.5 * ((double)item.u0 + (double)item.u1)) * (double)h);
+    double local_duration = (double)h *
+        ((double)item.u1 - (double)item.u0);
     float swept_radius, inflation;
     uint32_t offset_us = (uint32_t)item.interval * step_us +
         (uint32_t)((double)item.u0 * step_us);
@@ -1373,7 +1378,7 @@ uint8_t m5_trajectory_safety_test_curve_bounds(
   MotionReferencePoint start, end;
   M5SafetyBezier bezier;
   M5SafetyCurveBounds bounds;
-  float local_duration;
+  double local_duration;
   unsigned axis;
 
   if (start_position == NULL || start_velocity == NULL ||
@@ -1401,7 +1406,7 @@ uint8_t m5_trajectory_safety_test_curve_bounds(
 
   if (!build_curve(&start, &end, (double)duration_s,
                    (float)u0, (float)u1, &bezier)) return 0u;
-  local_duration = duration_s * (u1 - u0);
+  local_duration = (double)duration_s * ((double)u1 - (double)u0);
   if (!curve_bounds(&bezier, local_duration, &bounds)) return 0u;
 
   for (axis = 0u; axis < 3u; ++axis) {
