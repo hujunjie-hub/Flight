@@ -42,15 +42,15 @@ max_dynamic_obstacle_accel_mps2 是独立输入，必须由产品安全配置批
 
 response_delay_us 必须覆盖感知数据年龄、验证/调度延迟和控制/执行器响应延迟的批准上界。当前接口限制在 200ms 内，超过即拒绝；这不是实测响应时间。
 
-## 本轮追加边界测试（S06-053..063 已通过；S06-064..066 待验证）
+## 本轮追加边界测试（S06-053..063 已通过；S06-064..067 待验证）
 
 新增动态时间边界、围栏上下高度 margin/退化高度、uint64 proof horizon 溢出、有限极大动态不确定度数值溢出，以及固定 seed 32 组属性测试。首轮 CI 暴露的地图中心 fixture 问题已修复，S06-053..063 在 run `42650028230` 全部通过。具体见验证矩阵。
 
 ## 未完成项
 
-1. 执行新增 S06-064..066 的 Host/ASan/UBSan/ARM CI。
-2. 将解析 oracle 扩展到随机凹多边形、边界点与共线点，并建立 Bernstein bounds/连续距离下界的独立差分实现。
-3. 扩大多 track 时间戳、预测 lease、source identity 与相对运动组合 Fuzz。
+1. 执行新增 S06-064..067 的 Host/ASan/UBSan/ARM CI。
+2. 将解析 oracle 扩展到随机凹多边形、边界点与共线点；当前已覆盖 L/C 凹多边形、CW/CCW、共线与近共线边。
+3. 扩大多 track 时间戳、预测 lease、source identity 与相对运动组合 Fuzz；建立 Bernstein bounds/连续距离下界的独立差分实现。
 2. 对动态加速度上界开展更多参数敏感性分析；完成边界 fuzz。
 3. 独立复核 Bernstein 变换、浮点舍入误差、几何距离下界和所有连续性证明；当前不能宣称形式化证明。
 4. M5-07 接入 M5-05 candidate、M5-06 result、FMS Permit 和 M6 消费端，保证候选无法绕过验证器。

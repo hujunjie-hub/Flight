@@ -49,10 +49,12 @@
 
 使膨胀覆盖整个子区间最远时刻及响应延迟。动态 track 预测原本已包含子区间半宽。
 
-## 新增几何差分与组合 Fuzz（新 Head CI 待验证）
+## 新增几何差分与组合 Fuzz（扩展至凹多边形，等待新 Head CI）
 
-- 128 个固定 seed 平面点：将 KEEP_IN/KEEP_OUT 方形围栏 clearance 与独立解析距离公式对照，误差阈值 1e-5m。
-- 16 组轻微扰动凸四边形与动态 track 联合验证，要求几何合法且连续轨迹通过。
+- 独立参考实现使用 winding-number 分类和双精度点到线段距离，与生产实现的 ray-parity 分类进行差分。
+- L/C 凹多边形、CW/CCW 绕序、共线边和近共线边；随机点、顶点、边中点及边两侧；KEEP_IN/KEEP_OUT 均做差分，阈值 2e-5m。
+- 16 组 8 顶点交替半径凹多边形与动态 track 联合验证；每组另抽 32 个点做 clearance oracle 差分。
+- 新增相邻共线回折重叠边、非相邻重复顶点的 fail-closed 几何拒绝用例。
 - 32 组动态 track 属性测试扩展：在有效 PASS 基线上分别破坏速度不确定度、预览 offset、map time_epoch、track sample timestamp，必须 fail-closed。
 - DFS 栈保护测试明确断言 29 项容量、最大深度 5、workspace≤512B，并保留前后 canary。
 
@@ -77,7 +79,7 @@ S06-053..063 已在新 Head 执行通过：reference/map time_epoch、directive 
 
 ## 下一批必须补齐
 
-1. 执行并关闭 S06-064..066 的 Host/ASan/UBSan/ARM CI。
+1. 执行并关闭 S06-064..067 的 Host/ASan/UBSan/ARM CI。
 2. 将解析 oracle 扩展到随机凹多边形、边界点/共线点，并保存失败 seed 与最小反例。
 3. 对 Bernstein bounds、浮点外向舍入和连续距离下界建立独立参考实现/差分测试。
 4. 扩大多 track 时间戳、预测 lease、source identity 与相对运动组合 Fuzz。

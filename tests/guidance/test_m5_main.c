@@ -2284,78 +2284,237 @@ static void test_m5_safety_deterministic_property_fuzz(void)
   }
 }
 
-static float safety_square_clearance_reference(
-    float x, float y, float half_extent, float margin, uint8_t kind)
+static double safety_reference_polygon_clearance(
+    const ProductGeofenceSnapshot *fence, double x, double y)
 {
-  double ax = fabs((double)x), ay = fabs((double)y);
-  double dx = fmax(0.0, ax - half_extent);
-  double dy = fmax(0.0, ay - half_extent);
-  uint8_t inside = (uint8_t)(ax <= half_extent && ay <= half_extent);
-  double signed_clearance = inside ?
-      fmin((double)half_extent - ax, (double)half_extent - ay) :
-      -sqrt(dx * dx + dy * dy);
-  if (kind == PRODUCT_GEOFENCE_KEEP_OUT) signed_clearance = -signed_clearance;
-  return (float)(signed_clearance - margin);
+  double best = INFINITY;
+  int winding = 0;
+  unsigned i;
+
+  for (i = 0u; i < fence->vertex_count; ++i) {
+    unsigned next = (i + 1u) % fence->vertex_count;
+    double ax = fence->vertices_ne_m[i][0];
+    double ay = fence->vertices_ne_m[i][1];
+    double bx = fence->vertices_ne_m[next][0];
+    double by = fence->vertices_ne_m[next][1];
+    double dx = bx - ax, dy = by - ay;
+    double length2 = dx * dx + dy * dy;
+    double u = length2 > 0.0 ?
+        (((x - ax) * dx + (y - ay) * dy) / length2) : 0.0;
+    double ex, ey, distance, side;
+
+    u = fmax(0.0, fmin(1.0, u));
+    ex = x - (ax + u * dx);
+    ey = y - (ay + u * dy);
+    distance = sqrt(ex * ex + ey * ey);
+    if (distance < best) best = distance;
+
+    /* Winding-number classification is independent of production ray parity. */
+    side = dx * (y - ay) - dy * (x - ax);
+    if (ay <= y) {
+      if (by > y && side > 0.0) ++winding;
+    } else if (by <= y && side < 0.0) {
+      --winding;
+    }
+  }
+
+  {
+    double signed_clearance = (winding != 0) ? best : -best;
+    if (fence->kind == PRODUCT_GEOFENCE_KEEP_OUT)
+      signed_clearance = -signed_clearance;
+    return signed_clearance - fence->horizontal_margin_m;
+  }
+}
+
+static void safety_geometry_fixture(
+    ProductGeofenceSnapshot *fence,
+    const float vertices[][2],
+    uint8_t vertex_count,
+    uint8_t kind,
+    float margin)
+{
+  unsigned i;
+  memset(fence, 0, sizeof(*fence));
+  fence->validity = PRODUCT_GEOFENCE_VALID;
+  fence->frame_id = FRAME_LOCAL_NED;
+  fence->kind = kind;
+  fence->vertex_count = vertex_count;
+  fence->horizontal_margin_m = margin;
+  fence->vertical_margin_m = 0.10f;
+  fence->min_height_above_home_m = 0.0f;
+  fence->max_height_above_home_m = 10.0f;
+  for (i = 0u; i < vertex_count; ++i) {
+    fence->vertices_ne_m[i][0] = vertices[i][0];
+    fence->vertices_ne_m[i][1] = vertices[i][1];
+  }
+}
+
+static void safety_check_geometry_polygon(
+    const float vertices[][2],
+    uint8_t vertex_count,
+    uint32_t *seed)
+{
+  ProductGeofenceSnapshot fence;
+  unsigned kind, i;
+
+  for (kind = PRODUCT_GEOFENCE_KEEP_IN;
+       kind <= PRODUCT_GEOFENCE_KEEP_OUT; ++kind) {
+    safety_geometry_fixture(&fence, vertices, vertex_count,
+                            (uint8_t)kind, 0.12f);
+    CHECK(fence_geometry_valid(&fence));
+
+    for (i = 0u; i < 128u; ++i) {
+      float x = safety_fuzz_signed_unit(seed) * 15.0f;
+      float y = safety_fuzz_signed_unit(seed) * 15.0f;
+      float actual = fence_clearance(&fence, x, y);
+      float expected = (float)safety_reference_polygon_clearance(
+          &fence, (double)x, (double)y);
+      CHECK(isfinite(actual));
+      CHECK(fabsf(actual - expected) <= 0.00002f);
+    }
+
+    /* Exercise every vertex, every collinear edge midpoint, and both sides
+       of each edge at a small but representable distance. */
+    for (i = 0u; i < vertex_count; ++i) {
+      unsigned next = (i + 1u) % vertex_count;
+      double ax = vertices[i][0], ay = vertices[i][1];
+      double bx = vertices[next][0], by = vertices[next][1];
+      double dx = bx - ax, dy = by - ay;
+      double length = sqrt(dx * dx + dy * dy);
+      double nx = (length > 0.0) ? -dy / length : 0.0;
+      double ny = (length > 0.0) ? dx / length : 0.0;
+      double samples[3][2] = {
+        {ax, ay},
+        {0.5 * (ax + bx), 0.5 * (ay + by)},
+        {0.5 * (ax + bx) + nx * 0.0001,
+         0.5 * (ay + by) + ny * 0.0001}
+      };
+      unsigned sample;
+      for (sample = 0u; sample < 3u; ++sample) {
+        float actual = fence_clearance(&fence,
+            (float)samples[sample][0], (float)samples[sample][1]);
+        float expected = (float)safety_reference_polygon_clearance(
+            &fence, samples[sample][0], samples[sample][1]);
+        CHECK(isfinite(actual));
+        CHECK(fabsf(actual - expected) <= 0.00002f);
+      }
+    }
+  }
 }
 
 static void test_m5_safety_geometry_clearance_reference(void)
 {
-  ProductGeofenceSnapshot fence;
+  static const float concave_l[6][2] = {
+    {-2.0f, -2.0f}, {2.0f, -2.0f}, {2.0f, -1.0f},
+    {0.0f, -1.0f}, {0.0f, 2.0f}, {-2.0f, 2.0f}
+  };
+  static const float concave_c[8][2] = {
+    {-2.0f, -2.0f}, {2.0f, -2.0f}, {2.0f, -1.0f},
+    {-1.0f, -1.0f}, {-1.0f, 1.0f}, {2.0f, 1.0f},
+    {2.0f, 2.0f}, {-2.0f, 2.0f}
+  };
+  static const float collinear_square[5][2] = {
+    {-2.0f, -2.0f}, {0.0f, -2.0f}, {2.0f, -2.0f},
+    {2.0f, 2.0f}, {-2.0f, 2.0f}
+  };
+  static const float near_collinear[5][2] = {
+    {-2.0f, -2.0f}, {0.0f, -2.0f}, {2.0f, -1.9999f},
+    {2.0f, 2.0f}, {-2.0f, 2.0f}
+  };
+  static const float concave_l_clockwise[6][2] = {
+    {-2.0f, 2.0f}, {0.0f, 2.0f}, {0.0f, -1.0f},
+    {2.0f, -1.0f}, {2.0f, -2.0f}, {-2.0f, -2.0f}
+  };
   uint32_t seed = 0x0640C1EAu;
+
+  safety_check_geometry_polygon(concave_l, 6u, &seed);
+  safety_check_geometry_polygon(concave_c, 8u, &seed);
+  safety_check_geometry_polygon(collinear_square, 5u, &seed);
+  safety_check_geometry_polygon(near_collinear, 5u, &seed);
+  safety_check_geometry_polygon(concave_l_clockwise, 6u, &seed);
+}
+
+static void safety_build_radial_concave_polygon(
+    ProductGeofenceSnapshot *fence, uint32_t *seed)
+{
   unsigned i;
-  memset(&fence, 0, sizeof(fence));
-  fence.kind = PRODUCT_GEOFENCE_KEEP_IN;
-  fence.vertex_count = 4u;
-  fence.horizontal_margin_m = 0.12f;
-  fence.vertices_ne_m[0][0] = -2.0f;
-  fence.vertices_ne_m[0][1] = -2.0f;
-  fence.vertices_ne_m[1][0] = 2.0f;
-  fence.vertices_ne_m[1][1] = -2.0f;
-  fence.vertices_ne_m[2][0] = 2.0f;
-  fence.vertices_ne_m[2][1] = 2.0f;
-  fence.vertices_ne_m[3][0] = -2.0f;
-  fence.vertices_ne_m[3][1] = 2.0f;
-
-  for (i = 0u; i < 128u; ++i) {
-    float x = safety_fuzz_signed_unit(&seed) * 15.0f;
-    float y = safety_fuzz_signed_unit(&seed) * 15.0f;
-    float actual, expected;
-    fence.kind = PRODUCT_GEOFENCE_KEEP_IN;
-    actual = fence_clearance(&fence, x, y);
-    expected = safety_square_clearance_reference(
-        x, y, 2.0f, fence.horizontal_margin_m, fence.kind);
-    CHECK(isfinite(actual));
-    CHECK(fabsf(actual - expected) <= 0.00001f);
-
-    fence.kind = PRODUCT_GEOFENCE_KEEP_OUT;
-    actual = fence_clearance(&fence, x, y);
-    expected = safety_square_clearance_reference(
-        x, y, 2.0f, fence.horizontal_margin_m, fence.kind);
-    CHECK(isfinite(actual));
-    CHECK(fabsf(actual - expected) <= 0.00001f);
+  const double two_pi = 6.2831853071795864769;
+  fence->vertex_count = 8u;
+  for (i = 0u; i < 8u; ++i) {
+    float radius = ((i & 1u) != 0u ? 1.25f : 2.25f) +
+        safety_fuzz_signed_unit(seed) * 0.15f;
+    double angle = two_pi * (double)i / 8.0;
+    fence->vertices_ne_m[i][0] = radius * (float)cos(angle);
+    fence->vertices_ne_m[i][1] = radius * (float)sin(angle);
   }
+}
+
+static void test_m5_safety_geofence_adversarial_vertices_rejected(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 64500000u);
+  safety_set_keep_in_fence(&fx, 0.0f, 4.0f, 0.10f);
+  fx.fence.vertex_count = 5u;
+  fx.fence.vertices_ne_m[0][0] = -2.0f;
+  fx.fence.vertices_ne_m[0][1] = -2.0f;
+  fx.fence.vertices_ne_m[1][0] = 2.0f;
+  fx.fence.vertices_ne_m[1][1] = -2.0f;
+  fx.fence.vertices_ne_m[2][0] = 1.0f;
+  fx.fence.vertices_ne_m[2][1] = -2.0f;
+  fx.fence.vertices_ne_m[3][0] = 2.0f;
+  fx.fence.vertices_ne_m[3][1] = 2.0f;
+  fx.fence.vertices_ne_m[4][0] = -2.0f;
+  fx.fence.vertices_ne_m[4][1] = 2.0f;
+  CHECK(!fence_geometry_valid(&fx.fence));
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+
+  fx.fence.vertices_ne_m[0][0] = -2.0f;
+  fx.fence.vertices_ne_m[0][1] = -2.0f;
+  fx.fence.vertices_ne_m[1][0] = 2.0f;
+  fx.fence.vertices_ne_m[1][1] = -2.0f;
+  fx.fence.vertices_ne_m[2][0] = 2.0f;
+  fx.fence.vertices_ne_m[2][1] = 2.0f;
+  fx.fence.vertices_ne_m[3][0] = -2.0f;
+  fx.fence.vertices_ne_m[3][1] = 2.0f;
+  fx.fence.vertices_ne_m[4][0] = 2.0f;
+  fx.fence.vertices_ne_m[4][1] = -2.0f;
+  CHECK(!fence_geometry_valid(&fx.fence));
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
 }
 
 static void test_m5_safety_random_polygon_dynamic_track_fuzz(void)
 {
   SafetyFx fx;
   uint32_t seed = 0x65A17F03u;
-  unsigned i, vertex;
+  unsigned i, sample;
 
   for (i = 0u; i < 16u; ++i) {
     M5DynamicTrack *track;
     M5TrajectorySafetyStatus status;
-    uint64_t now = 64000000ull + (uint64_t)i * 1000000ull;
+    uint64_t now = 65000000ull + (uint64_t)i * 1000000ull;
 
     safety_fx_init(&fx, now);
     safety_set_constant_position(&fx, 0.0f, 0.0f, -1.0f);
     safety_map_reset(&fx);
     safety_set_keep_in_fence(&fx, 0.0f, 4.0f, 0.10f);
-    for (vertex = 0u; vertex < 4u; ++vertex) {
-      fx.fence.vertices_ne_m[vertex][0] +=
-          safety_fuzz_signed_unit(&seed) * 0.25f;
-      fx.fence.vertices_ne_m[vertex][1] +=
-          safety_fuzz_signed_unit(&seed) * 0.25f;
+    fx.fence.horizontal_margin_m = 0.10f;
+    safety_build_radial_concave_polygon(&fx.fence, &seed);
+    CHECK(fence_geometry_valid(&fx.fence));
+
+    /* Differentially check random concave geometry before feeding it to the
+       full trajectory validator. */
+    for (sample = 0u; sample < 32u; ++sample) {
+      float x = safety_fuzz_signed_unit(&seed) * 15.0f;
+      float y = safety_fuzz_signed_unit(&seed) * 15.0f;
+      float actual = fence_clearance(&fx.fence, x, y);
+      float expected = (float)safety_reference_polygon_clearance(
+          &fx.fence, (double)x, (double)y);
+      CHECK(isfinite(actual));
+      CHECK(fabsf(actual - expected) <= 0.00002f);
     }
 
     track = &fx.map.tracks[0];
@@ -2373,7 +2532,6 @@ static void test_m5_safety_random_polygon_dynamic_track_fuzz(void)
     track->position_std_m = 0.01f;
     track->velocity_std_mps = 0.01f;
 
-    CHECK(fence_geometry_valid(&fx.fence));
     status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
     CHECK(status == M5_SAFETY_PASS);
     CHECK(fx.result.passed == 1u);
@@ -3406,6 +3564,7 @@ int main(void)
     {"m5_safety_property_fuzz", test_m5_safety_deterministic_property_fuzz},
     {"m5_safety_geometry_clearance_reference", test_m5_safety_geometry_clearance_reference},
     {"m5_safety_random_polygon_dynamic_track_fuzz", test_m5_safety_random_polygon_dynamic_track_fuzz},
+    {"m5_safety_geofence_adversarial_vertices", test_m5_safety_geofence_adversarial_vertices_rejected},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
