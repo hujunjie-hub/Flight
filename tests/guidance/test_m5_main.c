@@ -2354,6 +2354,9 @@ static void test_m5_safety_dfs_work_unit_budget_exhaustion(void)
   }
 
   status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+  printf("M5-06 DFS-budget probe: status=%u reason=%u work=%u cells=%u\n",
+      (unsigned)status, (unsigned)fx.result.reason_code,
+      (unsigned)fx.result.work_units, (unsigned)fx.result.cell_checks);
   CHECK(status == M5_SAFETY_BUDGET_EXCEEDED);
   CHECK(fx.result.passed == 0u);
   CHECK(fx.result.work_units == M5_SAFETY_MAX_WORK_UNITS + 1u);
