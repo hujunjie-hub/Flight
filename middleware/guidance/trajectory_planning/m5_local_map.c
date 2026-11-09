@@ -171,7 +171,7 @@ static void update_cell(M5LocalMap *map, uint16_t voxel, int delta,
 
 static uint8_t update_free_ray(M5LocalMap *map, const ProductObstacleObservation *o)
 {
-  float delta[3], length, step;
+  float delta[3], length;
   unsigned axis, count, i;
   for (axis = 0u; axis < 3u; ++axis)
     delta[axis] = o->ray_end_ned_m[axis] - o->ray_start_ned_m[axis];
