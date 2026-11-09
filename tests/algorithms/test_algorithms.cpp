@@ -338,10 +338,18 @@ static void test_mpc_axis_and_failure_regressions() {
     f.ref.anchor.point.position_ned_m[axis] = target;
     for (auto &point : f.ref.points)
       point.point.position_ned_m[axis] = target;
-    CHECK(control_outer_update(&f.in) == STATUS_OK);
+    const Status axis_status = control_outer_update(&f.in);
+    if (axis_status != STATUS_OK)
+      std::printf("MPC axis regression axis=%d status=%u\\n", axis,
+                  static_cast<unsigned>(axis_status));
+    CHECK(axis_status == STATUS_OK);
     check_mpc_snapshot_feasible(f);
     MpcSnapshot snapshot{};
     CHECK(mpc_read(&snapshot));
+    if (snapshot.acceleration[axis] * target <= 0.0f)
+      std::printf("MPC axis response axis=%d target=%g accel=%g solver=%u\\n",
+                  axis, target, snapshot.acceleration[axis],
+                  snapshot.solver_status);
     CHECK(snapshot.acceleration[axis] * target > 0.0f);
   }
 
@@ -372,7 +380,11 @@ static void test_mpc_axis_and_failure_regressions() {
   Fixture invalid_reference;
   invalid_reference.ref.points[10].point.position_ned_m[0] =
       std::numeric_limits<float>::quiet_NaN();
-  CHECK(control_outer_update(&invalid_reference.in) == STATUS_NUMERIC_ERROR);
+  const Status invalid_status = control_outer_update(&invalid_reference.in);
+  if (invalid_status != STATUS_NUMERIC_ERROR)
+    std::printf("MPC invalid-reference status=%u\\n",
+                static_cast<unsigned>(invalid_status));
+  CHECK(invalid_status == STATUS_NUMERIC_ERROR);
   CHECK(mpc_read(&failed));
   CHECK(failed.expires_at_us == 0);
   CHECK(failed.solver_status == CONTROL_SOLVER_NUMERICAL_FAILURE);
