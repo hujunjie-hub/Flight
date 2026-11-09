@@ -2075,6 +2075,22 @@ static void test_m5_safety_keep_out_crossing_between_preview_endpoints(void)
   CHECK(fx.result.passed == 0u);
 }
 
+
+static void test_m5_safety_occupied_static_voxel_rejected(void)
+{
+  SafetyFx fx;
+  float origin[3] = {0.0f, 0.0f, 0.0f};
+  uint16_t voxel = 0u;
+  safety_fx_init(&fx, 26000000u);
+  CHECK(m5_local_map_world_to_voxel(&fx.map, origin, &voxel));
+  fx.map.cells[voxel].state = M5_MAP_CELL_OCCUPIED_CONFIRMED;
+  fx.map.cells[voxel].log_odds = 4;
+  fx.map.cells[voxel].source_mask = 1u;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STATIC_COLLISION);
+  CHECK(fx.result.passed == 0u);
+}
+
 int main(void)
 {
   struct {
@@ -2140,6 +2156,7 @@ int main(void)
     {"m5_safety_static_free_pass", test_m5_safety_static_free_reference_passes},
     {"m5_safety_dynamic_delay", test_m5_safety_dynamic_response_delay_is_inflated},
     {"m5_safety_unknown_fail_closed", test_m5_safety_unknown_voxel_fails_closed},
+    {"m5_safety_occupied_static_voxel", test_m5_safety_occupied_static_voxel_rejected},
     {"m5_safety_nan_reject", test_m5_safety_nan_preview_rejected},
     {"m5_safety_reference_ttl", test_m5_safety_reference_expiring_before_proof_end_rejected},
     {"m5_safety_keepout_crossing", test_m5_safety_keep_out_crossing_between_preview_endpoints},
