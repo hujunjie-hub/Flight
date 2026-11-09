@@ -15,6 +15,7 @@
 #include "trajectory_planning/m5_kinodynamic_astar.h"
 #include "trajectory_planning/m5_path_smoother.h"
 #include "trajectory_planning/m5_time_scaler.h"
+#include "trajectory_planning/m5_trajectory_safety.h"
 
 #define T_BOOT 0x1122334455667788ull
 #define T_EPOCH 3u
@@ -1873,6 +1874,207 @@ static void test_m5_smoother_rejects_stale_and_mismatched_paths(void)
 }
 
 
+
+typedef struct {
+  Fx base;
+  M5LocalMap map;
+  MotionReference reference;
+  ProductGeofenceSnapshot fence;
+  M5TrajectorySafetyInput input;
+  M5TrajectorySafetyWorkspace workspace;
+  M5TrajectorySafetyResult result;
+} SafetyFx;
+
+static void safety_point_set(MotionReferencePoint *point,
+                             float x, float y, float z,
+                             float vx, float vy, float vz)
+{
+  memset(point, 0, sizeof(*point));
+  point->valid_mask = 0x1Fu;
+  point->point.valid_mask = 0x1Fu;
+  point->point.position_ned_m[0] = x;
+  point->point.position_ned_m[1] = y;
+  point->point.position_ned_m[2] = z;
+  point->point.velocity_ned_mps[0] = vx;
+  point->point.velocity_ned_mps[1] = vy;
+  point->point.velocity_ned_mps[2] = vz;
+}
+
+static void safety_map_reset(SafetyFx *fx)
+{
+  unsigned i;
+  CHECK(m5_local_map_init(&fx->map, &fx->base.nav, fx->base.now,
+      0.10f, 0.05f, 1.0f,
+      M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
+  for (i = 0u; i < M5_MAP_CELL_COUNT; ++i) {
+    fx->map.cells[i].state = M5_MAP_CELL_FREE_CONFIRMED;
+    fx->map.cells[i].log_odds = -4;
+    fx->map.cells[i].source_mask = 1u;
+    fx->map.cells[i].last_update_ms = (uint32_t)(fx->base.now / 1000u);
+  }
+  fx->map.last_ingest_us = fx->base.now;
+  fx->map.source_deadline_us = fx->base.now + 1000000u;
+  fx->input.map = &fx->map;
+  fx->input.expected_map_revision = fx->map.map_revision;
+}
+
+static void safety_fx_init(SafetyFx *fx, uint64_t now_us)
+{
+  unsigned i;
+  memset(fx, 0, sizeof(*fx));
+  fx_defaults(&fx->base);
+  fx->base.now = now_us;
+  fx->base.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
+  fx_fill(&fx->base);
+
+  fill_header(&fx->reference.header, MSG_MOTION_REFERENCE, SOURCE_M5, now_us);
+  fx->reference.reference_id = 1u;
+  fx->reference.reference_epoch = 1u;
+  fx->reference.state_epoch = T_STATE_EPOCH;
+  fx->reference.origin_id = T_ORIGIN;
+  fx->reference.authority_epoch = T_AUTH_EPOCH;
+  fx->reference.directive_epoch = T_DIR_EPOCH;
+  fx->reference.point_count = PRODUCT_PREVIEW_COUNT;
+  fx->reference.reference_kind = GUIDANCE_REFERENCE_TRAJECTORY;
+  safety_point_set(&fx->reference.anchor, 0.0f, 0.0f, 0.0f,
+                   0.0f, 0.0f, 0.0f);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    fx->reference.points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+    safety_point_set(&fx->reference.points[i], 0.0f, 0.0f, 0.0f,
+                     0.0f, 0.0f, 0.0f);
+  }
+
+  safety_map_reset(fx);
+  fx->input.candidate_reference = &fx->reference;
+  fx->input.navigation = &fx->base.nav;
+  fx->input.directive = &fx->base.dir;
+  fx->input.safety_envelope = &fx->base.env;
+  fx->input.max_dynamic_obstacle_accel_mps2 = 0.5f;
+  fx->input.evaluation_time_us = now_us;
+}
+
+static void test_m5_safety_static_free_reference_passes(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 20000000u);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 1u);
+  CHECK(fx.result.work_units == PRODUCT_PREVIEW_COUNT);
+  CHECK(fx.result.valid_until_us >= fx.input.evaluation_time_us +
+      PRODUCT_PREVIEW_COUNT * PRODUCT_PREVIEW_STEP_US);
+}
+
+static void test_m5_safety_dynamic_response_delay_is_inflated(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+  safety_fx_init(&fx, 21000000u);
+  track = &fx.map.tracks[0];
+  track->id = 11u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now;
+  track->expires_us = fx.base.now + 1000000u;
+  track->position_ned_m[0] = 5.08f;
+  track->velocity_ned_mps[0] = -10.0f;
+  track->radius_m = 0.05f;
+  track->position_std_m = 0.0f;
+  track->velocity_std_mps = 0.0f;
+
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_PASS);
+  fx.input.response_delay_us = 10000u;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_DYNAMIC_COLLISION);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_unknown_voxel_fails_closed(void)
+{
+  SafetyFx fx;
+  float origin[3] = {0.0f, 0.0f, 0.0f};
+  uint16_t voxel = 0u;
+  safety_fx_init(&fx, 22000000u);
+  CHECK(m5_local_map_world_to_voxel(&fx.map, origin, &voxel));
+  fx.map.cells[voxel].state = M5_MAP_CELL_UNKNOWN;
+  fx.map.cells[voxel].log_odds = 0;
+  fx.map.cells[voxel].source_mask = 0u;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_UNKNOWN);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_nan_preview_rejected(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 23000000u);
+  fx.reference.points[7].point.position_ned_m[1] = NAN;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_reference_expiring_before_proof_end_rejected(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 24000000u);
+  fx.reference.header.valid_until_us = fx.base.now +
+      PRODUCT_PREVIEW_COUNT * PRODUCT_PREVIEW_STEP_US - 1u;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_keep_out_crossing_between_preview_endpoints(void)
+{
+  SafetyFx fx;
+  unsigned i;
+  safety_fx_init(&fx, 25000000u);
+  fx.base.nav.core.position_ned_m[0] = -1.0f;
+  fx.base.nav.core.position_ned_m[2] = -10.0f;
+  fx.base.nav.core.velocity_ned_mps[0] = 100.0f;
+  safety_map_reset(&fx);
+  fx.base.env.max_linear_speed_mps = 120.0f;
+  fx.base.env.max_linear_accel_mps2 = 200.0f;
+  fx.base.env.vehicle_extension.max_velocity_ned_mps[0] = 120.0f;
+  fx.base.env.vehicle_extension.max_acceleration_ned_mps2[0] = 200.0f;
+  safety_point_set(&fx.reference.anchor, -1.0f, 0.0f, -10.0f,
+                   100.0f, 0.0f, 0.0f);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    float x = -1.0f + 100.0f * (float)(i + 1u) *
+        ((float)PRODUCT_PREVIEW_STEP_US * 1e-6f);
+    fx.reference.points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+    safety_point_set(&fx.reference.points[i], x, 0.0f, -10.0f,
+                     100.0f, 0.0f, 0.0f);
+  }
+
+  fill_header(&fx.fence.header, MSG_PRODUCT_GEOFENCE_SNAPSHOT,
+              SOURCE_M4, fx.base.now);
+  fx.fence.fence_id = 1u;
+  fx.fence.frame_id = FRAME_LOCAL_NED;
+  fx.fence.origin_id = T_ORIGIN;
+  fx.fence.state_epoch = T_STATE_EPOCH;
+  fx.fence.validity = PRODUCT_GEOFENCE_VALID;
+  fx.fence.kind = PRODUCT_GEOFENCE_KEEP_OUT;
+  fx.fence.vertex_count = 4u;
+  fx.fence.vertices_ne_m[0][0] = -0.2f;
+  fx.fence.vertices_ne_m[0][1] = -0.2f;
+  fx.fence.vertices_ne_m[1][0] = 0.2f;
+  fx.fence.vertices_ne_m[1][1] = -0.2f;
+  fx.fence.vertices_ne_m[2][0] = 0.2f;
+  fx.fence.vertices_ne_m[2][1] = 0.2f;
+  fx.fence.vertices_ne_m[3][0] = -0.2f;
+  fx.fence.vertices_ne_m[3][1] = 0.2f;
+  fx.fence.min_height_above_home_m = 0.0f;
+  fx.fence.max_height_above_home_m = 50.0f;
+  fx.input.geofences = &fx.fence;
+  fx.input.geofence_count = 1u;
+  CHECK(fence_geometry_valid(&fx.fence));
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_GEOFENCE_VIOLATION);
+  CHECK(fx.result.passed == 0u);
+}
+
 int main(void)
 {
   struct {
@@ -1935,6 +2137,12 @@ int main(void)
     {"m5_smoother_single_edge", test_m5_smoother_builds_single_edge_candidate},
     {"m5_smoother_two_segment", test_m5_smoother_optimizes_two_segment_path_continuously},
     {"m5_smoother_fail_closed", test_m5_smoother_rejects_stale_and_mismatched_paths},
+    {"m5_safety_static_free_pass", test_m5_safety_static_free_reference_passes},
+    {"m5_safety_dynamic_delay", test_m5_safety_dynamic_response_delay_is_inflated},
+    {"m5_safety_unknown_fail_closed", test_m5_safety_unknown_voxel_fails_closed},
+    {"m5_safety_nan_reject", test_m5_safety_nan_preview_rejected},
+    {"m5_safety_reference_ttl", test_m5_safety_reference_expiring_before_proof_end_rejected},
+    {"m5_safety_keepout_crossing", test_m5_safety_keep_out_crossing_between_preview_endpoints},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
