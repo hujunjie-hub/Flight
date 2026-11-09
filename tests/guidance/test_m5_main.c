@@ -1096,6 +1096,7 @@ static void test_m5_map_free_ray_log_odds_and_stale(void)
   float start[3] = {-1.75f, -1.75f, -1.75f};
   float outside[3] = {4.0f, 0.0f, 0.0f};
   uint8_t state = M5_MAP_CELL_INVALID;
+  uint16_t voxel = 0u;
   const uint64_t now = 2000000u;
 
   planner_nav_init(&nav, now);
@@ -1112,7 +1113,12 @@ static void test_m5_map_free_ray_log_odds_and_stale(void)
     observations[i].ray_end_ned_m[1] = -1.75f;
     observations[i].ray_end_ned_m[2] = -1.75f;
   }
-  CHECK(m5_local_map_ingest(&map, &nav, observations, 2u, now) == STATUS_OK);
+  CHECK(m5_local_map_ingest(&map, &nav, observations, 1u, now) == STATUS_OK);
+  CHECK(m5_local_map_world_to_voxel(start, &voxel));
+  CHECK(map.cells[voxel].log_odds == -2);
+  CHECK(map.cells[voxel].state == M5_MAP_CELL_UNKNOWN);
+  CHECK(m5_local_map_ingest(&map, &nav, &observations[1], 1u, now) == STATUS_OK);
+  CHECK(map.cells[voxel].log_odds == -4);
   CHECK(m5_local_map_is_ready(&map, &nav, now));
   CHECK(m5_local_map_query(&map, start, now, &state) == STATUS_OK);
   CHECK(state == M5_MAP_CELL_FREE_CONFIRMED);
