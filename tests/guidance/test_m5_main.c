@@ -3541,6 +3541,9 @@ static void test_m5_safety_arbitrary_hermite_swept_volume_differential(void)
     safety_point_set(&fx.reference.anchor,
         (float)p0[0], (float)p0[1], (float)p0[2],
         (float)v0[0], (float)v0[1], (float)v0[2]);
+    for (axis = 0u; axis < 3u; ++axis) {
+      fx.reference.anchor.point.acceleration_ned_mps2[axis] = (float)a0[axis];
+    }
     for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
       double t = (double)(i + 1u) * PRODUCT_PREVIEW_STEP_US * 1.0e-6;
       double position[3], velocity[3], acceleration[3];
