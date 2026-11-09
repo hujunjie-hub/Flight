@@ -1956,6 +1956,36 @@ static void safety_fx_init(SafetyFx *fx, uint64_t now_us)
   fx->input.evaluation_time_us = now_us;
 }
 
+static void test_m5_safety_reference_time_epoch_mismatch(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 56000000u);
+  fx.reference.header.time_epoch++;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_map_time_epoch_mismatch(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 56100000u);
+  fx.map.time_epoch++;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_directive_frame_mismatch(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 56200000u);
+  fx.base.dir.header.frame_id = (uint8_t)(FRAME_LOCAL_NED ^ 1u);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
 static void test_m5_safety_static_free_reference_passes(void)
 {
   SafetyFx fx;
@@ -2967,6 +2997,9 @@ int main(void)
     {"m5_safety_epoch_origin_frame_mismatch", test_m5_safety_navigation_map_epoch_origin_frame_mismatch_rejected},
     {"m5_safety_dfs_max_depth_stack_guard", test_m5_safety_dfs_max_depth_stack_guard},
     {"m5_safety_dfs_work_budget", test_m5_safety_dfs_work_unit_budget_exhaustion},
+    {"m5_safety_reference_time_epoch", test_m5_safety_reference_time_epoch_mismatch},
+    {"m5_safety_map_time_epoch", test_m5_safety_map_time_epoch_mismatch},
+    {"m5_safety_directive_frame", test_m5_safety_directive_frame_mismatch},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {

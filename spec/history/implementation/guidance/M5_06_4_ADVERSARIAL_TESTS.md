@@ -61,6 +61,10 @@
 - Cortex-M7 compile and MPC RAM checks：PASS
 - 全部 workflow jobs：success
 
+## 本轮追加测试源（新 Head CI 待验证）
+
+新增 MotionReference time_epoch、LocalMap time_epoch、Directive frame_id 三个失配用例，均要求 INVALID 且 passed=0。测试源码已登记；新 Head 的 Host、ASan/UBSan 结果尚未取得。
+
 ## 下一批必须补齐
 
 1. 工作栈容量压力与最大细分树边界用例（DFS work-unit 256 和 cell-check 8192 两个预算均已覆盖）。

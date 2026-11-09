@@ -66,7 +66,7 @@
 | S06-020 | response delay 超过配置上限 | INVALID | Host PASS |
 | S06-021 | 静态地图 cell-check 预算超过 8192 | BUDGET_EXCEEDED | Host PASS：8193 次时 fail-closed |
 | S06-022 | DFS work-unit 预算 256 耗尽 | BUDGET_EXCEEDED | Host PASS：第 257 个工作单元触发 fail-closed，cell-check 预算未耗尽 |
-| S06-023 | 工作栈容量边界和最大细分压力 | CAPACITY/BUDGET 拒绝 | 待补 |
+| S06-023 | 工作栈容量边界和最大细分压力 | CAPACITY/BUDGET 拒绝 | 已有深度/栈保护与 256 work-unit 耗尽用例；最大工作栈可达性仍待补 |
 | S06-024 | 工作栈固定 512B 编译期断言 | 编译通过 | Host/Cortex-M7 CI PASS |
 | S06-025 | Host ASan/UBSan | 无内存或未定义行为错误 | CI PASS；fuzz 待补 |
 | S06-026 | 动态障碍物中点碰撞 | DYNAMIC_COLLISION | Host PASS |
@@ -76,10 +76,18 @@
 | S06-030 | 预览点 offset 单点偏差 | INVALID | Host PASS |
 | S06-031 | 导航不确定度传播至子区间远端 | 保守膨胀 | 代码修正并通过完整 CI；专项边界用例待补 |
 
+## 本轮新增测试源（待新 Head CI 验证）
+
+| 新用例 | 场景 | 预期 | 状态 |
+|---|---|---|---|
+| S06-053 | MotionReference header time_epoch 失配 | INVALID | 已加入测试源，CI 待验证 |
+| S06-054 | LocalMap time_epoch 失配 | INVALID | 已加入测试源，CI 待验证 |
+| S06-055 | Directive header frame_id 失配 | INVALID | 已加入测试源，CI 待验证 |
+
 ## 仍未关闭的审查项
 
 1. 独立复核 Bernstein 变换、浮点外向舍入和连续几何距离下界；当前不是形式化证明。
-2. 补齐导航/围栏 frame 组合不匹配、围栏共线/零面积退化、动态速度非有限值与最大预测时域边界、工作栈容量压力、地图边界、擦边碰撞和数值极值测试。
+2. 补齐围栏高度擦边、动态预测时域整数边界、时间戳溢出、系统化属性 Fuzz，以及独立几何差分验证；本轮新增测试须以新 Head CI 关闭。
 3. 对动态障碍物加速度上界进行更多目标类别/传感器标定和参数敏感性分析。
 4. M5-07 尚未完成，M5-06 PASS 尚未成为 M6 不可绕过的发布门禁。
 5. H723 实机仍需真实传感器标定、WCET/RTA、RAM/栈、HIL 和逐级场地安全验证。
