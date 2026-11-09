@@ -378,6 +378,65 @@ static void test_mpc_axis_and_failure_regressions() {
   CHECK(failed.solver_status == CONTROL_SOLVER_NUMERICAL_FAILURE);
 }
 
+static void test_mpc_multiaxis_reference_regressions() {
+  const float position_targets[3][3] = {
+      {0.05f, -0.04f, 0.03f},
+      {-0.04f, 0.05f, -0.03f},
+      {0.03f, 0.03f, 0.03f},
+  };
+  for (const auto &targets : position_targets) {
+    clock_value.monotonic_us += 100000;
+    init_control();
+    Fixture f;
+    for (int axis = 0; axis < 3; ++axis) {
+      f.ref.anchor.point.position_ned_m[axis] = targets[axis];
+      for (auto &point : f.ref.points)
+        point.point.position_ned_m[axis] = targets[axis];
+    }
+    const Status status = control_outer_update(&f.in);
+    if (status != STATUS_OK)
+      std::printf("MPC multi-axis position status=%u\n",
+                  static_cast<unsigned>(status));
+    CHECK(status == STATUS_OK);
+    check_mpc_snapshot_feasible(f);
+    MpcSnapshot snapshot{};
+    CHECK(mpc_read(&snapshot));
+    for (int axis = 0; axis < 3; ++axis)
+      CHECK(snapshot.acceleration[axis] * targets[axis] > 0.0f);
+  }
+
+  /* Constant-velocity references exercise the velocity part of the objective
+     independently of a position step. The reference position is integrated
+     consistently so the test does not ask for a physically contradictory path. */
+  const float velocity_targets[2][3] = {
+      {0.10f, -0.08f, 0.06f},
+      {-0.08f, 0.10f, -0.06f},
+  };
+  for (const auto &targets : velocity_targets) {
+    clock_value.monotonic_us += 100000;
+    init_control();
+    Fixture f;
+    for (int axis = 0; axis < 3; ++axis) {
+      f.ref.anchor.point.velocity_ned_mps[axis] = targets[axis];
+      for (unsigned i = 0; i < f.ref.point_count; ++i) {
+        f.ref.points[i].point.velocity_ned_mps[axis] = targets[axis];
+        f.ref.points[i].point.position_ned_m[axis] =
+            targets[axis] * static_cast<float>(i + 1) * 0.02f;
+      }
+    }
+    const Status status = control_outer_update(&f.in);
+    if (status != STATUS_OK)
+      std::printf("MPC multi-axis velocity status=%u\n",
+                  static_cast<unsigned>(status));
+    CHECK(status == STATUS_OK);
+    check_mpc_snapshot_feasible(f);
+    MpcSnapshot snapshot{};
+    CHECK(mpc_read(&snapshot));
+    for (int axis = 0; axis < 3; ++axis)
+      CHECK(snapshot.acceleration[axis] * targets[axis] > 0.0f);
+  }
+}
+
 static void test_math_allocator() {
   init_control();
   const float pi = 3.14159265358979f;
@@ -717,6 +776,7 @@ int main() {
   test_rearm_clears_motor_history();
   test_mpc_and_modes();
   test_mpc_axis_and_failure_regressions();
+  test_mpc_multiaxis_reference_regressions();
   test_navigation();
   test_shadow_probation();
   std::printf("controller_navigation: %u checks, %u failures\n", checks,
