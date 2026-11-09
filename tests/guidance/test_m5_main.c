@@ -1757,13 +1757,14 @@ static void test_m5_smoother_builds_single_edge_candidate(void)
   CHECK(output.segment_count == 1u);
   CHECK(output.fallback_used == 0u);
   CHECK(output.map_revision == fx.map.map_revision);
-  CHECK(output.total_duration_us == 400000u);
-  CHECK(output.segment_duration_us[0] == 400000u);
+  CHECK(output.total_duration_us == timed.path.offset_us[1]);
+  CHECK(output.segment_duration_us[0] == timed.path.offset_us[1]);
   CHECK(isfinite(output.initial_cost) && isfinite(output.optimized_cost));
   CHECK(output.optimized_cost <= output.initial_cost + 1e-6);
   CHECK(fabsf(guidance_quintic_eval(&output.position[0][0], 0.0f, 0u) -
               fx.path.position_ned_m[0][0]) < 1e-5f);
-  CHECK(fabsf(guidance_quintic_eval(&output.position[0][0], 0.4f, 0u) -
+  CHECK(fabsf(guidance_quintic_eval(&output.position[0][0],
+              (float)timed.path.offset_us[1] * 1e-6f, 0u) -
               fx.path.position_ned_m[1][0]) < 1e-4f);
   for (unsigned i = 0u; i < 6u; ++i) CHECK(isfinite(output.yaw[0].c[i]));
 }
@@ -1796,14 +1797,22 @@ static void test_m5_smoother_optimizes_two_segment_path_continuously(void)
   CHECK(m5_path_smoother_build(&timed, &fx.map, &fx.navigation, now,
       &workspace, &output) == M5_SMOOTHER_OK);
   CHECK(output.segment_count == 2u && output.fallback_used == 0u);
-  CHECK(output.total_duration_us == 800000u);
+  CHECK(output.total_duration_us == timed.path.offset_us[2]);
+  CHECK(output.segment_duration_us[0] ==
+        timed.path.offset_us[1] - timed.path.offset_us[0]);
+  CHECK(output.segment_duration_us[1] ==
+        timed.path.offset_us[2] - timed.path.offset_us[1]);
   CHECK(output.optimized_cost < output.initial_cost);
-  CHECK(fabs(guidance_quintic_eval(&output.position[0][0], 0.4f, 0u) + 1.25) < 1e-5);
-  CHECK(fabs(guidance_quintic_eval(&output.position[1][0], 0.0f, 0u) + 1.25) < 1e-5);
-  left_velocity = guidance_quintic_eval(&output.position[0][0], 0.4f, 1u);
-  right_velocity = guidance_quintic_eval(&output.position[1][0], 0.0f, 1u);
-  left_acceleration = guidance_quintic_eval(&output.position[0][0], 0.4f, 2u);
-  right_acceleration = guidance_quintic_eval(&output.position[1][0], 0.0f, 2u);
+  {
+    float first_duration_s = (float)output.segment_duration_us[0] * 1e-6f;
+    CHECK(fabs(guidance_quintic_eval(&output.position[0][0],
+                first_duration_s, 0u) + 1.25) < 1e-5);
+    CHECK(fabs(guidance_quintic_eval(&output.position[1][0], 0.0f, 0u) + 1.25) < 1e-5);
+    left_velocity = guidance_quintic_eval(&output.position[0][0], first_duration_s, 1u);
+    right_velocity = guidance_quintic_eval(&output.position[1][0], 0.0f, 1u);
+    left_acceleration = guidance_quintic_eval(&output.position[0][0], first_duration_s, 2u);
+    right_acceleration = guidance_quintic_eval(&output.position[1][0], 0.0f, 2u);
+  }
   CHECK(fabsf(left_velocity - right_velocity) < 1e-4f);
   CHECK(fabsf(left_acceleration - right_acceleration) < 1e-3f);
 }
