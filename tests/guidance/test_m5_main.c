@@ -1961,30 +1961,36 @@ static void test_m5_safety_static_free_reference_passes(void)
   safety_fx_init(&fx, 20000000u);
   status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
   printf("M5-06 fixture status=%u reason=%u passed=%u map_ready=%u "
-         "map_init=%u map_valid=%u map_degraded=%u map_rev=%lu expected_rev=%lu "
-         "map_deadline=%llu proof_end=%llu nav_sample=%llu ref_sample=%llu "
-         "dir_expiry=%llu ref_expiry=%llu env_expiry=%llu nav_epoch=%lu "
-         "ref_epoch=%lu dir_epoch=%lu origin=%lu map_origin=%lu state=%lu map_state=%lu\\n",
+         "navmask=%u reqmask=%u refsrc=%u expectedsrc=%u "
+         "refcount=%u expectedcount=%u refkind=%u expectedkind=%u refreserved=%u "
+         "anchoroff=%u anchormask=%u/%u dir_mode=%u op=%u dir_epoch=%u ref_dir_epoch=%u "
+         "dir_auth=%u ref_auth=%u dir_state=%u nav_state=%u env_id=%u dir_env_id=%u "
+         "envmask=%u map_boot=%llu nav_boot=%llu map_time=%lu nav_time=%lu "
+         "map_radius=%.3f map_margin=%.3f map_uncertainty=%.3f map_prediction=%lu "
+         "input_reserved=%u fence_count=%u response=%lu max_dyn_accel=%.3f\n",
          (unsigned)status, (unsigned)fx.result.reason_code,
          (unsigned)fx.result.passed,
          (unsigned)m5_local_map_is_ready(&fx.map, &fx.base.nav, fx.input.evaluation_time_us),
-         (unsigned)fx.map.initialized, (unsigned)fx.map.valid,
-         (unsigned)fx.map.degraded, (unsigned long)fx.map.map_revision,
-         (unsigned long)fx.input.expected_map_revision,
-         (unsigned long long)fx.map.source_deadline_us,
-         (unsigned long long)(fx.reference.header.timestamp_sample_us +
-             (uint64_t)PRODUCT_PREVIEW_COUNT * PRODUCT_PREVIEW_STEP_US +
-             fx.input.response_delay_us),
-         (unsigned long long)fx.base.nav.header.timestamp_sample_us,
-         (unsigned long long)fx.reference.header.timestamp_sample_us,
-         (unsigned long long)fx.base.dir.directive_expires_at_us,
-         (unsigned long long)fx.reference.header.valid_until_us,
-         (unsigned long long)fx.base.env.header.valid_until_us,
-         (unsigned long)fx.base.nav.state_epoch,
-         (unsigned long)fx.reference.state_epoch,
-         (unsigned long)fx.base.dir.state_epoch,
-         (unsigned long)fx.base.nav.origin_id, (unsigned long)fx.map.origin_id,
-         (unsigned long)fx.base.nav.state_epoch, (unsigned long)fx.map.state_epoch);
+         (unsigned)fx.base.nav.core.valid_mask, (unsigned)M5_SAFETY_NAV_MASK,
+         (unsigned)fx.reference.header.source_id, (unsigned)SOURCE_M5,
+         (unsigned)fx.reference.point_count, (unsigned)M5_SAFETY_INTERVAL_COUNT,
+         (unsigned)fx.reference.reference_kind, (unsigned)GUIDANCE_REFERENCE_TRAJECTORY,
+         (unsigned)fx.reference.reserved, (unsigned)fx.reference.anchor.offset_us,
+         (unsigned)fx.reference.anchor.valid_mask, (unsigned)fx.reference.anchor.point.valid_mask,
+         (unsigned)fx.base.dir.guidance_mode_code, (unsigned)fx.base.dir.operation_code,
+         (unsigned)fx.base.dir.directive_epoch, (unsigned)fx.reference.directive_epoch,
+         (unsigned)fx.base.dir.authority_epoch, (unsigned)fx.reference.authority_epoch,
+         (unsigned)fx.base.dir.state_epoch, (unsigned)fx.base.nav.state_epoch,
+         (unsigned)fx.base.env.safety_envelope_id, (unsigned)fx.base.dir.safety_envelope_id,
+         (unsigned)fx.base.env.vehicle_extension.valid_mask,
+         (unsigned long long)fx.map.boot_id, (unsigned long long)fx.base.nav.header.boot_id,
+         (unsigned long)fx.map.time_epoch, (unsigned long)fx.base.nav.header.time_epoch,
+         (double)fx.map.vehicle_radius_m, (double)fx.map.clearance_margin_m,
+         (double)fx.map.uncertainty_inflation_factor,
+         (unsigned long)fx.map.max_dynamic_prediction_us,
+         (unsigned)fx.input.reserved0, (unsigned)fx.input.geofence_count,
+         (unsigned long)fx.input.response_delay_us,
+         (double)fx.input.max_dynamic_obstacle_accel_mps2);
   CHECK(status == M5_SAFETY_PASS);
   CHECK(fx.result.passed == 1u);
   CHECK(fx.result.work_units == PRODUCT_PREVIEW_COUNT);
