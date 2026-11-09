@@ -20,6 +20,8 @@
 | STALE voxel | 轨迹膨胀区覆盖 STALE cell | STALE | PASS |
 | INVALID voxel | 栅格状态编码非法 | INVALID | PASS |
 | 动态租约不足 | track expires_us 早于 proof_end | STALE | PASS |
+| 动态 track 元数据非法 | flags 非零或 source_id 为零 | STALE | PASS |
+| 动态 track 缺少加速度界 | 存在 track，但 max_dynamic_obstacle_accel_mps2 为零 | INVALID | PASS |
 | 重复 track | 同一 track 身份重复出现 | INVALID | PASS |
 | 动态加速度上界 | 较低加速度界可通过，批准上界导致预测包络碰撞 | PASS / DYNAMIC_COLLISION | PASS |
 | 导航有效位缺失 | 清除必需导航 valid bit | INVALID | PASS |
@@ -44,12 +46,12 @@
 
 ## 最新证据
 
-- CI：[最新 Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42632671853)
-- Commit：`377c877affd6fc3765113763bedb0cc20dd5cd6b`
+- CI：[最新 Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42637434996)
+- Commit：`27630aec8a0e9f982890267cc84b8de3d11148c2`
 - M4 Host：927 / 0 failures
-- M5 Host：8,371 / 0 failures
+- M5 Host：8,430 / 0 failures
 - M4/M5 Integration：1,000 / 0 failures
-- M5 ASan/UBSan：8,371 / 0 failures
+- M5 ASan/UBSan：8,430 / 0 failures
 - M4/M5 Integration ASan/UBSan：1,000 / 0 failures
 - Cortex-M7 compile and MPC RAM checks：PASS
 - 全部 workflow jobs：success
@@ -61,7 +63,7 @@
 1. 导航 epoch、origin、frame 不匹配组合。
 2. 围栏重复顶点、退化边、边界擦边和垂直高度边界。
 3. 地图外边界、障碍物膨胀临界值和 cell 状态组合。
-4. 动态 track 过旧/未来 sample、非有限位置/速度、零/负半径和最大预测时域边界。
+4. 动态 track 过旧/未来 sample、非有限位置/速度、零/负半径和最大预测时域边界（本轮已覆盖 flags/source metadata 非法及缺少加速度界）。
 5. DFS 深度与最大工作栈压力；两个独立预算（work-unit、cell-check）均已由可达用例验证。
 6. 随机/属性 fuzz，并对关键几何边界建立可复现最小反例。
 
