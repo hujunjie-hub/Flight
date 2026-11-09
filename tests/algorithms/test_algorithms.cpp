@@ -3,6 +3,8 @@
 #include "ins_interface.h"
 #include "control_interface.h"
 #include "attitude_rate_control/controller_internal.h"
+#include "osqp.h"
+#include "quad_workspace.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
