@@ -1,5 +1,5 @@
 /*
- * M5-04 Host/SIL path smoothing.
+ * M5-05 Host/SIL minimum-jerk trajectory optimization.
  *
  * Consumes an M5-03 path and its bounded M5-04 quintic parameterization,
  * then returns minimum-jerk position quintics. Output is a candidate only.
