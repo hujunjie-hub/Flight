@@ -2112,6 +2112,7 @@ static void test_m5_safety_geofence_height_margins(void)
   /* Both lower and upper limits include the approved vertical margin. */
   safety_fx_init(&fx, 57300000u);
   safety_set_constant_position(&fx, 0.0f, 0.0f, -0.31f);
+  safety_map_reset(&fx);
   safety_set_keep_in_fence(&fx, 0.0f, 2.0f, 0.15f);
   CHECK(fence_geometry_valid(&fx.fence));
   status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
@@ -2120,6 +2121,7 @@ static void test_m5_safety_geofence_height_margins(void)
 
   safety_fx_init(&fx, 57400000u);
   safety_set_constant_position(&fx, 0.0f, 0.0f, -0.29f);
+  safety_map_reset(&fx);
   safety_set_keep_in_fence(&fx, 0.0f, 2.0f, 0.15f);
   status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
   CHECK(status != M5_SAFETY_PASS);
@@ -2127,6 +2129,7 @@ static void test_m5_safety_geofence_height_margins(void)
 
   safety_fx_init(&fx, 57500000u);
   safety_set_constant_position(&fx, 0.0f, 0.0f, -1.69f);
+  safety_map_reset(&fx);
   safety_set_keep_in_fence(&fx, 0.0f, 2.0f, 0.15f);
   status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
   CHECK(status == M5_SAFETY_PASS);
@@ -2134,6 +2137,7 @@ static void test_m5_safety_geofence_height_margins(void)
 
   safety_fx_init(&fx, 57600000u);
   safety_set_constant_position(&fx, 0.0f, 0.0f, -1.71f);
+  safety_map_reset(&fx);
   safety_set_keep_in_fence(&fx, 0.0f, 2.0f, 0.15f);
   status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
   CHECK(status != M5_SAFETY_PASS);
@@ -2143,6 +2147,7 @@ static void test_m5_safety_geofence_height_margins(void)
      conservatively reject it, but it must never be reported as PASS. */
   safety_fx_init(&fx, 57700000u);
   safety_set_constant_position(&fx, 0.0f, 0.0f, -0.15f);
+  safety_map_reset(&fx);
   safety_set_keep_in_fence(&fx, 0.0f, 2.0f, 0.15f);
   status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
   CHECK(status != M5_SAFETY_PASS);
