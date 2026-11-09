@@ -53,11 +53,17 @@ static M5SmootherResult validate_path(const M5AstarPath *path,
     return M5_SMOOTHER_INVALID_INPUT;
 
   for (i = 0u; i <= path->segment_count; ++i) {
+    uint16_t voxel;
+    uint8_t cell_state;
     if (!finite3(path->position_ned_m[i]) ||
         !finite3(path->velocity_ned_mps[i]) ||
         !finite3(path->acceleration_ned_mps2[i]) ||
         !isfinite(path->yaw_rad[i]) || !isfinite(path->yaw_rate_radps[i]))
       return M5_SMOOTHER_INVALID_INPUT;
+    if (!m5_local_map_world_to_voxel(map, path->position_ned_m[i], &voxel) ||
+        !m5_local_map_voxel_state(map, voxel, now_us, &cell_state) ||
+        cell_state != M5_MAP_CELL_FREE_CONFIRMED)
+      return M5_SMOOTHER_INPUT_STALE;
   }
   for (i = 0u; i < path->segment_count; ++i) {
     uint32_t duration;
