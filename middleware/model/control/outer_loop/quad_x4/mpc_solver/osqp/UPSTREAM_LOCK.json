@@ -15,7 +15,6 @@
   "local_modifications": "Symbolic index arrays const in Flash; static pointer casts; QDLDL numeric refactor verifies fixed L indices; embedded unused certificate buffers alias their delta work vectors.",
   "source": "https://github.com/osqp/osqp/tree/v1.0.0",
   "files": {
-    "bindings.cpp": "fb06e8904a2c26b39fde2f829afabcb95695e93028a9d641b87f2bb0db5044fb",
     "CMakeLists.txt": "ea8a50d229b1d2a455275c06dadb0a31db976192b31f769feb5eb0a910e7bf85",
     "emosqp.c": "fa39dfae53679100f7ba31afe600eab41144d61a6db220fc8512f0b8c8fb19b6",
     "inc/private/algebra_impl.h": "959ec180af6e1423f35722a3a9e662eba97aa884d7831a37292ce602d5e3eab0",
@@ -62,5 +61,9 @@
     "src/scaling.c": "a4a4190a138e516d07b88dca03d9c0fc6639f37a466a77fc59cd22da2af931a2",
     "src/util.c": "5bbaa12e7944e27cf98a12051aa61ba5179d6eac37c3ebf53cfcb979cafc8988",
     "src/vector.c": "4eb0b9632b9f9a01434a91d0d43e7976d7311e182b5a88a384fc881e2d349ac0"
-  }
+  },
+  "host_only_files": [
+    "bindings.cpp"
+  ],
+  "host_only_files_note": "Local pybind11 test wrapper; not part of the upstream OSQP v1.0.0 source tree or embedded firmware."
 }
