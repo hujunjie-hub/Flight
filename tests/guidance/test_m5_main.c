@@ -2,8 +2,8 @@
  * Host tests for M5 Guidance (QUAD_X4, NONE obstacle mode).
  *
  * Scope: reference construction, anchor+24 preview, dynamics/geofence checks,
- * READY/ACTIVE lifecycle and epoch behaviour. A-star/local-map/collision are not
- * implemented and are reported NOT_RUN.
+ * READY/ACTIVE lifecycle, plus Host/SIL-only M5-02 map and M5-03 A* kernels.
+ * The map/A* tests do not imply H723/NONE deployment or M5-06 collision proof.
  */
 #include <stdio.h>
 #include <string.h>
@@ -11,6 +11,8 @@
 #include "ports/port_api.h"
 #include "guidance_update/guidance.h"
 #include "guidance_update/guidance_internal.h"
+#include "trajectory_planning/m5_local_map.h"
+#include "trajectory_planning/m5_kinodynamic_astar.h"
 
 #define T_BOOT 0x1122334455667788ull
 #define T_EPOCH 3u
@@ -1039,6 +1041,382 @@ static void test_minimum_jerk_nonzero_endpoint_boundary_states(void)
              guidance_quintic_eval(&output[1][0], 0.0f, 2u)) < 1e-3);
 }
 
+
+static void planner_nav_init(NavigationSnapshot *nav, uint64_t now_us)
+{
+  unsigned axis;
+  memset(nav, 0, sizeof(*nav));
+  fill_header(&nav->header, MSG_NAVIGATION_SNAPSHOT, SOURCE_M3, now_us);
+  nav->state_epoch = T_STATE_EPOCH;
+  nav->origin_id = T_ORIGIN;
+  nav->core.q_nb_wxyz[0] = 1.0f;
+  for (axis = 0u; axis < 3u; ++axis) {
+    nav->core.position_std_m[axis] = 0.01f;
+    nav->core.velocity_std_mps[axis] = 0.01f;
+  }
+}
+
+static void planner_observation_init(ProductObstacleObservation *observation,
+                                     const NavigationSnapshot *nav, uint64_t now_us,
+                                     uint32_t id)
+{
+  memset(observation, 0, sizeof(*observation));
+  fill_header(&observation->header, MSG_PRODUCT_OBSTACLE_OBSERVATION,
+              SOURCE_PLATFORM, now_us);
+  observation->observation_id = id;
+  observation->sensor_instance_id = 2u;
+  observation->source_health_epoch = 1u;
+  observation->origin_id = nav->origin_id;
+  observation->state_epoch = nav->state_epoch;
+  observation->source_health = PRODUCT_OBS_SOURCE_NORMAL;
+  observation->confidence_0_to_1 = 1.0f;
+}
+
+static void test_m5_map_fixed_grid_and_bounds(void)
+{
+  float p[3], outside[3] = {4.0f, 0.0f, 0.0f};
+  uint16_t voxel = 0u;
+  p[0] = p[1] = p[2] = -4.0f;
+  CHECK(m5_local_map_world_to_voxel(p, &voxel) && voxel == 0u);
+  p[0] = p[1] = p[2] = 3.999f;
+  CHECK(m5_local_map_world_to_voxel(p, &voxel) && voxel == 4095u);
+  CHECK(!m5_local_map_world_to_voxel(outside, &voxel));
+  m5_local_map_voxel_center(4095u, p);
+  CHECK(fabsf(p[0] - 3.75f) < 1e-6f);
+  CHECK(fabsf(p[1] - 3.75f) < 1e-6f);
+  CHECK(fabsf(p[2] - 3.75f) < 1e-6f);
+}
+
+static void test_m5_map_free_ray_log_odds_and_stale(void)
+{
+  M5LocalMap map;
+  NavigationSnapshot nav;
+  ProductObstacleObservation observations[2];
+  float start[3] = {-1.75f, -1.75f, -1.75f};
+  float outside[3] = {4.0f, 0.0f, 0.0f};
+  uint8_t state = M5_MAP_CELL_INVALID;
+  const uint64_t now = 2000000u;
+
+  planner_nav_init(&nav, now);
+  CHECK(m5_local_map_init(&map, &nav, now, 0.25f, 0.30f, 2.0f,
+                          M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
+  planner_observation_init(&observations[0], &nav, now, 1u);
+  planner_observation_init(&observations[1], &nav, now, 2u);
+  for (unsigned i = 0u; i < 2u; ++i) {
+    observations[i].observation_kind = PRODUCT_OBS_FREE_SPACE_RAY;
+    observations[i].ray_start_ned_m[0] = -1.75f;
+    observations[i].ray_start_ned_m[1] = -1.75f;
+    observations[i].ray_start_ned_m[2] = -1.75f;
+    observations[i].ray_end_ned_m[0] = -1.25f;
+    observations[i].ray_end_ned_m[1] = -1.75f;
+    observations[i].ray_end_ned_m[2] = -1.75f;
+  }
+  CHECK(m5_local_map_ingest(&map, &nav, observations, 2u, now) == STATUS_OK);
+  CHECK(m5_local_map_is_ready(&map, &nav, now));
+  CHECK(m5_local_map_query(&map, start, now, &state) == STATUS_OK);
+  CHECK(state == M5_MAP_CELL_FREE_CONFIRMED);
+  CHECK(m5_local_map_query(&map, outside, now, &state) == STATUS_OUT_OF_RANGE);
+  CHECK(state == M5_MAP_CELL_INVALID);
+  CHECK(m5_local_map_query(&map, start, now + 501000u, &state) == STATUS_OK);
+  CHECK(state == M5_MAP_CELL_STALE);
+}
+
+static void test_m5_map_occupied_primitive_and_dynamic_track(void)
+{
+  M5LocalMap map;
+  NavigationSnapshot nav;
+  ProductObstacleObservation observation;
+  float center[3] = {-1.75f, -1.75f, -1.75f};
+  uint8_t state = M5_MAP_CELL_UNKNOWN;
+  const uint64_t now = 3000000u;
+
+  planner_nav_init(&nav, now);
+  CHECK(m5_local_map_init(&map, &nav, now, 0.25f, 0.30f, 2.0f,
+                          M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
+  planner_observation_init(&observation, &nav, now, 7u);
+  observation.observation_kind = PRODUCT_OBS_OCCUPIED_PRIMITIVE;
+  observation.shape_kind = PRODUCT_OBS_SHAPE_SPHERE;
+  for (unsigned axis = 0u; axis < 3u; ++axis) {
+    observation.obstacle_center_ned_m[axis] = center[axis];
+    observation.obstacle_half_extent_m[axis] = 0.25f;
+    observation.position_std_m[axis] = 0.02f;
+    observation.velocity_std_mps[axis] = 0.01f;
+  }
+  observation.obstacle_velocity_ned_mps[0] = 0.5f;
+  CHECK(m5_local_map_ingest(&map, &nav, &observation, 1u, now) == STATUS_OK);
+  CHECK(m5_local_map_query(&map, center, now, &state) == STATUS_OK);
+  CHECK(state == M5_MAP_CELL_OCCUPIED_CONFIRMED);
+  CHECK(map.tracks[0].id == 7u);
+  CHECK(map.tracks[0].source_id == 2u);
+  CHECK(fabsf(map.tracks[0].radius_m - 0.25f) < 1e-6f);
+  CHECK(map.tracks[0].expires_us == observation.header.valid_until_us);
+  CHECK(m5_local_map_is_ready(&map, &nav, now));
+}
+
+static void test_m5_map_epoch_reset_and_reject_source(void)
+{
+  M5LocalMap map;
+  NavigationSnapshot nav;
+  ProductObstacleObservation observation;
+  uint8_t state = M5_MAP_CELL_INVALID;
+  float p[3] = {-1.75f, -1.75f, -1.75f};
+  const uint64_t now = 4000000u;
+
+  planner_nav_init(&nav, now);
+  CHECK(m5_local_map_init(&map, &nav, now, 0.25f, 0.30f, 2.0f,
+                          M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
+  map.cells[0].state = M5_MAP_CELL_OCCUPIED_CONFIRMED;
+  nav.state_epoch++;
+  fill_header(&nav.header, MSG_NAVIGATION_SNAPSHOT, SOURCE_M3, now + 10000u);
+  CHECK(m5_local_map_ingest(&map, &nav, NULL, 0u, now + 10000u) == STATUS_STALE_DATA);
+  CHECK(map.state_epoch == nav.state_epoch);
+  CHECK(map.last_ingest_us == 0u);
+  CHECK(map.cells[0].state == M5_MAP_CELL_UNKNOWN);
+  planner_observation_init(&observation, &nav, now + 10000u, 8u);
+  observation.observation_kind = PRODUCT_OBS_OCCUPIED_PRIMITIVE;
+  observation.shape_kind = PRODUCT_OBS_SHAPE_POINT;
+  observation.obstacle_center_ned_m[0] = p[0];
+  observation.obstacle_center_ned_m[1] = p[1];
+  observation.obstacle_center_ned_m[2] = p[2];
+  observation.source_health = PRODUCT_OBS_SOURCE_REJECT;
+  CHECK(m5_local_map_ingest(&map, &nav, &observation, 1u, now + 10000u) ==
+        STATUS_NOT_PERMITTED);
+  CHECK(map.valid == 0u);
+  CHECK(m5_local_map_query(&map, p, now + 10000u, &state) == STATUS_NOT_PERMITTED);
+  CHECK(state == M5_MAP_CELL_INVALID);
+}
+
+static void test_m5_map_batch_validation_is_fail_closed(void)
+{
+  M5LocalMap map;
+  NavigationSnapshot nav;
+  ProductObstacleObservation observations[2];
+  const uint64_t now = 5000000u;
+  uint16_t voxel = 0u;
+  float p[3] = {-1.75f, -1.75f, -1.75f};
+
+  planner_nav_init(&nav, now);
+  CHECK(m5_local_map_init(&map, &nav, now, 0.25f, 0.30f, 2.0f,
+                          M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
+  planner_observation_init(&observations[0], &nav, now, 11u);
+  planner_observation_init(&observations[1], &nav, now, 12u);
+  observations[0].observation_kind = PRODUCT_OBS_FREE_SPACE_RAY;
+  observations[0].ray_start_ned_m[0] = p[0];
+  observations[0].ray_start_ned_m[1] = p[1];
+  observations[0].ray_start_ned_m[2] = p[2];
+  observations[0].ray_end_ned_m[0] = -1.25f;
+  observations[0].ray_end_ned_m[1] = p[1];
+  observations[0].ray_end_ned_m[2] = p[2];
+  observations[1].observation_kind = PRODUCT_OBS_OCCUPIED_PRIMITIVE;
+  observations[1].shape_kind = 99u;
+  observations[1].obstacle_center_ned_m[0] = p[0];
+  observations[1].obstacle_center_ned_m[1] = p[1];
+  observations[1].obstacle_center_ned_m[2] = p[2];
+  CHECK(m5_local_map_ingest(&map, &nav, observations, 2u, now) == STATUS_STALE_DATA);
+  CHECK(m5_local_map_world_to_voxel(p, &voxel));
+  CHECK(map.cells[voxel].log_odds == 0);
+  CHECK(map.valid == 0u);
+}
+
+static void test_m5_kinodynamic_key_and_primitive_manifest(void)
+{
+  const M5KinodynamicPrimitive *table;
+  uint8_t count = 0u, velocity_bin, yaw_bin, time_bin;
+  uint16_t voxel;
+  uint32_t key;
+  float velocity[3];
+
+  table = m5_kinodynamic_primitive_table(&count);
+  CHECK(table != NULL && count == 60u);
+  CHECK(table[0].kind == M5_PRIMITIVE_TRANSLATE && table[0].dir == 0u &&
+        table[0].speed_id == 0u && table[0].duration_us == 200000u);
+  CHECK(table[31].dir == 7u && table[31].speed_id == 1u &&
+        table[31].duration_us == 400000u);
+  CHECK(table[32].speed_id == 2u && table[32].target_speed == 2.0f);
+  CHECK(table[40].kind == M5_PRIMITIVE_VERTICAL);
+  CHECK(table[48].kind == M5_PRIMITIVE_YAW && table[48].yaw_rate_hint < 0.0f);
+  CHECK(table[56].kind == M5_PRIMITIVE_WAIT);
+  CHECK(table[58].kind == M5_PRIMITIVE_BRAKE);
+  for (unsigned i = 60u; i < 64u; ++i)
+    CHECK(table[i].kind == 0u && table[i].duration_us == 0u &&
+          table[i].target_speed == 0.0f && table[i].yaw_rate_hint == 0.0f);
+
+  key = m5_kinodynamic_encode_key(4095u, 28u, 15u, 31u);
+  CHECK(key != UINT32_MAX && (key >> 26) == 0u);
+  CHECK(m5_kinodynamic_decode_key(key, &voxel, &velocity_bin, &yaw_bin, &time_bin));
+  CHECK(voxel == 4095u && velocity_bin == 28u && yaw_bin == 15u && time_bin == 31u);
+  CHECK(m5_kinodynamic_encode_key(4096u, 0u, 0u, 0u) == UINT32_MAX);
+  CHECK(m5_kinodynamic_encode_key(0u, 29u, 0u, 0u) == UINT32_MAX);
+  CHECK(m5_kinodynamic_encode_key(0u, 0u, 0u, 32u) == UINT32_MAX);
+  CHECK(m5_kinodynamic_velocity_bin(0u, velocity));
+  CHECK(velocity[0] == 0.0f && velocity[1] == 0.0f && velocity[2] == 0.0f);
+  CHECK(m5_kinodynamic_velocity_bin(25u, velocity) && velocity[2] < 0.0f);
+  CHECK(m5_kinodynamic_velocity_bin(28u, velocity) && velocity[2] > 0.0f);
+  CHECK(!m5_kinodynamic_velocity_bin(29u, velocity));
+}
+
+static uint64_t planner_clock_read(void *context)
+{
+  return *(const uint64_t *)context;
+}
+
+typedef struct {
+  NavigationSnapshot navigation;
+  ProductGuidanceConfig config;
+  SafetyEnvelope envelope;
+  M5LocalMap map;
+  M5AstarWorkspace workspace;
+  M5AstarPath path;
+  M5AstarStats stats;
+  M5AstarRequest request;
+  uint64_t clock_us;
+} PlannerFx;
+
+static void planner_fx_init(PlannerFx *fx, uint64_t now_us)
+{
+  unsigned i, axis;
+  memset(fx, 0, sizeof(*fx));
+  fx->clock_us = now_us;
+  planner_nav_init(&fx->navigation, now_us);
+  guidance_default_config(&fx->config);
+  fx->config.payload.obstacle_source_mode = 1u; /* Host STATIC_MAP profile */
+  fx->config.payload.max_dynamic_prediction_us = 1000000u;
+  fill_header(&fx->envelope.header, MSG_SAFETY_ENVELOPE, SOURCE_M4, now_us);
+  fx->envelope.safety_envelope_id = 1u;
+  fx->envelope.max_linear_speed_mps = 4.0f;
+  fx->envelope.max_linear_accel_mps2 = 20.0f;
+  fx->envelope.max_angular_rate_radps = 10.0f;
+  fx->envelope.max_yaw_rate_radps = 2.0f;
+  fx->envelope.vehicle_extension.valid_mask = 0x7Fu;
+  fx->envelope.vehicle_extension.max_tilt_rad = 1.2f;
+  fx->envelope.vehicle_extension.min_total_thrust_n = 4.0f;
+  fx->envelope.vehicle_extension.max_total_thrust_n = 30.0f;
+  for (axis = 0u; axis < 3u; ++axis) {
+    fx->envelope.vehicle_extension.max_velocity_ned_mps[axis] =
+        fx->config.payload.max_velocity_ned_mps[axis];
+    fx->envelope.vehicle_extension.max_acceleration_ned_mps2[axis] = 20.0f;
+    fx->envelope.vehicle_extension.max_jerk_ned_mps3[axis] = 1000.0f;
+    fx->envelope.vehicle_extension.max_body_rate_frd_radps[axis] = 10.0f;
+  }
+  CHECK(m5_local_map_init(&fx->map, &fx->navigation, now_us,
+      fx->config.payload.vehicle_radius_m, fx->config.payload.clearance_margin_m,
+      fx->config.payload.uncertainty_inflation_factor,
+      fx->config.payload.max_dynamic_prediction_us) == STATUS_OK);
+  for (i = 0u; i < M5_MAP_CELL_COUNT; ++i) {
+    fx->map.cells[i].log_odds = -4;
+    fx->map.cells[i].state = M5_MAP_CELL_FREE_CONFIRMED;
+    fx->map.cells[i].source_mask = 1u;
+    fx->map.cells[i].last_update_ms = (uint32_t)(now_us / 1000u);
+  }
+  fx->map.last_ingest_us = now_us;
+  fx->map.source_deadline_us = now_us + 500000u;
+  fx->request.map = &fx->map;
+  fx->request.navigation = &fx->navigation;
+  fx->request.guidance_config = &fx->config;
+  fx->request.safety_envelope = &fx->envelope;
+  fx->request.start_position_ned_m[0] = -1.75f;
+  fx->request.start_position_ned_m[1] = -1.75f;
+  fx->request.start_position_ned_m[2] = -1.75f;
+  fx->request.start_velocity_ned_mps[0] = 1.0f;
+  fx->request.goal_position_ned_m[0] = -1.25f;
+  fx->request.goal_position_ned_m[1] = -1.75f;
+  fx->request.goal_position_ned_m[2] = -1.75f;
+  fx->request.goal_yaw_rad = 0.0f;
+  fx->request.start_yaw_rad = 0.0f;
+  fx->request.acceptance_radius_m = 0.15f;
+  fx->request.terminal_speed_max_mps = 1.1f;
+  fx->request.yaw_tolerance_rad = 0.1f;
+  fx->request.evaluation_time_us = now_us;
+  fx->request.planning_deadline_monotonic_us = now_us + 100000u;
+  fx->request.monotonic_now = planner_clock_read;
+  fx->request.clock_context = &fx->clock_us;
+}
+
+static void test_m5_astar_finds_deterministic_one_edge_path(void)
+{
+  PlannerFx fx;
+  M5AstarPath first;
+  const uint64_t now = 6000000u;
+  planner_fx_init(&fx, now);
+  CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
+      &fx.path, &fx.stats) == M5_PLANNER_OK);
+  CHECK(fx.path.segment_count == 1u);
+  CHECK(fx.path.map_revision == fx.map.map_revision);
+  CHECK(fabsf(fx.path.position_ned_m[0][0] + 1.75f) < 1e-6f);
+  CHECK(fabsf(fx.path.position_ned_m[1][0] + 1.25f) < 1e-6f);
+  CHECK(fabsf(fx.path.velocity_ned_mps[1][0] - 1.0f) < 1e-6f);
+  CHECK(fx.path.offset_us[1] == 400000u);
+  CHECK(fx.stats.expanded_nodes <= M5_ASTAR_MAX_EXPANSIONS);
+  first = fx.path;
+  CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
+      &fx.path, &fx.stats) == M5_PLANNER_OK);
+  CHECK(memcmp(&first, &fx.path, sizeof(first)) == 0);
+}
+
+static void test_m5_astar_unknown_space_and_deadline_fail_closed(void)
+{
+  PlannerFx fx;
+  uint16_t start_voxel, goal_voxel;
+  uint8_t state;
+  const uint64_t now = 7000000u;
+  planner_fx_init(&fx, now);
+  for (unsigned i = 0u; i < M5_MAP_CELL_COUNT; ++i) {
+    fx.map.cells[i].state = M5_MAP_CELL_UNKNOWN;
+    fx.map.cells[i].log_odds = 0;
+  }
+  CHECK(m5_local_map_world_to_voxel(fx.request.start_position_ned_m, &start_voxel));
+  CHECK(m5_local_map_world_to_voxel(fx.request.goal_position_ned_m, &goal_voxel));
+  fx.map.cells[start_voxel].state = M5_MAP_CELL_FREE_CONFIRMED;
+  fx.map.cells[start_voxel].log_odds = -4;
+  fx.map.cells[goal_voxel].state = M5_MAP_CELL_FREE_CONFIRMED;
+  fx.map.cells[goal_voxel].log_odds = -4;
+  CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
+      &fx.path, &fx.stats) == M5_PLANNER_NO_PATH);
+  CHECK(fx.path.segment_count == 0u);
+  CHECK(fx.stats.rejected_edges > 0u);
+  fx.clock_us = fx.request.planning_deadline_monotonic_us;
+  CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
+      &fx.path, &fx.stats) == M5_PLANNER_DEADLINE_MISSED);
+  CHECK(fx.path.segment_count == 0u);
+  CHECK(!m5_local_map_voxel_state(&fx.map, M5_MAP_CELL_COUNT, now, &state));
+}
+
+static void test_m5_astar_rejects_stale_map_and_obstacle_barrier(void)
+{
+  PlannerFx fx;
+  const uint64_t now = 8000000u;
+  planner_fx_init(&fx, now);
+  fx.map.last_ingest_us = now - M5_MAP_STALE_US - 1u;
+  CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
+      &fx.path, &fx.stats) == M5_PLANNER_INPUT_STALE);
+
+  planner_fx_init(&fx, now);
+  for (unsigned i = 0u; i < M5_MAP_CELL_COUNT; ++i) {
+    fx.map.cells[i].state = M5_MAP_CELL_UNKNOWN;
+    fx.map.cells[i].log_odds = 0;
+  }
+  /* A narrow known corridor is cut by a full occupied voxel plane. */
+  for (unsigned z = 3u; z <= 5u; ++z)
+    for (unsigned y = 3u; y <= 5u; ++y)
+      for (unsigned x = 3u; x <= 7u; ++x) {
+        uint16_t voxel = (uint16_t)((z * 16u + y) * 16u + x);
+        fx.map.cells[voxel].state = M5_MAP_CELL_FREE_CONFIRMED;
+        fx.map.cells[voxel].log_odds = -4;
+        fx.map.cells[voxel].last_update_ms = (uint32_t)(now / 1000u);
+      }
+  for (unsigned z = 3u; z <= 5u; ++z)
+    for (unsigned y = 3u; y <= 5u; ++y) {
+      uint16_t voxel = (uint16_t)((z * 16u + y) * 16u + 5u);
+      fx.map.cells[voxel].state = M5_MAP_CELL_OCCUPIED_CONFIRMED;
+      fx.map.cells[voxel].log_odds = 4;
+    }
+  fx.request.goal_position_ned_m[0] = -0.75f;
+  CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
+      &fx.path, &fx.stats) == M5_PLANNER_NO_PATH);
+  CHECK(fx.path.segment_count == 0u);
+}
+
+
 int main(void)
 {
   struct {
@@ -1078,6 +1456,15 @@ int main(void)
     {"minimum_jerk_invalid_inputs", test_minimum_jerk_rejects_invalid_inputs_atomically},
     {"minimum_jerk_objective_three_axes", test_minimum_jerk_objective_sums_three_axes},
     {"minimum_jerk_nonzero_endpoints", test_minimum_jerk_nonzero_endpoint_boundary_states},
+    {"m5_map_fixed_grid_bounds", test_m5_map_fixed_grid_and_bounds},
+    {"m5_map_free_ray_stale", test_m5_map_free_ray_log_odds_and_stale},
+    {"m5_map_occupied_dynamic_track", test_m5_map_occupied_primitive_and_dynamic_track},
+    {"m5_map_epoch_reject", test_m5_map_epoch_reset_and_reject_source},
+    {"m5_map_batch_fail_closed", test_m5_map_batch_validation_is_fail_closed},
+    {"m5_astar_key_primitives", test_m5_kinodynamic_key_and_primitive_manifest},
+    {"m5_astar_one_edge_deterministic", test_m5_astar_finds_deterministic_one_edge_path},
+    {"m5_astar_unknown_deadline", test_m5_astar_unknown_space_and_deadline_fail_closed},
+    {"m5_astar_stale_obstacle_barrier", test_m5_astar_rejects_stale_map_and_obstacle_barrier},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
