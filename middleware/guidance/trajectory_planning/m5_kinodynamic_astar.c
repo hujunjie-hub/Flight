@@ -354,6 +354,27 @@ static uint8_t make_edge(const M5AstarRequest *r, const M5AstarNode *node,
                               (uint8_t)(node_id != 0u || root_velocity_is_lattice),
                               &end_velocity_bin, end_velocity)) return 0u;
   if (!m5_kinodynamic_velocity_bin(end_velocity_bin, velocity_lattice)) return 0u;
+  if (primitive->kind == M5_PRIMITIVE_TRANSLATE ||
+      primitive->kind == M5_PRIMITIVE_VERTICAL) {
+    float target_norm = sqrtf(velocity_lattice[0]*velocity_lattice[0] +
+                              velocity_lattice[1]*velocity_lattice[1] +
+                              velocity_lattice[2]*velocity_lattice[2]);
+    if (!isfinite(primitive->target_speed) ||
+        fabsf(target_norm - primitive->target_speed) > 1e-5f) return 0u;
+  } else if (primitive->target_speed != 0.0f) {
+    return 0u;
+  }
+  if (primitive->kind == M5_PRIMITIVE_YAW) {
+    float expected_delta, hinted_delta;
+    if (!isfinite(primitive->yaw_rate_hint) || primitive->dir > 1u ||
+        primitive->speed_id < 1u || primitive->speed_id > 2u) return 0u;
+    if (node_id != 0u) {
+      expected_delta = (primitive->dir == 0u ? -1.0f : 1.0f) *
+          (float)primitive->speed_id * (M5_ASTAR_TWO_PI / 16.0f);
+      hinted_delta = primitive->yaw_rate_hint * duration;
+      if (fabsf(expected_delta - hinted_delta) > 1e-4f) return 0u;
+    }
+  }
   memcpy(end_velocity, velocity_lattice, sizeof(float) * 3u);
 
   end_yaw_bin = yaw_bin;
