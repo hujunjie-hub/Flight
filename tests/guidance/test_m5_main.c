@@ -1135,6 +1135,7 @@ static void test_m5_map_source_lease_refresh(void)
   ProductObstacleObservation observation;
   const uint64_t t0 = 2500000u;
   float p[3] = {-1.75f, -1.75f, -1.75f};
+  uint8_t state = M5_MAP_CELL_INVALID;
 
   planner_nav_init(&nav, t0);
   CHECK(m5_local_map_init(&map, &nav, t0, 0.25f, 0.30f, 2.0f,
