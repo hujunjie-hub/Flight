@@ -2315,6 +2315,51 @@ static void test_m5_safety_preview_count_mismatch_rejected(void)
 }
 
 
+static void test_m5_safety_dfs_work_unit_budget_exhaustion(void)
+{
+  SafetyFx fx;
+  unsigned i, axis;
+  uint16_t voxel = 0u;
+  const float unknown_cell[3] = {0.25f, 0.75f, 0.25f};
+  M5TrajectorySafetyStatus status;
+  safety_fx_init(&fx, 43000000u);
+
+  /* A single UNKNOWN voxel sits just outside the true inflated path. Each
+     coarse interval is unresolved, but depth-3 subdivision proves clearance.
+     Repeating this over 24 intervals exhausts DFS work units, not cell checks. */
+  fx.base.nav.core.position_ned_m[0] = 0.0f;
+  fx.base.nav.core.position_ned_m[1] = 0.25f;
+  fx.base.nav.core.position_ned_m[2] = 0.0f;
+  for (axis = 0u; axis < 3u; ++axis) {
+    fx.base.nav.core.velocity_ned_mps[axis] = 0.0f;
+    fx.base.nav.core.acceleration_ned_mps2[axis] = 0.0f;
+    fx.base.env.vehicle_extension.max_velocity_ned_mps[axis] = 60.0f;
+    fx.base.env.vehicle_extension.max_acceleration_ned_mps2[axis] = 12000.0f;
+  }
+  fx.base.env.max_linear_speed_mps = 60.0f;
+  fx.base.env.max_linear_accel_mps2 = 12000.0f;
+  safety_map_reset(&fx);
+  CHECK(m5_local_map_world_to_voxel(&fx.map, unknown_cell, &voxel));
+  fx.map.cells[voxel].state = M5_MAP_CELL_UNKNOWN;
+  fx.map.cells[voxel].log_odds = 0;
+  fx.map.cells[voxel].source_mask = 0u;
+
+  safety_point_set(&fx.reference.anchor, 0.0f, 0.25f, 0.0f,
+                   0.0f, 0.0f, 0.0f);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    float x = (i % 2u == 0u) ? 0.1f : -0.1f;
+    fx.reference.points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+    safety_point_set(&fx.reference.points[i], x, 0.25f, 0.0f,
+                     0.0f, 0.0f, 0.0f);
+  }
+
+  status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+  CHECK(status == M5_SAFETY_BUDGET_EXCEEDED);
+  CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.work_units == M5_SAFETY_MAX_WORK_UNITS + 1u);
+  CHECK(fx.result.cell_checks < M5_SAFETY_MAX_CELL_CHECKS);
+}
+
 static void test_m5_safety_cell_check_budget_exhaustion(void)
 {
   SafetyFx fx;
@@ -2529,7 +2574,8 @@ int main(void)
     {"m5_safety_nav_validity", test_m5_safety_navigation_missing_required_validity_rejected},
     {"m5_safety_map_revision", test_m5_safety_map_revision_mismatch_rejected},
     {"m5_safety_geofence_self_intersection", test_m5_safety_self_intersecting_geofence_rejected},
-    {"m5_safety_work_budget", test_m5_safety_work_budget_exhaustion_rejected},
+    {"m5_safety_cell_budget", test_m5_safety_cell_check_budget_exhaustion},
+    {"m5_safety_dfs_work_budget", test_m5_safety_dfs_work_unit_budget_exhaustion},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
