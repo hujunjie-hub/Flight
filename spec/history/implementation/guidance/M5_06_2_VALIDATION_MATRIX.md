@@ -1,52 +1,79 @@
-# M5-06.2 验证矩阵与当前审查记录
+# M5-06.2 / M5-06.4 验证矩阵与 Host 证据
 
-状态：**已补齐第一批 Host 单测源码；尚未编译、尚未执行、不得判定 PASS。**
+状态：**本轮 Host/SIL 自动化回归通过；M5-06 整体仍未验收，不具备 H723 实机避障放行效力。**
 
-## 本轮代码审查发现并修复
+## 本轮修复与验证结论
 
-1. 多类安全检查共享 unresolved 标志，静态地图检查会清除此前的围栏未决状态。已改为跨检查累积，并按 INVALID > STALE > UNKNOWN > 静态/动态碰撞 > 围栏未决的顺序保留最严格结果。
-2. 移除未使用的函数/常量，避免 Host 的 -Wall -Wextra -Werror 构建被无用静态符号阻断。
-3. 增加输入保留字段、地图保留字段、围栏 fence_id/保留字段和操作枚举检查。
-4. 结果有效期纳入导航、Home 的租约；并增加参考、directive、safety envelope 和 directive expiry 必须覆盖完整 24×20ms 预览 + response delay 的校验，不能只在验证时刻有效。
+1. 修复测试夹具中的参考点偏移初始化问题：`safety_point_set()` 原先通过 `memset` 清除了调用方预先设置的 `offset_us`，导致 24 个预览点均为零偏移。现在保留偏移字段，再初始化点的有效位和运动数据。
+2. 追加对抗性测试，覆盖 STALE/INVALID 栅格、动态障碍物中点碰撞和交叉碰撞、静态障碍物区间中段碰撞、KEEP_IN 连续越界、动态预测租约过期、重复 track ID、超限响应延迟、预览点数量/偏移错误以及 Inf 输入。
+3. 移除仅用于定位问题的临时诊断输出；测试辅助函数不再引用生产 C 文件私有宏。
+4. 先前 CI 失败均已定位：一次为测试夹具偏移清零，一次为临时诊断代码引用私有宏。最新提交已修复并完成完整回归。
 
-## 自动化测试矩阵（源码已覆盖部分场景；全部仍为 NOT_RUN）
+## 最新 CI 证据
 
-| ID | 场景 | 期望 | 源码状态 |
+- Workflow：Host validation
+- Run：[#358](https://github.com/hujunjie-hub/Flight/actions/runs/42619284762)
+- Commit：`e026fe0c63acd494ab9d18caba9833e469288ee9`
+- 结果：**全部 jobs success**
+
+| CI 项目 | 实际结果 |
+|---|---:|
+| M4 Host | 927 checks / 0 failures |
+| M5 Host | 8,357 checks / 0 failures |
+| M4/M5 Integration | 1,000 checks / 0 failures |
+| M5 ASan/UBSan | 8,357 checks / 0 failures |
+| M4/M5 Integration ASan/UBSan | 1,000 checks / 0 failures |
+| Cortex-M7 compile and MPC RAM checks | PASS |
+| Navigation and control host tests | PASS |
+| Source layout and time-service tests | PASS |
+
+以上为本次 CI 实际执行结果，不代表真实飞行环境、传感器或 H723 实机验证。
+
+## 自动化测试矩阵
+
+| ID | 场景 | 期望 | 当前结果 |
 |---|---|---|---|
-| S06-001 | 合法、全覆盖 FREE 地图、静止轨迹 | PASS | 已覆盖：m5_safety_static_free_pass |
-| S06-002 | 24 个区间任意一个点数值 NaN/Inf | INVALID | 已覆盖 NaN：m5_safety_nan_reject；Inf 待补 |
-| S06-003 | point_count 少于/多于 24、offset 不等距 | INVALID | 待补 |
-| S06-004 | reference/header/directive/envelope 任一在 proof_end 前过期 | STALE/INVALID，拒绝 | 已覆盖 reference TTL：m5_safety_reference_ttl；其他待补 |
+| S06-001 | 全覆盖 FREE 地图、静止轨迹 | PASS | Host PASS |
+| S06-002 | 预览点 NaN / Inf | INVALID | Host PASS |
+| S06-003 | 预览点数量或 offset 不符合 24×20ms 契约 | INVALID | Host PASS：数量不足、偏移不等距 |
+| S06-004 | reference 在 proof_end 前过期 | INVALID，拒绝 | Host PASS |
 | S06-005 | map_revision 与 candidate 不一致 | INVALID | 待补 |
-| S06-006 | swept volume 穿过 UNKNOWN voxel | UNKNOWN | 已覆盖：m5_safety_unknown_fail_closed |
-| S06-007 | swept volume 穿过 STALE voxel | STALE | 待补 |
-| S06-008 | swept volume 穿过 INVALID voxel | INVALID | 待补 |
-| S06-009 | 静态障碍在 vehicle radius + clearance 外侧/内侧临界值 | 外侧可证明才 PASS；内侧拒绝 | 部分覆盖：m5_safety_occupied_static_voxel；临界值待补 |
-| S06-010 | 24 个区间中间穿过静态障碍、端点均安全 | STATIC_COLLISION | 待补 |
-| S06-011 | 动态障碍迎面相撞 | DYNAMIC_COLLISION | 部分覆盖：m5_safety_dynamic_delay；直接碰撞待补 |
-| S06-012 | 动态障碍交叉路径相撞 | DYNAMIC_COLLISION | 待补 |
-| S06-013 | 动态障碍最大加速度上界导致扫掠包络相交 | DYNAMIC_COLLISION/未证明拒绝 | 待补 |
-| S06-014 | 动态 track expires_us 早于 proof_end | STALE | 待补 |
-| S06-015 | track sample 超前、过旧、重复 ID 或数值非法 | STALE/INVALID | 待补 |
-| S06-016 | keep-in 围栏内部穿越边界、端点仍在内部 | GEOFENCE_VIOLATION | 待补 |
-| S06-017 | keep-out 围栏穿越、擦边、垂直上下限越界 | GEOFENCE_VIOLATION | 已覆盖穿越：m5_safety_keepout_crossing；擦边/高度待补 |
-| S06-018 | 围栏顶点重复、自交、无效类型/保留字段 | INVALID | 待补 |
-| S06-019 | 导航缺少任一所需 valid bit 或 epoch/origin/frame 不匹配 | INVALID | 待补 |
-| S06-020 | response delay 超过配置上限 | INVALID | 待补 |
-| S06-021 | DFS 深度/工作单元/体素检查预算耗尽 | BUDGET_EXCEEDED | 待补 |
-| S06-022 | 工作栈容量边界及所有区间都需细分 | CAPACITY_EXCEEDED 或 BUDGET_EXCEEDED | 待补 |
-| S06-023 | 编译期断言验证工作栈不超过 512B | 编译通过 | 待执行 |
-| S06-024 | Host ASan/UBSan、边界 fuzz | 无内存/未定义行为错误 | 待执行 |
+| S06-006 | swept volume 穿过 UNKNOWN voxel | UNKNOWN | Host PASS |
+| S06-007 | swept volume 穿过 STALE voxel | STALE | Host PASS |
+| S06-008 | swept volume 穿过 INVALID voxel 编码 | INVALID | Host PASS |
+| S06-009 | 静态障碍物与机体膨胀区相交 | STATIC_COLLISION | Host PASS：占用栅格 |
+| S06-010 | 预览区间中段穿过静态障碍，端点安全 | STATIC_COLLISION | Host PASS |
+| S06-011 | 动态障碍物响应延迟膨胀 | DYNAMIC_COLLISION | Host PASS |
+| S06-012 | 动态障碍物交叉轨迹碰撞 | DYNAMIC_COLLISION | Host PASS |
+| S06-013 | 动态障碍最大加速度上界导致扫掠包络相交 | DYNAMIC_COLLISION / 未证明拒绝 | 待补独立边界用例 |
+| S06-014 | track expires_us 早于 proof_end | STALE | Host PASS |
+| S06-015 | track 重复 ID | INVALID | Host PASS；未来/过旧 sample 和非法数值组合待补 |
+| S06-016 | KEEP_IN 连续轨迹越界，端点在围栏内 | GEOFENCE_VIOLATION | Host PASS |
+| S06-017 | KEEP_OUT 连续穿越，端点安全 | GEOFENCE_VIOLATION | Host PASS |
+| S06-018 | 围栏自交、重复顶点、非法类型和保留字段 | INVALID | 待补 |
+| S06-019 | 导航 valid bit 缺失、epoch/origin/frame 不匹配 | INVALID | 待补 |
+| S06-020 | response delay 超过配置上限 | INVALID | Host PASS |
+| S06-021 | DFS 工作单元或体素检查预算耗尽 | BUDGET_EXCEEDED | 待补 |
+| S06-022 | 工作栈容量边界和最大细分压力 | CAPACITY/BUDGET 拒绝 | 待补 |
+| S06-023 | 工作栈固定 512B 编译期断言 | 编译通过 | Host/Cortex-M7 CI PASS |
+| S06-024 | Host ASan/UBSan | 无内存或未定义行为错误 | CI PASS；fuzz 待补 |
+| S06-025 | 动态障碍物中点碰撞 | DYNAMIC_COLLISION | Host PASS |
+| S06-026 | 动态障碍物预测租约不足 | STALE | Host PASS |
+| S06-027 | 多个动态 track 重复身份 | INVALID | Host PASS |
+| S06-028 | 预览点数量不足 | INVALID | Host PASS |
+| S06-029 | 预览点 offset 单点偏差 | INVALID | Host PASS |
 
-## 尚未关闭的审查项
+## 仍未关闭的审查项
 
-- 独立复核 Bernstein 变换、浮点外向舍入和几何距离下界；当前不能宣称形式化证明。
-- 核对动态 track 与静态 occupancy 的重复表示及其误拒绝率。
-- 验证 keep-in/keep-out 几何符号和边界容差的完整组合。
-- 第一批 Host 单测已加入 `tests/guidance/test_m5_main.c`：全 FREE 地图 PASS、UNKNOWN 拒绝、静态占用拒绝、动态响应延迟膨胀、NaN 预览拒绝、参考租约不足拒绝、KEEP_OUT 连续穿越拒绝。另增加地图 revision 和 TTL 检查仍待覆盖。
-- 真实编译和运行测试。当前 GitHub Actions 没有发现该 PR commit 对应的 workflow run；不能据此宣称 CI 通过。
-- M5-07 仍未接线，任何 PASS 结果都不能单独进入 M6。
+1. 独立复核 Bernstein 变换、浮点外向舍入和连续几何距离下界；当前不是形式化证明。
+2. 补齐动态加速度不确定性边界、导航状态失效、围栏几何畸形、map revision 失配和预算耗尽等测试。
+3. 对地图边界、障碍物擦边、动态轨迹切向相交和数值极值开展系统性测试与 fuzz。
+4. M5-07 尚未完成，M5-06 PASS 尚未成为 M6 不可绕过的发布门禁。
+5. H723 实机仍需真实传感器标定、WCET/RTA、RAM/栈、HIL 和逐级场地安全验证。
 
 ## 安全声明
 
-所有 S06 测试在取得可复现日志前均为 NOT_RUN。Host/SIL 测试不能替代 H723 的传感器标定、WCET/RTA、内存/栈分析、HIL、场地试验和安全放行。
+- M5-05 输出始终只是候选轨迹。
+- 只有 M5-06 返回 PASS 才能作为后续门禁的输入；本阶段尚未完成 M5-07 接线。
+- UNKNOWN、STALE、INVALID 和任何无法证明安全的情况均不得放行。
+- Host/SIL CI 全通过不等于 H723 已获得实机避障放行。
