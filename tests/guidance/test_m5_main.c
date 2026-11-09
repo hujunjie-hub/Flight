@@ -1388,9 +1388,18 @@ static void test_m5_astar_finds_deterministic_one_edge_path(void)
   PlannerFx fx;
   M5AstarPath first;
   const uint64_t now = 6000000u;
+  M5PlannerResult result;
   planner_fx_init(&fx, now);
-  CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
-      &fx.path, &fx.stats) == M5_PLANNER_OK);
+  result = m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
+      &fx.path, &fx.stats);
+  if (result != M5_PLANNER_OK) {
+    printf("A* diagnostic result=%u expanded=%u generated=%u rejected=%u nodes=%u open=%u map_ready=%u\\n",
+        (unsigned)result, (unsigned)fx.stats.expanded_nodes,
+        (unsigned)fx.stats.generated_edges, (unsigned)fx.stats.rejected_edges,
+        (unsigned)fx.stats.node_count, (unsigned)fx.workspace.open_count,
+        (unsigned)m5_local_map_is_ready(&fx.map, &fx.navigation, now));
+  }
+  CHECK(result == M5_PLANNER_OK);
   CHECK(fx.path.segment_count == 1u);
   CHECK(fx.path.map_revision == fx.map.map_revision);
   CHECK(fabsf(fx.path.position_ned_m[0][0] + 1.75f) < 1e-6f);
