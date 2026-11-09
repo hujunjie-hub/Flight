@@ -1680,7 +1680,7 @@ static void test_m5_smoother_builds_single_edge_candidate(void)
               fx.path.position_ned_m[0][0]) < 1e-5f);
   CHECK(fabsf(guidance_quintic_eval(&output.position[0][0], 0.4f, 0u) -
               fx.path.position_ned_m[1][0]) < 1e-4f);
-  CHECK(quintic_finite(&output.yaw[0]));
+  for (unsigned i = 0u; i < 6u; ++i) CHECK(isfinite(output.yaw[0].c[i]));
 }
 
 static void test_m5_smoother_optimizes_two_segment_path_continuously(void)
