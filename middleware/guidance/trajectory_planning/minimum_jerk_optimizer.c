@@ -274,11 +274,11 @@ uint8_t guidance_minimum_jerk_optimize(
   memset(workspace->candidate, 0, sizeof(workspace->candidate));
 
   for (axis = 0u; axis < 3u; ++axis) {
+    double axis_initial = 0.0;
+    double axis_optimized = 0.0;
     memset(workspace->hessian, 0, sizeof(workspace->hessian));
     memset(workspace->gradient, 0, sizeof(workspace->gradient));
     memset(workspace->solution, 0, sizeof(workspace->solution));
-    total_initial = 0.0;
-    total_optimized = 0.0;
 
     /* Assemble local segment quadratics into a global block-tridiagonal system. */
     for (segment = 0u; segment < segment_count; ++segment) {
@@ -293,7 +293,7 @@ uint8_t guidance_minimum_jerk_optimize(
       if (!isfinite(base_cost)) {
         return 0u;
       }
-      total_initial += base_cost;
+      axis_initial += base_cost;
 
       if (segment > 0u) {
         workspace->active_local[local_count] = 0u;
@@ -373,11 +373,11 @@ uint8_t guidance_minimum_jerk_optimize(
     {
       double optimized_axis = axis_total_cost(knot_position, segment_duration_s,
           segment_count, axis, workspace);
-      double tolerance = 1e-9 * fmax(1.0, total_initial);
+      double tolerance = 1e-9 * fmax(1.0, axis_initial);
       if (!isfinite(optimized_axis) || optimized_axis > total_initial + tolerance) {
         return 0u;
       }
-      total_optimized += optimized_axis;
+      axis_optimized = optimized_axis;
     }
     for (segment = 0u; segment < segment_count; ++segment) {
       double coefficients[6];
@@ -391,6 +391,8 @@ uint8_t guidance_minimum_jerk_optimize(
       }
       memcpy(workspace->candidate[segment][axis].c, coefficients, sizeof(coefficients));
     }
+    total_initial += axis_initial;
+    total_optimized += axis_optimized;
   }
 
   for (segment = 0u; segment < segment_count; ++segment) {
