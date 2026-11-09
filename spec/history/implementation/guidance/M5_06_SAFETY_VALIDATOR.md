@@ -1,6 +1,6 @@
 # M5-06 独立轨迹安全验证器（实现切片）
 
-状态：**实现进行中 / 尚未验收 / 不具备实机避障放行效力**
+状态：**Host/SIL 自动化回归通过；整体实现进行中；尚未验收；不具备 H723 实机避障放行效力。**
 
 ## 边界
 
@@ -18,6 +18,21 @@
 - 检查导航、参考、指令、安全包络、地图、Home 和围栏的消息类型、有效位、frame、boot/time/state/origin epoch、TTL 和数值范围。
 - 只接受 GUIDANCE_REFERENCE_TRAJECTORY；Pilot/Altitude-only 参考不冒充 3D 避障轨迹。
 - 失败原因独立编码；所有非 PASS 状态都必须拒绝。
+- Host 测试覆盖连续静态碰撞、动态中点/交叉碰撞、UNKNOWN/STALE/INVALID、KEEP_IN/KEEP_OUT 穿越、动态租约过期、重复 track、输入数值错误和响应延迟上限。
+
+## 最新 Host/SIL 证据
+
+- GitHub Actions：[Host validation Run #358](https://github.com/hujunjie-hub/Flight/actions/runs/42619284762)
+- Commit：`e026fe0c63acd494ab9d18caba9833e469288ee9`
+- M4 Host：927 checks / 0 failures
+- M5 Host：8,357 checks / 0 failures
+- M4/M5 Integration：1,000 checks / 0 failures
+- M5 ASan/UBSan：8,357 checks / 0 failures
+- M4/M5 Integration ASan/UBSan：1,000 checks / 0 failures
+- Cortex-M7 编译及 MPC RAM 检查：PASS
+- 导航/控制、源码布局和时间服务回归：PASS
+
+本轮还修复了测试夹具中 `safety_point_set()` 清零 `offset_us` 的问题。该问题导致测试轨迹不满足 24×20ms 契约，并使安全验证器正确拒绝输入；修复后所有当前纳入 CI 的 M5 安全测试通过。
 
 ## 产品参数要求
 
@@ -27,12 +42,12 @@ response_delay_us 必须覆盖感知数据年龄、验证/调度延迟和控制/
 
 ## 未完成项
 
-1. 为 M5-06 增加完整 Host 数据集和 adversarial 单测：24 区间穿越、静态膨胀边界、动态迎面/交叉/加速、预测过期、地图外、围栏边缘、NaN/Inf、工作栈/栅格访问预算。
-2. 复核几何证明的保守性、浮点舍入误差和边界容差；完成独立代码审查。
-3. M5-07 接入 M5-05 candidate、M5-06 result、FMS Permit 和 M6 消费端，保证候选无法绕过验证器。
-4. 更新 spec/09 证据台账，Host/SIL 分开记录；当前全部 M5-COL 测试仍为 NOT_RUN。
-5. H723 实机仍需真实障碍传感器、标定、WCET/RTA、RAM/栈、HIL 和逐级安全测试；Host/SIL 通过不等于实机放行。
+1. 补齐动态加速度边界、导航状态有效位/epoch、围栏畸形几何、map revision 失配和预算耗尽测试。
+2. 复核地图边界、擦边碰撞、切向动态交会和数值极值；开展边界 fuzz。
+3. 独立复核 Bernstein 变换、浮点舍入误差、几何距离下界和所有连续性证明；当前不能宣称形式化证明。
+4. M5-07 接入 M5-05 candidate、M5-06 result、FMS Permit 和 M6 消费端，保证候选无法绕过验证器。
+5. H723 实机仍需真实障碍传感器、标定、WCET/RTA、RAM/栈、HIL 和逐级安全测试。
 
 ## 本切片的结论
 
-新增验证器源文件和接口已经提交到独立分支，但尚未执行编译、单测、ASan/UBSan、目标构建或独立审查。因此状态不能标记 PASS，不能合并到 main，也不能接入可执行飞行链路。
+当前 Host/SIL 回归已取得可复现 CI 证据，但 M5-06 尚未完成独立安全审查与 M5-07 门禁接线。不得合并到 main，不得接入可执行飞行链路，不得据此宣称 H723 实机避障能力已放行。
