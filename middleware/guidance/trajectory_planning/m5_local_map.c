@@ -6,6 +6,7 @@
 
 #if defined(FLIGHT_M5_HOST_PLANNER)
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include "guidance_update/guidance_internal.h"
 #include "trajectory_planning/m5_local_map.h"
@@ -274,11 +275,21 @@ static uint8_t update_occupied(M5LocalMap *map, const ProductObstacleObservation
     memcpy(half, o->obstacle_half_extent_m, sizeof(half));
   }
   for (axis = 0u; axis < 3u; ++axis) {
+    float relative_low, relative_high;
     half[axis] += map->uncertainty_inflation_factor * o->position_std_m[axis];
     low[axis] = o->obstacle_center_ned_m[axis] - half[axis];
     high[axis] = o->obstacle_center_ned_m[axis] + half[axis];
-    lo[axis] = (int)floorf((low[axis] - map->center_ned_m[axis] + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
-    hi[axis] = (int)floorf((high[axis] - map->center_ned_m[axis] + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
+    if (!isfinite(half[axis]) || !isfinite(low[axis]) || !isfinite(high[axis]))
+      return 0u;
+    relative_low = low[axis] - map->center_ned_m[axis];
+    relative_high = high[axis] - map->center_ned_m[axis];
+    if (!isfinite(relative_low) || !isfinite(relative_high)) return 0u;
+    if (relative_high < -M5_MAP_HALF_EXTENT_M ||
+        relative_low >= M5_MAP_HALF_EXTENT_M) return 1u;
+    if (relative_low < -M5_MAP_HALF_EXTENT_M) relative_low = -M5_MAP_HALF_EXTENT_M;
+    if (relative_high >= M5_MAP_HALF_EXTENT_M) relative_high = M5_MAP_HALF_EXTENT_M - 1e-6f;
+    lo[axis] = (int)floorf((relative_low + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
+    hi[axis] = (int)floorf((relative_high + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
     if (lo[axis] < 0) lo[axis] = 0;
     if (hi[axis] > 15) hi[axis] = 15;
   }
