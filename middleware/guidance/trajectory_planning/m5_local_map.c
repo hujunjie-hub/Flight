@@ -155,7 +155,7 @@ static int choose_track_slot(const M5LocalMap *map, uint32_t id, uint16_t source
 }
 
 static void update_cell(M5LocalMap *map, uint16_t voxel, int delta,
-                        uint16_t source_id, uint64_t sample_us)
+                        uint16_t source_id, uint64_t sample_us, uint64_t valid_until_us)
 {
   M5MapCell *cell = &map->cells[voxel];
   int value = (int)cell->log_odds + delta;
@@ -163,7 +163,13 @@ static void update_cell(M5LocalMap *map, uint16_t voxel, int delta,
   if (value > 32) value = 32;
   cell->log_odds = (int8_t)value;
   cell->source_mask = (uint16_t)(cell->source_mask | (uint16_t)(1u << (source_id & 15u)));
-  cell->last_update_ms = (uint32_t)(sample_us / 1000u);
+  {
+    uint64_t freshness_anchor_us = sample_us;
+    uint64_t lease_anchor_us = valid_until_us > M5_MAP_STALE_US ?
+        valid_until_us - M5_MAP_STALE_US : 0u;
+    if (lease_anchor_us < freshness_anchor_us) freshness_anchor_us = lease_anchor_us;
+    cell->last_update_ms = (uint32_t)(freshness_anchor_us / 1000u);
+  }
   if (value <= -4) cell->state = M5_MAP_CELL_FREE_CONFIRMED;
   else if (value >= 4) cell->state = M5_MAP_CELL_OCCUPIED_CONFIRMED;
   else cell->state = M5_MAP_CELL_UNKNOWN;
@@ -191,7 +197,7 @@ static uint8_t update_free_ray(M5LocalMap *map, const ProductObstacleObservation
     /* Multiple ray samples in one cell are one observation, not independent hits. */
     if (voxel != previous_voxel) {
       update_cell(map, voxel, -2, (uint16_t)o->sensor_instance_id,
-                  o->header.timestamp_sample_us);
+                  o->header.timestamp_sample_us, o->header.valid_until_us);
       previous_voxel = voxel;
     }
   }
@@ -228,7 +234,7 @@ static uint8_t update_occupied(M5LocalMap *map, const ProductObstacleObservation
       for (ix = (unsigned)lo[0]; ix <= (unsigned)hi[0]; ++ix) {
         uint16_t voxel = (uint16_t)((iz * 16u + iy) * 16u + ix);
         update_cell(map, voxel, 4, (uint16_t)o->sensor_instance_id,
-                    o->header.timestamp_sample_us);
+                    o->header.timestamp_sample_us, o->header.valid_until_us);
       }
   return 1u;
 }
