@@ -287,6 +287,8 @@ static void test_mpc_and_modes() {
     point.point.position_ned_m[0] = .05f;
   Status s = control_outer_update(&step.in);
   CHECK(s == STATUS_OK);
+  CHECK(std::isfinite(quad_solver.info->obj_val));
+  CHECK(quad_solver.info->obj_val < 0.0f); // Better than the zero-input baseline.
   CHECK(controller_update(&step.in, &out) == STATUS_OK);
   CHECK(m6.previous_accel[0] > 0);
   CHECK(m6.previous_accel[0] <= .02001f); // 1 ms jerk, not the MPC's 20 ms
