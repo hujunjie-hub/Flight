@@ -23,6 +23,7 @@
 #define M5_SAFETY_ANCHOR_VELOCITY_TOL_MPS 0.10f
 #define M5_SAFETY_ANCHOR_ACCEL_TOL_MPS2 0.25f
 #define M5_SAFETY_CELL_HALF_M (0.5f * M5_MAP_CELL_SIZE_M)
+#define M5_SAFETY_GEOMETRY_EPSILON_M 0.00001f
  
 static const double choose[6][6] = {
   {1.0, 0.0, 0.0, 0.0, 0.0, 0.0},
@@ -45,6 +46,8 @@ typedef struct {
   float speed_bound;
   float acceleration_bound;
   float velocity_mid_norm;
+  float position_rounding_error_m;
+  float velocity_rounding_error_mps;
   float half_duration_s;
 } M5SafetyCurveBounds;
 
@@ -59,12 +62,36 @@ static uint8_t finite3(const float v[3])
   return (uint8_t)(isfinite(v[0]) && isfinite(v[1]) && isfinite(v[2]));
 }
 
-static float norm3(const float v[3])
+static float round_up_float(double value)
 {
-  return sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+  float rounded = (float)value;
+  if (!isfinite(rounded)) return rounded;
+  if ((double)rounded < value) rounded = nextafterf(rounded, INFINITY);
+  return rounded;
 }
 
- static uint64_t earlier_u64(uint64_t a, uint64_t b)
+static float round_down_float(double value)
+{
+  float rounded = (float)value;
+  if (!isfinite(rounded)) return rounded;
+  if ((double)rounded > value) rounded = nextafterf(rounded, -INFINITY);
+  return rounded;
+}
+
+static float norm3_upper(const float v[3])
+{
+  const double x = v[0], y = v[1], z = v[2];
+  return round_up_float(sqrt(x * x + y * y + z * z));
+}
+
+static float norm3_lower(const double x, const double y, const double z)
+{
+  double value = sqrt(x * x + y * y + z * z);
+  float rounded = round_down_float(value);
+  return rounded > 0.0f ? nextafterf(rounded, -INFINITY) : 0.0f;
+}
+
+static uint64_t earlier_u64(uint64_t a, uint64_t b)
 {
   return a < b ? a : b;
 }
@@ -420,6 +447,7 @@ static uint8_t curve_bounds(
   double velocity_control[3][5];
   double acceleration_control[3][4];
   double speed2 = 0.0, acceleration2 = 0.0, velocity_mid2 = 0.0;
+  double position_rounding2 = 0.0, velocity_rounding2 = 0.0;
   unsigned axis, i;
   if (!(duration_s > 0.0f) || !isfinite(duration_s)) return 0u;
 
@@ -447,25 +475,40 @@ static uint8_t curve_bounds(
     }
     bounds->position_low[axis] = (float)p_low;
     bounds->position_high[axis] = (float)p_high;
-    bounds->position[axis] = (float)evaluate_bernstein(curve->position[axis], 5u, 0.5);
-    bounds->velocity[axis] =
-        (float)evaluate_bernstein(velocity_control[axis], 4u, 0.5);
+      {
+      double position_mid = evaluate_bernstein(curve->position[axis], 5u, 0.5);
+      double velocity_mid = evaluate_bernstein(velocity_control[axis], 4u, 0.5);
+      bounds->position[axis] = (float)position_mid;
+      bounds->velocity[axis] = (float)velocity_mid;
+      position_rounding2 +=
+          ((double)bounds->position[axis] - position_mid) *
+          ((double)bounds->position[axis] - position_mid);
+      velocity_rounding2 +=
+          ((double)bounds->velocity[axis] - velocity_mid) *
+          ((double)bounds->velocity[axis] - velocity_mid);
+      velocity_mid2 += velocity_mid * velocity_mid;
+    }
+    bounds->position_low[axis] = round_down_float(p_low);
+    bounds->position_high[axis] = round_up_float(p_high);
     if (!isfinite(bounds->position_low[axis]) ||
         !isfinite(bounds->position_high[axis]) ||
         !isfinite(bounds->position[axis]) ||
         !isfinite(bounds->velocity[axis])) return 0u;
     speed2 += v_abs * v_abs;
     acceleration2 += a_abs * a_abs;
-    velocity_mid2 += (double)bounds->velocity[axis] * bounds->velocity[axis];
   }
 
-  bounds->speed_bound = (float)sqrt(speed2);
-  bounds->acceleration_bound = (float)sqrt(acceleration2);
-  bounds->velocity_mid_norm = (float)sqrt(velocity_mid2);
+  bounds->speed_bound = round_up_float(sqrt(speed2));
+  bounds->acceleration_bound = round_up_float(sqrt(acceleration2));
+  bounds->velocity_mid_norm = round_up_float(sqrt(velocity_mid2));
+  bounds->position_rounding_error_m = round_up_float(sqrt(position_rounding2));
+  bounds->velocity_rounding_error_mps = round_up_float(sqrt(velocity_rounding2));
   bounds->half_duration_s = 0.5f * duration_s;
   return (uint8_t)(isfinite(bounds->speed_bound) &&
       isfinite(bounds->acceleration_bound) &&
-      isfinite(bounds->velocity_mid_norm));
+      isfinite(bounds->velocity_mid_norm) &&
+      isfinite(bounds->position_rounding_error_m) &&
+      isfinite(bounds->velocity_rounding_error_mps));
 }
 
 static M5TrajectorySafetyStatus state_status(uint8_t state)
@@ -515,7 +558,7 @@ static M5TrajectorySafetyStatus check_static_map(
     M5SafetyCheck *check)
 {
   const M5LocalMap *map = in->map;
-  float search_radius = swept_radius + inflation;
+  float search_radius = round_up_float((double)swept_radius + inflation);
   float low[3], high[3];
   int lo[3], hi[3];
   unsigned axis, x, y, z;
@@ -523,14 +566,16 @@ static M5TrajectorySafetyStatus check_static_map(
    if (!isfinite(search_radius) || search_radius < 0.0f)
     return M5_SAFETY_NUMERIC_FAILURE;
 
-  if (point_outside_map(map, curve->position, inflation))
+  if (point_outside_map(map, curve->position,
+                       round_up_float((double)inflation +
+                                      curve->position_rounding_error_m)))
     return M5_SAFETY_UNKNOWN;
 
   for (axis = 0u; axis < 3u; ++axis) {
     float map_low = map->center_ned_m[axis] - M5_MAP_HALF_EXTENT_M;
     float map_high = map->center_ned_m[axis] + M5_MAP_HALF_EXTENT_M;
-    low[axis] = curve->position[axis] - search_radius;
-    high[axis] = curve->position[axis] + search_radius;
+    low[axis] = round_down_float((double)curve->position[axis] - search_radius);
+    high[axis] = round_up_float((double)curve->position[axis] + search_radius);
     if (low[axis] < map_low || high[axis] >= map_high) {
       mark_unresolved(check, M5_SAFETY_UNKNOWN);
       return M5_SAFETY_PASS;
@@ -546,7 +591,8 @@ static M5TrajectorySafetyStatus check_static_map(
       for (x = (unsigned)lo[0]; x <= (unsigned)hi[0]; ++x) {
         uint16_t voxel = (uint16_t)((z * M5_MAP_DIM + y) * M5_MAP_DIM + x);
         uint8_t state;
-        float center[3], d[3], distance;
+        float center[3], distance;
+        double d2 = 0.0;
         M5TrajectorySafetyStatus status;
         if (++result->cell_checks > M5_SAFETY_MAX_CELL_CHECKS)
           return M5_SAFETY_BUDGET_EXCEEDED;
@@ -554,10 +600,14 @@ static M5TrajectorySafetyStatus check_static_map(
           return M5_SAFETY_INVALID;
         status = state_status(state);
         m5_local_map_voxel_center(map, voxel, center);
-        for (axis = 0u; axis < 3u; ++axis)
-          d[axis] = fmaxf(fabsf(curve->position[axis] - center[axis]) -
-                          M5_SAFETY_CELL_HALF_M, 0.0f);
-        distance = norm3(d);
+        for (axis = 0u; axis < 3u; ++axis) {
+          double delta = fabs((double)curve->position[axis] - center[axis]) -
+                         M5_SAFETY_CELL_HALF_M;
+          if (delta > 0.0) d2 += delta * delta;
+        }
+        distance = norm3_lower(sqrt(d2), 0.0, 0.0);
+        distance = fmaxf(0.0f, round_down_float(
+            (double)distance - curve->position_rounding_error_m));
         if (!isfinite(distance)) return M5_SAFETY_NUMERIC_FAILURE;
 
         if (distance <= inflation && status != M5_SAFETY_PASS)
@@ -586,12 +636,16 @@ static M5TrajectorySafetyStatus check_geofences(
     float clearance, height_mid, height_low, height_high;
     float min_height, max_height;
     result->geofence_checks++;
-    clearance = fence_clearance(f, curve->position[0], curve->position[1]);
+    clearance = round_down_float((double)fence_clearance(
+        f, curve->position[0], curve->position[1]) -
+        M5_SAFETY_GEOMETRY_EPSILON_M);
     height_mid = home_down - curve->position[2];
-    height_low = home_down - curve->position_high[2];
-    height_high = home_down - curve->position_low[2];
-    min_height = f->min_height_above_home_m + f->vertical_margin_m + inflation;
-    max_height = f->max_height_above_home_m - f->vertical_margin_m - inflation;
+    height_low = round_down_float((double)home_down - curve->position_high[2]);
+    height_high = round_up_float((double)home_down - curve->position_low[2]);
+    min_height = round_up_float((double)f->min_height_above_home_m +
+        f->vertical_margin_m + inflation);
+    max_height = round_down_float((double)f->max_height_above_home_m -
+        f->vertical_margin_m - inflation);
     if (!isfinite(clearance) || !isfinite(height_mid) ||
         !isfinite(height_low) || !isfinite(height_high) ||
         !isfinite(min_height) || !isfinite(max_height) ||
@@ -671,6 +725,7 @@ static M5TrajectorySafetyStatus check_dynamic_tracks(
     float obstacle_speed, relative_speed, relative_accel;
     float uncertainty_horizon, uncertainty, combined_radius;
     float sweep_v, sweep_a, relative_sweep, distance;
+    double obstacle_rounding2 = 0.0;
     if (t->id == 0u) continue;
     if (++result->track_checks > M5_SAFETY_MAX_WORK_UNITS * M5_MAP_MAX_TRACKS)
       return M5_SAFETY_BUDGET_EXCEEDED;
@@ -678,36 +733,51 @@ static M5TrajectorySafetyStatus check_dynamic_tracks(
     {
       uint64_t interval_mid_us = r->header.timestamp_sample_us +
           (uint64_t)(horizon_mid_s * 1000000.0f);
+      double dt_exact;
       if (interval_mid_us >= t->sample_us)
-        dt = (float)(interval_mid_us - t->sample_us) * 1e-6f;
+        dt_exact = (double)(interval_mid_us - t->sample_us) * 1e-6;
       else
-        dt = -(float)(t->sample_us - interval_mid_us) * 1e-6f;
+        dt_exact = -(double)(t->sample_us - interval_mid_us) * 1e-6;
+      dt = (float)dt_exact;
+      for (axis = 0u; axis < 3u; ++axis) {
+        double predicted = (double)t->position_ned_m[axis] +
+                           (double)t->velocity_ned_mps[axis] * dt_exact;
+        obstacle[axis] = (float)predicted;
+        obstacle_rounding2 += ((double)obstacle[axis] - predicted) *
+                              ((double)obstacle[axis] - predicted);
+        relative_velocity[axis] = curve->velocity[axis] - t->velocity_ned_mps[axis];
+      }
     }
-    for (axis = 0u; axis < 3u; ++axis) {
-      obstacle[axis] = t->position_ned_m[axis] + t->velocity_ned_mps[axis] * dt;
-      relative_velocity[axis] = curve->velocity[axis] - t->velocity_ned_mps[axis];
-    }
-    if (!finite3(obstacle) || !finite3(relative_velocity))
+    if (!finite3(obstacle) || !finite3(relative_velocity) || !isfinite(dt))
       return M5_SAFETY_NUMERIC_FAILURE;
 
-    obstacle_speed = norm3(t->velocity_ned_mps);
-    relative_speed = norm3(relative_velocity) + t->velocity_std_mps;
-    relative_accel = curve->acceleration_bound + dynamic_accel;
-    uncertainty_horizon = fabsf(dt) + half_dt + delay_s;
-    uncertainty = map->uncertainty_inflation_factor *
-        (t->position_std_m + uncertainty_horizon * t->velocity_std_mps +
-         0.5f * dynamic_accel * uncertainty_horizon * uncertainty_horizon);
-    combined_radius = t->radius_m + inflation + uncertainty;
-    sweep_v = (curve->speed_bound + obstacle_speed + t->velocity_std_mps) * half_dt;
-    sweep_a = relative_speed * half_dt +
-              0.5f * relative_accel * half_dt * half_dt +
-              t->velocity_std_mps * half_dt;
+    obstacle_speed = norm3_upper(t->velocity_ned_mps);
+    relative_speed = round_up_float((double)norm3_upper(relative_velocity) +
+        curve->velocity_rounding_error_mps + t->velocity_std_mps);
+    relative_accel = round_up_float((double)curve->acceleration_bound + dynamic_accel);
+    uncertainty_horizon = round_up_float(fabs((double)dt) + half_dt + delay_s);
+    uncertainty = round_up_float((double)map->uncertainty_inflation_factor *
+        ((double)t->position_std_m +
+         (double)uncertainty_horizon * t->velocity_std_mps +
+         0.5 * dynamic_accel * uncertainty_horizon * uncertainty_horizon));
+    /* During response delay the obstacle's known nominal velocity also moves
+       it. Inflate by that bounded displacement; acceleration and velocity
+       uncertainty are already included above. */
+    combined_radius = round_up_float((double)t->radius_m + inflation + uncertainty +
+        (double)obstacle_speed * delay_s + sqrt(obstacle_rounding2));
+    sweep_v = round_up_float(((double)curve->speed_bound + obstacle_speed +
+        t->velocity_std_mps) * half_dt);
+    sweep_a = round_up_float((double)relative_speed * half_dt +
+        0.5 * relative_accel * half_dt * half_dt +
+        (double)t->velocity_std_mps * half_dt);
     relative_sweep = fminf(sweep_v, sweep_a);
     {
-      float delta[3];
-      for (axis = 0u; axis < 3u; ++axis)
-        delta[axis] = curve->position[axis] - obstacle[axis];
-      distance = norm3(delta);
+      double dx = (double)curve->position[0] - obstacle[0];
+      double dy = (double)curve->position[1] - obstacle[1];
+      double dz = (double)curve->position[2] - obstacle[2];
+      distance = norm3_lower(dx, dy, dz);
+      distance = fmaxf(0.0f, round_down_float((double)distance -
+          curve->position_rounding_error_m - round_up_float(sqrt(obstacle_rounding2))));
     }
     if (!isfinite(combined_radius) || !isfinite(relative_sweep) ||
         !isfinite(distance)) return M5_SAFETY_NUMERIC_FAILURE;
@@ -729,9 +799,9 @@ static uint8_t compute_inflation(
   const NavigationSnapshot *nav = in->navigation;
   float position_std[3], velocity_std[3];
   float home_std[3] = {0.0f, 0.0f, 0.0f};
-  float uncertainty_horizon = horizon_mid_s +
-      (float)in->response_delay_us * 1e-6f;
-  float delay_s = (float)in->response_delay_us * 1e-6f;
+  double uncertainty_horizon = (double)horizon_mid_s +
+      (double)in->response_delay_us * 1e-6;
+  double delay_s = (double)in->response_delay_us * 1e-6;
   unsigned axis;
   for (axis = 0u; axis < 3u; ++axis) {
     position_std[axis] = nav->core.position_std_m[axis];
@@ -742,13 +812,21 @@ static uint8_t compute_inflation(
       home_std[axis] = in->directive->payload.home.position_std_m[axis];
   }
   {
-    float uncertainty = norm3(position_std) +
-        uncertainty_horizon * norm3(velocity_std) +
-        norm3(home_std);
-    float delay_motion = curve->speed_bound * delay_s +
-        0.5f * curve->acceleration_bound * delay_s * delay_s;
-    *inflation = map->vehicle_radius_m + map->clearance_margin_m +
-        map->uncertainty_inflation_factor * uncertainty + delay_motion;
+    double position_norm = sqrt((double)position_std[0] * position_std[0] +
+        (double)position_std[1] * position_std[1] +
+        (double)position_std[2] * position_std[2]);
+    double velocity_norm = sqrt((double)velocity_std[0] * velocity_std[0] +
+        (double)velocity_std[1] * velocity_std[1] +
+        (double)velocity_std[2] * velocity_std[2]);
+    double home_norm = sqrt((double)home_std[0] * home_std[0] +
+        (double)home_std[1] * home_std[1] +
+        (double)home_std[2] * home_std[2]);
+    double uncertainty = position_norm + uncertainty_horizon * velocity_norm + home_norm;
+    double delay_motion = curve->speed_bound * delay_s +
+        0.5 * curve->acceleration_bound * delay_s * delay_s;
+    *inflation = round_up_float((double)map->vehicle_radius_m +
+        map->clearance_margin_m +
+        (double)map->uncertainty_inflation_factor * uncertainty + delay_motion);
   }
   return (uint8_t)(isfinite(*inflation) && *inflation > 0.0f);
 }
@@ -839,34 +917,34 @@ M5TrajectorySafetyStatus m5_trajectory_safety_validate(
                       M5_SAFETY_REASON_DYNAMICS, offset_us);
       }
       for (axis = 0u; axis < 3u; ++axis) {
-        float velocity_abs = 0.0f, acceleration_abs = 0.0f;
+        double velocity_abs = 0.0, acceleration_abs = 0.0;
         unsigned k;
         double velocity_control[5], acceleration_control[4];
         for (k = 0u; k < 5u; ++k) {
           velocity_control[k] = 5.0 *
               (bezier.position[axis][k + 1u] - bezier.position[axis][k]) /
               local_duration;
-          velocity_abs = fmaxf(velocity_abs, (float)fabs(velocity_control[k]));
+          velocity_abs = fmax(velocity_abs, fabs(velocity_control[k]));
         }
         for (k = 0u; k < 4u; ++k) {
           acceleration_control[k] = 4.0 *
               (velocity_control[k + 1u] - velocity_control[k]) /
               local_duration;
-          acceleration_abs = fmaxf(acceleration_abs,
-                                   (float)fabs(acceleration_control[k]));
+          acceleration_abs = fmax(acceleration_abs, fabs(acceleration_control[k]));
         }
-        if (velocity_abs > e->max_velocity_ned_mps[axis] + 1e-4f ||
-            acceleration_abs > e->max_acceleration_ned_mps2[axis] + 1e-4f) {
+        if (round_up_float(velocity_abs) > e->max_velocity_ned_mps[axis] + 1e-4f ||
+            round_up_float(acceleration_abs) > e->max_acceleration_ned_mps2[axis] + 1e-4f) {
           return reject(result, M5_SAFETY_DYNAMICS_VIOLATION,
                         M5_SAFETY_REASON_DYNAMICS, offset_us);
         }
       }
     }
 
-    swept_radius = fminf(curve.speed_bound * curve.half_duration_s,
-        curve.velocity_mid_norm * curve.half_duration_s +
-        0.5f * curve.acceleration_bound *
-            curve.half_duration_s * curve.half_duration_s);
+    swept_radius = round_up_float(fmin(
+        (double)curve.speed_bound * curve.half_duration_s,
+        (double)curve.velocity_mid_norm * curve.half_duration_s +
+        0.5 * curve.acceleration_bound * curve.half_duration_s *
+            curve.half_duration_s) + curve.position_rounding_error_m);
     if (!isfinite(swept_radius) || swept_radius < 0.0f ||
         !compute_inflation(input, &curve, local_mid, &inflation))
       return reject(result, M5_SAFETY_NUMERIC_FAILURE,
