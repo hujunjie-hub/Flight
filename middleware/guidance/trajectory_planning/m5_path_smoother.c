@@ -74,9 +74,10 @@ static M5SmootherResult validate_path(const M5AstarPath *path,
         duration % GUIDANCE_TIME_BIN_US != 0u ||
         duration > GUIDANCE_MAX_DURATION_US ||
         total > GUIDANCE_MAX_DURATION_US - duration ||
-        path->primitive_index[i] >= primitive_count ||
-        primitives[path->primitive_index[i]].duration_us != duration)
+        path->primitive_index[i] >= primitive_count)
       return M5_SMOOTHER_CAPACITY_EXCEEDED;
+    if (primitives[path->primitive_index[i]].duration_us != duration)
+      return M5_SMOOTHER_INVALID_INPUT;
     total += duration;
   }
   if (path->offset_us[path->segment_count] != total ||
