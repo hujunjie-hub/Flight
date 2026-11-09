@@ -17,6 +17,8 @@
 #define GUIDANCE_PREVIEW_POINTS PRODUCT_PREVIEW_COUNT
 #define GUIDANCE_REF_TTL_US 200000u
 #define GUIDANCE_VALIDATE_SUBSAMPLES 8u
+#define GUIDANCE_TIME_BIN_US 200000u
+#define GUIDANCE_MAX_TIME_BINS 31u
 #define GUIDANCE_MAX_DURATION_S 6.2f
 #define GUIDANCE_MAX_DURATION_ATTEMPTS 16u
 #define GUIDANCE_VALIDATION_WORK_UNITS 256u
@@ -75,6 +77,8 @@ typedef struct {
   uint8_t global_index[4];
   GuidanceQuintic candidate[GUIDANCE_MIN_JERK_MAX_SEGMENTS][3];
 } GuidanceMinimumJerkWorkspace;
+CONTRACT_STATIC_ASSERT(sizeof(GuidanceMinimumJerkWorkspace) <= 2304u,
+                       "Host/SIL minimum-jerk workspace exceeds fixed memory budget");
 
 typedef struct {
   uint8_t valid;
