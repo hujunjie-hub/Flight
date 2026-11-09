@@ -168,7 +168,12 @@ static uint8_t plan(GuidanceState *s, const GuidanceInput *in, const float goal[
             return 1;
         }
         if (duration >= max_duration) break;
-        duration = quantize_duration_up(duration*1.25f);
+        {
+            const float next_duration = quantize_duration_up(duration * 1.25f);
+            /* Do not skip the final 6.2 s bin when geometric growth overshoots it. */
+            duration = (!isfinite(next_duration) || next_duration > max_duration)
+                ? max_duration : next_duration;
+        }
     }
     *reason = GUIDANCE_PLAN_REASON_ENVELOPE_INVALID;
     if (*constraint == GUIDANCE_PLAN_CONSTRAINT_NONE) *constraint = GUIDANCE_PLAN_CONSTRAINT_TIME;
