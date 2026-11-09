@@ -1,5 +1,5 @@
 /*
- * M5-05 bounded time parameterization for Host/SIL planning.
+ * M5-04 bounded time parameterization for Host/SIL planning.
  *
  * Converts discrete A* primitive durations into Bernstein-bounded segment
  * durations on the 200 ms lattice. H723/NONE does not compile this module.
