@@ -26,7 +26,8 @@ typedef enum {
 typedef struct {
   uint8_t segment_count;
   uint8_t fallback_used;
-  uint16_t reserved0;
+  uint8_t cost_valid;
+  uint8_t reserved0;
   uint32_t map_revision;
   uint32_t total_duration_us;
   uint32_t segment_duration_us[M5_SMOOTHER_MAX_SEGMENTS];
