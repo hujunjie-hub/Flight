@@ -955,7 +955,12 @@ static void test_minimum_jerk_rejects_invalid_inputs_atomically(void)
   durations[0] = 0.3f;
   CHECK(!guidance_minimum_jerk_optimize(positions, durations, 2u,
       zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
+  durations[0] = 0.20001f;
+  CHECK(!guidance_minimum_jerk_optimize(positions, durations, 1u,
+      zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
   durations[0] = 0.2f;
+  CHECK(!guidance_minimum_jerk_optimize(positions, durations, 9u,
+      zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
   for (unsigned i = 0u; i < 8u; ++i) durations[i] = 0.8f;
   CHECK(!guidance_minimum_jerk_optimize(positions, durations, 8u,
       zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
@@ -965,6 +970,25 @@ static void test_minimum_jerk_rejects_invalid_inputs_atomically(void)
   CHECK(!guidance_minimum_jerk_optimize(positions, durations, 1u,
       zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
   CHECK(output[0][0].c[0] == 0.0);
+}
+
+
+static void test_minimum_jerk_objective_sums_three_axes(void)
+{
+  GuidanceMinimumJerkWorkspace workspace;
+  GuidanceQuintic output[GUIDANCE_MIN_JERK_MAX_SEGMENTS][3];
+  float positions[GUIDANCE_MIN_JERK_MAX_SEGMENTS + 1u][3] = {{0}};
+  float durations[GUIDANCE_MIN_JERK_MAX_SEGMENTS] = {1.0f, 1.0f};
+  float zero[3] = {0};
+  double initial_cost = 0.0, optimized_cost = 0.0;
+
+  positions[1][0] = 1.0f; positions[2][0] = 2.0f;
+  positions[1][1] = 0.5f; positions[2][1] = 1.0f;
+  positions[1][2] = -0.25f; positions[2][2] = -0.5f;
+  CHECK(guidance_minimum_jerk_optimize(positions, durations, 2u,
+      zero, zero, zero, zero, &workspace, output, &initial_cost, &optimized_cost));
+  CHECK(fabs(initial_cost - 1890.0) < 1e-6);
+  CHECK(fabs(optimized_cost - 118.125) < 1e-6);
 }
 
 int main(void)
@@ -1003,6 +1027,7 @@ int main(void)
     {"minimum_jerk_nonuniform_multiaxis", test_minimum_jerk_nonuniform_multiaxis},
     {"minimum_jerk_eight_segments", test_minimum_jerk_eight_segments_deterministic},
     {"minimum_jerk_invalid_inputs", test_minimum_jerk_rejects_invalid_inputs_atomically},
+    {"minimum_jerk_objective_three_axes", test_minimum_jerk_objective_sums_three_axes},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
