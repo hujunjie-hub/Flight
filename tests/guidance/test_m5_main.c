@@ -1094,6 +1094,23 @@ static void test_m5_map_fixed_grid_and_bounds(void)
   CHECK(fabsf(p[2] - 3.75f) < 1e-6f);
 }
 
+static void test_m5_map_initial_origin_is_cell_aligned(void)
+{
+  M5LocalMap map;
+  NavigationSnapshot nav;
+  const uint64_t now = 1500000u;
+  planner_nav_init(&nav, now);
+  nav.core.position_ned_m[0] = 0.24f;
+  nav.core.position_ned_m[1] = -0.26f;
+  nav.core.position_ned_m[2] = 1.13f;
+  CHECK(m5_local_map_init(&map, &nav, now, 0.25f, 0.30f, 2.0f,
+                          M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
+  CHECK(fabsf(map.center_ned_m[0] - 0.0f) < 1e-6f);
+  CHECK(fabsf(map.center_ned_m[1] + 0.5f) < 1e-6f);
+  CHECK(fabsf(map.center_ned_m[2] - 1.0f) < 1e-6f);
+  CHECK(m5_local_map_is_ready(&map, &nav, now));
+}
+
 static void test_m5_map_roll_preserves_world_cells(void)
 {
   M5LocalMap map;
@@ -1585,6 +1602,7 @@ int main(void)
     {"minimum_jerk_objective_three_axes", test_minimum_jerk_objective_sums_three_axes},
     {"minimum_jerk_nonzero_endpoints", test_minimum_jerk_nonzero_endpoint_boundary_states},
     {"m5_map_fixed_grid_bounds", test_m5_map_fixed_grid_and_bounds},
+    {"m5_map_origin_cell_aligned", test_m5_map_initial_origin_is_cell_aligned},
     {"m5_map_roll_preserves_world_cells", test_m5_map_roll_preserves_world_cells},
     {"m5_map_free_ray_stale", test_m5_map_free_ray_log_odds_and_stale},
     {"m5_map_source_lease_refresh", test_m5_map_source_lease_refresh},
