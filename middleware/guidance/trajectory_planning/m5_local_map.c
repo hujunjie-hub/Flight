@@ -244,14 +244,20 @@ static void update_track(M5LocalMap *map, const ProductObstacleObservation *o, i
   for (axis = 0u; axis < 3u; ++axis) {
     speed2 += o->obstacle_velocity_ned_mps[axis] * o->obstacle_velocity_ned_mps[axis];
   }
-  radius = o->shape_kind == PRODUCT_OBS_SHAPE_POINT ? 0.0f :
-      fmaxf(o->obstacle_half_extent_m[0],
+  if (o->shape_kind == PRODUCT_OBS_SHAPE_POINT) radius = 0.0f;
+  else if (o->shape_kind == PRODUCT_OBS_SHAPE_SPHERE)
+    radius = fmaxf(o->obstacle_half_extent_m[0],
         fmaxf(o->obstacle_half_extent_m[1], o->obstacle_half_extent_m[2]));
+  else radius = sqrtf(o->obstacle_half_extent_m[0] * o->obstacle_half_extent_m[0] +
+        o->obstacle_half_extent_m[1] * o->obstacle_half_extent_m[1] +
+        o->obstacle_half_extent_m[2] * o->obstacle_half_extent_m[2]);
   track->radius_m = radius;
-  track->position_std_m = fmaxf(o->position_std_m[0],
-      fmaxf(o->position_std_m[1], o->position_std_m[2]));
-  track->velocity_std_mps = fmaxf(o->velocity_std_mps[0],
-      fmaxf(o->velocity_std_mps[1], o->velocity_std_mps[2]));
+  track->position_std_m = sqrtf(o->position_std_m[0] * o->position_std_m[0] +
+      o->position_std_m[1] * o->position_std_m[1] +
+      o->position_std_m[2] * o->position_std_m[2]);
+  track->velocity_std_mps = sqrtf(o->velocity_std_mps[0] * o->velocity_std_mps[0] +
+      o->velocity_std_mps[1] * o->velocity_std_mps[1] +
+      o->velocity_std_mps[2] * o->velocity_std_mps[2]);
   if (speed2 <= 1e-4f) memset(track, 0, sizeof(*track));
 }
 
