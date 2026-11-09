@@ -16,7 +16,7 @@ static float quantize_duration_up(float seconds)
 {
     double ticks;
     if (!isfinite(seconds) || seconds <= 0.0f) return INFINITY;
-    ticks = ceil((double)seconds / 0.2 - 1e-7);
+    ticks = ceil((double)seconds / 0.2 - 2e-7);
     if (!isfinite(ticks) || ticks < 1.0 || ticks > 31.0) return INFINITY;
     return (float)(ticks * 0.2);
 }
