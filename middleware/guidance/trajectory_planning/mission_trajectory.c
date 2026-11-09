@@ -11,6 +11,16 @@ static uint8_t route_operation(const GuidanceInput *in)
     return operation == PRODUCT_OP_MISSION || operation == PRODUCT_OP_RETURN;
 }
 
+/* M5 time is quantized upward to the 200 ms planning lattice, capped at 31 bins. */
+static float quantize_duration_up(float seconds)
+{
+    double ticks;
+    if (!isfinite(seconds) || seconds <= 0.0f) return INFINITY;
+    ticks = ceil((double)seconds / 0.2 - 1e-7);
+    if (!isfinite(ticks) || ticks < 1.0 || ticks > 31.0) return INFINITY;
+    return (float)(ticks * 0.2);
+}
+
 static uint8_t target(const GuidanceInput *in, GuidanceState *s, float p[3], float *yaw)
 {
     const ProductDirectivePayload *d = &in->directive->payload;
@@ -98,11 +108,10 @@ static uint8_t plan(GuidanceState *s, const GuidanceInput *in, const float goal[
     const ProductSafetyEnvelopePayload *e = &in->safety_envelope->vehicle_extension;
     ProductMotionPoint start;
     GuidanceQuintic q[4];
-    /* Mission legs and the return to Home can span the flight area. Keep the
-       short duration bound for other modes and validate each curve before publishing
-       the same bounded control preview. */
-    const uint8_t long_route = route_operation(in);
-    const float max_duration = long_route ? 240.0f : GUIDANCE_MAX_DURATION_S;
+    /* One M5 planning request is bounded to 6.2 s / 31 time bins.
+       M4 must split longer mission and return legs into authorized waypoints;
+       M5 never silently stretches a local planning horizon. */
+    const float max_duration = GUIDANCE_MAX_DURATION_S;
     float duration = 0.2f;
     unsigned axis, attempt;
     memset(&start, 0, sizeof(start));
@@ -125,7 +134,7 @@ static uint8_t plan(GuidanceState *s, const GuidanceInput *in, const float goal[
         duration = fmaxf(duration, cbrtf(d/fminf(cfg->max_jerk_ned_mps3[axis], e->max_jerk_ned_mps3[axis])));
     }
     duration = fmaxf(duration, fabsf(guidance_wrap_pi(yaw-start.yaw_rad))/in->safety_envelope->max_yaw_rate_radps);
-    duration = ceilf(duration/0.2f)*0.2f;
+    duration = quantize_duration_up(duration);
     for (attempt = 0; attempt < GUIDANCE_MAX_DURATION_ATTEMPTS && duration <= max_duration + 1e-5f; ++attempt) {
         uint8_t feasible = 1;
         unsigned interval;
@@ -156,8 +165,7 @@ static uint8_t plan(GuidanceState *s, const GuidanceInput *in, const float goal[
             return 1;
         }
         if (duration >= max_duration) break;
-        duration = ceilf(duration*1.25f/0.2f)*0.2f;
-        if (long_route) duration = fminf(duration, max_duration);
+        duration = quantize_duration_up(duration*1.25f);
     }
     *reason = GUIDANCE_PLAN_REASON_ENVELOPE_INVALID;
     if (*constraint == GUIDANCE_PLAN_CONSTRAINT_NONE) *constraint = GUIDANCE_PLAN_CONSTRAINT_TIME;
