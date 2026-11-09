@@ -11,6 +11,7 @@
 #include <math.h>
 #include <string.h>
 #include "trajectory_planning/m5_trajectory_safety.h"
+#include "messages/message_ids.h"
 #include "geofence_geometry/geofence_geometry.h"
 
 #define M5_SAFETY_POINT_MASK 0x1Fu
