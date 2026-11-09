@@ -134,7 +134,7 @@ static uint8_t observation_valid(const ProductObstacleObservation *o,
   return 1u;
 }
 
-static int find_track(const M5LocalMap *map, uint32_t id, uint16_t source_id)
+static int find_track(const M5LocalMap *map, uint32_t id, uint32_t source_id)
 {
   unsigned i;
   for (i = 0u; i < M5_MAP_MAX_TRACKS; ++i)
@@ -142,7 +142,7 @@ static int find_track(const M5LocalMap *map, uint32_t id, uint16_t source_id)
   return -1;
 }
 
-static int choose_track_slot(const M5LocalMap *map, uint32_t id, uint16_t source_id,
+static int choose_track_slot(const M5LocalMap *map, uint32_t id, uint32_t source_id,
                              uint64_t now_us, const uint8_t used[M5_MAP_MAX_TRACKS])
 {
   unsigned i;
@@ -246,7 +246,7 @@ static void update_track(M5LocalMap *map, const ProductObstacleObservation *o, i
   float speed2 = 0.0f, radius;
   memset(track, 0, sizeof(*track));
   track->id = o->observation_id;
-  track->source_id = (uint16_t)o->sensor_instance_id;
+  track->source_id = o->sensor_instance_id;
   track->flags = (uint16_t)(o->source_health == PRODUCT_OBS_SOURCE_DEGRADED ? 1u : 0u);
   track->sample_us = o->header.timestamp_sample_us;
   track->expires_us = o->header.valid_until_us;
@@ -332,7 +332,7 @@ Status m5_local_map_ingest(M5LocalMap *map, const NavigationSnapshot *nav,
         speed2 += o->obstacle_velocity_ned_mps[j] * o->obstacle_velocity_ned_mps[j];
       if (speed2 > 1e-4f) {
         int slot = choose_track_slot(map, o->observation_id,
-            (uint16_t)o->sensor_instance_id, now_us, used);
+            o->sensor_instance_id, now_us, used);
         if (slot < 0) {
           map->valid = 0u;
           return STATUS_BUFFER_FULL;
@@ -356,7 +356,7 @@ Status m5_local_map_ingest(M5LocalMap *map, const NavigationSnapshot *nav,
         return STATUS_OUT_OF_RANGE;
       }
     } else {
-      int existing = find_track(map, o->observation_id, (uint16_t)o->sensor_instance_id);
+      int existing = find_track(map, o->observation_id, o->sensor_instance_id);
       if (!update_occupied(map, o)) {
         map->valid = 0u;
         return STATUS_OUT_OF_RANGE;
@@ -394,6 +394,13 @@ uint8_t m5_local_map_voxel_state(const M5LocalMap *map, uint16_t voxel,
   if (state == NULL || map == NULL || voxel >= M5_MAP_CELL_COUNT) return 0u;
   if (map->initialized == 0u || map->valid == 0u) {
     *state = M5_MAP_CELL_INVALID;
+    return 1u;
+  }
+  if ((map->source_deadline_us != 0u && now_us >= map->source_deadline_us) ||
+      (map->last_ingest_us != 0u &&
+       (now_us < map->last_ingest_us ||
+        now_us - map->last_ingest_us > M5_MAP_STALE_US))) {
+    *state = M5_MAP_CELL_STALE;
     return 1u;
   }
   cell = &map->cells[voxel];
