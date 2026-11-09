@@ -18,16 +18,16 @@
 - 检查导航、参考、指令、安全包络、地图、Home 和围栏的消息类型、有效位、frame、boot/time/state/origin epoch、TTL 和数值范围。
 - 只接受 GUIDANCE_REFERENCE_TRAJECTORY；Pilot/Altitude-only 参考不冒充 3D 避障轨迹。
 - 失败原因独立编码；所有非 PASS 状态都必须拒绝。
-- Host 测试覆盖连续静态碰撞、动态中点/交叉碰撞、UNKNOWN/STALE/INVALID、KEEP_IN/KEEP_OUT 穿越、动态租约过期、重复 track、动态加速度上界、导航有效位缺失、地图 revision 失配、围栏自交、数值错误和静态地图 cell-check 预算耗尽（8193 次触发 8192 上限，fail-closed）。
+- Host 测试覆盖连续静态碰撞、动态中点/交叉碰撞、UNKNOWN/STALE/INVALID、KEEP_IN/KEEP_OUT 穿越、动态租约过期、重复 track、动态加速度上界、导航有效位缺失、地图 revision 失配、围栏自交、数值错误以及两类独立预算耗尽：DFS 第 257 个工作单元触发 256 上限、静态地图第 8193 次 cell check 触发 8192 上限，均 fail-closed。
 
 ## 最新 Host/SIL 证据
 
-- GitHub Actions：[Host validation latest](https://github.com/hujunjie-hub/Flight/actions/runs/42630463108)
-- Commit：`ffc597b12c825c0897f263502b754d7eb1c8a267`
+- GitHub Actions：[Host validation latest](https://github.com/hujunjie-hub/Flight/actions/runs/42632671853)
+- Commit：`377c877affd6fc3765113763bedb0cc20dd5cd6b`
 - M4 Host：927 checks / 0 failures
-- M5 Host：8,377 checks / 0 failures
+- M5 Host：8,384 checks / 0 failures
 - M4/M5 Integration：1,000 checks / 0 failures
-- M5 ASan/UBSan：8,377 checks / 0 failures
+- M5 ASan/UBSan：8,384 checks / 0 failures
 - M4/M5 Integration ASan/UBSan：1,000 checks / 0 failures
 - Cortex-M7 编译及 MPC RAM 检查：PASS
 - 导航/控制、源码布局和时间服务回归：PASS
@@ -40,7 +40,7 @@ response_delay_us 必须覆盖感知数据年龄、验证/调度延迟和控制/
 
 ## 未完成项
 
-1. 补齐导航 epoch/origin/frame 不匹配、围栏退化几何、DFS work-unit 预算 256 耗尽、工作栈容量压力、地图边界、擦边碰撞和数值极值测试。
+1. 补齐导航 epoch/origin/frame 不匹配、围栏退化几何、工作栈容量压力、地图边界、擦边碰撞和数值极值测试。
 2. 对动态加速度上界开展更多参数敏感性分析；完成边界 fuzz。
 3. 独立复核 Bernstein 变换、浮点舍入误差、几何距离下界和所有连续性证明；当前不能宣称形式化证明。
 4. M5-07 接入 M5-05 candidate、M5-06 result、FMS Permit 和 M6 消费端，保证候选无法绕过验证器。
