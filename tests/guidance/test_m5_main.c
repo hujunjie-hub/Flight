@@ -1596,6 +1596,7 @@ static void test_m5_smoother_minimum_jerk_continuity(void)
       &workspace, &output) == M5_SMOOTHER_OK);
   CHECK(output.segment_count == 2u);
   CHECK(output.fallback_used == 0u);
+  CHECK(output.cost_valid == 1u);
   CHECK(output.map_revision == fx.map.map_revision);
   CHECK(output.total_duration_us == 800000u);
   CHECK(output.segment_duration_us[0] == 400000u);
@@ -1780,6 +1781,7 @@ static void test_m5_smoother_builds_single_edge_candidate(void)
       &workspace, &output) == M5_SMOOTHER_OK);
   CHECK(output.segment_count == 1u);
   CHECK(output.fallback_used == 0u);
+  CHECK(output.cost_valid == 1u);
   CHECK(output.map_revision == fx.map.map_revision);
   CHECK(output.total_duration_us == timed.path.offset_us[1]);
   CHECK(output.segment_duration_us[0] == timed.path.offset_us[1]);
@@ -1821,6 +1823,7 @@ static void test_m5_smoother_optimizes_two_segment_path_continuously(void)
   CHECK(m5_path_smoother_build(&timed, &fx.map, &fx.navigation, now,
       &workspace, &output) == M5_SMOOTHER_OK);
   CHECK(output.segment_count == 2u && output.fallback_used == 0u);
+  CHECK(output.cost_valid == 1u);
   CHECK(output.total_duration_us == timed.path.offset_us[2]);
   CHECK(output.segment_duration_us[0] ==
         timed.path.offset_us[1] - timed.path.offset_us[0]);
