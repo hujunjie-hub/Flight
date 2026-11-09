@@ -910,6 +910,11 @@ M5PlannerResult m5_kinodynamic_astar_plan(const M5AstarRequest *r,
     for (primitive_id = 0u; primitive_id < primitive_count &&
          primitive_id < M5_ASTAR_MAX_EDGE_CHECKS_PER_NODE; ++primitive_id) {
       GuidanceQuintic q[4];
+      if (!check_deadline(r, &last_now)) {
+        result = (last_now >= r->planning_deadline_monotonic_us) ?
+            M5_PLANNER_DEADLINE_MISSED : M5_PLANNER_INPUT_STALE;
+        goto search_done;
+      }
       uint32_t next_key;
       float next_position[3], next_velocity[3], next_yaw, duration;
       uint8_t next_time_bin;
