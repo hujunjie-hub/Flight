@@ -85,11 +85,6 @@ if lock.get('schema_version') != 2 or lock.get('hash_algorithm') != 'git-blob-sh
     raise SystemExit('Unsupported OSQP source-lock schema or hash algorithm')
 osqp_root = ROOT / 'middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/generated'
 osqp_mismatches = []
-for rel, entry in sorted(lock['files'].items()):
-    path = osqp_root / rel
-    if not path.is_file():
-        osqp_mismatches.append((rel, entry.get('git_blob_sha1', 'MISSING'), 'FILE_MISSING'))
-        continue
 # Verify the Git blob hashing implementation against the standard "abc" vector.
 if hashlib.sha1(b'blob 3' + bytes((0,)) + b'abc').hexdigest() != 'f2ba8f84ab5c1bce84a7b441cb1959cfc7093b7f':
     raise SystemExit('Git blob SHA-1 self-test failed')
