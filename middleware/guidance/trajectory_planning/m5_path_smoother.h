@@ -11,7 +11,7 @@
 #error "M5 path smoother is Host/SIL only; H723/NONE does not compile this module"
 #endif
 
-#include "trajectory_planning/m5_kinodynamic_astar.h"
+#include "trajectory_planning/m5_time_scaler.h"
 
 #define M5_SMOOTHER_MAX_SEGMENTS M5_ASTAR_MAX_PATH_SEGMENTS
 
@@ -40,7 +40,7 @@ CONTRACT_STATIC_ASSERT(sizeof(M5SmoothedTrajectory) <= 2048u,
                        "M5 smoothed path output exceeds fixed 2 KiB budget");
 
 M5SmootherResult m5_path_smoother_build(
-    const M5AstarPath *path, const M5LocalMap *map,
+    const M5TimeScaledPath *path, const M5LocalMap *map,
     const NavigationSnapshot *navigation, uint64_t now_us,
     GuidanceMinimumJerkWorkspace *workspace, M5SmoothedTrajectory *output);
 
