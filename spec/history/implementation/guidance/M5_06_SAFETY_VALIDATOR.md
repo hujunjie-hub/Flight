@@ -12,9 +12,9 @@
 ## 当前实现
 
 - 固定 24 个根区间；固定 DFS 工作栈（29 项）、最大深度 5、最多 256 个区间工作单元、8192 次栅格检查。
-- 对每个子区间重建 Bernstein 控制点，使用凸包得到位置、速度、加速度界；按扫掠界无法证明时二分细分，达到上限拒绝。
+- 对每个子区间重建 Bernstein 控制点；Hermite 系数、子区间 power transform、Bernstein 控制点及一/二阶导数界使用逐步 `nextafter` outward interval 运算，再用凸包得到位置、速度、加速度界；按扫掠界无法证明时二分细分，达到上限拒绝。
 - 静态局部地图检查机体半径、净空、导航不确定度和反应延迟；导航不确定度按子区间远端时域传播，并叠加 response delay；地图外、UNKNOWN、STALE、INVALID 不作为 FREE。
-- 动态 track 按同一 FCU monotonic 时间轴做相对运动预测，计入目标半径、位置/速度不确定度、最大动态加速度上界和反应延迟。track 的预测租约必须覆盖完整验证窗口。
+- 动态 track 按同一 FCU monotonic 时间轴做相对运动预测，计入目标半径、位置/速度不确定度、最大动态加速度上界和反应延迟；动态相对扫掠上界独立 oracle 验证。track 的预测租约必须覆盖完整验证窗口。
 - 检查导航、参考、指令、安全包络、地图、Home 和围栏的消息类型、有效位、frame、boot/time/state/origin epoch、TTL 和数值范围。
 - 只接受 GUIDANCE_REFERENCE_TRAJECTORY；Pilot/Altitude-only 参考不冒充 3D 避障轨迹。
 - 失败原因独立编码；所有非 PASS 状态都必须拒绝。
@@ -22,14 +22,14 @@
 
 ## 最新 Host/SIL 证据
 
-- 新增 S06-064..072 凹多边形、Bernstein、AABB 距离下界及动态相对扫掠界用例已在新 Head 完整通过。
+- 新增 S06-064..073 凹多边形、Bernstein、AABB 距离下界、动态相对扫掠界及严格 outward interval bounds 用例已在新 Head 完整通过。
 
-- GitHub Actions：[Host validation #419](https://github.com/hujunjie-hub/Flight/actions/runs/42658820703)
-- Commit：`1e471b89f5b6746551d85a2fdcbef88517f3cd65`
+- GitHub Actions：[Host validation #425](https://github.com/hujunjie-hub/Flight/actions/runs/42660981911)
+- Commit：`3cc58e8683d504b3f12615406d8713274054dbad`
 - M4 Host：927 checks / 0 failures
-- M5 Host：83,102 checks / 0 failures
+- M5 Host：260,119 checks / 0 failures
 - M4/M5 Integration：1,000 checks / 0 failures
-- M5 ASan/UBSan：83,102 checks / 0 failures
+- M5 ASan/UBSan：260,119 checks / 0 failures
 - M4/M5 Integration ASan/UBSan：1,000 checks / 0 failures
 - Cortex-M7 编译及 MPC RAM 检查：PASS
 - M4/M5 production-source Cortex-M7 compile：PASS
@@ -42,13 +42,13 @@ max_dynamic_obstacle_accel_mps2 是独立输入，必须由产品安全配置批
 
 response_delay_us 必须覆盖感知数据年龄、验证/调度延迟和控制/执行器响应延迟的批准上界。当前接口限制在 200ms 内，超过即拒绝；这不是实测响应时间。
 
-## 本轮追加边界测试（S06-053..072 已通过）
+## 本轮追加边界测试（S06-053..073 已通过）
 
-新增动态时间边界、围栏上下高度 margin/退化高度、uint64 proof horizon 溢出、有限极大动态不确定度数值溢出、32 组动态 track 属性测试、凹多边形 clearance oracle、16 组随机凹多边形 + 动态 track 联合测试、重复/回折顶点拒绝、48 组 Hermite→Bernstein 随机子区间差分、1..8 track 多目标组合、2,048 组 point-to-AABB 距离下界 oracle，以及 512 组动态相对运动扫掠上界测试。S06-053..072 已在 run `42658820703` 的 Host、ASan/UBSan 与 Cortex-M7 编译工作流通过。具体见验证矩阵。
+新增动态时间边界、围栏上下高度 margin/退化高度、uint64 proof horizon 溢出、有限极大动态不确定度数值溢出、32 组动态 track 属性测试、凹多边形 clearance oracle、16 组随机凹多边形 + 动态 track 联合测试、重复/回折顶点拒绝、256 组 Hermite→Bernstein 随机子区间严格 bounds 差分、1..8 track 多目标组合、2,048 组 point-to-AABB 距离下界 oracle、512 组动态相对运动扫掠上界测试，以及零曲线区间包含性。S06-053..073 已在 run `42660981911` 的 Host、ASan/UBSan 与 Cortex-M7 编译工作流通过。具体见验证矩阵。
 
 ## 未完成项
 
-1. 独立复核 Bernstein control-hull bounds 的数学推导、浮点运算误差和 `nextafterf` 外向舍入策略；当前随机采样 oracle 不是穷尽证明。
+1. 独立复核 Bernstein control-hull bounds 的数学推导、双精度 outward interval 算术的 IEEE-754/编译器假设及 `nextafter` 舍入策略；当前随机采样 oracle 不是穷尽证明。
 2. 将 point-to-AABB 与 dynamic relative sweep helper oracle 扩展为端到端 swept-volume/continuous-distance 差分，覆盖边界擦碰和相邻区间接缝。
 3. 扩大多 track 时间戳、预测 lease、source identity、速度/加速度不确定度和相对运动组合 Fuzz。
 2. 对动态加速度上界开展更多参数敏感性分析；完成边界 fuzz。
