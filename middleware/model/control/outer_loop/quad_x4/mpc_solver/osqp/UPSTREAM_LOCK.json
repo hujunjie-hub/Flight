@@ -15,8 +15,6 @@
   "local_modifications": "Symbolic index arrays const in Flash; static pointer casts; QDLDL numeric refactor verifies fixed L indices; embedded unused certificate buffers alias their delta work vectors.",
   "source": "https://github.com/osqp/osqp/tree/v1.0.0",
   "files": {
-    "CMakeLists.txt": "ea8a50d229b1d2a455275c06dadb0a31db976192b31f769feb5eb0a910e7bf85",
-    "emosqp.c": "fa39dfae53679100f7ba31afe600eab41144d61a6db220fc8512f0b8c8fb19b6",
     "inc/private/algebra_impl.h": "959ec180af6e1423f35722a3a9e662eba97aa884d7831a37292ce602d5e3eab0",
     "inc/private/algebra_matrix.h": "adc11ae9fea44184765fe5ed8e9c7fad84e86844e88c28863e28201a0669d6e0",
     "inc/private/algebra_vector.h": "87676b5fb188ca7cc2fd7414185f970d43774c19464c0d537875e2a8265eac70",
@@ -43,11 +41,9 @@
     "inc/public/osqp_api_functions.h": "870625312308fd22ca60b893ed2dbdfd5da831650b9d240c11502d6898440270",
     "inc/public/osqp_api_types.h": "98b2d3825ecd272950146e75ad1a47f97acdeb0d1e154d812cdbee3333835c7d",
     "inc/public/osqp_export_define.h": "f81ad3766bad061d92ff6a726ea8cae1b5c7a36c4472add649e7af395d195d43",
-    "Makefile": "af8c1082fdc21051ae13092b5b1719b2ffaae544734e8ee54cd67dadaa153f68",
     "osqp_configure.h": "2bb2431281dba6fae2eae6fd775d9db78c7016dd7569e3b8b4de0cec76cb45f0",
     "quad_workspace.c": "5fc1c8dc9196c7f2264cb2abfa73d8aef2b899c5b9af9e06890d07d2713d756d",
     "quad_workspace.h": "0d8dcc9804cfaa88bad8b305291acaea783ab54ba70a1f6501d96ebc9874f687",
-    "setup.py": "f76a96dae38bb639bafebd8294742c7564c8eab12a5c492fe5737a6c8eb27662",
     "src/algebra_libs.c": "950cdd61ba8e1da7b2f49f0965cf42bbe63d8d4b4f99d123654f94f17384fb1b",
     "src/auxil.c": "f1fbd7eb6cd08d04659fccd67bd8d3879b1c4e9f1a9878d15a679ff1874b4ff8",
     "src/csc_math.c": "1e6dd624c09a707be71a725929bfeb126bf2242aa5202c369a4b32e8b91dfdc2",
@@ -63,7 +59,11 @@
     "src/vector.c": "4eb0b9632b9f9a01434a91d0d43e7976d7311e182b5a88a384fc881e2d349ac0"
   },
   "host_only_files": [
-    "bindings.cpp"
+    "CMakeLists.txt",
+    "Makefile",
+    "bindings.cpp",
+    "emosqp.c",
+    "setup.py"
   ],
-  "host_only_files_note": "Local pybind11 test wrapper; not part of the upstream OSQP v1.0.0 source tree or embedded firmware."
+  "host_only_files_note": "Local pybind11 wrapper and OSQP packaging/build helpers are host tooling, not part of the embedded solver source lock."
 }
