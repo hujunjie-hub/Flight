@@ -1075,17 +1075,62 @@ static void planner_observation_init(ProductObstacleObservation *observation,
 
 static void test_m5_map_fixed_grid_and_bounds(void)
 {
+  M5LocalMap map;
+  NavigationSnapshot nav;
   float p[3], outside[3] = {4.0f, 0.0f, 0.0f};
   uint16_t voxel = 0u;
+  const uint64_t now = 1000000u;
+  planner_nav_init(&nav, now);
+  CHECK(m5_local_map_init(&map, &nav, now, 0.25f, 0.30f, 2.0f,
+                          M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
   p[0] = p[1] = p[2] = -4.0f;
-  CHECK(m5_local_map_world_to_voxel(p, &voxel) && voxel == 0u);
+  CHECK(m5_local_map_world_to_voxel(&map, p, &voxel) && voxel == 0u);
   p[0] = p[1] = p[2] = 3.999f;
-  CHECK(m5_local_map_world_to_voxel(p, &voxel) && voxel == 4095u);
-  CHECK(!m5_local_map_world_to_voxel(outside, &voxel));
-  m5_local_map_voxel_center(4095u, p);
+  CHECK(m5_local_map_world_to_voxel(&map, p, &voxel) && voxel == 4095u);
+  CHECK(!m5_local_map_world_to_voxel(&map, outside, &voxel));
+  m5_local_map_voxel_center(&map, 4095u, p);
   CHECK(fabsf(p[0] - 3.75f) < 1e-6f);
   CHECK(fabsf(p[1] - 3.75f) < 1e-6f);
   CHECK(fabsf(p[2] - 3.75f) < 1e-6f);
+}
+
+static void test_m5_map_roll_preserves_world_cells(void)
+{
+  M5LocalMap map;
+  NavigationSnapshot nav;
+  ProductObstacleObservation observation;
+  float old_world[3] = {0.25f, 0.0f, 0.0f};
+  float cell_center[3];
+  uint16_t old_voxel = 0u, new_voxel = 0u;
+  uint8_t state = M5_MAP_CELL_UNKNOWN;
+  const uint64_t t0 = 1500000u;
+
+  planner_nav_init(&nav, t0);
+  CHECK(m5_local_map_init(&map, &nav, t0, 0.25f, 0.30f, 2.0f,
+                          M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
+  CHECK(m5_local_map_world_to_voxel(&map, old_world, &old_voxel));
+  map.cells[old_voxel].state = M5_MAP_CELL_FREE_CONFIRMED;
+  map.cells[old_voxel].log_odds = -4;
+  map.cells[old_voxel].last_update_ms = (uint32_t)(t0 / 1000u);
+
+  planner_nav_init(&nav, t0 + 10000u);
+  nav.core.position_ned_m[0] = 0.5f;
+  planner_observation_init(&observation, &nav, t0 + 10000u, 31u);
+  observation.observation_kind = PRODUCT_OBS_FREE_SPACE_RAY;
+  observation.ray_start_ned_m[0] = 0.5f;
+  observation.ray_start_ned_m[1] = 0.0f;
+  observation.ray_start_ned_m[2] = 0.0f;
+  observation.ray_end_ned_m[0] = 0.75f;
+  observation.ray_end_ned_m[1] = 0.0f;
+  observation.ray_end_ned_m[2] = 0.0f;
+  CHECK(m5_local_map_ingest(&map, &nav, &observation, 1u, t0 + 10000u) == STATUS_OK);
+  CHECK(fabsf(map.center_ned_m[0] - 0.5f) < 1e-6f);
+  CHECK(m5_local_map_world_to_voxel(&map, old_world, &new_voxel));
+  CHECK(new_voxel == (uint16_t)(old_voxel - 1u));
+  m5_local_map_voxel_center(&map, new_voxel, cell_center);
+  CHECK(fabsf(cell_center[0] - old_world[0]) < 1e-6f);
+  CHECK(m5_local_map_query(&map, old_world, t0 + 10000u, &state) == STATUS_OK);
+  CHECK(state == M5_MAP_CELL_FREE_CONFIRMED);
 }
 
 static void test_m5_map_free_ray_log_odds_and_stale(void)
@@ -1114,7 +1159,7 @@ static void test_m5_map_free_ray_log_odds_and_stale(void)
     observations[i].ray_end_ned_m[2] = -1.75f;
   }
   CHECK(m5_local_map_ingest(&map, &nav, observations, 1u, now) == STATUS_OK);
-  CHECK(m5_local_map_world_to_voxel(start, &voxel));
+  CHECK(m5_local_map_world_to_voxel(&map, start, &voxel));
   CHECK(map.cells[voxel].log_odds == -2);
   CHECK(map.cells[voxel].state == M5_MAP_CELL_UNKNOWN);
   CHECK(m5_local_map_ingest(&map, &nav, &observations[1], 1u, now) == STATUS_OK);
@@ -1263,7 +1308,7 @@ static void test_m5_map_batch_validation_is_fail_closed(void)
   observations[1].obstacle_center_ned_m[1] = p[1];
   observations[1].obstacle_center_ned_m[2] = p[2];
   CHECK(m5_local_map_ingest(&map, &nav, observations, 2u, now) == STATUS_STALE_DATA);
-  CHECK(m5_local_map_world_to_voxel(p, &voxel));
+  CHECK(m5_local_map_world_to_voxel(&map, p, &voxel));
   CHECK(map.cells[voxel].log_odds == 0);
   CHECK(map.valid == 0u);
 }
@@ -1430,8 +1475,8 @@ static void test_m5_astar_unknown_space_and_deadline_fail_closed(void)
     fx.map.cells[i].state = M5_MAP_CELL_UNKNOWN;
     fx.map.cells[i].log_odds = 0;
   }
-  CHECK(m5_local_map_world_to_voxel(fx.request.start_position_ned_m, &start_voxel));
-  CHECK(m5_local_map_world_to_voxel(fx.request.goal_position_ned_m, &goal_voxel));
+  CHECK(m5_local_map_world_to_voxel(&fx.map, fx.request.start_position_ned_m, &start_voxel));
+  CHECK(m5_local_map_world_to_voxel(&fx.map, fx.request.goal_position_ned_m, &goal_voxel));
   fx.map.cells[start_voxel].state = M5_MAP_CELL_FREE_CONFIRMED;
   fx.map.cells[start_voxel].log_odds = -4;
   fx.map.cells[goal_voxel].state = M5_MAP_CELL_FREE_CONFIRMED;
@@ -1540,6 +1585,7 @@ int main(void)
     {"minimum_jerk_objective_three_axes", test_minimum_jerk_objective_sums_three_axes},
     {"minimum_jerk_nonzero_endpoints", test_minimum_jerk_nonzero_endpoint_boundary_states},
     {"m5_map_fixed_grid_bounds", test_m5_map_fixed_grid_and_bounds},
+    {"m5_map_roll_preserves_world_cells", test_m5_map_roll_preserves_world_cells},
     {"m5_map_free_ray_stale", test_m5_map_free_ray_log_odds_and_stale},
     {"m5_map_source_lease_refresh", test_m5_map_source_lease_refresh},
     {"m5_map_occupied_dynamic_track", test_m5_map_occupied_primitive_and_dynamic_track},
