@@ -46,6 +46,26 @@ jobs:
       - name: Run time-service host test
         run: /tmp/test_time_service
 
+  algorithm-arm:
+    name: Cortex-M7 compile and MPC RAM checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ARM embedded toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-dev
+
+      - name: Compile and inspect Cortex-M7 objects
+        run: python tests/algorithms/run_tests.py --target arm
+
   algorithm-host:
     name: Navigation and control host tests
     runs-on: ubuntu-latest

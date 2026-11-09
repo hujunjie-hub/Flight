@@ -23,12 +23,14 @@ build/host_deps/osqp-env/Scripts/python.exe middleware/model/control/outer_loop/
 `SConscript` 仅选择 `generated/src/*.c` 与 `quad_workspace.c`。生成器附带的 Python 扩展、
 CMake/Makefile、示例入口不参与固件构建。根工程仍由原 SCons 管理。
 
-为满足 32 KiB 静态 RAM 预算，生成器执行三项固定修改：
+OSQP 求解器工作区与 `mpc.c` 静态数据单独受 32 KiB `.data + .bss` 预算约束；该数字不包含
+MPC worker 的 8 KiB 线程栈、`worker_bundle` 或其他运行时全局数据。ARM 验证报告会分别记录
+求解器静态 RAM、worker 栈和两者之和。为满足求解器预算，生成器执行三项固定修改：
 
 - 将固定 CSC 索引、KKT 映射、消元树及符号计数存为 const；只在静态结构初始化时适配上游指针类型。
 - QDLDL 数值重分解对 L 的索引执行一致性检查，替代重复写入同一符号模式；不一致返回失败。
 - embedded 模式未对外使用的 infeasibility certificate 缓冲与对应 delta 工作向量共用存储。
 
-修改由生成器重现；运行时仍保留独立原约束检查和求解残差检查。最终 ARM 静态 RAM 报告由
-`tests/algorithms/run_tests.py` 生成并强制检查，见
-`build/validation/controller_navigation/summary.json`。这不构成 H723 WCET 证据。
+修改由生成器重现；运行时仍保留独立原约束检查和求解残差检查。最终 Cortex-M7 编译与求解器 RAM 报告由 `tests/algorithms/run_tests.py --target arm` 生成并强制检查，
+见 `build/validation/controller_navigation/summary.json`。worker 栈单独报告，不与求解器 32 KiB
+预算混淆。这不构成 H723 WCET 证据，也不替代整机链接、实机时序与飞行验证。

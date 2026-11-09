@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -209,7 +210,7 @@ for target in targets:
 
     if target == 'arm':
         run([
-            linker, '-mcpu=cortex-m7', '-mthumb', '-mfpu=fpv5-d16',
+            linker, '-nostdlib', '-mcpu=cortex-m7', '-mthumb', '-mfpu=fpv5-d16',
             '-mfloat-abi=hard', '-r', *objects, '-o', objdir / 'algorithms.o',
         ])
         run([tool_path('arm', 'size'), objdir / 'algorithms.o'])
@@ -232,11 +233,19 @@ for target in targets:
             for line in sizes.splitlines()[1:] if line.strip()
         )
         if ram > 32768:
-            raise SystemExit(f'MPC static RAM exceeds 32 KiB: {ram}')
+            raise SystemExit(f'MPC solver static RAM exceeds 32 KiB: {ram}')
+        task_source = (ROOT / 'applications/tasks/mpc/task_mpc.c').read_text()
+        stack_match = re.search(r'\\btask_mpc_stack\\s*\\[\\s*(\\d+)\\s*\\]', task_source)
+        if not stack_match:
+            raise SystemExit('Cannot determine the statically allocated MPC worker stack')
+        worker_stack = int(stack_match.group(1))
         results.update(
             arm_compile_link='PASS',
-            mpc_static_ram_bytes=ram,
+            mpc_static_ram_bytes=ram,  # Backwards-compatible report key.
+            mpc_solver_static_ram_bytes=ram,
             mpc_static_ram_budget_bytes=32768,
+            mpc_worker_stack_bytes=worker_stack,
+            mpc_solver_plus_worker_stack_bytes=ram + worker_stack,
         )
 
 (OUT / 'commands.json').write_text(json.dumps(commands, indent=2))
