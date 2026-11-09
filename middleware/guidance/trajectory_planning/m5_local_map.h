@@ -39,8 +39,7 @@ typedef struct {
 
 typedef struct {
   uint32_t id;
-  uint16_t source_id;
-  uint16_t flags;
+  uint32_t source_id;
   uint64_t sample_us;
   uint64_t expires_us;
   float position_ned_m[3];
@@ -48,7 +47,7 @@ typedef struct {
   float radius_m;
   float position_std_m;
   float velocity_std_mps;
-  uint32_t reserved;
+  uint32_t flags;
 } M5DynamicTrack;
 
 typedef struct {
