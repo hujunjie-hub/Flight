@@ -129,6 +129,7 @@ typedef struct {
 } M5AstarStats;
 
 const M5KinodynamicPrimitive *m5_kinodynamic_primitive_table(uint8_t *count);
+uint8_t m5_kinodynamic_primitive_table_validate(void);
 uint32_t m5_kinodynamic_encode_key(uint16_t voxel, uint8_t velocity_bin,
                                    uint8_t yaw_bin, uint8_t time_bin);
 uint8_t m5_kinodynamic_decode_key(uint32_t key, uint16_t *voxel,
