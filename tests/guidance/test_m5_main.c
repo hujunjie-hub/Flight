@@ -1332,6 +1332,12 @@ static void planner_fx_init(PlannerFx *fx, uint64_t now_us)
   guidance_default_config(&fx->config);
   fx->config.payload.obstacle_source_mode = 1u; /* Host STATIC_MAP profile */
   fx->config.payload.max_dynamic_prediction_us = 1000000u;
+  /* This deterministic one-edge fixture tests search, not the default
+     conservative QUAD tuning. Keep config and envelope limits consistent. */
+  for (axis = 0u; axis < 3u; ++axis) {
+    fx->config.payload.max_acceleration_ned_mps2[axis] = 20.0f;
+    fx->config.payload.max_jerk_ned_mps3[axis] = 1000.0f;
+  }
   fill_header(&fx->envelope.header, MSG_SAFETY_ENVELOPE, SOURCE_M4, now_us);
   fx->envelope.safety_envelope_id = 1u;
   fx->envelope.max_linear_speed_mps = 4.0f;
