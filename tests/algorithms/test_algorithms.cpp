@@ -391,15 +391,25 @@ static void test_mpc_axis_and_failure_regressions() {
   Fixture invalid_reference;
   invalid_reference.ref.points[10].point.position_ned_m[0] =
       std::numeric_limits<float>::quiet_NaN();
+  uint32_t invalid_epoch = 0;
+  uint16_t invalid_mode = 0;
+  const Status validation_status = controller_validate_input(
+      &invalid_reference.in, &invalid_epoch, &invalid_mode);
   const Status invalid_status = control_outer_update(&invalid_reference.in);
   if (invalid_status != STATUS_NUMERIC_ERROR) {
     ProductMotionPoint sampled{};
     const Status sample_status = control_sample_reference(
         &invalid_reference.ref,
         invalid_reference.in.control_time_us + 220000u, &sampled);
-    std::printf("MPC invalid-reference status=%u direct_sample=%u\n",
+    std::printf("MPC invalid-reference status=%u validate=%u direct_sample=%u "
+                "control=%llu eval=%llu ref_sample=%llu now=%llu\\n",
                 static_cast<unsigned>(invalid_status),
-                static_cast<unsigned>(sample_status));
+                static_cast<unsigned>(validation_status),
+                static_cast<unsigned>(sample_status),
+                static_cast<unsigned long long>(invalid_reference.in.control_time_us),
+                static_cast<unsigned long long>(invalid_reference.in.evaluation_time_us),
+                static_cast<unsigned long long>(invalid_reference.ref.header.timestamp_sample_us),
+                static_cast<unsigned long long>(clock_value.monotonic_us));
   }
   CHECK(invalid_status == STATUS_NUMERIC_ERROR);
   CHECK(mpc_read(&failed));

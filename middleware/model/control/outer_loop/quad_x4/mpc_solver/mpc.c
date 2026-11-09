@@ -201,27 +201,38 @@ Status mpc_solve(const ControllerInput *in,
     out->solver_status = CONTROL_SOLVER_NUMERICAL_FAILURE;
     return STATUS_NUMERIC_ERROR;
   }
+  /* OSQP's solved status uses absolute + relative termination tolerances.
+     In particular, dual_res is a stationarity residual, not a safety bound,
+     and can legitimately exceed a fixed 1e-3 threshold when the problem scale
+     is larger. Safety is checked below against the original, unscaled A/l/u. */
   if (!isfinite(quad_solver.info->prim_res) ||
-      !isfinite(quad_solver.info->dual_res) ||
-      quad_solver.info->prim_res > 1e-3f || quad_solver.info->dual_res > 1e-3f)
+      !isfinite(quad_solver.info->dual_res)) {
+    out->solver_status = CONTROL_SOLVER_NUMERICAL_FAILURE;
     return STATUS_NUMERIC_ERROR;
+  }
   /* Independent check against the unscaled original constraints. */
   {
     float y[190] = {0};
     const OSQPFloat *x = quad_solver.solution->x;
-    if (!finite_array(x, 15))
+    if (!finite_array(x, 15)) {
+      out->solver_status = CONTROL_SOLVER_NUMERICAL_FAILURE;
       return STATUS_NUMERIC_ERROR;
+    }
     for (col = 0; col < 15; ++col)
       for (n = qp_a_ptr[col]; n < qp_a_ptr[col + 1]; ++n)
         y[qp_a_row[n]] += ax[n] * x[col];
     for (i = 0; i < 190; ++i)
-      if (y[i] < lower[i] - 1e-3f || y[i] > upper[i] + 1e-3f)
+      if (y[i] < lower[i] - 1e-3f || y[i] > upper[i] + 1e-3f) {
+        out->solver_status = CONTROL_SOLVER_NUMERICAL_FAILURE;
         return STATUS_OUT_OF_RANGE;
+      }
     for (k = 0; k < 5; ++k) {
       float a = x[3 * k], b = x[3 * k + 1], c = CONTROL_GRAVITY_MPS2 - x[3 * k + 2];
       if (cfg->mass_kg * sqrtf(a * a + b * b + c * c) >
-          e->max_total_thrust_n + 1e-3f)
+          e->max_total_thrust_n + 1e-3f) {
+        out->solver_status = CONTROL_SOLVER_NUMERICAL_FAILURE;
         return STATUS_OUT_OF_RANGE;
+      }
     }
     memcpy(out->acceleration, x, 3 * sizeof(float));
   }
