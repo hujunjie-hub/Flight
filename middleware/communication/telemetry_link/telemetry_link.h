@@ -19,6 +19,8 @@ uint32_t telemetry_link_poll_rc(void);
 /* CRSF decode: returns the number of new RC frames and copies the latest
  * 16 channels plus uplink link quality. */
 uint32_t telemetry_link_poll_rc_channels(uint16_t channels[16], uint8_t *link_quality);
+/* Request receiver bind through the telemetry/RC device adapter. */
+bool telemetry_link_send_rc_bind(void);
 /* Request receiver binding without exposing the ELRS device API to applications. */
 bool telemetry_link_request_rc_bind(void);
 void telemetry_link_poll_transmit(void);
