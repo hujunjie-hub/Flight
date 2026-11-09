@@ -540,7 +540,7 @@ static int edge_map_clear(const M5AstarRequest *r, const GuidanceQuintic q[4],
   for (subdivision = 0u; subdivision < M5_ASTAR_EDGE_SUBDIVISIONS; ++subdivision) {
     float t0 = duration * (float)subdivision / (float)M5_ASTAR_EDGE_SUBDIVISIONS;
     float t1 = duration * (float)(subdivision + 1u) / (float)M5_ASTAR_EDGE_SUBDIVISIONS;
-    float low[3], high[3];
+    float low[3], high[3], relative_low[3], relative_high[3];
     unsigned volume = 1u;
     for (axis = 0u; axis < 3u; ++axis) {
       float lo, hi;
@@ -553,13 +553,16 @@ static int edge_map_clear(const M5AstarRequest *r, const GuidanceQuintic q[4],
       low[axis] = lo - inflation - 1e-5f;
       high[axis] = hi + inflation + 1e-5f;
       {
-        float relative_low = low[axis] - r->map->center_ned_m[axis];
-        float relative_high = high[axis] - r->map->center_ned_m[axis];
         int first, last;
-        if (!isfinite(relative_low) || !isfinite(relative_high) ||
-            relative_low < -4.0f || relative_high >= 4.0f) return 0;
-        first = (int)floorf((relative_low + 4.0f) / 0.5f);
-        last = (int)floorf((relative_high + 4.0f) / 0.5f);
+        relative_low[axis] = low[axis] - r->map->center_ned_m[axis];
+        relative_high[axis] = high[axis] - r->map->center_ned_m[axis];
+        if (!isfinite(relative_low[axis]) || !isfinite(relative_high[axis]) ||
+            relative_low[axis] < -M5_MAP_HALF_EXTENT_M ||
+            relative_high[axis] >= M5_MAP_HALF_EXTENT_M) return 0;
+        first = (int)floorf((relative_low[axis] + M5_MAP_HALF_EXTENT_M) /
+                            M5_MAP_CELL_SIZE_M);
+        last = (int)floorf((relative_high[axis] + M5_MAP_HALF_EXTENT_M) /
+                           M5_MAP_CELL_SIZE_M);
         if (first < 0 || last > 15 || last < first) return 0;
         volume *= (unsigned)(last - first + 1);
         if (volume > M5_ASTAR_CELL_CHECK_LIMIT) return 0;
