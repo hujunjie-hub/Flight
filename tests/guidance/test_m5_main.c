@@ -3398,7 +3398,7 @@ static void test_m5_safety_static_voxel_sweep_differential(void)
   uint32_t seed = 0x5A71C061u;
   unsigned trial;
 
-  for (trial = 0u; trial < 48u; ++trial) {
+  for (trial = 0u; trial < 64u; ++trial) {
     SafetyFx fx;
     const float start_x = -0.75f;
     const float speed_x = 2.0f;
@@ -3407,14 +3407,16 @@ static void test_m5_safety_static_voxel_sweep_differential(void)
     float crossing_time = safety_fuzz_between(&seed, 0.01f, 0.47f);
     float contact[3], center[3];
     double distance2 = 0.0;
+    double clearance;
     uint16_t voxel = 0u;
     unsigned axis;
+    int collision_case = (trial < 32u);
 
     safety_fx_init(&fx, 100000000ull + (uint64_t)trial * 1000000ull);
     safety_set_linear_reference(&fx, start_x, 0.0f, -10.0f,
                                 speed_x, 0.0f, 0.0f);
     contact[0] = start_x + speed_x * crossing_time;
-    contact[1] = 0.0f;
+    contact[1] = collision_case ? 0.0f : 1.5f;
     contact[2] = -10.0f;
     CHECK((double)crossing_time > 0.0 &&
           (double)crossing_time < horizon_s);
@@ -3422,17 +3424,31 @@ static void test_m5_safety_static_voxel_sweep_differential(void)
     m5_local_map_voxel_center(&fx.map, voxel, center);
 
     for (axis = 0u; axis < 3u; ++axis) {
-      double delta = fabs((double)contact[axis] - center[axis]) - 0.25;
+      double delta = fabs((double)center[axis] -
+                          (axis == 0u ? (double)contact[axis] :
+                           (axis == 1u ? 0.0 : (double)contact[axis]))) - 0.25;
       if (delta > 0.0) distance2 += delta * delta;
     }
-    CHECK(distance2 == 0.0);
+    clearance = sqrt(distance2) - (double)fx.map.vehicle_radius_m -
+                (double)fx.map.clearance_margin_m;
+    if (collision_case) {
+      CHECK(clearance <= 0.0);
+    } else {
+      CHECK(clearance > 0.25);
+    }
 
     fx.map.cells[voxel].state = M5_MAP_CELL_OCCUPIED_CONFIRMED;
     fx.map.cells[voxel].log_odds = 4;
     fx.map.cells[voxel].source_mask = 1u;
-    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
-        &fx.result) == M5_SAFETY_STATIC_COLLISION);
-    CHECK(fx.result.passed == 0u);
+    if (collision_case) {
+      CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+          &fx.result) == M5_SAFETY_STATIC_COLLISION);
+      CHECK(fx.result.passed == 0u);
+    } else {
+      CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+          &fx.result) == M5_SAFETY_PASS);
+      CHECK(fx.result.passed == 1u);
+    }
   }
 }
 
