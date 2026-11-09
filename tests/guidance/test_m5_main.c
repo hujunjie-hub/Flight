@@ -991,6 +991,37 @@ static void test_minimum_jerk_objective_sums_three_axes(void)
   CHECK(fabs(optimized_cost - 118.125) < 1e-6);
 }
 
+
+static void test_minimum_jerk_nonzero_endpoint_boundary_states(void)
+{
+  GuidanceMinimumJerkWorkspace workspace;
+  GuidanceQuintic output[GUIDANCE_MIN_JERK_MAX_SEGMENTS][3];
+  float positions[GUIDANCE_MIN_JERK_MAX_SEGMENTS + 1u][3] = {{0}};
+  float durations[GUIDANCE_MIN_JERK_MAX_SEGMENTS] = {0.4f, 0.6f};
+  float start_velocity[3] = {0.2f, 0.0f, 0.0f};
+  float start_acceleration[3] = {0.1f, 0.0f, 0.0f};
+  float end_velocity[3] = {0.1f, 0.0f, 0.0f};
+  float end_acceleration[3] = {-0.05f, 0.0f, 0.0f};
+  double initial_cost = 0.0, optimized_cost = 0.0;
+
+  positions[1][0] = 1.0f;
+  positions[2][0] = 2.0f;
+  CHECK(guidance_minimum_jerk_optimize(positions, durations, 2u,
+      start_velocity, start_acceleration, end_velocity, end_acceleration,
+      &workspace, output, &initial_cost, &optimized_cost));
+  CHECK(optimized_cost < initial_cost);
+  CHECK(fabs(guidance_quintic_eval(&output[0][0], 0.0f, 0u)) < 1e-6);
+  CHECK(fabs(guidance_quintic_eval(&output[0][0], 0.0f, 1u) - 0.2f) < 1e-5);
+  CHECK(fabs(guidance_quintic_eval(&output[0][0], 0.0f, 2u) - 0.1f) < 1e-4);
+  CHECK(fabs(guidance_quintic_eval(&output[1][0], 0.6f, 0u) - 2.0f) < 1e-5);
+  CHECK(fabs(guidance_quintic_eval(&output[1][0], 0.6f, 1u) - 0.1f) < 1e-4);
+  CHECK(fabs(guidance_quintic_eval(&output[1][0], 0.6f, 2u) + 0.05f) < 1e-3);
+  CHECK(fabs(guidance_quintic_eval(&output[0][0], 0.4f, 1u) -
+             guidance_quintic_eval(&output[1][0], 0.0f, 1u)) < 1e-4);
+  CHECK(fabs(guidance_quintic_eval(&output[0][0], 0.4f, 2u) -
+             guidance_quintic_eval(&output[1][0], 0.0f, 2u)) < 1e-3);
+}
+
 int main(void)
 {
   struct {
@@ -1028,6 +1059,7 @@ int main(void)
     {"minimum_jerk_eight_segments", test_minimum_jerk_eight_segments_deterministic},
     {"minimum_jerk_invalid_inputs", test_minimum_jerk_rejects_invalid_inputs_atomically},
     {"minimum_jerk_objective_three_axes", test_minimum_jerk_objective_sums_three_axes},
+    {"minimum_jerk_nonzero_endpoints", test_minimum_jerk_nonzero_endpoint_boundary_states},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
