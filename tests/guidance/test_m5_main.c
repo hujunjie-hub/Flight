@@ -2783,6 +2783,8 @@ static void test_m5_safety_dynamic_collision_at_adaptive_and_preview_boundaries(
   status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
   CHECK(status == M5_SAFETY_DYNAMIC_COLLISION);
   CHECK(fx.result.passed == 0u);
+  printf("M5 dynamic adaptive diagnostic status=%u work_units=%u\\n",
+      (unsigned)fx.result.status, (unsigned)fx.result.work_units);
   CHECK(fx.result.work_units > PRODUCT_PREVIEW_COUNT);
 }
 
@@ -3390,6 +3392,8 @@ static void test_m5_safety_static_collision_at_preview_seam_adaptive_split(void)
   CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
       &fx.result) == M5_SAFETY_STATIC_COLLISION);
   CHECK(fx.result.passed == 0u);
+  printf("M5 static seam diagnostic status=%u work_units=%u\\n",
+      (unsigned)fx.result.status, (unsigned)fx.result.work_units);
   CHECK(fx.result.work_units > PRODUCT_PREVIEW_COUNT);
 }
 
