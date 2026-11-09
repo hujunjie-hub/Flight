@@ -303,30 +303,44 @@ static void check_mpc_snapshot_feasible(const Fixture &f) {
   CHECK(snapshot.header.boot_id == clock_value.boot_id);
   CHECK(snapshot.solver_status == CONTROL_SOLVER_SOLVED ||
         snapshot.solver_status == CONTROL_SOLVER_SOLVED_INACCURATE);
-  for (int axis = 0; axis < 3; ++axis) {
-    const float a = snapshot.acceleration[axis];
-    CHECK(std::isfinite(a));
-    CHECK(a >= f.model.bounds.input_min[axis] - 1e-3f);
-    CHECK(a <= f.model.bounds.input_max[axis] + 1e-3f);
-    /* The MPC worker runs at 50 Hz; the first seed is zero after reset. */
-    CHECK(std::fabs(a) <= f.model.bounds.input_slew_max[axis] * .02f + 1e-3f);
-  }
+  CHECK(quad_solver.solution != nullptr);
+  if (!quad_solver.solution || !quad_solver.solution->x)
+    return;
 
   const auto &e = f.envelope.vehicle_extension;
   const float tangent = std::tan(e.max_tilt_rad) * .92387953251f;
-  for (int side = 0; side < 8; ++side) {
-    const float nx = std::cos(side * .785398163397f);
-    const float ny = std::sin(side * .785398163397f);
-    CHECK(nx * snapshot.acceleration[0] + ny * snapshot.acceleration[1] <=
-          tangent * (CONTROL_GRAVITY_MPS2 - snapshot.acceleration[2]) + 1e-3f);
+  float previous[3] = {0, 0, 0}; // mpc_reset() clears the first 50 Hz seed.
+  for (int move = 0; move < 5; ++move) {
+    float acceleration[3];
+    for (int axis = 0; axis < 3; ++axis) {
+      const float value =
+          static_cast<float>(quad_solver.solution->x[move * 3 + axis]);
+      acceleration[axis] = value;
+      CHECK(std::isfinite(value));
+      CHECK(value >= f.model.bounds.input_min[axis] - 1e-3f);
+      CHECK(value <= f.model.bounds.input_max[axis] + 1e-3f);
+      CHECK(std::fabs(value - previous[axis]) <=
+            f.model.bounds.input_slew_max[axis] * .02f + 1e-3f);
+    }
+    for (int side = 0; side < 8; ++side) {
+      const float nx = std::cos(side * .785398163397f);
+      const float ny = std::sin(side * .785398163397f);
+      CHECK(nx * acceleration[0] + ny * acceleration[1] <=
+            tangent * (CONTROL_GRAVITY_MPS2 - acceleration[2]) + 1e-3f);
+    }
+    const float thrust = m6.config.payload.mass_kg *
+        std::sqrt(acceleration[0] * acceleration[0] +
+                  acceleration[1] * acceleration[1] +
+                  (CONTROL_GRAVITY_MPS2 - acceleration[2]) *
+                  (CONTROL_GRAVITY_MPS2 - acceleration[2]));
+    CHECK(thrust >= e.min_total_thrust_n - 1e-3f);
+    CHECK(thrust <= e.max_total_thrust_n + 1e-3f);
+    for (int axis = 0; axis < 3; ++axis)
+      previous[axis] = acceleration[axis];
   }
-  const float thrust = m6.config.payload.mass_kg *
-      std::sqrt(snapshot.acceleration[0] * snapshot.acceleration[0] +
-                 snapshot.acceleration[1] * snapshot.acceleration[1] +
-                 (CONTROL_GRAVITY_MPS2 - snapshot.acceleration[2]) *
-                 (CONTROL_GRAVITY_MPS2 - snapshot.acceleration[2]));
-  CHECK(thrust >= e.min_total_thrust_n - 1e-3f);
-  CHECK(thrust <= e.max_total_thrust_n + 1e-3f);
+  for (int axis = 0; axis < 3; ++axis)
+    CHECK(std::fabs(snapshot.acceleration[axis] -
+                    static_cast<float>(quad_solver.solution->x[axis])) <= 1e-4f);
 }
 
 static void test_mpc_axis_and_failure_regressions() {
