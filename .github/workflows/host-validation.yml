@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: host-validation-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   source-and-time:
     name: Source layout and time-service tests
