@@ -1128,6 +1128,45 @@ static void test_m5_map_free_ray_log_odds_and_stale(void)
   CHECK(state == M5_MAP_CELL_STALE);
 }
 
+static void test_m5_map_source_lease_refresh(void)
+{
+  M5LocalMap map;
+  NavigationSnapshot nav;
+  ProductObstacleObservation observation;
+  const uint64_t t0 = 2500000u;
+  float p[3] = {-1.75f, -1.75f, -1.75f};
+
+  planner_nav_init(&nav, t0);
+  CHECK(m5_local_map_init(&map, &nav, t0, 0.25f, 0.30f, 2.0f,
+                          M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
+  planner_observation_init(&observation, &nav, t0, 21u);
+  observation.observation_kind = PRODUCT_OBS_FREE_SPACE_RAY;
+  observation.ray_start_ned_m[0] = p[0];
+  observation.ray_start_ned_m[1] = p[1];
+  observation.ray_start_ned_m[2] = p[2];
+  observation.ray_end_ned_m[0] = -1.25f;
+  observation.ray_end_ned_m[1] = p[1];
+  observation.ray_end_ned_m[2] = p[2];
+  CHECK(m5_local_map_ingest(&map, &nav, &observation, 1u, t0) == STATUS_OK);
+  CHECK(map.source_deadline_us == t0 + 500000u);
+
+  planner_nav_init(&nav, t0 + 100000u);
+  planner_observation_init(&observation, &nav, t0 + 100000u, 22u);
+  observation.observation_kind = PRODUCT_OBS_FREE_SPACE_RAY;
+  observation.ray_start_ned_m[0] = p[0];
+  observation.ray_start_ned_m[1] = p[1];
+  observation.ray_start_ned_m[2] = p[2];
+  observation.ray_end_ned_m[0] = -1.25f;
+  observation.ray_end_ned_m[1] = p[1];
+  observation.ray_end_ned_m[2] = p[2];
+  CHECK(m5_local_map_ingest(&map, &nav, &observation, 1u, t0 + 100000u) == STATUS_OK);
+  CHECK(map.source_deadline_us == t0 + 600000u);
+
+  planner_nav_init(&nav, t0 + 550000u);
+  CHECK(m5_local_map_is_ready(&map, &nav, t0 + 550000u));
+  CHECK(!m5_local_map_is_ready(&map, &nav, t0 + 600001u));
+}
+
 static void test_m5_map_occupied_primitive_and_dynamic_track(void)
 {
   M5LocalMap map;
@@ -1469,6 +1508,7 @@ int main(void)
     {"minimum_jerk_nonzero_endpoints", test_minimum_jerk_nonzero_endpoint_boundary_states},
     {"m5_map_fixed_grid_bounds", test_m5_map_fixed_grid_and_bounds},
     {"m5_map_free_ray_stale", test_m5_map_free_ray_log_odds_and_stale},
+    {"m5_map_source_lease_refresh", test_m5_map_source_lease_refresh},
     {"m5_map_occupied_dynamic_track", test_m5_map_occupied_primitive_and_dynamic_track},
     {"m5_map_epoch_reject", test_m5_map_epoch_reset_and_reject_source},
     {"m5_map_batch_fail_closed", test_m5_map_batch_validation_is_fail_closed},
