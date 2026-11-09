@@ -2,12 +2,12 @@
 Run with a Host-only environment containing osqp==1.0.0, numpy and scipy.
 """
 from pathlib import Path
-import hashlib
 import json
 import re
 import numpy as np
 import scipy.sparse as sp
 import osqp
+from source_lock import refresh_lock
 
 assert osqp.__version__ == '1.0.0', osqp.__version__
 out = Path(__file__).resolve().parent / 'generated'
@@ -76,15 +76,7 @@ with pattern.open('w', encoding='utf-8') as f:
         for suffix, data in [('ptr', mat.indptr), ('row', mat.indices)]:
             f.write('static const int qp_%s_%s[%d]={%s};\n' %
                     (name, suffix, len(data), ','.join(map(str, data))))
-lock = {'version': '1.0.0', 'generator': 'osqp Python 1.0.0',
-        'mode': 2, 'float': True, 'variables': 15, 'constraints': 190,
-        'p_nnz': P.nnz, 'a_nnz': A.nnz, 'max_iter': 80,
-        'adaptive_rho_interval': 25, 'license': 'Apache-2.0',
-        'scaling': 0, 'rho_is_vec': False,
-        'local_modifications': 'Symbolic index arrays const in Flash; static pointer casts; QDLDL numeric refactor verifies fixed L indices; embedded unused certificate buffers alias their delta work vectors.',
-        'source': 'https://github.com/osqp/osqp/tree/v1.0.0',
-        'files': {p.relative_to(out).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-                  for p in sorted(out.rglob('*')) if p.is_file()
-                  and p.suffix not in {'.o', '.su'}}}
-(out.parent / 'UPSTREAM_LOCK.json').write_text(json.dumps(lock, indent=2)+'\n')
+# Refresh only generated/local-patch blob identities. Upstream-identical files
+# must continue to match their pinned upstream blob or generation fails closed.
+refresh_lock(out.parent / 'UPSTREAM_LOCK.json', out)
 print('Generated:', P.nnz, 'P entries,', A.nnz, 'A entries')
