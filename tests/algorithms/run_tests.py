@@ -253,7 +253,7 @@ for target in targets:
             )):
                 continue
             for line in report.read_text(errors='replace').splitlines():
-                fields = line.rsplit('\\t', 2)
+                fields = line.rsplit(None, 2)
                 if len(fields) != 3:
                     continue
                 try:
