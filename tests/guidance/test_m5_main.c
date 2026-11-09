@@ -2315,6 +2315,55 @@ static void test_m5_safety_preview_count_mismatch_rejected(void)
 }
 
 
+static void test_m5_safety_dfs_max_depth_stack_guard(void)
+{
+  SafetyFx fx;
+  unsigned i, axis;
+  uint16_t voxel = 0u;
+  const float unknown_cell[3] = {0.25f, 0.75f, 0.25f};
+  struct {
+    uint32_t before;
+    M5TrajectorySafetyWorkspace workspace;
+    uint32_t after;
+  } guarded;
+  M5TrajectorySafetyStatus status;
+
+  safety_fx_init(&fx, 44000000u);
+  fx.base.nav.core.position_ned_m[1] = 0.34999f;
+  fx.base.nav.core.velocity_ned_mps[0] = 0.5f;
+  fx.base.nav.core.velocity_ned_mps[1] = 0.0f;
+  fx.base.nav.core.velocity_ned_mps[2] = 0.0f;
+  for (axis = 0u; axis < 3u; ++axis)
+    fx.base.nav.core.acceleration_ned_mps2[axis] = 0.0f;
+  safety_map_reset(&fx);
+
+  CHECK(m5_local_map_world_to_voxel(&fx.map, unknown_cell, &voxel));
+  fx.map.cells[voxel].state = M5_MAP_CELL_UNKNOWN;
+  fx.map.cells[voxel].log_odds = 0;
+  fx.map.cells[voxel].source_mask = 0u;
+
+  safety_point_set(&fx.reference.anchor, 0.0f, 0.34999f, 0.0f,
+                   0.5f, 0.0f, 0.0f);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    fx.reference.points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+    safety_point_set(&fx.reference.points[i], (float)(i + 1u) * 0.01f,
+                     0.34999f, 0.0f, 0.5f, 0.0f, 0.0f);
+  }
+
+  guarded.before = 0x4D350601u;
+  guarded.after = 0xA60C5AFEul;
+  CHECK(M5_SAFETY_STACK_CAPACITY ==
+        M5_SAFETY_INTERVAL_COUNT + M5_SAFETY_MAX_DEPTH);
+  status = m5_trajectory_safety_validate(&fx.input, &guarded.workspace,
+                                         &fx.result);
+  CHECK(status == M5_SAFETY_UNKNOWN);
+  CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_MAP_UNKNOWN);
+  CHECK(fx.result.work_units == M5_SAFETY_MAX_DEPTH + 1u);
+  CHECK(guarded.before == 0x4D350601u);
+  CHECK(guarded.after == 0xA60C5AFEul);
+}
+
 static void test_m5_safety_dfs_work_unit_budget_exhaustion(void)
 {
   SafetyFx fx;
@@ -2571,6 +2620,7 @@ int main(void)
     {"m5_safety_map_revision", test_m5_safety_map_revision_mismatch_rejected},
     {"m5_safety_geofence_self_intersection", test_m5_safety_self_intersecting_geofence_rejected},
     {"m5_safety_cell_budget", test_m5_safety_cell_check_budget_exhaustion},
+    {"m5_safety_dfs_max_depth_stack_guard", test_m5_safety_dfs_max_depth_stack_guard},
     {"m5_safety_dfs_work_budget", test_m5_safety_dfs_work_unit_budget_exhaustion},
   };
   size_t i;
