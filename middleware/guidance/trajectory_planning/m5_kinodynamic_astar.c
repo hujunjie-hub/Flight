@@ -552,10 +552,14 @@ static int edge_map_clear(const M5AstarRequest *r, const GuidanceQuintic q[4],
       if (!guidance_quintic_bounds(&q[axis], t0, t1, 0u, &lo, &hi)) return 0;
       low[axis] = lo - inflation - 1e-5f;
       high[axis] = hi + inflation + 1e-5f;
-      if (low[axis] < -4.0f || high[axis] >= 4.0f) return 0;
       {
-        int first = (int)floorf((low[axis] + 4.0f) / 0.5f);
-        int last = (int)floorf((high[axis] + 4.0f) / 0.5f);
+        float relative_low = low[axis] - r->map->center_ned_m[axis];
+        float relative_high = high[axis] - r->map->center_ned_m[axis];
+        int first, last;
+        if (!isfinite(relative_low) || !isfinite(relative_high) ||
+            relative_low < -4.0f || relative_high >= 4.0f) return 0;
+        first = (int)floorf((relative_low + 4.0f) / 0.5f);
+        last = (int)floorf((relative_high + 4.0f) / 0.5f);
         if (first < 0 || last > 15 || last < first) return 0;
         volume *= (unsigned)(last - first + 1);
         if (volume > M5_ASTAR_CELL_CHECK_LIMIT) return 0;
