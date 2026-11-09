@@ -29,6 +29,11 @@
 | 自交围栏 | bow-tie polygon | INVALID | PASS |
 | 预览点 offset 错误 | 单点 offset 偏离 20ms 均匀采样契约 | INVALID | PASS |
 | Inf 输入 | 预览点速度含 Inf | INVALID | PASS |
+| 导航 epoch/origin/frame | state_epoch、origin_id 不匹配或 frame 非 LOCAL_NED | INVALID | PASS |
+| 围栏 origin | fence origin_id 与导航不一致 | INVALID | PASS |
+| 围栏重复顶点 | 相邻顶点重复形成退化边 | INVALID | PASS |
+| 动态 track 时间 | sample 在未来或超过陈旧阈值 | STALE | PASS |
+| 动态 track 数值 | position 为 NaN 或 radius 为负 | STALE | PASS |
 
 ## 测试夹具问题及修复
 
@@ -46,12 +51,12 @@
 
 ## 最新证据
 
-- CI：[最新 Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42637434996)
-- Commit：`27630aec8a0e9f982890267cc84b8de3d11148c2`
+- CI：[最新 Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42638931948)
+- Commit：`c35e6497e483ff2c0925612786d4ca8eb6acb851`
 - M4 Host：927 / 0 failures
-- M5 Host：8,430 / 0 failures
+- M5 Host：8,458 / 0 failures
 - M4/M5 Integration：1,000 / 0 failures
-- M5 ASan/UBSan：8,430 / 0 failures
+- M5 ASan/UBSan：8,458 / 0 failures
 - M4/M5 Integration ASan/UBSan：1,000 / 0 failures
 - Cortex-M7 compile and MPC RAM checks：PASS
 - 全部 workflow jobs：success
@@ -60,10 +65,10 @@
 
 1. 工作栈容量压力与最大细分树边界用例（DFS work-unit 256 和 cell-check 8192 两个预算均已覆盖）。
 
-1. 导航 epoch、origin、frame 不匹配组合。
+1. 导航及围栏 frame/origin/state epoch 交叉组合；当前已覆盖导航三项独立失配与围栏 origin 失配。
 2. 围栏重复顶点、退化边、边界擦边和垂直高度边界。
 3. 地图外边界、障碍物膨胀临界值和 cell 状态组合。
-4. 动态 track 过旧/未来 sample、非有限位置/速度、零/负半径和最大预测时域边界（本轮已覆盖 flags/source metadata 非法及缺少加速度界）。
+4. 动态 track 非有限速度、零半径、最大预测时域边界及时间戳整数极值。
 5. DFS 深度与最大工作栈压力；两个独立预算（work-unit、cell-check）均已由可达用例验证。
 6. 随机/属性 fuzz，并对关键几何边界建立可复现最小反例。
 
