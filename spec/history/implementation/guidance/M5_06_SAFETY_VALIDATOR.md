@@ -18,21 +18,22 @@
 - 检查导航、参考、指令、安全包络、地图、Home 和围栏的消息类型、有效位、frame、boot/time/state/origin epoch、TTL 和数值范围。
 - 只接受 GUIDANCE_REFERENCE_TRAJECTORY；Pilot/Altitude-only 参考不冒充 3D 避障轨迹。
 - 失败原因独立编码；所有非 PASS 状态都必须拒绝。
-- Host 测试覆盖连续静态碰撞、动态中点/交叉碰撞、UNKNOWN/STALE/INVALID、KEEP_IN/KEEP_OUT 穿越、动态租约过期、重复 track、非法 track flags/source metadata、动态 track 缺少加速度上界、未来/过旧 sample、NaN 位置、负半径、动态加速度上界、导航有效位/epoch/origin/frame 失配、地图 revision 失配、围栏 origin 失配/自交/重复顶点、数值错误以及两类独立预算耗尽：DFS 第 257 个工作单元触发 256 上限、静态地图第 8193 次 cell check 触发 8192 上限，均 fail-closed。
+- Host 测试覆盖连续静态碰撞、静态 voxel 线性扫掠与安全近失、动态中点/交叉碰撞、恒速与有界加速度动态连续距离差分、静态/动态预览接缝和自适应细分碰撞、UNKNOWN/STALE/INVALID、KEEP_IN/KEEP_OUT 穿越、动态租约过期、重复 track、非法 track flags/source metadata、动态 track 缺少加速度上界、未来/过旧 sample、NaN 位置、负半径、动态加速度上界、导航有效位/epoch/origin/frame 失配、地图 revision 失配、围栏 origin 失配/自交/重复顶点、数值错误以及两类独立预算耗尽：DFS 第 257 个工作单元触发 256 上限、静态地图第 8193 次 cell check 触发 8192 上限，均 fail-closed。
 
 ## 最新 Host/SIL 证据
 
-- 新增 S06-064..073 凹多边形、Bernstein、AABB 距离下界、动态相对扫掠界及严格 outward interval bounds 用例已在新 Head 完整通过。
+- 新增 S06-064..078 凹多边形、Bernstein、AABB 距离下界、动态相对扫掠界、严格 outward interval bounds、静态/动态端到端连续距离差分和预览接缝用例已在新 Head 完整通过。
 
-- GitHub Actions：[Host validation #425](https://github.com/hujunjie-hub/Flight/actions/runs/42660981911)
-- Commit：`3cc58e8683d504b3f12615406d8713274054dbad`
+- GitHub Actions：[Host validation #433](https://github.com/hujunjie-hub/Flight/actions/runs/42718225825)
+- Commit：`d06920f254611732fe971d5f60bfeb6431b8d6f6`
 - M4 Host：927 checks / 0 failures
-- M5 Host：260,119 checks / 0 failures
+- M5 Host：261,285 checks / 0 failures
 - M4/M5 Integration：1,000 checks / 0 failures
-- M5 ASan/UBSan：260,119 checks / 0 failures
+- M5 ASan/UBSan：261,285 checks / 0 failures
 - M4/M5 Integration ASan/UBSan：1,000 checks / 0 failures
 - Cortex-M7 编译及 MPC RAM 检查：PASS
 - M4/M5 production-source Cortex-M7 compile：PASS
+- MPC RAM：29,252 bytes；worker stack：8,192 bytes；largest single frame：2,024 bytes
 - Source/time、Navigation/Control：PASS
 - All workflow jobs：success
 
@@ -42,19 +43,27 @@ max_dynamic_obstacle_accel_mps2 是独立输入，必须由产品安全配置批
 
 response_delay_us 必须覆盖感知数据年龄、验证/调度延迟和控制/执行器响应延迟的批准上界。当前接口限制在 200ms 内，超过即拒绝；这不是实测响应时间。
 
-## 本轮追加边界测试（S06-053..073 已通过）
+## 本轮追加边界测试（S06-053..078 已通过）
 
-新增动态时间边界、围栏上下高度 margin/退化高度、uint64 proof horizon 溢出、有限极大动态不确定度数值溢出、32 组动态 track 属性测试、凹多边形 clearance oracle、16 组随机凹多边形 + 动态 track 联合测试、重复/回折顶点拒绝、256 组 Hermite→Bernstein 随机子区间严格 bounds 差分、1..8 track 多目标组合、2,048 组 point-to-AABB 距离下界 oracle、512 组动态相对运动扫掠上界测试，以及零曲线区间包含性。S06-053..073 已在 run `42660981911` 的 Host、ASan/UBSan 与 Cortex-M7 编译工作流通过。具体见验证矩阵。
+新增动态时间边界、围栏上下高度 margin/退化高度、uint64 proof horizon 溢出、有限极大动态不确定度数值溢出、32 组动态 track 属性测试、凹多边形 clearance oracle、16 组随机凹多边形 + 动态 track 联合测试、重复/回折顶点拒绝、256 组 Hermite→Bernstein 随机子区间严格 bounds 差分、1..8 track 多目标组合、2,048 组 point-to-AABB 距离下界 oracle、512 组动态相对运动扫掠上界测试，以及零曲线区间包含性。S06-053..078 已在 run `42718225825` 的 Host、ASan/UBSan 与 Cortex-M7 编译工作流通过。具体见验证矩阵。
 
 ## 未完成项
 
 1. 独立复核 Bernstein control-hull bounds 的数学推导、双精度 outward interval 算术的 IEEE-754/编译器假设及 `nextafter` 舍入策略；当前随机采样 oracle 不是穷尽证明。
-2. 将 point-to-AABB 与 dynamic relative sweep helper oracle 扩展为端到端 swept-volume/continuous-distance 差分，覆盖边界擦碰和相邻区间接缝。
+2. 已增加静态 voxel 线性扫掠、动态恒速/有界加速度相对运动差分，以及静态/动态预览接缝和自适应细分碰撞用例；仍需扩展到任意五次 Hermite 曲线的独立连续距离 oracle、精确擦边/切触和最小反例归档。
 3. 扩大多 track 时间戳、预测 lease、source identity、速度/加速度不确定度和相对运动组合 Fuzz。
 2. 对动态加速度上界开展更多参数敏感性分析；完成边界 fuzz。
 3. 独立复核 Bernstein 变换、浮点舍入误差、几何距离下界和所有连续性证明；当前不能宣称形式化证明。
 4. M5-07 接入 M5-05 candidate、M5-06 result、FMS Permit 和 M6 消费端，保证候选无法绕过验证器。
 5. H723 实机仍需真实障碍传感器、标定、WCET/RTA、RAM/栈、HIL 和逐级安全测试。
+
+## S06-074..078 新增连续碰撞差分
+
+- S06-074：64 组静态 voxel 线性扫掠（32 碰撞、32 安全近失），独立 AABB 距离 oracle。
+- S06-075：64 组动态恒速相对运动（32 碰撞、32 安全），解析最近接近时刻 oracle。
+- S06-076：64 组动态有界加速度轨迹（32 碰撞、32 安全），实际加速度≤0.45m/s²、测试上界 0.5m/s²，每组 257 个时刻采样。
+- S06-077/078：静态障碍物在 20ms 预览接缝、动态障碍物在自适应细分内部及预览接缝碰撞，均拒绝通过。
+- 完整结果见 [Host validation #433](https://github.com/hujunjie-hub/Flight/actions/runs/42718225825)。随机采样和有限场景差分仍不构成形式化证明。
 
 ## 本切片的结论
 
