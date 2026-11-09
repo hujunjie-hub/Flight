@@ -88,7 +88,9 @@ static void roll_map_to_position(M5LocalMap *map, const float position_ned_m[3])
   if (!changed && !clear_all) return;
   if (clear_all || abs(shift[0]) >= 16 || abs(shift[1]) >= 16 || abs(shift[2]) >= 16) {
     memset(map->cells, 0, sizeof(map->cells));
-    memcpy(map->center_ned_m, position_ned_m, sizeof(map->center_ned_m));
+    for (axis = 0u; axis < 3u; ++axis)
+      map->center_ned_m[axis] = roundf(position_ned_m[axis] / M5_MAP_CELL_SIZE_M) *
+                                M5_MAP_CELL_SIZE_M;
   } else {
     memset(shifted, 0, sizeof(shifted));
     for (z = 0u; z < 16u; ++z)
@@ -143,7 +145,9 @@ Status m5_local_map_init(M5LocalMap *map, const NavigationSnapshot *nav,
   map->vehicle_radius_m = vehicle_radius_m;
   map->clearance_margin_m = clearance_margin_m;
   map->uncertainty_inflation_factor = uncertainty_inflation_factor;
-  memcpy(map->center_ned_m, nav->core.position_ned_m, sizeof(map->center_ned_m));
+  for (unsigned axis = 0u; axis < 3u; ++axis)
+    map->center_ned_m[axis] = roundf(nav->core.position_ned_m[axis] /
+        M5_MAP_CELL_SIZE_M) * M5_MAP_CELL_SIZE_M;
   return STATUS_OK;
 }
 
