@@ -341,6 +341,12 @@ static uint8_t validate_reference_shape(
 
   if (!finite_motion_point(&r->anchor)) return 0u;
   for (axis = 0u; axis < 3u; ++axis) {
+    float grid_coordinate = in->map->center_ned_m[axis] / M5_MAP_CELL_SIZE_M;
+    if (!isfinite(grid_coordinate) ||
+        fabsf(grid_coordinate - roundf(grid_coordinate)) > 1e-4f) return 0u;
+  }
+
+  for (axis = 0u; axis < 3u; ++axis) {
     if (fabsf(r->anchor.point.position_ned_m[axis] -
               nav->core.position_ned_m[axis]) > M5_SAFETY_ANCHOR_POSITION_TOL_M ||
         fabsf(r->anchor.point.velocity_ned_mps[axis] -
@@ -473,9 +479,7 @@ static uint8_t curve_bounds(
       if (!isfinite(acceleration_control[axis][i])) return 0u;
       a_abs = fmax(a_abs, fabs(acceleration_control[axis][i]));
     }
-    bounds->position_low[axis] = (float)p_low;
-    bounds->position_high[axis] = (float)p_high;
-      {
+    {
       double position_mid = evaluate_bernstein(curve->position[axis], 5u, 0.5);
       double velocity_mid = evaluate_bernstein(velocity_control[axis], 4u, 0.5);
       bounds->position[axis] = (float)position_mid;
@@ -520,6 +524,23 @@ static M5TrajectorySafetyStatus state_status(uint8_t state)
     case M5_MAP_CELL_INVALID: return M5_SAFETY_INVALID;
     case M5_MAP_CELL_OCCUPIED_CONFIRMED: return M5_SAFETY_STATIC_COLLISION;
     default: return M5_SAFETY_INVALID;
+  }
+}
+
+static uint8_t map_cell_encoding_valid(const M5MapCell *cell)
+{
+  if (cell == NULL || cell->log_odds < -32 || cell->log_odds > 32) return 0u;
+  switch (cell->state) {
+    case M5_MAP_CELL_UNKNOWN:
+      return (uint8_t)(cell->log_odds > -4 && cell->log_odds < 4);
+    case M5_MAP_CELL_FREE_CONFIRMED:
+      return (uint8_t)(cell->log_odds <= -4 && cell->source_mask != 0u);
+    case M5_MAP_CELL_OCCUPIED_CONFIRMED:
+      return (uint8_t)(cell->log_odds >= 4 && cell->source_mask != 0u);
+    case M5_MAP_CELL_STALE:
+      return 1u;
+    default:
+      return 0u;
   }
 }
 
@@ -580,8 +601,8 @@ static M5TrajectorySafetyStatus check_static_map(
       mark_unresolved(check, M5_SAFETY_UNKNOWN);
       return M5_SAFETY_PASS;
     }
-    lo[axis] = (int)floorf((low[axis] - map_low) / M5_MAP_CELL_SIZE_M);
-    hi[axis] = (int)floorf((high[axis] - map_low) / M5_MAP_CELL_SIZE_M);
+    lo[axis] = (int)floor(((double)low[axis] - map_low) / M5_MAP_CELL_SIZE_M);
+    hi[axis] = (int)floor(((double)high[axis] - map_low) / M5_MAP_CELL_SIZE_M);
     if (lo[axis] < 0 || hi[axis] >= (int)M5_MAP_DIM)
       return M5_SAFETY_UNKNOWN;
   }
@@ -596,7 +617,8 @@ static M5TrajectorySafetyStatus check_static_map(
         M5TrajectorySafetyStatus status;
         if (++result->cell_checks > M5_SAFETY_MAX_CELL_CHECKS)
           return M5_SAFETY_BUDGET_EXCEEDED;
-        if (!m5_local_map_voxel_state(map, voxel, proof_end_us, &state))
+        if (!map_cell_encoding_valid(&map->cells[voxel]) ||
+            !m5_local_map_voxel_state(map, voxel, proof_end_us, &state))
           return M5_SAFETY_INVALID;
         status = state_status(state);
         m5_local_map_voxel_center(map, voxel, center);
@@ -654,7 +676,7 @@ static M5TrajectorySafetyStatus check_geofences(
     if (clearance <= inflation || height_mid < min_height ||
         height_mid > max_height) return M5_SAFETY_GEOFENCE_VIOLATION;
 
-    if (clearance <= inflation + swept_radius ||
+    if (clearance <= round_up_float((double)inflation + swept_radius) ||
         height_low < min_height || height_high > max_height) {
       mark_unresolved(check, M5_SAFETY_GEOFENCE_VIOLATION);
     }
@@ -782,7 +804,7 @@ static M5TrajectorySafetyStatus check_dynamic_tracks(
     if (!isfinite(combined_radius) || !isfinite(relative_sweep) ||
         !isfinite(distance)) return M5_SAFETY_NUMERIC_FAILURE;
     if (distance <= combined_radius) return M5_SAFETY_DYNAMIC_COLLISION;
-    if (distance <= combined_radius + relative_sweep) {
+    if (distance <= round_up_float((double)combined_radius + relative_sweep)) {
       mark_unresolved(check, M5_SAFETY_DYNAMIC_COLLISION);
     }
   }
