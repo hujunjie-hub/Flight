@@ -36,7 +36,15 @@ static const double choose[6][6] = {
 };
 
 typedef struct {
+  double low;
+  double high;
+  uint8_t valid;
+} M5SafetyInterval;
+
+typedef struct {
   double position[3][6];
+  double position_low[3][6];
+  double position_high[3][6];
 } M5SafetyBezier;
 
 typedef struct {
@@ -46,6 +54,8 @@ typedef struct {
   float position_high[3];
   float speed_bound;
   float acceleration_bound;
+  float velocity_axis_bound[3];
+  float acceleration_axis_bound[3];
   float velocity_mid_norm;
   float position_rounding_error_m;
   float velocity_rounding_error_mps;
@@ -61,6 +71,134 @@ typedef struct {
 static uint8_t finite3(const float v[3])
 {
   return (uint8_t)(isfinite(v[0]) && isfinite(v[1]) && isfinite(v[2]));
+}
+
+
+static M5SafetyInterval interval_invalid(void)
+{
+  M5SafetyInterval value = {0.0, 0.0, 0u};
+  return value;
+}
+
+static M5SafetyInterval interval_bounds(double low, double high)
+{
+  M5SafetyInterval value;
+  value.low = low;
+  value.high = high;
+  value.valid = (uint8_t)(isfinite(low) && isfinite(high) && low <= high);
+  return value.valid != 0u ? value : interval_invalid();
+}
+
+static M5SafetyInterval interval_exact(double value)
+{
+  return interval_bounds(value, value);
+}
+
+static M5SafetyInterval interval_add(
+    M5SafetyInterval a, M5SafetyInterval b)
+{
+  if (a.valid == 0u || b.valid == 0u) return interval_invalid();
+  return interval_bounds(
+      nextafter(a.low + b.low, -INFINITY),
+      nextafter(a.high + b.high, INFINITY));
+}
+
+static M5SafetyInterval interval_sub(
+    M5SafetyInterval a, M5SafetyInterval b)
+{
+  if (a.valid == 0u || b.valid == 0u) return interval_invalid();
+  return interval_bounds(
+      nextafter(a.low - b.high, -INFINITY),
+      nextafter(a.high - b.low, INFINITY));
+}
+
+static M5SafetyInterval interval_mul(
+    M5SafetyInterval a, M5SafetyInterval b)
+{
+  double products[4], low, high;
+  unsigned i;
+  if (a.valid == 0u || b.valid == 0u) return interval_invalid();
+  products[0] = a.low * b.low;
+  products[1] = a.low * b.high;
+  products[2] = a.high * b.low;
+  products[3] = a.high * b.high;
+  for (i = 0u; i < 4u; ++i)
+    if (!isfinite(products[i])) return interval_invalid();
+  low = products[0];
+  high = products[0];
+  for (i = 1u; i < 4u; ++i) {
+    low = fmin(low, products[i]);
+    high = fmax(high, products[i]);
+  }
+  return interval_bounds(nextafter(low, -INFINITY),
+                         nextafter(high, INFINITY));
+}
+
+static M5SafetyInterval interval_div(
+    M5SafetyInterval a, M5SafetyInterval b)
+{
+  double quotients[4], low, high;
+  unsigned i;
+  if (a.valid == 0u || b.valid == 0u ||
+      (b.low <= 0.0 && b.high >= 0.0)) return interval_invalid();
+  quotients[0] = a.low / b.low;
+  quotients[1] = a.low / b.high;
+  quotients[2] = a.high / b.low;
+  quotients[3] = a.high / b.high;
+  for (i = 0u; i < 4u; ++i)
+    if (!isfinite(quotients[i])) return interval_invalid();
+  low = quotients[0];
+  high = quotients[0];
+  for (i = 1u; i < 4u; ++i) {
+    low = fmin(low, quotients[i]);
+    high = fmax(high, quotients[i]);
+  }
+  return interval_bounds(nextafter(low, -INFINITY),
+                         nextafter(high, INFINITY));
+}
+
+static M5SafetyInterval interval_scale(M5SafetyInterval a, double scale)
+{
+  return interval_mul(a, interval_exact(scale));
+}
+
+static M5SafetyInterval interval_evaluate_bernstein(
+    const M5SafetyInterval *control, unsigned degree, double u)
+{
+  M5SafetyInterval work[6];
+  M5SafetyInterval u_i = interval_exact(u);
+  M5SafetyInterval one_minus_u = interval_sub(interval_exact(1.0), u_i);
+  unsigned i, level;
+  if (control == NULL || degree > 5u || !isfinite(u) ||
+      u < 0.0 || u > 1.0 || u_i.valid == 0u ||
+      one_minus_u.valid == 0u) return interval_invalid();
+  for (i = 0u; i <= degree; ++i) {
+    if (control[i].valid == 0u) return interval_invalid();
+    work[i] = control[i];
+  }
+  for (level = 1u; level <= degree; ++level) {
+    for (i = 0u; i <= degree - level; ++i) {
+      work[i] = interval_add(
+          interval_mul(one_minus_u, work[i]),
+          interval_mul(u_i, work[i + 1u]));
+      if (work[i].valid == 0u) return interval_invalid();
+    }
+  }
+  return work[0];
+}
+
+static double interval_abs_max(M5SafetyInterval value)
+{
+  if (value.valid == 0u) return INFINITY;
+  return fmax(fabs(value.low), fabs(value.high));
+}
+
+static double sum_square_upper(double sum, double value)
+{
+  double square;
+  if (value == 0.0) return sum;
+  square = nextafter(value * value, INFINITY);
+  return nextafter(sum + square, INFINITY);
 }
 
 static float round_up_float(double value)
@@ -442,6 +580,90 @@ static uint8_t build_curve(
       if (!isfinite(value)) return 0u;
       curve->position[axis][j] = value;
     }
+
+    {
+      M5SafetyInterval hp = interval_exact(h);
+      M5SafetyInterval h2 = interval_mul(hp, hp);
+      M5SafetyInterval h3 = interval_mul(h2, hp);
+      M5SafetyInterval h4 = interval_mul(h3, hp);
+      M5SafetyInterval h5 = interval_mul(h4, hp);
+      M5SafetyInterval p0_i = interval_exact(p0);
+      M5SafetyInterval v0_i = interval_exact(v0);
+      M5SafetyInterval a0_i = interval_exact(a0);
+      M5SafetyInterval p1_i = interval_exact(p1);
+      M5SafetyInterval v1_i = interval_exact(v1);
+      M5SafetyInterval a1_i = interval_exact(a1);
+      M5SafetyInterval dp_i, dv_i, da_i, c_i[6];
+      M5SafetyInterval t0_i, dt_i, t_power_i[6], dt_power_i[6];
+      M5SafetyInterval local_power_i[6], bezier_i[6];
+      M5SafetyInterval predicted_i;
+
+      if (h2.valid == 0u || h3.valid == 0u ||
+          h4.valid == 0u || h5.valid == 0u) return 0u;
+      predicted_i = interval_add(
+          interval_add(p0_i, interval_mul(v0_i, hp)),
+          interval_mul(interval_scale(a0_i, 0.5), h2));
+      dp_i = interval_sub(p1_i, predicted_i);
+      dv_i = interval_sub(v1_i,
+          interval_add(v0_i, interval_mul(a0_i, hp)));
+      da_i = interval_sub(a1_i, a0_i);
+
+      c_i[0] = p0_i;
+      c_i[1] = v0_i;
+      c_i[2] = interval_scale(a0_i, 0.5);
+      c_i[3] = interval_add(
+          interval_sub(
+              interval_div(interval_scale(dp_i, 10.0), h3),
+              interval_div(interval_scale(dv_i, 4.0), h2)),
+          interval_div(interval_scale(da_i, 0.5), hp));
+      c_i[4] = interval_add(
+          interval_add(
+              interval_div(interval_scale(dp_i, -15.0), h4),
+              interval_div(interval_scale(dv_i, 7.0), h3)),
+          interval_div(interval_scale(da_i, -1.0), h2));
+      c_i[5] = interval_add(
+          interval_add(
+              interval_div(interval_scale(dp_i, 6.0), h5),
+              interval_div(interval_scale(dv_i, -3.0), h4)),
+          interval_div(interval_scale(da_i, 0.5), h3));
+
+      t0_i = interval_mul(hp, interval_exact((double)u0));
+      dt_i = interval_mul(hp,
+          interval_sub(interval_exact((double)u1), interval_exact((double)u0)));
+      t_power_i[0] = interval_exact(1.0);
+      dt_power_i[0] = interval_exact(1.0);
+      for (i = 1u; i <= 5u; ++i) {
+        t_power_i[i] = interval_mul(t_power_i[i - 1u], t0_i);
+        dt_power_i[i] = interval_mul(dt_power_i[i - 1u], dt_i);
+      }
+      for (k = 0u; k <= 5u; ++k) {
+        local_power_i[k] = interval_exact(0.0);
+        for (i = k; i <= 5u; ++i) {
+          M5SafetyInterval term = interval_mul(c_i[i],
+              interval_exact(choose[i][k]));
+          term = interval_mul(term, t_power_i[i - k]);
+          term = interval_mul(term, dt_power_i[k]);
+          local_power_i[k] = interval_add(local_power_i[k], term);
+        }
+      }
+      for (j = 0u; j <= 5u; ++j) {
+        bezier_i[j] = interval_exact(0.0);
+        for (k = 0u; k <= j; ++k) {
+          M5SafetyInterval term = interval_mul(local_power_i[k],
+              interval_exact(choose[j][k]));
+          term = interval_div(term, interval_exact(choose[5][k]));
+          bezier_i[j] = interval_add(bezier_i[j], term);
+        }
+        if (bezier_i[j].valid == 0u || c_i[0].valid == 0u ||
+            c_i[1].valid == 0u || c_i[2].valid == 0u ||
+            c_i[3].valid == 0u || c_i[4].valid == 0u ||
+            c_i[5].valid == 0u || t_power_i[j].valid == 0u) return 0u;
+        curve->position_low[axis][j] =
+            fmin(bezier_i[j].low, curve->position[axis][j]);
+        curve->position_high[axis][j] =
+            fmax(bezier_i[j].high, curve->position[axis][j]);
+      }
+    }
   }
   return 1u;
 }
@@ -451,63 +673,107 @@ static uint8_t curve_bounds(
     float duration_s,
     M5SafetyCurveBounds *bounds)
 {
-  double velocity_control[3][5];
-  double acceleration_control[3][4];
   double speed2 = 0.0, acceleration2 = 0.0, velocity_mid2 = 0.0;
   double position_rounding2 = 0.0, velocity_rounding2 = 0.0;
   unsigned axis, i;
-  if (!(duration_s > 0.0f) || !isfinite(duration_s)) return 0u;
+
+  if (curve == NULL || bounds == NULL ||
+      !(duration_s > 0.0f) || !isfinite(duration_s)) return 0u;
 
   for (axis = 0u; axis < 3u; ++axis) {
-    double p_low = INFINITY, p_high = -INFINITY;
-    double v_abs = 0.0, a_abs = 0.0;
+    M5SafetyInterval position_control[6];
+    M5SafetyInterval velocity_control[5];
+    M5SafetyInterval acceleration_control[4];
+    M5SafetyInterval position_mid_interval, velocity_mid_interval;
+    double position_low = INFINITY, position_high = -INFINITY;
+    double velocity_abs = 0.0, acceleration_abs = 0.0;
+    double velocity_mid_abs;
+    double velocity_mid_control[5];
+    double position_mid, velocity_mid;
+
     for (i = 0u; i < 6u; ++i) {
-      p_low = fmin(p_low, curve->position[axis][i]);
-      p_high = fmax(p_high, curve->position[axis][i]);
-      if (!isfinite(curve->position[axis][i])) return 0u;
+      position_control[i] = interval_bounds(
+          curve->position_low[axis][i], curve->position_high[axis][i]);
+      if (position_control[i].valid == 0u ||
+          !isfinite(curve->position[axis][i])) return 0u;
+      position_low = fmin(position_low, position_control[i].low);
+      position_high = fmax(position_high, position_control[i].high);
     }
+
     for (i = 0u; i < 5u; ++i) {
-      velocity_control[axis][i] =
-          5.0 * (curve->position[axis][i + 1u] -
-                 curve->position[axis][i]) / duration_s;
-      if (!isfinite(velocity_control[axis][i])) return 0u;
-      v_abs = fmax(v_abs, fabs(velocity_control[axis][i]));
+      M5SafetyInterval difference = interval_sub(
+          position_control[i + 1u], position_control[i]);
+      velocity_control[i] = interval_div(
+          interval_scale(difference, 5.0), interval_exact(duration_s));
+      if (velocity_control[i].valid == 0u) return 0u;
+      velocity_abs = fmax(velocity_abs,
+                          interval_abs_max(velocity_control[i]));
+      velocity_mid_control[i] = 5.0 *
+          (curve->position[axis][i + 1u] -
+           curve->position[axis][i]) / duration_s;
+      if (!isfinite(velocity_mid_control[i])) return 0u;
     }
+
     for (i = 0u; i < 4u; ++i) {
-      acceleration_control[axis][i] =
-          4.0 * (velocity_control[axis][i + 1u] -
-                 velocity_control[axis][i]) / duration_s;
-      if (!isfinite(acceleration_control[axis][i])) return 0u;
-      a_abs = fmax(a_abs, fabs(acceleration_control[axis][i]));
+      M5SafetyInterval difference = interval_sub(
+          velocity_control[i + 1u], velocity_control[i]);
+      acceleration_control[i] = interval_div(
+          interval_scale(difference, 4.0), interval_exact(duration_s));
+      if (acceleration_control[i].valid == 0u) return 0u;
+      acceleration_abs = fmax(acceleration_abs,
+                              interval_abs_max(acceleration_control[i]));
     }
-    {
-      double position_mid = evaluate_bernstein(curve->position[axis], 5u, 0.5);
-      double velocity_mid = evaluate_bernstein(velocity_control[axis], 4u, 0.5);
-      bounds->position[axis] = (float)position_mid;
-      bounds->velocity[axis] = (float)velocity_mid;
-      position_rounding2 +=
-          ((double)bounds->position[axis] - position_mid) *
-          ((double)bounds->position[axis] - position_mid);
-      velocity_rounding2 +=
-          ((double)bounds->velocity[axis] - velocity_mid) *
-          ((double)bounds->velocity[axis] - velocity_mid);
-      velocity_mid2 += velocity_mid * velocity_mid;
-    }
-    bounds->position_low[axis] = round_down_float(p_low);
-    bounds->position_high[axis] = round_up_float(p_high);
-    if (!isfinite(bounds->position_low[axis]) ||
-        !isfinite(bounds->position_high[axis]) ||
+
+    position_mid_interval =
+        interval_evaluate_bernstein(position_control, 5u, 0.5);
+    velocity_mid_interval =
+        interval_evaluate_bernstein(velocity_control, 4u, 0.5);
+    if (position_mid_interval.valid == 0u ||
+        velocity_mid_interval.valid == 0u) return 0u;
+
+    position_mid = evaluate_bernstein(curve->position[axis], 5u, 0.5);
+    velocity_mid = evaluate_bernstein(velocity_mid_control, 4u, 0.5);
+    bounds->position[axis] = (float)position_mid;
+    bounds->velocity[axis] = (float)velocity_mid;
+    if (!isfinite(position_mid) || !isfinite(velocity_mid) ||
         !isfinite(bounds->position[axis]) ||
         !isfinite(bounds->velocity[axis])) return 0u;
-    speed2 += v_abs * v_abs;
-    acceleration2 += a_abs * a_abs;
+
+    {
+      double position_error = fmax(
+          fabs((double)bounds->position[axis] - position_mid_interval.low),
+          fabs(position_mid_interval.high - (double)bounds->position[axis]));
+      double velocity_error = fmax(
+          fabs((double)bounds->velocity[axis] - velocity_mid_interval.low),
+          fabs(velocity_mid_interval.high - (double)bounds->velocity[axis]));
+      velocity_mid_abs = interval_abs_max(velocity_mid_interval);
+      position_rounding2 = sum_square_upper(position_rounding2, position_error);
+      velocity_rounding2 = sum_square_upper(velocity_rounding2, velocity_error);
+      velocity_mid2 = sum_square_upper(velocity_mid2, velocity_mid_abs);
+    }
+
+    bounds->position_low[axis] = round_down_float(position_low);
+    bounds->position_high[axis] = round_up_float(position_high);
+    bounds->velocity_axis_bound[axis] = round_up_float(velocity_abs);
+    bounds->acceleration_axis_bound[axis] = round_up_float(acceleration_abs);
+    if (!isfinite(bounds->position_low[axis]) ||
+        !isfinite(bounds->position_high[axis]) ||
+        !isfinite(bounds->velocity_axis_bound[axis]) ||
+        !isfinite(bounds->acceleration_axis_bound[axis])) return 0u;
+
+    speed2 = sum_square_upper(speed2, velocity_abs);
+    acceleration2 = sum_square_upper(acceleration2, acceleration_abs);
   }
 
-  bounds->speed_bound = round_up_float(sqrt(speed2));
-  bounds->acceleration_bound = round_up_float(sqrt(acceleration2));
-  bounds->velocity_mid_norm = round_up_float(sqrt(velocity_mid2));
-  bounds->position_rounding_error_m = round_up_float(sqrt(position_rounding2));
-  bounds->velocity_rounding_error_mps = round_up_float(sqrt(velocity_rounding2));
+  bounds->speed_bound = round_up_float(nextafter(sqrt(speed2), INFINITY));
+  bounds->acceleration_bound =
+      round_up_float(nextafter(sqrt(acceleration2), INFINITY));
+  bounds->velocity_mid_norm =
+      round_up_float(nextafter(sqrt(velocity_mid2), INFINITY));
+  bounds->position_rounding_error_m =
+      round_up_float(nextafter(sqrt(position_rounding2), INFINITY));
+  bounds->velocity_rounding_error_mps =
+      round_up_float(nextafter(sqrt(velocity_rounding2), INFINITY));
   bounds->half_duration_s = 0.5f * duration_s;
   return (uint8_t)(isfinite(bounds->speed_bound) &&
       isfinite(bounds->acceleration_bound) &&
@@ -999,23 +1265,10 @@ M5TrajectorySafetyStatus m5_trajectory_safety_validate(
                       M5_SAFETY_REASON_DYNAMICS, offset_us);
       }
       for (axis = 0u; axis < 3u; ++axis) {
-        double velocity_abs = 0.0, acceleration_abs = 0.0;
-        unsigned k;
-        double velocity_control[5], acceleration_control[4];
-        for (k = 0u; k < 5u; ++k) {
-          velocity_control[k] = 5.0 *
-              (bezier.position[axis][k + 1u] - bezier.position[axis][k]) /
-              local_duration;
-          velocity_abs = fmax(velocity_abs, fabs(velocity_control[k]));
-        }
-        for (k = 0u; k < 4u; ++k) {
-          acceleration_control[k] = 4.0 *
-              (velocity_control[k + 1u] - velocity_control[k]) /
-              local_duration;
-          acceleration_abs = fmax(acceleration_abs, fabs(acceleration_control[k]));
-        }
-        if (round_up_float(velocity_abs) > e->max_velocity_ned_mps[axis] + 1e-4f ||
-            round_up_float(acceleration_abs) > e->max_acceleration_ned_mps2[axis] + 1e-4f) {
+        if (curve.velocity_axis_bound[axis] >
+                e->max_velocity_ned_mps[axis] + 1e-4f ||
+            curve.acceleration_axis_bound[axis] >
+                e->max_acceleration_ned_mps2[axis] + 1e-4f) {
           return reject(result, M5_SAFETY_DYNAMICS_VIOLATION,
                         M5_SAFETY_REASON_DYNAMICS, offset_us);
         }
