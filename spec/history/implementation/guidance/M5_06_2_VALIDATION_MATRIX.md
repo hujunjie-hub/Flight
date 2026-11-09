@@ -12,16 +12,16 @@
 ## 最新 CI 证据
 
 - Workflow：Host validation
-- Run：[#360](https://github.com/hujunjie-hub/Flight/actions/runs/42620286760)
-- Commit：`6cf9aa117eff21c29a8985ddb93660236cad762b`
+- Run：[Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42630463108)
+- Commit：`ffc597b12c825c0897f263502b754d7eb1c8a267`
 - 结果：**全部 jobs success**
 
 | CI 项目 | 实际结果 |
 |---|---:|
 | M4 Host | 927 checks / 0 failures |
-| M5 Host | 8,371 checks / 0 failures |
+| M5 Host | 8,377 checks / 0 failures |
 | M4/M5 Integration | 1,000 checks / 0 failures |
-| M5 ASan/UBSan | 8,371 checks / 0 failures |
+| M5 ASan/UBSan | 8,377 checks / 0 failures |
 | M4/M5 Integration ASan/UBSan | 1,000 checks / 0 failures |
 | Cortex-M7 compile and MPC RAM checks | PASS |
 | Navigation and control host tests | PASS |
@@ -53,16 +53,17 @@
 | S06-018 | 围栏自交几何 | INVALID | Host PASS；重复顶点/边界退化待补 |
 | S06-019 | 导航缺少所需 valid bit | INVALID | Host PASS；epoch/origin/frame 不匹配待补 |
 | S06-020 | response delay 超过配置上限 | INVALID | Host PASS |
-| S06-021 | DFS 工作单元或体素检查预算耗尽 | BUDGET_EXCEEDED | 待补 |
-| S06-022 | 工作栈容量边界和最大细分压力 | CAPACITY/BUDGET 拒绝 | 待补 |
-| S06-023 | 工作栈固定 512B 编译期断言 | 编译通过 | Host/Cortex-M7 CI PASS |
-| S06-024 | Host ASan/UBSan | 无内存或未定义行为错误 | CI PASS；fuzz 待补 |
-| S06-025 | 动态障碍物中点碰撞 | DYNAMIC_COLLISION | Host PASS |
-| S06-026 | 动态障碍物预测租约不足 | STALE | Host PASS |
-| S06-027 | 多个动态 track 重复身份 | INVALID | Host PASS |
-| S06-028 | 预览点数量不足 | INVALID | Host PASS |
-| S06-029 | 预览点 offset 单点偏差 | INVALID | Host PASS |
-| S06-030 | 导航不确定度传播至子区间远端 | 保守膨胀 | 代码修正并通过完整 CI；专项边界用例待补 |
+| S06-021 | 静态地图 cell-check 预算超过 8192 | BUDGET_EXCEEDED | Host PASS：8193 次时 fail-closed |
+| S06-022 | DFS work-unit 预算 256 耗尽 | BUDGET_EXCEEDED | 待补独立可达用例 |
+| S06-023 | 工作栈容量边界和最大细分压力 | CAPACITY/BUDGET 拒绝 | 待补 |
+| S06-024 | 工作栈固定 512B 编译期断言 | 编译通过 | Host/Cortex-M7 CI PASS |
+| S06-025 | Host ASan/UBSan | 无内存或未定义行为错误 | CI PASS；fuzz 待补 |
+| S06-026 | 动态障碍物中点碰撞 | DYNAMIC_COLLISION | Host PASS |
+| S06-027 | 动态障碍物预测租约不足 | STALE | Host PASS |
+| S06-028 | 多个动态 track 重复身份 | INVALID | Host PASS |
+| S06-029 | 预览点数量不足 | INVALID | Host PASS |
+| S06-030 | 预览点 offset 单点偏差 | INVALID | Host PASS |
+| S06-031 | 导航不确定度传播至子区间远端 | 保守膨胀 | 代码修正并通过完整 CI；专项边界用例待补 |
 
 ## 仍未关闭的审查项
 
