@@ -725,6 +725,7 @@ M5PlannerResult m5_kinodynamic_astar_plan(const M5AstarRequest *r,
   }
   (void)nearest_velocity_bin(r->start_velocity_ned_mps,
                              &start_velocity_bin, &velocity_lattice);
+  (void)velocity_lattice; /* make_edge separately enforces root lattice rules */
   yaw_bin = nearest_yaw_bin(r->start_yaw_rad);
   root_key = m5_kinodynamic_encode_key(root_voxel, (uint8_t)start_velocity_bin,
                                        yaw_bin, 0u);
