@@ -66,6 +66,7 @@ typedef struct {
   float vehicle_radius_m;
   float clearance_margin_m;
   float uncertainty_inflation_factor;
+  float center_ned_m[3]; /* rolling grid centre, snapped in 0.5 m increments */
   M5MapCell cells[M5_MAP_CELL_COUNT];
   M5DynamicTrack tracks[M5_MAP_MAX_TRACKS];
 } M5LocalMap;
@@ -85,8 +86,10 @@ Status m5_local_map_query(const M5LocalMap *map, const float position_ned_m[3],
                           uint64_t now_us, uint8_t *state);
 uint8_t m5_local_map_is_ready(const M5LocalMap *map, const NavigationSnapshot *navigation,
                               uint64_t now_us);
-uint8_t m5_local_map_world_to_voxel(const float position_ned_m[3], uint16_t *voxel);
-void m5_local_map_voxel_center(uint16_t voxel, float position_ned_m[3]);
+uint8_t m5_local_map_world_to_voxel(const M5LocalMap *map,
+                                     const float position_ned_m[3], uint16_t *voxel);
+void m5_local_map_voxel_center(const M5LocalMap *map, uint16_t voxel,
+                               float position_ned_m[3]);
 uint8_t m5_local_map_voxel_state(const M5LocalMap *map, uint16_t voxel,
                                  uint64_t now_us, uint8_t *state);
 
