@@ -3461,6 +3461,161 @@ static void test_m5_safety_static_collision_at_preview_seam_adaptive_split(void)
   CHECK(fx.result.work_units > 1u);
 }
 
+
+static void safety_eval_hermite_basis_axis(
+    double p0, double v0, double a0,
+    double p1, double v1, double a1,
+    double duration, double time_s,
+    double *position, double *velocity, double *acceleration)
+{
+  double u = time_s / duration;
+  double u2 = u * u, u3 = u2 * u, u4 = u3 * u, u5 = u4 * u;
+  double h00 = 1.0 - 10.0*u3 + 15.0*u4 - 6.0*u5;
+  double h10 = u - 6.0*u3 + 8.0*u4 - 3.0*u5;
+  double h20 = 0.5 * (u2 - 3.0*u3 + 3.0*u4 - u5);
+  double h01 = 10.0*u3 - 15.0*u4 + 6.0*u5;
+  double h11 = -4.0*u3 + 7.0*u4 - 3.0*u5;
+  double h21 = 0.5 * (u3 - 2.0*u4 + u5);
+  double h00d = -30.0*u2 + 60.0*u3 - 30.0*u4;
+  double h10d = 1.0 - 18.0*u2 + 32.0*u3 - 15.0*u4;
+  double h20d = u - 4.5*u2 + 6.0*u3 - 2.5*u4;
+  double h01d = 30.0*u2 - 60.0*u3 + 30.0*u4;
+  double h11d = -12.0*u2 + 28.0*u3 - 15.0*u4;
+  double h21d = 1.5*u2 - 4.0*u3 + 2.5*u4;
+  double h00dd = -60.0*u + 180.0*u2 - 120.0*u3;
+  double h10dd = -36.0*u + 96.0*u2 - 60.0*u3;
+  double h20dd = 1.0 - 9.0*u + 18.0*u2 - 10.0*u3;
+  double h01dd = 60.0*u - 180.0*u2 + 120.0*u3;
+  double h11dd = -24.0*u + 84.0*u2 - 60.0*u3;
+  double h21dd = 3.0*u - 12.0*u2 + 10.0*u3;
+  double t2 = duration * duration;
+
+  *position = h00*p0 + h10*duration*v0 + h20*t2*a0 +
+      h01*p1 + h11*duration*v1 + h21*t2*a1;
+  *velocity = (h00d*p0 + h10d*duration*v0 + h20d*t2*a0 +
+      h01d*p1 + h11d*duration*v1 + h21d*t2*a1) / duration;
+  *acceleration = (h00dd*p0 + h10dd*duration*v0 + h20dd*t2*a0 +
+      h01dd*p1 + h11dd*duration*v1 + h21dd*t2*a1) / t2;
+}
+
+static void test_m5_safety_arbitrary_hermite_swept_volume_differential(void)
+{
+  uint32_t seed = 0x5EED0679u;
+  const double duration = (double)PRODUCT_PREVIEW_COUNT *
+      PRODUCT_PREVIEW_STEP_US * 1.0e-6;
+  const double obstacle_time = 0.237;
+  unsigned trial;
+
+  for (trial = 0u; trial < 64u; ++trial) {
+    SafetyFx fx;
+    double p0[3], v0[3], a0[3], p1[3], v1[3], a1[3];
+    double contact_position[3], contact_velocity[3], contact_acceleration[3];
+    double minimum_aabb_distance = INFINITY;
+    float obstacle[3], center[3];
+    uint16_t voxel = 0u;
+    unsigned axis, i, sample;
+    int collision_case = (trial < 32u);
+
+    safety_fx_init(&fx, 180000000ull + (uint64_t)trial * 1000000ull);
+    p0[0] = -0.45 + (double)safety_fuzz_signed_unit(&seed) * 0.01;
+    p1[0] =  0.45 + (double)safety_fuzz_signed_unit(&seed) * 0.01;
+    v0[0] = 1.875 + (double)safety_fuzz_signed_unit(&seed) * 0.05;
+    v1[0] = 1.875 + (double)safety_fuzz_signed_unit(&seed) * 0.05;
+    a0[0] = (double)safety_fuzz_signed_unit(&seed) * 0.10;
+    a1[0] = (double)safety_fuzz_signed_unit(&seed) * 0.10;
+    p0[1] = (double)safety_fuzz_signed_unit(&seed) * 0.02;
+    p1[1] = (double)safety_fuzz_signed_unit(&seed) * 0.02;
+    v0[1] = (double)safety_fuzz_signed_unit(&seed) * 0.03;
+    v1[1] = (double)safety_fuzz_signed_unit(&seed) * 0.03;
+    a0[1] = (double)safety_fuzz_signed_unit(&seed) * 0.05;
+    a1[1] = (double)safety_fuzz_signed_unit(&seed) * 0.05;
+    p0[2] = p1[2] = 0.0;
+    v0[2] = v1[2] = 0.0;
+    a0[2] = a1[2] = 0.0;
+
+    for (axis = 0u; axis < 3u; ++axis) {
+      fx.base.nav.core.position_ned_m[axis] = (float)p0[axis];
+      fx.base.nav.core.velocity_ned_mps[axis] = (float)v0[axis];
+      fx.base.nav.core.acceleration_ned_mps2[axis] = (float)a0[axis];
+    }
+    safety_point_set(&fx.reference.anchor,
+        (float)p0[0], (float)p0[1], (float)p0[2],
+        (float)v0[0], (float)v0[1], (float)v0[2]);
+    for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+      double t = (double)(i + 1u) * PRODUCT_PREVIEW_STEP_US * 1.0e-6;
+      double position[3], velocity[3], acceleration[3];
+      for (axis = 0u; axis < 3u; ++axis) {
+        safety_eval_hermite_basis_axis(p0[axis], v0[axis], a0[axis],
+            p1[axis], v1[axis], a1[axis], duration, t,
+            &position[axis], &velocity[axis], &acceleration[axis]);
+      }
+      safety_point_set(&fx.reference.points[i],
+          (float)position[0], (float)position[1], (float)position[2],
+          (float)velocity[0], (float)velocity[1], (float)velocity[2]);
+      fx.reference.points[i].offset_us =
+          (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+      for (axis = 0u; axis < 3u; ++axis) {
+        fx.reference.points[i].point.acceleration_ned_mps2[axis] =
+            (float)acceleration[axis];
+      }
+    }
+    fx.reference.anchor.offset_us = 0u;
+    for (axis = 0u; axis < 3u; ++axis) {
+      safety_eval_hermite_basis_axis(p0[axis], v0[axis], a0[axis],
+          p1[axis], v1[axis], a1[axis], duration, obstacle_time,
+          &contact_position[axis], &contact_velocity[axis],
+          &contact_acceleration[axis]);
+    }
+
+    obstacle[0] = (float)contact_position[0];
+    obstacle[1] = (float)(contact_position[1] +
+        (collision_case ? 0.0 : 1.5));
+    obstacle[2] = (float)contact_position[2];
+    safety_map_reset(&fx);
+    CHECK(m5_local_map_world_to_voxel(&fx.map, obstacle, &voxel));
+    m5_local_map_voxel_center(&fx.map, voxel, center);
+
+    for (sample = 0u; sample <= 1024u; ++sample) {
+      double t = duration * (double)sample / 1024.0;
+      double point[3], velocity[3], acceleration[3], distance2 = 0.0;
+      for (axis = 0u; axis < 3u; ++axis) {
+        double delta;
+        safety_eval_hermite_basis_axis(p0[axis], v0[axis], a0[axis],
+            p1[axis], v1[axis], a1[axis], duration, t,
+            &point[axis], &velocity[axis], &acceleration[axis]);
+        delta = fabs(point[axis] - (double)center[axis]) - 0.25;
+        if (delta > 0.0) distance2 += delta * delta;
+      }
+      minimum_aabb_distance = fmin(minimum_aabb_distance, sqrt(distance2));
+    }
+
+    if (collision_case) {
+      double contact_distance2 = 0.0;
+      for (axis = 0u; axis < 3u; ++axis) {
+        double delta = fabs(contact_position[axis] -
+                            (double)center[axis]) - 0.25;
+        if (delta > 0.0) contact_distance2 += delta * delta;
+      }
+      CHECK(contact_distance2 == 0.0);
+    } else {
+      CHECK(minimum_aabb_distance > 1.0);
+    }
+
+    fx.map.cells[voxel].state = M5_MAP_CELL_OCCUPIED_CONFIRMED;
+    fx.map.cells[voxel].log_odds = 4;
+    fx.map.cells[voxel].source_mask = 1u;
+    if (collision_case) {
+      CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+          &fx.result) == M5_SAFETY_STATIC_COLLISION);
+      CHECK(fx.result.passed == 0u);
+    } else {
+      CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+          &fx.result) == M5_SAFETY_PASS);
+      CHECK(fx.result.passed == 1u);
+    }
+  }
+}
+
 static void test_m5_safety_static_voxel_sweep_differential(void)
 {
   uint32_t seed = 0x5A71C061u;
@@ -4250,6 +4405,7 @@ int main(void)
     {"m5_safety_static_midsegment", test_m5_safety_static_collision_between_preview_endpoints},
     {"m5_safety_static_seam_adaptive_split", test_m5_safety_static_collision_at_preview_seam_adaptive_split},
     {"m5_safety_static_voxel_sweep_differential", test_m5_safety_static_voxel_sweep_differential},
+    {"m5_safety_arbitrary_hermite_swept_volume_differential", test_m5_safety_arbitrary_hermite_swept_volume_differential},
     {"m5_safety_keepin_excursion", test_m5_safety_keep_in_curve_excursion_rejected},
     {"m5_safety_dynamic_expiry", test_m5_safety_dynamic_track_expiry_rejected},
     {"m5_safety_duplicate_track", test_m5_safety_duplicate_dynamic_track_rejected},
