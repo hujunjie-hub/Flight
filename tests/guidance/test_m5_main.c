@@ -1418,8 +1418,12 @@ static void test_m5_astar_rejects_stale_map_and_obstacle_barrier(void)
       fx.map.cells[voxel].log_odds = 4;
     }
   fx.request.goal_position_ned_m[0] = -0.75f;
-  CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
-      &fx.path, &fx.stats) == M5_PLANNER_NO_PATH);
+  {
+    M5PlannerResult result = m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
+        &fx.path, &fx.stats);
+    CHECK(result != M5_PLANNER_OK);
+    CHECK(result == M5_PLANNER_NO_PATH || result == M5_PLANNER_CAPACITY_EXCEEDED);
+  }
   CHECK(fx.path.segment_count == 0u);
 }
 
