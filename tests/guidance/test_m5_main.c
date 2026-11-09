@@ -2315,7 +2315,7 @@ static void test_m5_safety_preview_count_mismatch_rejected(void)
 }
 
 
-static void test_m5_safety_work_budget_exhaustion_rejected(void)
+static void test_m5_safety_cell_check_budget_exhaustion(void)
 {
   SafetyFx fx;
   unsigned i, axis;
@@ -2346,9 +2346,6 @@ static void test_m5_safety_work_budget_exhaustion_rejected(void)
   }
 
   status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
-  printf("M5-06 cell-budget probe: status=%u reason=%u work=%u cells=%u\n",
-      (unsigned)status, (unsigned)fx.result.reason_code,
-      (unsigned)fx.result.work_units, (unsigned)fx.result.cell_checks);
   CHECK(status == M5_SAFETY_BUDGET_EXCEEDED);
   CHECK(fx.result.passed == 0u);
   CHECK(fx.result.cell_checks == M5_SAFETY_MAX_CELL_CHECKS + 1u);
