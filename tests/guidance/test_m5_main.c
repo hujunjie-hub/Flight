@@ -2121,11 +2121,11 @@ static void test_m5_safety_bernstein_bounds_randomized(void)
   uint32_t seed = 0xB37A1155u;
   unsigned trial;
 
-  for (trial = 0u; trial < 48u; ++trial) {
+  for (trial = 0u; trial < 256u; ++trial) {
     float p0[3], v0[3], a0[3], p1[3], v1[3], a1[3];
     float position_low[3], position_high[3];
     float speed_bound = 0.0f, acceleration_bound = 0.0f;
-    float duration = safety_fuzz_between(&seed, 0.08f, 1.5f);
+    float duration = safety_fuzz_between(&seed, 0.02f, 1.5f);
     float u0 = safety_fuzz_between(&seed, 0.0f, 0.75f);
     float u1 = safety_fuzz_between(&seed, u0 + 0.05f, 1.0f);
     unsigned axis, sample;
@@ -2152,13 +2152,13 @@ static void test_m5_safety_bernstein_bounds_randomized(void)
       safety_reference_quintic(p0, v0, a0, p1, v1, a1,
           (double)duration, t, position, velocity, acceleration);
       for (axis = 0u; axis < 3u; ++axis) {
-        CHECK(position[axis] >= (double)position_low[axis] - 0.000002);
-        CHECK(position[axis] <= (double)position_high[axis] + 0.000002);
+        CHECK(position[axis] >= (double)position_low[axis]);
+        CHECK(position[axis] <= (double)position_high[axis]);
         speed2 += velocity[axis] * velocity[axis];
         acceleration2 += acceleration[axis] * acceleration[axis];
       }
-      CHECK(sqrt(speed2) <= (double)speed_bound + 0.0002);
-      CHECK(sqrt(acceleration2) <= (double)acceleration_bound + 0.002);
+      CHECK(sqrt(speed2) <= (double)speed_bound);
+      CHECK(sqrt(acceleration2) <= (double)acceleration_bound);
 
       if ((sample & 1u) == 0u) {
         float evaluated_position[3], evaluated_velocity[3];
@@ -2176,6 +2176,23 @@ static void test_m5_safety_bernstein_bounds_randomized(void)
       }
     }
   }
+}
+
+static void test_m5_safety_bernstein_zero_curve_enclosure(void)
+{
+  const float zero[3] = {0.0f, 0.0f, 0.0f};
+  float low[3], high[3], speed, acceleration;
+  unsigned axis;
+
+  CHECK(m5_trajectory_safety_test_curve_bounds(
+      zero, zero, zero, zero, zero, zero, 0.02f, 0.0f, 1.0f,
+      low, high, &speed, &acceleration));
+  for (axis = 0u; axis < 3u; ++axis) {
+    CHECK(low[axis] <= 0.0f);
+    CHECK(high[axis] >= 0.0f);
+  }
+  CHECK(speed >= 0.0f);
+  CHECK(acceleration >= 0.0f);
 }
 
 static void test_m5_safety_bernstein_bounds_invalid_inputs(void)
@@ -3989,6 +4006,7 @@ int main(void)
     {"m5_safety_random_polygon_dynamic_track_fuzz", test_m5_safety_random_polygon_dynamic_track_fuzz},
     {"m5_safety_geofence_adversarial_vertices", test_m5_safety_geofence_adversarial_vertices_rejected},
     {"m5_safety_bernstein_bounds_randomized", test_m5_safety_bernstein_bounds_randomized},
+    {"m5_safety_bernstein_zero_curve", test_m5_safety_bernstein_zero_curve_enclosure},
     {"m5_safety_bernstein_bounds_invalid", test_m5_safety_bernstein_bounds_invalid_inputs},
     {"m5_safety_multi_track_all_slots", test_m5_safety_multi_track_all_slots_and_fail_closed},
     {"m5_safety_outward_rounding_norm_lower", test_m5_safety_outward_rounding_and_norm_lower},
