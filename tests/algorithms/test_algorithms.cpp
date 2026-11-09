@@ -452,6 +452,41 @@ static void test_mpc_multiaxis_reference_regressions() {
   }
 }
 
+static void test_mpc_repeated_workspace_update() {
+  clock_value.monotonic_us += 100000;
+  init_control();
+  Fixture f;
+  f.ref.anchor.point.position_ned_m[0] = .005f;
+  for (auto &point : f.ref.points)
+    point.point.position_ned_m[0] = .005f;
+  CHECK(control_outer_update(&f.in) == STATUS_OK);
+  MpcSnapshot first{};
+  CHECK(mpc_read(&first));
+  CHECK(first.solver_status == CONTROL_SOLVER_SOLVED ||
+        first.solver_status == CONTROL_SOLVER_SOLVED_INACCURATE);
+
+  /* Keep the same context/epoch but advance the trajectory sample. This
+     exercises repeated OSQP matrix/vector updates without a cold-start reset. */
+  clock_value.monotonic_us += 20000;
+  f.nav.header.timestamp_sample_us = clock_value.monotonic_us;
+  f.nav.header.timestamp_publish_us = clock_value.monotonic_us;
+  f.in.control_time_us = f.in.evaluation_time_us = clock_value.monotonic_us;
+  f.ref.header.timestamp_sample_us = clock_value.monotonic_us;
+  f.ref.header.timestamp_publish_us = clock_value.monotonic_us;
+  f.ref.anchor.point.position_ned_m[0] = .25f;
+  for (auto &point : f.ref.points)
+    point.point.position_ned_m[0] = .25f;
+  CHECK(control_outer_update(&f.in) == STATUS_OK);
+
+  MpcSnapshot second{};
+  CHECK(mpc_read(&second));
+  CHECK(second.header.sequence > first.header.sequence);
+  CHECK(second.solver_status == CONTROL_SOLVER_SOLVED ||
+        second.solver_status == CONTROL_SOLVER_SOLVED_INACCURATE);
+  CHECK(std::fabs(second.acceleration[0] - first.acceleration[0]) > 1e-4f);
+  check_mpc_snapshot_feasible(f);
+}
+
 static void test_math_allocator() {
   init_control();
   const float pi = 3.14159265358979f;
@@ -792,6 +827,7 @@ int main() {
   test_mpc_and_modes();
   test_mpc_axis_and_failure_regressions();
   test_mpc_multiaxis_reference_regressions();
+  test_mpc_repeated_workspace_update();
   test_navigation();
   test_shadow_probation();
   std::printf("controller_navigation: %u checks, %u failures\n", checks,
