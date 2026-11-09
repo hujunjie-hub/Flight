@@ -2,8 +2,8 @@
  * Host tests for M5 Guidance (QUAD_X4, NONE obstacle mode).
  *
  * Scope: reference construction, anchor+24 preview, dynamics/geofence checks,
- * READY/ACTIVE lifecycle, plus Host/SIL-only M5-02 map, M5-03 A*, and
- * M5-04 smoothing candidate kernels. None imply H723 deployment or M5-06 proof.
+ * READY/ACTIVE lifecycle, plus Host/SIL-only M5-02 map, M5-03 A*, M5-04 time
+ * scaling and M5-05 minimum-jerk optimization. None imply H723 deployment or M5-06 proof.
  */
 #include <stdio.h>
 #include <string.h>
