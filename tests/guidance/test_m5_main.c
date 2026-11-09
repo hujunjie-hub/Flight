@@ -2159,6 +2159,21 @@ static void test_m5_safety_bernstein_bounds_randomized(void)
       }
       CHECK(sqrt(speed2) <= (double)speed_bound + 0.0002);
       CHECK(sqrt(acceleration2) <= (double)acceleration_bound + 0.002);
+
+      if ((sample & 1u) == 0u) {
+        float evaluated_position[3], evaluated_velocity[3];
+        float evaluated_acceleration[3];
+        CHECK(m5_trajectory_safety_test_curve_eval(
+            p0, v0, a0, p1, v1, a1, duration, u0, u1,
+            (float)fraction, evaluated_position, evaluated_velocity,
+            evaluated_acceleration));
+        for (axis = 0u; axis < 3u; ++axis) {
+          CHECK(fabs((double)evaluated_position[axis] - position[axis]) <= 0.0001);
+          CHECK(fabs((double)evaluated_velocity[axis] - velocity[axis]) <= 0.001);
+          CHECK(fabs((double)evaluated_acceleration[axis] -
+                     acceleration[axis]) <= 0.01);
+        }
+      }
     }
   }
 }
@@ -2181,6 +2196,15 @@ static void test_m5_safety_bernstein_bounds_invalid_inputs(void)
   CHECK(!m5_trajectory_safety_test_curve_bounds(
       p0, v0, a0, p0, v0, a0, 1.0f, 0.0f, 1.1f,
       low, high, &speed, &acceleration));
+  {
+    float position[3], velocity[3], acceleration_values[3];
+    CHECK(!m5_trajectory_safety_test_curve_eval(
+        p0, v0, a0, p0, v0, a0, 1.0f, 0.0f, 1.0f, -0.1f,
+        position, velocity, acceleration_values));
+    CHECK(!m5_trajectory_safety_test_curve_eval(
+        p0, v0, a0, p0, v0, a0, 1.0f, 0.0f, 1.0f, 1.1f,
+        position, velocity, acceleration_values));
+  }
 }
 
 static void test_m5_safety_dynamic_prediction_time_boundaries(void)

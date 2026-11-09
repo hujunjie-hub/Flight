@@ -1103,6 +1103,82 @@ uint8_t m5_trajectory_safety_test_curve_bounds(
   *acceleration_bound = bounds.acceleration_bound;
   return 1u;
 }
+
+
+uint8_t m5_trajectory_safety_test_curve_eval(
+    const float start_position[3],
+    const float start_velocity[3],
+    const float start_acceleration[3],
+    const float end_position[3],
+    const float end_velocity[3],
+    const float end_acceleration[3],
+    float duration_s,
+    float u0,
+    float u1,
+    float local_u,
+    float position[3],
+    float velocity[3],
+    float acceleration[3])
+{
+  MotionReferencePoint start, end;
+  M5SafetyBezier bezier;
+  float local_duration;
+  unsigned axis, i;
+
+  if (start_position == NULL || start_velocity == NULL ||
+      start_acceleration == NULL || end_position == NULL ||
+      end_velocity == NULL || end_acceleration == NULL ||
+      position == NULL || velocity == NULL || acceleration == NULL ||
+      !finite3(start_position) || !finite3(start_velocity) ||
+      !finite3(start_acceleration) || !finite3(end_position) ||
+      !finite3(end_velocity) || !finite3(end_acceleration) ||
+      !isfinite(duration_s) || duration_s <= 0.0f ||
+      !isfinite(u0) || !isfinite(u1) || !isfinite(local_u) ||
+      u0 < 0.0f || u1 > 1.0f || u1 <= u0 ||
+      local_u < 0.0f || local_u > 1.0f) return 0u;
+
+  memset(&start, 0, sizeof(start));
+  memset(&end, 0, sizeof(end));
+  for (axis = 0u; axis < 3u; ++axis) {
+    start.point.position_ned_m[axis] = start_position[axis];
+    start.point.velocity_ned_mps[axis] = start_velocity[axis];
+    start.point.acceleration_ned_mps2[axis] = start_acceleration[axis];
+    end.point.position_ned_m[axis] = end_position[axis];
+    end.point.velocity_ned_mps[axis] = end_velocity[axis];
+    end.point.acceleration_ned_mps2[axis] = end_acceleration[axis];
+  }
+  if (!build_curve(&start, &end, (double)duration_s,
+                   (float)u0, (float)u1, &bezier)) return 0u;
+  local_duration = duration_s * (u1 - u0);
+  if (!(local_duration > 0.0f) || !isfinite(local_duration)) return 0u;
+
+  for (axis = 0u; axis < 3u; ++axis) {
+    double velocity_control[5], acceleration_control[4];
+    double p_value, v_value, a_value;
+    for (i = 0u; i < 5u; ++i) {
+      velocity_control[i] = 5.0 *
+          (bezier.position[axis][i + 1u] -
+           bezier.position[axis][i]) / local_duration;
+      if (!isfinite(velocity_control[i])) return 0u;
+    }
+    for (i = 0u; i < 4u; ++i) {
+      acceleration_control[i] = 4.0 *
+          (velocity_control[i + 1u] - velocity_control[i]) /
+          local_duration;
+      if (!isfinite(acceleration_control[i])) return 0u;
+    }
+    p_value = evaluate_bernstein(bezier.position[axis], 5u, local_u);
+    v_value = evaluate_bernstein(velocity_control, 4u, local_u);
+    a_value = evaluate_bernstein(acceleration_control, 3u, local_u);
+    position[axis] = (float)p_value;
+    velocity[axis] = (float)v_value;
+    acceleration[axis] = (float)a_value;
+    if (!isfinite(position[axis]) || !isfinite(velocity[axis]) ||
+        !isfinite(acceleration[axis])) return 0u;
+  }
+  return 1u;
+}
+
 #endif /* FLIGHT_M5_SAFETY_TEST_API */
 
 #endif /* FLIGHT_M5_HOST_PLANNER */
