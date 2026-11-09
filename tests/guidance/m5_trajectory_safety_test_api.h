@@ -56,4 +56,11 @@ uint8_t m5_trajectory_safety_test_dynamic_relative_sweep_bound(
     float half_duration_s,
     float *sweep_bound);
 
+/* operation: 0 add, 1 subtract, 2 multiply, 3 divide */
+uint8_t m5_trajectory_safety_test_interval_op(
+    uint8_t operation,
+    double a_low, double a_high,
+    double b_low, double b_high,
+    double *result_low, double *result_high);
+
 #endif /* M5_TRAJECTORY_SAFETY_TEST_API_H */

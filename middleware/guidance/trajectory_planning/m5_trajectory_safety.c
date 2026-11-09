@@ -1534,6 +1534,32 @@ uint8_t m5_trajectory_safety_test_dynamic_relative_sweep_bound(
       half_duration_s, sweep_bound);
 }
 
+
+uint8_t m5_trajectory_safety_test_interval_op(
+    uint8_t operation,
+    double a_low, double a_high,
+    double b_low, double b_high,
+    double *result_low, double *result_high)
+{
+  M5SafetyInterval a = interval_bounds(a_low, a_high);
+  M5SafetyInterval b = interval_bounds(b_low, b_high);
+  M5SafetyInterval result;
+
+  if (result_low == NULL || result_high == NULL ||
+      a.valid == 0u || b.valid == 0u) return 0u;
+  switch (operation) {
+    case 0u: result = interval_add(a, b); break;
+    case 1u: result = interval_sub(a, b); break;
+    case 2u: result = interval_mul(a, b); break;
+    case 3u: result = interval_div(a, b); break;
+    default: return 0u;
+  }
+  if (result.valid == 0u) return 0u;
+  *result_low = result.low;
+  *result_high = result.high;
+  return 1u;
+}
+
 #endif /* FLIGHT_M5_SAFETY_TEST_API */
 
 #endif /* FLIGHT_M5_HOST_PLANNER */

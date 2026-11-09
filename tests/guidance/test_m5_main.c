@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <float.h>
 #include "ports/port_api.h"
 #include "guidance_update/guidance.h"
 #include "guidance_update/guidance_internal.h"
@@ -2989,6 +2990,87 @@ static void test_m5_safety_multi_track_all_slots_and_fail_closed(void)
 }
 
 
+static void test_m5_safety_interval_arithmetic_oracle(void)
+{
+  uint32_t seed = 0x1A7E2A11u;
+  unsigned trial;
+
+  for (trial = 0u; trial < 2048u; ++trial) {
+    double a_low = (double)safety_fuzz_between(&seed, -1000.0f, 1000.0f);
+    double a_high = a_low +
+        0.01 + fabs((double)safety_fuzz_between(&seed, -2.0f, 2.0f));
+    double b_low = 0.25 +
+        fabs((double)safety_fuzz_between(&seed, -10.0f, 10.0f));
+    double b_high = b_low +
+        0.01 + fabs((double)safety_fuzz_between(&seed, -2.0f, 2.0f));
+    double result_low = 0.0, result_high = 0.0;
+    long double exact_low = 0.0L, exact_high = 0.0L;
+    uint8_t operation = (uint8_t)(trial & 3u);
+    unsigned i;
+    long double values[4];
+
+    if ((trial & 4u) != 0u) {
+      double old_low = b_low;
+      b_low = -b_high;
+      b_high = -old_low;
+    }
+
+    CHECK(m5_trajectory_safety_test_interval_op(operation,
+        a_low, a_high, b_low, b_high, &result_low, &result_high));
+
+    if (operation == 0u) {
+      exact_low = (long double)a_low + (long double)b_low;
+      exact_high = (long double)a_high + (long double)b_high;
+    } else if (operation == 1u) {
+      exact_low = (long double)a_low - (long double)b_high;
+      exact_high = (long double)a_high - (long double)b_low;
+    } else if (operation == 2u) {
+      values[0] = (long double)a_low * (long double)b_low;
+      values[1] = (long double)a_low * (long double)b_high;
+      values[2] = (long double)a_high * (long double)b_low;
+      values[3] = (long double)a_high * (long double)b_high;
+      exact_low = values[0];
+      exact_high = values[0];
+      for (i = 1u; i < 4u; ++i) {
+        if (values[i] < exact_low) exact_low = values[i];
+        if (values[i] > exact_high) exact_high = values[i];
+      }
+    } else {
+      values[0] = (long double)a_low / (long double)b_low;
+      values[1] = (long double)a_low / (long double)b_high;
+      values[2] = (long double)a_high / (long double)b_low;
+      values[3] = (long double)a_high / (long double)b_high;
+      exact_low = values[0];
+      exact_high = values[0];
+      for (i = 1u; i < 4u; ++i) {
+        if (values[i] < exact_low) exact_low = values[i];
+        if (values[i] > exact_high) exact_high = values[i];
+      }
+    }
+    CHECK((long double)result_low <= exact_low);
+    CHECK((long double)result_high >= exact_high);
+  }
+
+  {
+    const double tiny = nextafter(0.0, 1.0);
+    double low = 0.0, high = 0.0;
+    CHECK(m5_trajectory_safety_test_interval_op(
+        2u, tiny, tiny, tiny, tiny, &low, &high));
+    CHECK((long double)low <= (long double)tiny * (long double)tiny);
+    CHECK((long double)high >= (long double)tiny * (long double)tiny);
+    CHECK(!m5_trajectory_safety_test_interval_op(
+        3u, 1.0, 2.0, -1.0, 1.0, &low, &high));
+    CHECK(!m5_trajectory_safety_test_interval_op(
+        0u, DBL_MAX, DBL_MAX, DBL_MAX, DBL_MAX, &low, &high));
+    CHECK(!m5_trajectory_safety_test_interval_op(
+        3u, 1.0, 1.0, tiny, tiny, &low, &high));
+    CHECK(!m5_trajectory_safety_test_interval_op(
+        4u, 0.0, 1.0, 0.0, 1.0, &low, &high));
+    CHECK(!m5_trajectory_safety_test_interval_op(
+        0u, 2.0, 1.0, 0.0, 1.0, &low, &high));
+  }
+}
+
 static void test_m5_safety_outward_rounding_and_norm_lower(void)
 {
   uint32_t seed = 0xD15A6E71u;
@@ -4453,6 +4535,7 @@ int main(void)
     {"m5_safety_bernstein_zero_curve", test_m5_safety_bernstein_zero_curve_enclosure},
     {"m5_safety_bernstein_bounds_invalid", test_m5_safety_bernstein_bounds_invalid_inputs},
     {"m5_safety_multi_track_all_slots", test_m5_safety_multi_track_all_slots_and_fail_closed},
+    {"m5_safety_interval_arithmetic_oracle", test_m5_safety_interval_arithmetic_oracle},
     {"m5_safety_outward_rounding_norm_lower", test_m5_safety_outward_rounding_and_norm_lower},
     {"m5_safety_point_aabb_distance_oracle", test_m5_safety_point_aabb_distance_lower_oracle},
     {"m5_safety_dynamic_relative_sweep_oracle", test_m5_safety_dynamic_relative_sweep_oracle},
