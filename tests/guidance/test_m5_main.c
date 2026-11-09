@@ -2851,6 +2851,74 @@ static void test_m5_safety_dynamic_continuous_distance_differential(void)
   }
 }
 
+
+static void test_m5_safety_dynamic_acceleration_envelope_differential(void)
+{
+  uint32_t seed = 0xACCE5076u;
+  const double start_x = -0.5;
+  const double vehicle_vx = 0.5;
+  const double horizon_s =
+      (double)PRODUCT_PREVIEW_COUNT * PRODUCT_PREVIEW_STEP_US * 1.0e-6;
+  unsigned trial;
+
+  for (trial = 0u; trial < 64u; ++trial) {
+    SafetyFx fx;
+    M5DynamicTrack *track;
+    double obstacle_vx, obstacle_ax, crossing_time, offset, obstacle_x;
+    double oracle_min_distance = INFINITY, physical_contact_radius;
+    unsigned sample;
+    M5TrajectorySafetyStatus status;
+    int collision_case = (trial < 32u);
+
+    safety_fx_init(&fx, 150000000ull + (uint64_t)trial * 1000000ull);
+    safety_set_linear_reference(&fx, (float)start_x, 0.0f, 0.0f,
+                                (float)vehicle_vx, 0.0f, 0.0f);
+    obstacle_vx = (double)safety_fuzz_between(&seed, 1.0f, 3.0f);
+    obstacle_ax = (double)safety_fuzz_signed_unit(&seed) * 0.45;
+    crossing_time = (double)safety_fuzz_between(&seed, 0.01f, 0.47f);
+    offset = collision_case ?
+        (double)safety_fuzz_signed_unit(&seed) * 0.20 :
+        (double)(1.20f + fabsf(safety_fuzz_signed_unit(&seed)) * 0.30f);
+    obstacle_x = start_x + (vehicle_vx - obstacle_vx) * crossing_time -
+        0.5 * obstacle_ax * crossing_time * crossing_time;
+
+    track = &fx.map.tracks[0];
+    safety_set_far_dynamic_track(track, 900u + trial, fx.base.now,
+        (float)obstacle_x, (float)offset, 0.0f,
+        (float)obstacle_vx, 0.0f, 0.0f);
+    track->position_std_m = 0.0f;
+    track->velocity_std_mps = 0.0f;
+    fx.input.max_dynamic_obstacle_accel_mps2 = 0.5f;
+
+    for (sample = 0u; sample <= 512u; ++sample) {
+      double time_s = horizon_s * (double)sample / 512.0;
+      double vehicle_x = start_x + vehicle_vx * time_s;
+      double obstacle_position_x = obstacle_x + obstacle_vx * time_s +
+          0.5 * obstacle_ax * time_s * time_s;
+      double dx = vehicle_x - obstacle_position_x;
+      double distance = sqrt(dx * dx + offset * offset);
+      oracle_min_distance = fmin(oracle_min_distance, distance);
+    }
+
+    physical_contact_radius = (double)fx.map.vehicle_radius_m +
+        (double)fx.map.clearance_margin_m + (double)track->radius_m;
+    if (collision_case) {
+      CHECK(oracle_min_distance < physical_contact_radius);
+    } else {
+      CHECK(oracle_min_distance > 1.0);
+    }
+
+    status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+    if (collision_case) {
+      CHECK(status == M5_SAFETY_DYNAMIC_COLLISION);
+      CHECK(fx.result.passed == 0u);
+    } else {
+      CHECK(status == M5_SAFETY_PASS);
+      CHECK(fx.result.passed == 1u);
+    }
+  }
+}
+
 static void test_m5_safety_multi_track_all_slots_and_fail_closed(void)
 {
   SafetyFx fx;
@@ -4231,6 +4299,7 @@ int main(void)
     {"m5_safety_dynamic_relative_sweep_oracle", test_m5_safety_dynamic_relative_sweep_oracle},
     {"m5_safety_dynamic_adaptive_preview_boundaries", test_m5_safety_dynamic_collision_at_adaptive_and_preview_boundaries},
     {"m5_safety_dynamic_continuous_distance_differential", test_m5_safety_dynamic_continuous_distance_differential},
+    {"m5_safety_dynamic_acceleration_envelope_differential", test_m5_safety_dynamic_acceleration_envelope_differential},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
