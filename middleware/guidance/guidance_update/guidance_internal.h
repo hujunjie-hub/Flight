@@ -4,9 +4,9 @@
  *
  * First-version H723 production scope: OBSTACLE_SOURCE_MODE NONE only.
  * Missions that require obstacle avoidance are rejected and H723 does not
- * compile or allocate the map/A* arena. Host/SIL-only M5-02/M5-03 kernels are
- * separate behind FLIGHT_M5_HOST_PLANNER; they do not imply M5-06 collision
- * proof, real-sensor assurance, H723 timing or flight release.
+ * compile or allocate the map/A*/smoother arena. Host/SIL-only M5-02/M5-04
+ * kernels are separate behind FLIGHT_M5_HOST_PLANNER; they do not imply M5-06
+ * collision proof, real-sensor assurance, H723 timing or flight release.
  */
 #ifndef GUIDANCE_INTERNAL_H
 #define GUIDANCE_INTERNAL_H
