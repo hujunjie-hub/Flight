@@ -2,6 +2,7 @@
 #include "kfgins/quad_core.hpp"
 #include "ins_interface.h"
 #include "control_interface.h"
+#include "quad_workspace.h"
 #include "attitude_rate_control/controller_internal.h"
 #include <algorithm>
 #include <cmath>
