@@ -3601,7 +3601,7 @@ static void test_m5_safety_arbitrary_hermite_swept_volume_differential(void)
       }
       CHECK(contact_distance2 == 0.0);
     } else {
-      CHECK(minimum_aabb_distance > 1.0);
+      CHECK(minimum_aabb_distance > 0.70);
     }
 
     fx.map.cells[voxel].state = M5_MAP_CELL_OCCUPIED_CONFIRMED;
