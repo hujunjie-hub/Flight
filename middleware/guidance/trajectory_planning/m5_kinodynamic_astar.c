@@ -588,14 +588,13 @@ static uint8_t add_or_update_node(const M5AstarRequest *r, M5AstarWorkspace *w,
 {
   uint8_t found;
   uint16_t slot = hash_slot(w, key, &found);
-  float p[3], v[3], a[3], yaw, yaw_rate, h;
+  float p[3], yaw, h;
   uint16_t voxel;
   uint8_t velocity_bin, yaw_bin, time_bin;
   if (slot == M5_ASTAR_EMPTY_NODE ||
       !m5_kinodynamic_decode_key(key, &voxel, &velocity_bin, &yaw_bin, &time_bin))
     return 0u;
   m5_local_map_voxel_center(voxel, p);
-  (void)m5_kinodynamic_velocity_bin(velocity_bin, v);
   yaw = yaw_bin_angle(yaw_bin);
   h = heuristic(r, p, yaw);
   if (!isfinite(h) || !isfinite(g)) return 0u;
@@ -692,8 +691,8 @@ M5PlannerResult m5_kinodynamic_astar_plan(const M5AstarRequest *r,
                                           M5AstarStats *stats)
 {
   M5PlannerResult result;
-  uint16_t root_voxel, start_velocity_bin, root_id = 0u;
-  uint8_t velocity_lattice, yaw_bin, primitive_count;
+  uint16_t root_voxel, root_id = 0u;
+  uint8_t start_velocity_bin, velocity_lattice, yaw_bin, primitive_count;
   uint32_t root_key;
   float root_h;
   uint64_t last_now;
