@@ -1165,6 +1165,8 @@ static void test_m5_map_source_lease_refresh(void)
   planner_nav_init(&nav, t0 + 550000u);
   CHECK(m5_local_map_is_ready(&map, &nav, t0 + 550000u));
   CHECK(!m5_local_map_is_ready(&map, &nav, t0 + 600001u));
+  CHECK(m5_local_map_query(&map, p, t0 + 600001u, &state) == STATUS_OK);
+  CHECK(state == M5_MAP_CELL_STALE);
 }
 
 static void test_m5_map_occupied_primitive_and_dynamic_track(void)
@@ -1180,6 +1182,7 @@ static void test_m5_map_occupied_primitive_and_dynamic_track(void)
   CHECK(m5_local_map_init(&map, &nav, now, 0.25f, 0.30f, 2.0f,
                           M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
   planner_observation_init(&observation, &nav, now, 7u);
+  observation.sensor_instance_id = 70002u;
   observation.observation_kind = PRODUCT_OBS_OCCUPIED_PRIMITIVE;
   observation.shape_kind = PRODUCT_OBS_SHAPE_SPHERE;
   for (unsigned axis = 0u; axis < 3u; ++axis) {
@@ -1193,7 +1196,7 @@ static void test_m5_map_occupied_primitive_and_dynamic_track(void)
   CHECK(m5_local_map_query(&map, center, now, &state) == STATUS_OK);
   CHECK(state == M5_MAP_CELL_OCCUPIED_CONFIRMED);
   CHECK(map.tracks[0].id == 7u);
-  CHECK(map.tracks[0].source_id == 2u);
+  CHECK(map.tracks[0].source_id == 70002u);
   CHECK(fabsf(map.tracks[0].radius_m - 0.25f) < 1e-6f);
   CHECK(map.tracks[0].expires_us == observation.header.valid_until_us);
   CHECK(m5_local_map_is_ready(&map, &nav, now));
