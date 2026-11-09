@@ -22,6 +22,9 @@
 #define GUIDANCE_VALIDATION_WORK_UNITS 256u
 #define GUIDANCE_VALIDATION_MAX_DEPTH 5u
 
+#define GUIDANCE_MIN_JERK_MAX_SEGMENTS 8u
+#define GUIDANCE_MIN_JERK_MAX_VARIABLES (2u * (GUIDANCE_MIN_JERK_MAX_SEGMENTS - 1u))
+
 /* GuidanceFeasibility.violated_constraint_id (02 §4) */
 enum {
   GUIDANCE_PLAN_CONSTRAINT_NONE = 0,
@@ -54,6 +57,24 @@ enum {
 typedef struct {
   double c[6]; /* retain boundary accuracy when reconstructing 20 ms intervals */
 } GuidanceQuintic;
+
+/*
+ * Caller-owned fixed workspace for the Host/SIL minimum-jerk kernel.
+ * H723/NONE does not instantiate this object. H is stored as three lower
+ * off-diagonals plus the diagonal (block-tridiagonal, scalar bandwidth 3).
+ */
+typedef struct {
+  double hessian[GUIDANCE_MIN_JERK_MAX_VARIABLES][4];
+  double gradient[GUIDANCE_MIN_JERK_MAX_VARIABLES];
+  double solution[GUIDANCE_MIN_JERK_MAX_VARIABLES];
+  double trial[4];
+  double plus[4];
+  double knot_velocity[GUIDANCE_MIN_JERK_MAX_SEGMENTS + 1u];
+  double knot_acceleration[GUIDANCE_MIN_JERK_MAX_SEGMENTS + 1u];
+  uint8_t active_local[4];
+  uint8_t global_index[4];
+  GuidanceQuintic candidate[GUIDANCE_MIN_JERK_MAX_SEGMENTS][3];
+} GuidanceMinimumJerkWorkspace;
 
 typedef struct {
   uint8_t valid;
@@ -103,38 +124,47 @@ float guidance_quintic_eval(const GuidanceQuintic *q, float t, uint8_t derivativ
 float guidance_quintic_jerk(const GuidanceQuintic *q, float t);
 void guidance_quintic_boundary(float p0, float v0, float a0, float p1, float v1, float a1,
                           float duration, GuidanceQuintic *out);
+uint8_t guidance_minimum_jerk_optimize(
+    const float knot_position[GUIDANCE_MIN_JERK_MAX_SEGMENTS + 1u][3],
+    const float segment_duration_s[GUIDANCE_MIN_JERK_MAX_SEGMENTS],
+    uint8_t segment_count,
+    const float start_velocity[3], const float start_acceleration[3],
+    const float end_velocity[3], const float end_acceleration[3],
+    GuidanceMinimumJerkWorkspace *workspace,
+    GuidanceQuintic output[GUIDANCE_MIN_JERK_MAX_SEGMENTS][3],
+    double *initial_cost, double *optimized_cost);
 uint8_t guidance_quintic_bounds(const GuidanceQuintic *q, float t0, float t1, uint8_t derivative,
                            float *lower, float *upper);
 uint8_t guidance_validate_reference(const GuidanceInput *in, const ProductGuidanceConfig *config,
-                               const MotionReference *ref, uint16_t *reason,
-                               uint16_t *constraint, uint32_t *violation_offset_us);
+                                const MotionReference *ref, uint16_t *reason,
+                                uint16_t *constraint, uint32_t *violation_offset_us);
 uint8_t guidance_curve_dynamics(const GuidanceQuintic q[4], float t0, float t1,
                            const SafetyEnvelope *envelope,
                            const ProductGuidanceConfig *config, uint16_t *constraint);
 uint8_t guidance_landing_speed_ok(const GuidanceInput *in, const GuidanceQuintic *down,
-                                  float t0, float t1);
+                                   float t0, float t1);
 uint8_t guidance_has_landing_plane(const GuidanceInput *in);
 uint8_t guidance_plan_fences(const GuidanceInput *in, const ProductGuidanceConfig *config,
-                        const GuidanceQuintic q[4], float duration);
+                         const GuidanceQuintic q[4], float duration);
 uint8_t guidance_header_ok(const ContractHeader *h, const ContractHeader *nav, uint16_t type, uint64_t now);
 uint64_t guidance_deadline(const GuidanceInput *in, uint16_t kind);
 Status guidance_prepare_input(const GuidanceInput *in, const GuidanceState *state, uint16_t kind);
 uint8_t guidance_home_ok(const GuidanceInput *in);
 uint8_t guidance_handoff_acceleration(const GuidanceState *state, const GuidanceInput *in,
-                                      const GuidanceRefContext *next, float acceleration[3]);
+                                       const GuidanceRefContext *next, float acceleration[3]);
 Status guidance_build_trajectory(GuidanceState *state, const GuidanceInput *in, GuidanceOutput *out,
-                            const float *handoff_acceleration, uint16_t *reason, uint16_t *constraint);
+                             const float *handoff_acceleration, uint16_t *reason, uint16_t *constraint);
 Status guidance_build_pilot(GuidanceState *state, const GuidanceInput *in, GuidanceOutput *out);
 Status guidance_build_vertical_land(GuidanceState *state, const GuidanceInput *in, GuidanceOutput *out);
 void guidance_publish_header(const GuidanceInput *in, GuidanceState *state, ContractHeader *header,
-                         uint16_t type, uint16_t kind);
+                          uint16_t type, uint16_t kind);
 void guidance_quintic_hermite_eval(float p0, float v0, float a0, float p1, float v1, float a1,
-                             float h, float s, float *p, float *v);
+                              float h, float s, float *p, float *v);
 float guidance_wrap_pi(float angle);
 float guidance_yaw_from_quat(const float q_wxyz[4]);
 void guidance_quat_from_rpy(float roll, float pitch, float yaw, float q_wxyz[4]);
 
 uint8_t guidance_geofence_point_ok(const ProductGeofenceSnapshot *fences, uint16_t count,
-                             const float p_ned[3], float home_down_m);
+                              const float p_ned[3], float home_down_m);
 
 #endif /* GUIDANCE_INTERNAL_H */
