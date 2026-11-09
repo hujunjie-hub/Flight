@@ -104,20 +104,18 @@ M5 时标回归包括超出 6.2 s 的 Mission/Return 拒绝，以及 1.25 倍时
 
 ## 5. CI evidence and exact scope
 
-The implementation baseline `b9832c8ce1e8accb3c1e5591c02d4637c28e2d99` completed GitHub Actions run [42589657670](https://github.com/hujunjie-hub/Flight/actions/runs/42589657670) successfully:
+The current code/test baseline \`d05b1751af1efc8b4f7536c63e87a5e5b28d2517\` completed GitHub Actions run [42591613328](https://github.com/hujunjie-hub/Flight/actions/runs/42591613328) successfully. All four jobs passed:
 
 - M4 Host: 927 checks, 0 failures.
-- M5 Host: 8,054 checks, 0 failures.
+- M5 Host: 8,070 checks, 0 failures; all 33 named scenarios passed, including the final 6.2 s time-bin case and nonzero endpoint velocity/acceleration cases.
 - M4/M5 integration: 1,000 checks, 0 failures.
 - M5 Host AddressSanitizer/UndefinedBehaviorSanitizer: passed.
 - M4/M5 integration AddressSanitizer/UndefinedBehaviorSanitizer: passed.
 - Cortex-M7 production-source compile check and MPC RAM checks: passed.
-- Source-layout, OSQP source-lock and time-service jobs: passed.
+- Navigation/control Host tests, source-layout, OSQP source-lock and time-service jobs: passed.
 
 Artifacts:
-- [M4/M5 Host regression evidence](https://github.com/hujunjie-hub/Flight/actions/runs/42589657670/artifacts/13660916940)
-- [Cortex-M7 compile evidence](https://github.com/hujunjie-hub/Flight/actions/runs/42589657670/artifacts/13660637382)
+- [M4/M5 Host regression evidence](https://github.com/hujunjie-hub/Flight/actions/runs/42591613328/artifacts/13661168142)
+- [Cortex-M7 compile evidence](https://github.com/hujunjie-hub/Flight/actions/runs/42591613328/artifacts/13662630394)
 
-Important scope distinction: this successful run contains 31 named M5 scenarios. The 32nd scenario adds nonzero start/end velocity and acceleration boundary checks; the 33rd verifies that 1.25x duration growth does not skip a feasible final 6.2 s bin. Both were added after the successful baseline run, and the exact-current-commit CI run was still queued when this report was updated. Do not treat these later tests as passed until their exact commit's CI completes.
-
-The ARM job compiles the explicit M4/M5 production source list and checks the existing Cortex-M7/MPC build. It does not compile or execute the Host-only optimizer kernel on H723. No target link, H723 optimizer runtime, WCET/RTA, stack watermark, PIL/HIL or flight evidence is implied.
+Scope distinction: the Cortex-M7 job compiles the explicit M4/M5 production source list and checks the existing Cortex-M7/MPC build. It does not compile or execute the Host-only minimum-jerk optimizer on H723. No target link, H723 optimizer runtime, WCET/RTA, stack watermark, PIL/HIL or flight evidence is implied.
