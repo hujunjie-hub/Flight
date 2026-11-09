@@ -22,6 +22,8 @@
 | S06-068 | 48 组随机端点 Hermite 曲线；65 点检查 position hull、speed norm、acceleration norm；33 点直接比较 Bernstein eval 与独立 Hermite basis | bounds 保守覆盖，eval 误差在阈值内 | Host + ASan/UBSan PASS；run 42656744088 |
 | S06-069 | duration、u0/u1、local_u 非法值 | TEST API 拒绝输入 | Host + ASan/UBSan PASS；run 42656744088 |
 | S06-070 | 16 组 1..8 动态 tracks；未来 sample、重复身份、8-slot 容量及 1 个碰撞 track + 7 个安全 track | PASS / STALE / INVALID / DYNAMIC_COLLISION | Host + ASan/UBSan PASS；run 42656744088 |
+| S06-071 | 2,048 组随机点到 AABB 距离下界，随机半径/rounding error；面、棱、角精确接触与非法输入 | 下界不超过独立 double oracle；接触距离为 0 | Host + ASan/UBSan PASS；run 42658820703 |
+| S06-072 | 512 组动态相对运动/加速度/速度不确定度组合，每组 33 个时刻检查 sweep 上界 | 全采样相对位移≤sweep 上界；非法参数拒绝 | Host + ASan/UBSan PASS；run 42658820703 |
 
 ## 最新 CI 证据
 
@@ -113,12 +115,12 @@
 
 ## 最新 CI 证据
 
-- Run: [42656744088](https://github.com/hujunjie-hub/Flight/actions/runs/42656744088)
-- Commit: `abcdf901fcb6654880d1b55641a5d660aabf7084`
+- Run: [Host validation #419](https://github.com/hujunjie-hub/Flight/actions/runs/42658820703)
+- Commit: `1e471b89f5b6746551d85a2fdcbef88517f3cd65`
 - M4 Host: 927 checks / 0 failures
-- M5 Host: 53,903 checks / 0 failures
+- M5 Host: 83,102 checks / 0 failures
 - M4/M5 Integration: 1,000 checks / 0 failures
-- M5 ASan/UBSan: 53,903 checks / 0 failures
+- M5 ASan/UBSan: 83,102 checks / 0 failures
 - M4/M5 Integration ASan/UBSan: 1,000 checks / 0 failures
 - Source/time, Navigation/Control, Cortex-M7 compile and M4/M5 production-source compile: PASS
 - All workflow jobs: success
@@ -126,7 +128,7 @@
 ## 仍未关闭的审查项
 
 1. 独立复核 Bernstein 变换、浮点外向舍入和连续几何距离下界；当前不是形式化证明。
-2. 扩大多障碍 track 组合 Fuzz，并继续审查浮点外向舍入与连续距离下界；当前 Bernstein sampled oracle 不等同形式化证明。
+2. 将当前 point-to-AABB 与 dynamic sweep helper oracle 扩展为端到端扫掠体距离差分，覆盖边界擦碰、相邻区间接缝和最小反例归档；当前随机采样 oracle 不等同形式化证明。
 3. 对动态障碍物加速度上界进行更多目标类别/传感器标定和参数敏感性分析。
 4. M5-07 尚未完成，M5-06 PASS 尚未成为 M6 不可绕过的发布门禁。
 5. H723 实机仍需真实传感器标定、WCET/RTA、RAM/栈、HIL 和逐级场地安全验证。

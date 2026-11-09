@@ -49,7 +49,7 @@
 
 使膨胀覆盖整个子区间最远时刻及响应延迟。动态 track 预测原本已包含子区间半宽。
 
-## 新增几何差分、Bernstein 数值 oracle 与多 track Fuzz（S06-064..070 已通过）
+## 新增几何差分、Bernstein 数值 oracle、多 track 与连续距离界 Fuzz（S06-064..072 已通过）
 
 - 独立参考实现使用 winding-number 分类和双精度点到线段距离，与生产实现的 ray-parity 分类进行差分。
 - L/C 凹多边形、CW/CCW 绕序、共线边和近共线边；随机点、顶点、边中点及边两侧；KEEP_IN/KEEP_OUT 均做差分，阈值 2e-5m。
@@ -63,16 +63,18 @@
 - 48 组随机 Hermite 起终端状态、随机 duration 和随机子区间；每组 65 个采样点验证 position control-hull bounds、速度范数和加速度范数上界；每组 33 个点直接比较生产 Bernstein 曲线评估与独立 Hermite 基函数参考值。
 - 额外拒绝 duration≤0、u0/u1 反向或越界、local_u 越界。
 - 16 组 1..8 个动态 track 的多目标组合；覆盖完整 8 个 track slot、随机速度、future sample、duplicate identity，以及 7 个安全 track 中夹杂 1 个碰撞 track 的 fail-closed 行为。
-- 测试适配器仅在 Host/SIL 的 `FLIGHT_M5_SAFETY_TEST_API` 编译宏下启用，不进入 H723/NONE 产品配置。
+- 2,048 组随机 point-to-AABB 距离下界 oracle：以独立双精度 AABB 距离计算作为参考，验证生产下界扣除位置舍入误差后不高估净空；补充 face/edge/corner 精确接触和非法输入拒绝。
+- 512 组动态相对运动组合，每组 33 个采样时刻：相对初速度、车辆/障碍物加速度、速度不确定度和子区间时长随机化，检查生产 sweep 上界始终包络参考相对位移；非法速度/加速度/时间参数拒绝。
+- 将静态 voxel 距离与动态 relative sweep 计算提取为小型纯函数，生产验证器和 Host oracle 共用同一实现；测试 API 仅在 Host/SIL 的 `FLIGHT_M5_SAFETY_TEST_API` 编译宏下启用，不进入 H723/NONE 产品配置。
 
 ## 最新证据
 
-- CI：[Host validation #412](https://github.com/hujunjie-hub/Flight/actions/runs/42656744088)
-- Commit：`abcdf901fcb6654880d1b55641a5d660aabf7084`
+- CI：[Host validation #419](https://github.com/hujunjie-hub/Flight/actions/runs/42658820703)
+- Commit：`1e471b89f5b6746551d85a2fdcbef88517f3cd65`
 - M4 Host：927 / 0 failures
-- M5 Host：53,903 / 0 failures
+- M5 Host：83,102 / 0 failures
 - M4/M5 Integration：1,000 / 0 failures
-- M5 ASan/UBSan：53,903 / 0 failures
+- M5 ASan/UBSan：83,102 / 0 failures
 - M4/M5 Integration ASan/UBSan：1,000 / 0 failures
 - Cortex-M7 compile/RAM and M4/M5 production-source compile：PASS
 - Source/time and Navigation/Control：PASS
@@ -88,7 +90,7 @@ S06-053..063 已在新 Head 执行通过：reference/map time_epoch、directive 
 ## 下一批必须补齐
 
 1. 独立复核 position/velocity/acceleration Bernstein control-hull bound 的数学推导、浮点运算误差和 `nextafterf` 外向舍入策略；当前随机采样 oracle 不是穷尽证明。
-2. 对连续距离下界、扫掠半径、静态 voxel AABB 距离和动态相对运动下界建立独立参考实现/差分测试。
+2. 将 point-to-AABB 与 dynamic relative sweep helper oracle 扩展为端到端 swept-volume/continuous-distance 差分，覆盖边界擦碰、相邻区间接缝及自适应细分边界。
 3. 扩大多 track 时间戳、预测 lease、source identity、速度/加速度不确定度和相对运动组合 Fuzz，保存 seed 与最小反例。
 4. 动态障碍物加速度上界的传感器/目标类别标定与参数敏感性分析。
 5. DFS 深度与最大工作栈压力；两个独立预算（work-unit、cell-check）均已由可达用例验证。
