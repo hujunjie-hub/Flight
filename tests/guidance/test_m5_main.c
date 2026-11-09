@@ -1481,6 +1481,23 @@ static void test_m5_astar_finds_deterministic_one_edge_path(void)
   CHECK(memcmp(&first, &fx.path, sizeof(first)) == 0);
 }
 
+static void test_m5_astar_uses_rolling_world_coordinates(void)
+{
+  PlannerFx fx;
+  const uint64_t now = 9000000u;
+  planner_fx_init(&fx, now);
+  fx.navigation.core.position_ned_m[0] = 10.0f;
+  fx.map.center_ned_m[0] = 10.0f;
+  fx.request.start_position_ned_m[0] = 8.25f;
+  fx.request.goal_position_ned_m[0] = 8.75f;
+  CHECK(m5_local_map_is_ready(&fx.map, &fx.navigation, now));
+  CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
+      &fx.path, &fx.stats) == M5_PLANNER_OK);
+  CHECK(fx.path.segment_count == 1u);
+  CHECK(fabsf(fx.path.position_ned_m[0][0] - 8.25f) < 1e-6f);
+  CHECK(fabsf(fx.path.position_ned_m[1][0] - 8.75f) < 1e-6f);
+}
+
 static void test_m5_astar_unknown_space_and_deadline_fail_closed(void)
 {
   PlannerFx fx;
@@ -1611,6 +1628,7 @@ int main(void)
     {"m5_map_batch_fail_closed", test_m5_map_batch_validation_is_fail_closed},
     {"m5_astar_key_primitives", test_m5_kinodynamic_key_and_primitive_manifest},
     {"m5_astar_one_edge_deterministic", test_m5_astar_finds_deterministic_one_edge_path},
+    {"m5_astar_rolling_world_coordinates", test_m5_astar_uses_rolling_world_coordinates},
     {"m5_astar_unknown_deadline", test_m5_astar_unknown_space_and_deadline_fail_closed},
     {"m5_astar_future_stale_map", test_m5_astar_rejects_future_stale_map_cells},
     {"m5_astar_stale_obstacle_barrier", test_m5_astar_rejects_stale_map_and_obstacle_barrier},
