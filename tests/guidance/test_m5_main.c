@@ -1971,7 +1971,7 @@ static void test_m5_safety_static_free_reference_passes(void)
          (unsigned)status, (unsigned)fx.result.reason_code,
          (unsigned)fx.result.passed,
          (unsigned)m5_local_map_is_ready(&fx.map, &fx.base.nav, fx.input.evaluation_time_us),
-         (unsigned)fx.base.nav.core.valid_mask, (unsigned)M5_SAFETY_NAV_MASK,
+         (unsigned)fx.base.nav.core.valid_mask, (unsigned)(NAV_VALID_HORIZONTAL_POSITION | NAV_VALID_VERTICAL_POSITION | NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY | NAV_VALID_ACCELERATION),
          (unsigned)fx.reference.header.source_id, (unsigned)SOURCE_M5,
          (unsigned)fx.reference.point_count, (unsigned)M5_SAFETY_INTERVAL_COUNT,
          (unsigned)fx.reference.reference_kind, (unsigned)GUIDANCE_REFERENCE_TRAJECTORY,
