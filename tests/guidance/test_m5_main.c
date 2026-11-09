@@ -2007,6 +2007,32 @@ static void safety_set_constant_position(SafetyFx *fx,
   }
 }
 
+static void safety_set_linear_reference(
+    SafetyFx *fx,
+    float x, float y, float z,
+    float vx, float vy, float vz)
+{
+  unsigned i;
+  fx->base.nav.core.position_ned_m[0] = x;
+  fx->base.nav.core.position_ned_m[1] = y;
+  fx->base.nav.core.position_ned_m[2] = z;
+  fx->base.nav.core.velocity_ned_mps[0] = vx;
+  fx->base.nav.core.velocity_ned_mps[1] = vy;
+  fx->base.nav.core.velocity_ned_mps[2] = vz;
+  memset(fx->base.nav.core.acceleration_ned_mps2, 0,
+         sizeof(fx->base.nav.core.acceleration_ned_mps2));
+  safety_point_set(&fx->reference.anchor, x, y, z, vx, vy, vz);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    float t = (float)((double)(i + 1u) *
+        (double)PRODUCT_PREVIEW_STEP_US * 1.0e-6);
+    fx->reference.points[i].offset_us =
+        (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+    safety_point_set(&fx->reference.points[i],
+        x + vx * t, y + vy * t, z + vz * t, vx, vy, vz);
+  }
+  safety_map_reset(fx);
+}
+
 static void safety_set_keep_in_fence(SafetyFx *fx,
                                      float min_height,
                                      float max_height,
@@ -3237,6 +3263,87 @@ static void test_m5_safety_static_collision_between_preview_endpoints(void)
   CHECK(fx.result.passed == 0u);
 }
 
+static void test_m5_safety_static_collision_at_preview_seam_adaptive_split(void)
+{
+  SafetyFx fx;
+  const float obstacle[3] = {0.0f, 0.0f, 0.0f};
+  uint16_t voxel = 0u;
+  unsigned i;
+
+  safety_fx_init(&fx, 30500000u);
+  fx.base.nav.core.position_ned_m[0] = -0.48f;
+  fx.base.nav.core.velocity_ned_mps[0] = 24.0f;
+  safety_map_reset(&fx);
+
+  fx.base.env.max_linear_speed_mps = 100.0f;
+  fx.base.env.max_linear_accel_mps2 = 100000.0f;
+  fx.base.env.vehicle_extension.max_velocity_ned_mps[0] = 100.0f;
+  fx.base.env.vehicle_extension.max_acceleration_ned_mps2[0] = 100000.0f;
+  safety_point_set(&fx.reference.anchor, -0.48f, 0.0f, 0.0f,
+                   24.0f, 0.0f, 0.0f);
+  fx.reference.points[0].offset_us = PRODUCT_PREVIEW_STEP_US;
+  safety_point_set(&fx.reference.points[0], 0.0f, 0.0f, 0.0f,
+                   0.0f, 0.0f, 0.0f);
+  for (i = 1u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    fx.reference.points[i].offset_us =
+        (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+    safety_point_set(&fx.reference.points[i], 0.0f, 0.0f, 0.0f,
+                     0.0f, 0.0f, 0.0f);
+  }
+  CHECK(m5_local_map_world_to_voxel(&fx.map, obstacle, &voxel));
+  fx.map.cells[voxel].state = M5_MAP_CELL_OCCUPIED_CONFIRMED;
+  fx.map.cells[voxel].log_odds = 4;
+  fx.map.cells[voxel].source_mask = 1u;
+
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STATIC_COLLISION);
+  CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.work_units > PRODUCT_PREVIEW_COUNT);
+}
+
+static void test_m5_safety_static_voxel_sweep_differential(void)
+{
+  uint32_t seed = 0x5A71C061u;
+  unsigned trial;
+
+  for (trial = 0u; trial < 48u; ++trial) {
+    SafetyFx fx;
+    const float start_x = -0.75f;
+    const float speed_x = 2.0f;
+    const double horizon_s =
+        (double)PRODUCT_PREVIEW_COUNT * PRODUCT_PREVIEW_STEP_US * 1.0e-6;
+    float crossing_time = safety_fuzz_between(&seed, 0.01f, 0.47f);
+    float contact[3], center[3];
+    double distance2 = 0.0;
+    uint16_t voxel = 0u;
+    unsigned axis;
+
+    safety_fx_init(&fx, 100000000ull + (uint64_t)trial * 1000000ull);
+    safety_set_linear_reference(&fx, start_x, 0.0f, -10.0f,
+                                speed_x, 0.0f, 0.0f);
+    contact[0] = start_x + speed_x * crossing_time;
+    contact[1] = 0.0f;
+    contact[2] = -10.0f;
+    CHECK((double)crossing_time > 0.0 &&
+          (double)crossing_time < horizon_s);
+    CHECK(m5_local_map_world_to_voxel(&fx.map, contact, &voxel));
+    m5_local_map_voxel_center(&fx.map, voxel, center);
+
+    for (axis = 0u; axis < 3u; ++axis) {
+      double delta = fabs((double)contact[axis] - center[axis]) - 0.25;
+      if (delta > 0.0) distance2 += delta * delta;
+    }
+    CHECK(distance2 == 0.0);
+
+    fx.map.cells[voxel].state = M5_MAP_CELL_OCCUPIED_CONFIRMED;
+    fx.map.cells[voxel].log_odds = 4;
+    fx.map.cells[voxel].source_mask = 1u;
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+        &fx.result) == M5_SAFETY_STATIC_COLLISION);
+    CHECK(fx.result.passed == 0u);
+  }
+}
+
 static void test_m5_safety_keep_in_curve_excursion_rejected(void)
 {
   SafetyFx fx;
@@ -3965,6 +4072,8 @@ int main(void)
     {"m5_safety_dynamic_midpoint", test_m5_safety_dynamic_midpoint_collision_rejected},
     {"m5_safety_dynamic_crossing", test_m5_safety_dynamic_crossing_collision_rejected},
     {"m5_safety_static_midsegment", test_m5_safety_static_collision_between_preview_endpoints},
+    {"m5_safety_static_seam_adaptive_split", test_m5_safety_static_collision_at_preview_seam_adaptive_split},
+    {"m5_safety_static_voxel_sweep_differential", test_m5_safety_static_voxel_sweep_differential},
     {"m5_safety_keepin_excursion", test_m5_safety_keep_in_curve_excursion_rejected},
     {"m5_safety_dynamic_expiry", test_m5_safety_dynamic_track_expiry_rejected},
     {"m5_safety_duplicate_track", test_m5_safety_duplicate_dynamic_track_rejected},
