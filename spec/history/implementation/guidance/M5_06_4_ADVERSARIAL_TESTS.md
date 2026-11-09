@@ -8,6 +8,9 @@
 
 ## 本轮新增覆盖
 
+| DFS work-unit 预算 | 每个 20ms 区间需要深度 5 才能证明 UNKNOWN 栅格外的净空，跨区间累计超过 256 | BUDGET_EXCEEDED | PASS：第 257 个工作单元时拒绝，cell-check 未达到 8192 |
+| 静态地图 cell-check 预算 | 宽扫掠 FREE 地图体素，超过 8192 次检查 | BUDGET_EXCEEDED | PASS：第 8193 次检查时拒绝 |
+
 | 测试 | 构造 | 预期 | 实际 |
 |---|---|---|---|
 | 静态中段碰撞 | 24 区间连续轨迹中段穿过占用 voxel | STATIC_COLLISION | PASS |
@@ -41,8 +44,8 @@
 
 ## 最新证据
 
-- CI：[最新 Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42630463108)
-- Commit：`ffc597b12c825c0897f263502b754d7eb1c8a267`
+- CI：[最新 Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42632671853)
+- Commit：`377c877affd6fc3765113763bedb0cc20dd5cd6b`
 - M4 Host：927 / 0 failures
 - M5 Host：8,371 / 0 failures
 - M4/M5 Integration：1,000 / 0 failures
@@ -53,13 +56,13 @@
 
 ## 下一批必须补齐
 
-1. DFS work-unit 预算 256 耗尽与工作栈容量压力用例（当前已覆盖 cell-check 预算 8192，二者是独立计数器）。
+1. 工作栈容量压力与最大细分树边界用例（DFS work-unit 256 和 cell-check 8192 两个预算均已覆盖）。
 
 1. 导航 epoch、origin、frame 不匹配组合。
 2. 围栏重复顶点、退化边、边界擦边和垂直高度边界。
 3. 地图外边界、障碍物膨胀临界值和 cell 状态组合。
 4. 动态 track 过旧/未来 sample、非有限位置/速度、零/负半径和最大预测时域边界。
-5. DFS 深度、工作单元、体素访问预算耗尽与最大工作栈压力。
+5. DFS 深度与最大工作栈压力；两个独立预算（work-unit、cell-check）均已由可达用例验证。
 6. 随机/属性 fuzz，并对关键几何边界建立可复现最小反例。
 
 ## 放行约束
