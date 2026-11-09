@@ -175,12 +175,16 @@ M5SmootherResult m5_path_smoother_build(
 
   if (optimized != 0u) {
     candidate.fallback_used = 0u;
+    candidate.cost_valid = 1u;
     candidate.initial_cost = initial_cost;
     candidate.optimized_cost = optimized_cost;
   } else {
     if (!build_initial_position_quintics(path, duration_s, &candidate))
       return M5_SMOOTHER_INVALID_INPUT;
     candidate.fallback_used = 1u;
+    candidate.cost_valid = 0u;
+    candidate.initial_cost = 0.0;
+    candidate.optimized_cost = 0.0;
   }
   if (!build_yaw_quintics(path, duration_s, &candidate))
     return M5_SMOOTHER_INVALID_INPUT;
