@@ -242,6 +242,7 @@ for target in targets:
         stack_reports = sorted(objdir.rglob('*.su'))
         if not stack_reports:
             raise SystemExit('ARM compiler emitted no -fstack-usage reports')
+        # This is per-function static usage, not a summed call-chain or WCET proof.
         stack_records = []
         for report in stack_reports:
             # The MPC worker executes the controller and the embedded OSQP
@@ -268,7 +269,7 @@ for target in targets:
         )
         if max_frame >= worker_stack:
             raise SystemExit(
-                f'MPC function frame {max_frame} bytes exceeds worker stack '
+                f'MPC/control function frame {max_frame} bytes exceeds worker stack '
                 f'budget {worker_stack} bytes: {max_frame_function}'
             )
         dynamic_frames = sum(
@@ -289,7 +290,7 @@ for target in targets:
         )
         print(
             f'MPC RAM: {ram} bytes; worker stack: {worker_stack} bytes; '
-            f'max MPC function frame: {max_frame} bytes '
+            f'largest single frame in MPC/control sources: {max_frame} bytes '
             f'({max_frame_function}, {max_frame_kind})'
         )
 
