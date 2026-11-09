@@ -23,8 +23,7 @@
 #define M5_SAFETY_ANCHOR_VELOCITY_TOL_MPS 0.10f
 #define M5_SAFETY_ANCHOR_ACCEL_TOL_MPS2 0.25f
 #define M5_SAFETY_CELL_HALF_M (0.5f * M5_MAP_CELL_SIZE_M)
-#define M5_SAFETY_TWO_PI 6.28318530717958647692
-
+ 
 static const double choose[6][6] = {
   {1.0, 0.0, 0.0, 0.0, 0.0, 0.0},
   {1.0, 1.0, 0.0, 0.0, 0.0, 0.0},
@@ -65,14 +64,33 @@ static float norm3(const float v[3])
   return sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
 }
 
-static float minf3(float a, float b, float c)
-{
-  return fminf(a, fminf(b, c));
-}
-
-static uint64_t earlier_u64(uint64_t a, uint64_t b)
+ static uint64_t earlier_u64(uint64_t a, uint64_t b)
 {
   return a < b ? a : b;
+}
+
+static uint8_t unresolved_priority(uint8_t status)
+{
+  switch ((M5TrajectorySafetyStatus)status) {
+    case M5_SAFETY_INVALID: return 7u;
+    case M5_SAFETY_STALE: return 6u;
+    case M5_SAFETY_UNKNOWN: return 5u;
+    case M5_SAFETY_STATIC_COLLISION: return 4u;
+    case M5_SAFETY_DYNAMIC_COLLISION: return 3u;
+    case M5_SAFETY_GEOFENCE_VIOLATION: return 2u;
+    default: return 1u;
+  }
+}
+
+static void mark_unresolved(M5SafetyCheck *check, M5TrajectorySafetyStatus status)
+{
+  if (check == NULL) return;
+  if (check->unresolved == 0u ||
+      unresolved_priority((uint8_t)status) >
+          unresolved_priority(check->unresolved_status)) {
+    check->unresolved_status = (uint8_t)status;
+  }
+  check->unresolved = 1u;
 }
 
 static M5TrajectorySafetyStatus reject(
@@ -163,7 +181,7 @@ static uint8_t validate_reference_shape(
 
   if (r == NULL || nav == NULL || dir == NULL || env == NULL ||
       in->map == NULL || in->evaluation_time_us == 0u ||
-      in->expected_map_revision == 0u ||
+      in->expected_map_revision == 0u || in->reserved0 != 0u ||
       in->geofence_count > PRODUCT_MAX_GEOFENCE_POLYGONS ||
       (in->geofence_count != 0u && in->geofences == NULL) ||
       in->response_delay_us > M5_SAFETY_MAX_RESPONSE_DELAY_US ||
@@ -213,7 +231,13 @@ static uint8_t validate_reference_shape(
       dir->authority_epoch != r->authority_epoch ||
       (dir->guidance_mode_code != PRODUCT_GUIDANCE_MODE_POS_HOLD &&
        dir->guidance_mode_code != PRODUCT_GUIDANCE_MODE_TRAJECTORY) ||
-      dir->safety_envelope_id != env->safety_envelope_id) {
+      dir->safety_envelope_id != env->safety_envelope_id ||
+      (dir->operation_code != PRODUCT_OP_PILOT &&
+       dir->operation_code != PRODUCT_OP_HOLD &&
+       dir->operation_code != PRODUCT_OP_MISSION &&
+       dir->operation_code != PRODUCT_OP_RETURN &&
+       dir->operation_code != PRODUCT_OP_LAND &&
+       dir->operation_code != PRODUCT_OP_SAFE_ACTION)) {
     return 0u;
   }
 
@@ -239,7 +263,8 @@ static uint8_t validate_reference_shape(
                   (uint64_t)in->response_delay_us;
 
   if (in->map->initialized == 0u || in->map->valid == 0u ||
-      in->map->degraded != 0u ||
+      in->map->degraded != 0u || in->map->reserved0 != 0u ||
+      !finite3(in->map->center_ned_m) ||
       in->map->map_revision != in->expected_map_revision ||
       in->map->boot_id != nav->header.boot_id ||
       in->map->time_epoch != nav->header.time_epoch ||
@@ -273,8 +298,8 @@ static uint8_t validate_reference_shape(
           f->validity != PRODUCT_GEOFENCE_VALID ||
           f->frame_id != FRAME_LOCAL_NED ||
           f->origin_id != nav->origin_id ||
-          f->state_epoch != nav->state_epoch ||
-          !fence_geometry_valid(f)) return 0u;
+          f->state_epoch != nav->state_epoch || f->fence_id == 0u ||
+          f->reserved0 != 0u || !fence_geometry_valid(f)) return 0u;
     }
   }
 
@@ -295,13 +320,15 @@ static uint8_t validate_reference_shape(
         !finite_motion_point(p)) return 0u;
   }
 
-  *valid_until_us = minf3((float)r->header.valid_until_us,
-                          (float)dir->header.valid_until_us,
-                          (float)env->header.valid_until_us) > 0.0f ?
-      earlier_u64(earlier_u64(r->header.valid_until_us, dir->header.valid_until_us),
-                  env->header.valid_until_us) : 0u;
+  *valid_until_us = earlier_u64(
+      earlier_u64(r->header.valid_until_us, dir->header.valid_until_us),
+      earlier_u64(env->header.valid_until_us, nav->header.valid_until_us));
   *valid_until_us = earlier_u64(*valid_until_us, dir->directive_expires_at_us);
   *valid_until_us = earlier_u64(*valid_until_us, in->map->source_deadline_us);
+  if (in->geofence_count != 0u) {
+    *valid_until_us = earlier_u64(*valid_until_us,
+        in->directive->payload.home.home_expires_at_us);
+  }
   for (i = 0u; i < in->geofence_count; ++i)
     *valid_until_us = earlier_u64(*valid_until_us, in->geofences[i].header.valid_until_us);
   return (uint8_t)(*valid_until_us > in->evaluation_time_us);
@@ -484,9 +511,7 @@ static M5TrajectorySafetyStatus check_static_map(
   int lo[3], hi[3];
   unsigned axis, x, y, z;
 
-  check->unresolved = 0u;
-  check->unresolved_status = M5_SAFETY_PASS;
-  if (!isfinite(search_radius) || search_radius < 0.0f)
+   if (!isfinite(search_radius) || search_radius < 0.0f)
     return M5_SAFETY_NUMERIC_FAILURE;
 
   if (point_outside_map(map, curve->position, inflation))
@@ -498,8 +523,7 @@ static M5TrajectorySafetyStatus check_static_map(
     low[axis] = curve->position[axis] - search_radius;
     high[axis] = curve->position[axis] + search_radius;
     if (low[axis] < map_low || high[axis] >= map_high) {
-      check->unresolved = 1u;
-      check->unresolved_status = M5_SAFETY_UNKNOWN;
+      mark_unresolved(check, M5_SAFETY_UNKNOWN);
       return M5_SAFETY_PASS;
     }
     lo[axis] = (int)floorf((low[axis] - map_low) / M5_MAP_CELL_SIZE_M);
@@ -530,11 +554,7 @@ static M5TrajectorySafetyStatus check_static_map(
         if (distance <= inflation && status != M5_SAFETY_PASS)
           return status;
         if (distance <= search_radius && status != M5_SAFETY_PASS) {
-          check->unresolved = 1u;
-          if (check->unresolved_status == M5_SAFETY_PASS ||
-              status == M5_SAFETY_INVALID || status == M5_SAFETY_STALE ||
-              status == M5_SAFETY_UNKNOWN)
-            check->unresolved_status = (uint8_t)status;
+          mark_unresolved(check, status);
         }
       }
     }
@@ -573,9 +593,7 @@ static M5TrajectorySafetyStatus check_geofences(
 
     if (clearance <= inflation + swept_radius ||
         height_low < min_height || height_high > max_height) {
-      check->unresolved = 1u;
-      if (check->unresolved_status == M5_SAFETY_PASS)
-        check->unresolved_status = M5_SAFETY_GEOFENCE_VIOLATION;
+      mark_unresolved(check, M5_SAFETY_GEOFENCE_VIOLATION);
     }
   }
   return M5_SAFETY_PASS;
@@ -686,9 +704,7 @@ static M5TrajectorySafetyStatus check_dynamic_tracks(
         !isfinite(distance)) return M5_SAFETY_NUMERIC_FAILURE;
     if (distance <= combined_radius) return M5_SAFETY_DYNAMIC_COLLISION;
     if (distance <= combined_radius + relative_sweep) {
-      check->unresolved = 1u;
-      if (check->unresolved_status == M5_SAFETY_PASS)
-        check->unresolved_status = M5_SAFETY_DYNAMIC_COLLISION;
+      mark_unresolved(check, M5_SAFETY_DYNAMIC_COLLISION);
     }
   }
   return M5_SAFETY_PASS;
