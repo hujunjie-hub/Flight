@@ -84,10 +84,23 @@
 | S06-054 | LocalMap time_epoch 失配 | INVALID | 已加入测试源，CI 待验证 |
 | S06-055 | Directive header frame_id 失配 | INVALID | 已加入测试源，CI 待验证 |
 
+## 本轮新增边界用例（新 Head CI 待验证）
+
+| ID | 场景 | 期望 | 当前结果 |
+|---|---|---|---|
+| S06-056 | 动态 track sample age 恰为 500ms / 超 1us | PASS / STALE | 已加入源码，CI 待验证 |
+| S06-057 | 动态预测租约恰为 1s / 超 1us | PASS / STALE | 已加入源码，CI 待验证 |
+| S06-058 | 地图预测能力低于 1s 最低要求 | INVALID | 已加入源码，CI 待验证 |
+| S06-059 | 围栏最小/最大高度含 0.15m 垂直 margin | 内侧 PASS、外侧拒绝 | 已加入源码，CI 待验证 |
+| S06-060 | 围栏零高度区间 | INVALID | 已加入源码，CI 待验证 |
+| S06-061 | 24×20ms proof horizon 的 uint64 加法溢出 | INVALID | 已加入源码，CI 待验证 |
+| S06-062 | 动态障碍物有限但极大速度导致计算界溢出 | NUMERIC_FAILURE | 已加入源码，CI 待验证 |
+| S06-063 | 固定种子 32 组有效静态轨迹与 offset 单点破坏 | PASS invariant / INVALID | 已加入源码，CI 待验证 |
+
 ## 仍未关闭的审查项
 
 1. 独立复核 Bernstein 变换、浮点外向舍入和连续几何距离下界；当前不是形式化证明。
-2. 补齐围栏高度擦边、动态预测时域整数边界、时间戳溢出、系统化属性 Fuzz，以及独立几何差分验证；本轮新增测试须以新 Head CI 关闭。
+2. 完成新增 S06-053..063 的 Host/ASan/UBSan/ARM CI；扩大随机多边形/动态 track 组合 Fuzz，并进行独立几何差分验证。
 3. 对动态障碍物加速度上界进行更多目标类别/传感器标定和参数敏感性分析。
 4. M5-07 尚未完成，M5-06 PASS 尚未成为 M6 不可绕过的发布门禁。
 5. H723 实机仍需真实传感器标定、WCET/RTA、RAM/栈、HIL 和逐级场地安全验证。

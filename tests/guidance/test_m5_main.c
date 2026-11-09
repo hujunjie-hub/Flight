@@ -1986,6 +1986,267 @@ static void test_m5_safety_directive_frame_mismatch(void)
   CHECK(fx.result.passed == 0u);
 }
 
+
+static void safety_set_constant_position(SafetyFx *fx,
+                                         float x, float y, float z)
+{
+  unsigned i;
+  fx->base.nav.core.position_ned_m[0] = x;
+  fx->base.nav.core.position_ned_m[1] = y;
+  fx->base.nav.core.position_ned_m[2] = z;
+  memset(fx->base.nav.core.velocity_ned_mps, 0,
+         sizeof(fx->base.nav.core.velocity_ned_mps));
+  memset(fx->base.nav.core.acceleration_ned_mps2, 0,
+         sizeof(fx->base.nav.core.acceleration_ned_mps2));
+  safety_point_set(&fx->reference.anchor, x, y, z, 0.0f, 0.0f, 0.0f);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    fx->reference.points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+    safety_point_set(&fx->reference.points[i], x, y, z,
+                     0.0f, 0.0f, 0.0f);
+  }
+}
+
+static void safety_set_keep_in_fence(SafetyFx *fx,
+                                     float min_height,
+                                     float max_height,
+                                     float vertical_margin)
+{
+  fill_header(&fx->fence.header, MSG_PRODUCT_GEOFENCE_SNAPSHOT,
+              SOURCE_M4, fx->base.now);
+  fx->fence.fence_id = 91u;
+  fx->fence.frame_id = FRAME_LOCAL_NED;
+  fx->fence.origin_id = T_ORIGIN;
+  fx->fence.state_epoch = T_STATE_EPOCH;
+  fx->fence.validity = PRODUCT_GEOFENCE_VALID;
+  fx->fence.kind = PRODUCT_GEOFENCE_KEEP_IN;
+  fx->fence.vertex_count = 4u;
+  fx->fence.horizontal_margin_m = 0.0f;
+  fx->fence.vertical_margin_m = vertical_margin;
+  fx->fence.min_height_above_home_m = min_height;
+  fx->fence.max_height_above_home_m = max_height;
+  fx->fence.vertices_ne_m[0][0] = -2.0f;
+  fx->fence.vertices_ne_m[0][1] = -2.0f;
+  fx->fence.vertices_ne_m[1][0] = 2.0f;
+  fx->fence.vertices_ne_m[1][1] = -2.0f;
+  fx->fence.vertices_ne_m[2][0] = 2.0f;
+  fx->fence.vertices_ne_m[2][1] = 2.0f;
+  fx->fence.vertices_ne_m[3][0] = -2.0f;
+  fx->fence.vertices_ne_m[3][1] = 2.0f;
+  fx->input.geofences = &fx->fence;
+  fx->input.geofence_count = 1u;
+}
+
+static uint32_t safety_fuzz_next(uint32_t *state)
+{
+  uint32_t x = *state;
+  x ^= x << 13;
+  x ^= x >> 17;
+  x ^= x << 5;
+  *state = x;
+  return x;
+}
+
+static float safety_fuzz_signed_unit(uint32_t *state)
+{
+  int32_t scaled = (int32_t)(safety_fuzz_next(state) % 1001u) - 500;
+  return (float)scaled * 0.001f;
+}
+
+static void test_m5_safety_dynamic_prediction_time_boundaries(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+
+  /* A track exactly at the maximum age remains admissible if its lease
+     still covers the complete preview proof horizon. */
+  safety_fx_init(&fx, 57000000u);
+  track = &fx.map.tracks[0];
+  track->id = 51u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now - M5_MAP_STALE_US;
+  track->expires_us = track->sample_us + M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US;
+  track->position_ned_m[0] = 3.0f;
+  track->radius_m = 0.05f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 1u);
+
+  /* One microsecond beyond the stale-age boundary must fail closed. */
+  track->sample_us--;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STALE);
+  CHECK(fx.result.passed == 0u);
+
+  /* The prediction lease may end exactly at sample + configured horizon. */
+  safety_fx_init(&fx, 57100000u);
+  track = &fx.map.tracks[0];
+  track->id = 52u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now;
+  track->expires_us = track->sample_us +
+      M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US;
+  track->position_ned_m[0] = 3.0f;
+  track->radius_m = 0.05f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_PASS);
+  track->expires_us++;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STALE);
+  CHECK(fx.result.passed == 0u);
+
+  /* A map that advertises less than the required prediction horizon is
+     invalid even when no track currently occupies the map. */
+  safety_fx_init(&fx, 57200000u);
+  fx.map.max_dynamic_prediction_us =
+      M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US - 1u;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_geofence_height_margins(void)
+{
+  SafetyFx fx;
+  M5TrajectorySafetyStatus status;
+
+  /* Both lower and upper limits include the approved vertical margin. */
+  safety_fx_init(&fx, 57300000u);
+  safety_set_constant_position(&fx, 0.0f, 0.0f, -0.16f);
+  safety_set_keep_in_fence(&fx, 0.0f, 2.0f, 0.15f);
+  CHECK(fence_geometry_valid(&fx.fence));
+  status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+  CHECK(status == M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 1u);
+
+  safety_fx_init(&fx, 57400000u);
+  safety_set_constant_position(&fx, 0.0f, 0.0f, -0.14f);
+  safety_set_keep_in_fence(&fx, 0.0f, 2.0f, 0.15f);
+  status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+  CHECK(status == M5_SAFETY_GEOFENCE_VIOLATION);
+  CHECK(fx.result.passed == 0u);
+
+  safety_fx_init(&fx, 57500000u);
+  safety_set_constant_position(&fx, 0.0f, 0.0f, -1.84f);
+  safety_set_keep_in_fence(&fx, 0.0f, 2.0f, 0.15f);
+  status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+  CHECK(status == M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 1u);
+
+  safety_fx_init(&fx, 57600000u);
+  safety_set_constant_position(&fx, 0.0f, 0.0f, -1.86f);
+  safety_set_keep_in_fence(&fx, 0.0f, 2.0f, 0.15f);
+  status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+  CHECK(status == M5_SAFETY_GEOFENCE_VIOLATION);
+  CHECK(fx.result.passed == 0u);
+
+  /* Exact mathematical boundary is not assumed safe: outward rounding may
+     conservatively reject it, but it must never be reported as PASS. */
+  safety_fx_init(&fx, 57700000u);
+  safety_set_constant_position(&fx, 0.0f, 0.0f, -0.15f);
+  safety_set_keep_in_fence(&fx, 0.0f, 2.0f, 0.15f);
+  status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+  CHECK(status != M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 0u);
+
+  safety_fx_init(&fx, 57800000u);
+  safety_set_keep_in_fence(&fx, 1.0f, 1.0f, 0.0f);
+  CHECK(!fence_geometry_valid(&fx.fence));
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_preview_time_overflow_rejected(void)
+{
+  SafetyFx fx;
+  uint64_t reference_time = UINT64_MAX - 400000u;
+  uint64_t evaluation_time = reference_time + 1000u;
+  unsigned i;
+
+  safety_fx_init(&fx, 57900000u);
+  fx.base.now = evaluation_time;
+  fx.input.evaluation_time_us = evaluation_time;
+
+  fx.base.nav.header.timestamp_sample_us = reference_time;
+  fx.base.nav.header.timestamp_publish_us = evaluation_time;
+  fx.base.nav.header.valid_until_us = UINT64_MAX;
+
+  fx.reference.header.timestamp_sample_us = reference_time;
+  fx.reference.header.timestamp_publish_us = evaluation_time;
+  fx.reference.header.valid_until_us = UINT64_MAX;
+
+  fx.base.dir.header.timestamp_sample_us = evaluation_time;
+  fx.base.dir.header.timestamp_publish_us = evaluation_time;
+  fx.base.dir.header.valid_until_us = UINT64_MAX;
+  fx.base.dir.directive_expires_at_us = UINT64_MAX;
+
+  fx.base.env.header.timestamp_sample_us = evaluation_time;
+  fx.base.env.header.timestamp_publish_us = evaluation_time;
+  fx.base.env.header.valid_until_us = UINT64_MAX;
+
+  fx.map.last_ingest_us = evaluation_time;
+  fx.map.source_deadline_us = UINT64_MAX;
+  for (i = 0u; i < M5_MAP_CELL_COUNT; ++i)
+    fx.map.cells[i].last_update_ms = (uint32_t)(evaluation_time / 1000u);
+
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_finite_numeric_extreme_rejected(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+
+  safety_fx_init(&fx, 58000000u);
+  track = &fx.map.tracks[0];
+  track->id = 53u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now;
+  track->expires_us = fx.base.now + M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US;
+  track->position_ned_m[0] = 3.0f;
+  track->velocity_ned_mps[0] = 3.0e38f;
+  track->radius_m = 0.05f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_NUMERIC_FAILURE);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_deterministic_property_fuzz(void)
+{
+  SafetyFx fx;
+  uint32_t seed = 0x6D350607u;
+  unsigned i;
+
+  for (i = 0u; i < 32u; ++i) {
+    M5TrajectorySafetyStatus status;
+    unsigned bad_index;
+    uint64_t now = 59000000ull + (uint64_t)i * 1000000ull;
+    float x = safety_fuzz_signed_unit(&seed);
+    float y = safety_fuzz_signed_unit(&seed);
+    float z = -(0.5f + (float)(safety_fuzz_next(&seed) % 1001u) * 0.001f);
+
+    safety_fx_init(&fx, now);
+    safety_set_constant_position(&fx, x, y, z);
+    status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+    CHECK(status == M5_SAFETY_PASS);
+    CHECK(fx.result.passed == 1u);
+    CHECK(fx.result.reason_code == M5_SAFETY_REASON_NONE);
+    CHECK(fx.result.valid_until_us >= now +
+        PRODUCT_PREVIEW_COUNT * PRODUCT_PREVIEW_STEP_US);
+    CHECK(fx.result.work_units <= M5_SAFETY_MAX_WORK_UNITS);
+    CHECK(fx.result.cell_checks <= M5_SAFETY_MAX_CELL_CHECKS);
+
+    bad_index = (unsigned)(safety_fuzz_next(&seed) % PRODUCT_PREVIEW_COUNT);
+    fx.reference.points[bad_index].offset_us++;
+    status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+    CHECK(status == M5_SAFETY_INVALID);
+    CHECK(fx.result.passed == 0u);
+    CHECK(fx.result.status == (uint8_t)status);
+  }
+}
+
 static void test_m5_safety_static_free_reference_passes(void)
 {
   SafetyFx fx;
@@ -3000,6 +3261,11 @@ int main(void)
     {"m5_safety_reference_time_epoch", test_m5_safety_reference_time_epoch_mismatch},
     {"m5_safety_map_time_epoch", test_m5_safety_map_time_epoch_mismatch},
     {"m5_safety_directive_frame", test_m5_safety_directive_frame_mismatch},
+    {"m5_safety_dynamic_prediction_boundaries", test_m5_safety_dynamic_prediction_time_boundaries},
+    {"m5_safety_geofence_height_margins", test_m5_safety_geofence_height_margins},
+    {"m5_safety_preview_time_overflow", test_m5_safety_preview_time_overflow_rejected},
+    {"m5_safety_numeric_finite_extreme", test_m5_safety_finite_numeric_extreme_rejected},
+    {"m5_safety_property_fuzz", test_m5_safety_deterministic_property_fuzz},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
