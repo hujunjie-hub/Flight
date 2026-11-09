@@ -39,4 +39,21 @@ uint8_t m5_trajectory_safety_test_rounding_bounds(
 float m5_trajectory_safety_test_norm_lower_bound(
     double x, double y, double z);
 
+
+uint8_t m5_trajectory_safety_test_point_aabb_distance_lower(
+    const float point[3],
+    const float center[3],
+    float half_extent,
+    float point_rounding_error,
+    float *distance_lower);
+
+uint8_t m5_trajectory_safety_test_dynamic_relative_sweep_bound(
+    float curve_speed_bound,
+    float obstacle_speed_bound,
+    float velocity_std_mps,
+    float relative_speed_bound,
+    float relative_acceleration_bound,
+    float half_duration_s,
+    float *sweep_bound);
+
 #endif /* M5_TRAJECTORY_SAFETY_TEST_API_H */

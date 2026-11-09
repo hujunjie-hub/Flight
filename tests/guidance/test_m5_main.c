@@ -2834,6 +2834,135 @@ static void test_m5_safety_outward_rounding_and_norm_lower(void)
   }
 }
 
+
+static void test_m5_safety_point_aabb_distance_lower_oracle(void)
+{
+  uint32_t seed = 0xAABB0611u;
+  unsigned i;
+
+  for (i = 0u; i < 2048u; ++i) {
+    float point[3], center[3];
+    float half_extent = safety_fuzz_between(&seed, 0.0f, 0.75f);
+    float rounding_error = safety_fuzz_between(&seed, 0.0f, 0.25f);
+    float lower = -1.0f;
+    double exact2 = 0.0;
+    double exact;
+    unsigned axis;
+
+    for (axis = 0u; axis < 3u; ++axis) {
+      point[axis] = safety_fuzz_between(&seed, -8.0f, 8.0f);
+      center[axis] = safety_fuzz_between(&seed, -8.0f, 8.0f);
+    }
+    CHECK(m5_trajectory_safety_test_point_aabb_distance_lower(
+        point, center, half_extent, rounding_error, &lower));
+    for (axis = 0u; axis < 3u; ++axis) {
+      double delta = fabs((double)point[axis] - center[axis]) -
+                     (double)half_extent;
+      if (delta > 0.0) exact2 += delta * delta;
+    }
+    exact = fmax(0.0, sqrt(exact2) - (double)rounding_error);
+    CHECK((double)lower <= exact);
+    CHECK(lower >= 0.0f);
+  }
+
+  {
+    const float center[3] = {0.0f, 0.0f, 0.0f};
+    const float face[3] = {0.25f, 0.0f, 0.0f};
+    const float edge[3] = {0.25f, 0.25f, 0.0f};
+    const float corner[3] = {0.25f, 0.25f, 0.25f};
+    float lower;
+    CHECK(m5_trajectory_safety_test_point_aabb_distance_lower(
+        face, center, 0.25f, 0.0f, &lower));
+    CHECK(lower == 0.0f);
+    CHECK(m5_trajectory_safety_test_point_aabb_distance_lower(
+        edge, center, 0.25f, 0.0f, &lower));
+    CHECK(lower == 0.0f);
+    CHECK(m5_trajectory_safety_test_point_aabb_distance_lower(
+        corner, center, 0.25f, 0.0f, &lower));
+    CHECK(lower == 0.0f);
+    CHECK(!m5_trajectory_safety_test_point_aabb_distance_lower(
+        face, center, -0.25f, 0.0f, &lower));
+    CHECK(!m5_trajectory_safety_test_point_aabb_distance_lower(
+        face, center, 0.25f, -0.01f, &lower));
+  }
+}
+
+static double safety_test_norm3(const double v[3])
+{
+  return sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+}
+
+static void test_m5_safety_dynamic_relative_sweep_oracle(void)
+{
+  uint32_t seed = 0xD19A0612u;
+  unsigned trial;
+
+  for (trial = 0u; trial < 512u; ++trial) {
+    double curve_velocity[3], obstacle_velocity[3];
+    double curve_acceleration[3], obstacle_acceleration[3];
+    double velocity_uncertainty[3], relative_initial[3];
+    double curve_accel_norm, obstacle_accel_norm;
+    double velocity_std, relative_accel_bound;
+    double curve_speed_bound, obstacle_speed_bound, relative_speed_bound;
+    float half_dt = safety_fuzz_between(&seed, 0.001f, 0.12f);
+    float sweep_bound = 0.0f;
+    unsigned axis, sample;
+
+    for (axis = 0u; axis < 3u; ++axis) {
+      curve_velocity[axis] = (double)safety_fuzz_signed_unit(&seed) * 5.0;
+      obstacle_velocity[axis] = (double)safety_fuzz_signed_unit(&seed) * 4.0;
+      curve_acceleration[axis] =
+          (double)safety_fuzz_signed_unit(&seed) * 1.5;
+      obstacle_acceleration[axis] =
+          (double)safety_fuzz_signed_unit(&seed) * 1.0;
+      velocity_uncertainty[axis] =
+          (double)safety_fuzz_signed_unit(&seed) * 0.1;
+      relative_initial[axis] =
+          curve_velocity[axis] - obstacle_velocity[axis];
+    }
+
+    curve_accel_norm = safety_test_norm3(curve_acceleration);
+    obstacle_accel_norm = safety_test_norm3(obstacle_acceleration);
+    velocity_std = safety_test_norm3(velocity_uncertainty);
+    relative_accel_bound = curve_accel_norm + obstacle_accel_norm;
+    curve_speed_bound = safety_test_norm3(curve_velocity) +
+                        curve_accel_norm * (double)half_dt;
+    obstacle_speed_bound = safety_test_norm3(obstacle_velocity) +
+                           obstacle_accel_norm * (double)half_dt;
+    relative_speed_bound = safety_test_norm3(relative_initial) + velocity_std;
+
+    CHECK(m5_trajectory_safety_test_dynamic_relative_sweep_bound(
+        (float)curve_speed_bound, (float)obstacle_speed_bound,
+        (float)velocity_std, (float)relative_speed_bound,
+        (float)relative_accel_bound, half_dt, &sweep_bound));
+
+    for (sample = 0u; sample <= 32u; ++sample) {
+      double t = (double)half_dt * (double)sample / 32.0;
+      double displacement[3];
+      double distance;
+      for (axis = 0u; axis < 3u; ++axis) {
+        double relative_acceleration = curve_acceleration[axis] -
+                                       obstacle_acceleration[axis];
+        displacement[axis] =
+            (relative_initial[axis] + velocity_uncertainty[axis]) * t +
+            0.5 * relative_acceleration * t * t;
+      }
+      distance = safety_test_norm3(displacement);
+      CHECK(distance <= (double)sweep_bound + 0.00001);
+    }
+  }
+
+  {
+    float sweep = 0.0f;
+    CHECK(!m5_trajectory_safety_test_dynamic_relative_sweep_bound(
+        -1.0f, 1.0f, 0.1f, 1.0f, 1.0f, 0.1f, &sweep));
+    CHECK(!m5_trajectory_safety_test_dynamic_relative_sweep_bound(
+        1.0f, 1.0f, 0.1f, 1.0f, 1.0f, -0.1f, &sweep));
+    CHECK(!m5_trajectory_safety_test_dynamic_relative_sweep_bound(
+        1.0f, 1.0f, 0.1f, 1.0f, INFINITY, 0.1f, &sweep));
+  }
+}
+
 static void test_m5_safety_static_free_reference_passes(void)
 {
   SafetyFx fx;
@@ -3863,6 +3992,8 @@ int main(void)
     {"m5_safety_bernstein_bounds_invalid", test_m5_safety_bernstein_bounds_invalid_inputs},
     {"m5_safety_multi_track_all_slots", test_m5_safety_multi_track_all_slots_and_fail_closed},
     {"m5_safety_outward_rounding_norm_lower", test_m5_safety_outward_rounding_and_norm_lower},
+    {"m5_safety_point_aabb_distance_oracle", test_m5_safety_point_aabb_distance_lower_oracle},
+    {"m5_safety_dynamic_relative_sweep_oracle", test_m5_safety_dynamic_relative_sweep_oracle},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {

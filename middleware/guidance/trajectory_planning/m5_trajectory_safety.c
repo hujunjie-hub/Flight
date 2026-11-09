@@ -570,6 +570,72 @@ static uint8_t point_outside_map(
   return 0u;
 }
 
+
+static uint8_t point_aabb_distance_lower(
+    const float point[3],
+    const float center[3],
+    float half_extent,
+    float point_rounding_error,
+    float *distance_lower)
+{
+  double distance2 = 0.0;
+  unsigned axis;
+  float geometric_lower;
+
+  if (point == NULL || center == NULL || distance_lower == NULL ||
+      !finite3(point) || !finite3(center) ||
+      !isfinite(half_extent) || half_extent < 0.0f ||
+      !isfinite(point_rounding_error) || point_rounding_error < 0.0f) {
+    return 0u;
+  }
+
+  for (axis = 0u; axis < 3u; ++axis) {
+    double delta = fabs((double)point[axis] - center[axis]) -
+                   (double)half_extent;
+    if (delta > 0.0) distance2 += delta * delta;
+  }
+  geometric_lower = norm3_lower(sqrt(distance2), 0.0, 0.0);
+  *distance_lower = fmaxf(0.0f, round_down_float(
+      (double)geometric_lower - point_rounding_error));
+  return (uint8_t)isfinite(*distance_lower);
+}
+
+static uint8_t dynamic_relative_sweep_bound(
+    float curve_speed_bound,
+    float obstacle_speed_bound,
+    float velocity_std_mps,
+    float relative_speed_bound,
+    float relative_acceleration_bound,
+    float half_duration_s,
+    float *sweep_bound)
+{
+  float speed_sweep, acceleration_sweep;
+
+  if (sweep_bound == NULL ||
+      !isfinite(curve_speed_bound) || curve_speed_bound < 0.0f ||
+      !isfinite(obstacle_speed_bound) || obstacle_speed_bound < 0.0f ||
+      !isfinite(velocity_std_mps) || velocity_std_mps < 0.0f ||
+      !isfinite(relative_speed_bound) || relative_speed_bound < 0.0f ||
+      !isfinite(relative_acceleration_bound) ||
+          relative_acceleration_bound < 0.0f ||
+      !isfinite(half_duration_s) || half_duration_s < 0.0f) {
+    return 0u;
+  }
+
+  speed_sweep = round_up_float(
+      ((double)curve_speed_bound + obstacle_speed_bound +
+       velocity_std_mps) * half_duration_s);
+  acceleration_sweep = round_up_float(
+      (double)relative_speed_bound * half_duration_s +
+      0.5 * relative_acceleration_bound * half_duration_s *
+          half_duration_s +
+      (double)velocity_std_mps * half_duration_s);
+  if (!isfinite(speed_sweep) || !isfinite(acceleration_sweep)) return 0u;
+
+  *sweep_bound = fminf(speed_sweep, acceleration_sweep);
+  return (uint8_t)isfinite(*sweep_bound);
+}
+
 static M5TrajectorySafetyStatus check_static_map(
     const M5TrajectorySafetyInput *in,
     const M5SafetyCurveBounds *curve,
@@ -614,7 +680,6 @@ static M5TrajectorySafetyStatus check_static_map(
         uint16_t voxel = (uint16_t)((z * M5_MAP_DIM + y) * M5_MAP_DIM + x);
         uint8_t state;
         float center[3], distance;
-        double d2 = 0.0;
         M5TrajectorySafetyStatus status;
         if (++result->cell_checks > M5_SAFETY_MAX_CELL_CHECKS)
           return M5_SAFETY_BUDGET_EXCEEDED;
@@ -623,15 +688,9 @@ static M5TrajectorySafetyStatus check_static_map(
           return M5_SAFETY_INVALID;
         status = state_status(state);
         m5_local_map_voxel_center(map, voxel, center);
-        for (axis = 0u; axis < 3u; ++axis) {
-          double delta = fabs((double)curve->position[axis] - center[axis]) -
-                         M5_SAFETY_CELL_HALF_M;
-          if (delta > 0.0) d2 += delta * delta;
-        }
-        distance = norm3_lower(sqrt(d2), 0.0, 0.0);
-        distance = fmaxf(0.0f, round_down_float(
-            (double)distance - curve->position_rounding_error_m));
-        if (!isfinite(distance)) return M5_SAFETY_NUMERIC_FAILURE;
+        if (!point_aabb_distance_lower(curve->position, center,
+                M5_SAFETY_CELL_HALF_M, curve->position_rounding_error_m,
+                &distance)) return M5_SAFETY_NUMERIC_FAILURE;
 
         if (distance <= inflation && status != M5_SAFETY_PASS)
           return status;
@@ -747,7 +806,7 @@ static M5TrajectorySafetyStatus check_dynamic_tracks(
     float dt, obstacle[3], relative_velocity[3];
     float obstacle_speed, relative_speed, relative_accel;
     float uncertainty_horizon, uncertainty, combined_radius;
-    float sweep_v, sweep_a, relative_sweep, distance;
+    float relative_sweep, distance;
     double obstacle_rounding2 = 0.0;
     if (t->id == 0u) continue;
     if (++result->track_checks > M5_SAFETY_MAX_WORK_UNITS * M5_MAP_MAX_TRACKS)
@@ -788,12 +847,9 @@ static M5TrajectorySafetyStatus check_dynamic_tracks(
        uncertainty are already included above. */
     combined_radius = round_up_float((double)t->radius_m + inflation + uncertainty +
         (double)obstacle_speed * delay_s + sqrt(obstacle_rounding2));
-    sweep_v = round_up_float(((double)curve->speed_bound + obstacle_speed +
-        t->velocity_std_mps) * half_dt);
-    sweep_a = round_up_float((double)relative_speed * half_dt +
-        0.5 * relative_accel * half_dt * half_dt +
-        (double)t->velocity_std_mps * half_dt);
-    relative_sweep = fminf(sweep_v, sweep_a);
+    if (!dynamic_relative_sweep_bound(curve->speed_bound, obstacle_speed,
+            t->velocity_std_mps, relative_speed, relative_accel, half_dt,
+            &relative_sweep)) return M5_SAFETY_NUMERIC_FAILURE;
     {
       double dx = (double)curve->position[0] - obstacle[0];
       double dy = (double)curve->position[1] - obstacle[1];
@@ -1194,6 +1250,32 @@ float m5_trajectory_safety_test_norm_lower_bound(
 {
   return norm3_lower(x, y, z);
 }
+
+uint8_t m5_trajectory_safety_test_point_aabb_distance_lower(
+    const float point[3],
+    const float center[3],
+    float half_extent,
+    float point_rounding_error,
+    float *distance_lower)
+{
+  return point_aabb_distance_lower(point, center, half_extent,
+                                   point_rounding_error, distance_lower);
+}
+
+uint8_t m5_trajectory_safety_test_dynamic_relative_sweep_bound(
+    float curve_speed_bound,
+    float obstacle_speed_bound,
+    float velocity_std_mps,
+    float relative_speed_bound,
+    float relative_acceleration_bound,
+    float half_duration_s,
+    float *sweep_bound)
+{
+  return dynamic_relative_sweep_bound(curve_speed_bound, obstacle_speed_bound,
+      velocity_std_mps, relative_speed_bound, relative_acceleration_bound,
+      half_duration_s, sweep_bound);
+}
+
 #endif /* FLIGHT_M5_SAFETY_TEST_API */
 
 #endif /* FLIGHT_M5_HOST_PLANNER */
