@@ -13,7 +13,18 @@ static uint32_t seed_sequence;
 static uint32_t solve_sequence;
 static uint64_t last_solve_time;
 static MpcSnapshot last_context;
-static OSQPFloat px[45], ax[702], q[15], lower[190], upper[190];
+/* The generated OSQP 1.0.0 workspace exports mutable P/A/q value arrays.
+ * Its update routines copy these arrays element-by-element, so using the same
+ * arrays as update input is safe and avoids 3,048 bytes of duplicate staging
+ * RAM. Keep l/u staging separate: OSQP swaps their backing vectors on update.
+ */
+extern OSQPFloat quad_data_P_csc_x[45];
+extern OSQPFloat quad_data_A_csc_x[702];
+extern OSQPFloat quad_data_q_val[15];
+#define px quad_data_P_csc_x
+#define ax quad_data_A_csc_x
+#define q quad_data_q_val
+static OSQPFloat lower[190], upper[190];
 static int lock_exchange(void) {
   return !__atomic_exchange_n(&exchange_lock, 1u, __ATOMIC_ACQUIRE);
 }
