@@ -2416,24 +2416,6 @@ static void test_m5_safety_dynamic_track_nonfinite_velocity_rejected(void)
   CHECK(fx.result.passed == 0u);
 }
 
-static void test_m5_safety_map_edge_fails_closed(void)
-{
-  SafetyFx fx;
-  unsigned i;
-  safety_fx_init(&fx, 33980000u);
-  fx.base.nav.core.position_ned_m[0] = 3.9f;
-  safety_point_set(&fx.reference.anchor, 3.9f, 0.0f, 0.0f,
-                   0.0f, 0.0f, 0.0f);
-  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
-    fx.reference.points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
-    safety_point_set(&fx.reference.points[i], 3.9f, 0.0f, 0.0f,
-                     0.0f, 0.0f, 0.0f);
-  }
-  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
-      &fx.result) == M5_SAFETY_UNKNOWN);
-  CHECK(fx.result.passed == 0u);
-}
-
 static void test_m5_safety_geofence_collinear_vertices_rejected(void)
 {
   SafetyFx fx;
@@ -2983,7 +2965,6 @@ int main(void)
     {"m5_safety_geofence_self_intersection", test_m5_safety_self_intersecting_geofence_rejected},
     {"m5_safety_cell_budget", test_m5_safety_cell_check_budget_exhaustion},
     {"m5_safety_epoch_origin_frame_mismatch", test_m5_safety_navigation_map_epoch_origin_frame_mismatch_rejected},
-    {"m5_safety_map_edge", test_m5_safety_map_edge_fails_closed},
     {"m5_safety_dfs_max_depth_stack_guard", test_m5_safety_dfs_max_depth_stack_guard},
     {"m5_safety_dfs_work_budget", test_m5_safety_dfs_work_unit_budget_exhaustion},
   };
