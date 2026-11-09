@@ -250,24 +250,25 @@ uint8_t guidance_minimum_jerk_optimize(
     }
   }
   for (segment = 0u; segment < segment_count; ++segment) {
+    const double time_bin_s = (double)GUIDANCE_TIME_BIN_US * 1e-6;
     double ticks;
     double nearest_ticks;
     double duration = segment_duration_s[segment];
-    if (!isfinite(duration) || duration < 0.2 || duration > 6.2) {
+    if (!isfinite(duration) || duration < time_bin_s || duration > GUIDANCE_MAX_DURATION_S) {
       return 0u;
     }
-    ticks = duration / 0.2;
+    ticks = duration / time_bin_s;
     nearest_ticks = floor(ticks + 0.5);
     if (fabs(ticks - nearest_ticks) > 1e-6 ||
-        nearest_ticks < 1.0 || nearest_ticks > 31.0) {
+        nearest_ticks < 1.0 || nearest_ticks > GUIDANCE_MAX_TIME_BINS) {
       return 0u;
     }
     total_ticks = (uint16_t)(total_ticks + (uint16_t)nearest_ticks);
-    if (total_ticks > 31u) {
+    if (total_ticks > GUIDANCE_MAX_TIME_BINS) {
       return 0u;
     }
   }
-  total_duration = (double)total_ticks * 0.2;
+  total_duration = (double)total_ticks * ((double)GUIDANCE_TIME_BIN_US * 1e-6);
 
   scale = total_duration / segment_count;
   if (!isfinite(scale) || scale <= 0.0) {
