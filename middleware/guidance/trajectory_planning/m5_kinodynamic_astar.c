@@ -538,9 +538,11 @@ static M5PlannerResult validate_request(const M5AstarRequest *r)
   uint16_t start_voxel, goal_voxel;
   if (r == NULL || r->map == NULL || r->navigation == NULL ||
       r->guidance_config == NULL || r->safety_envelope == NULL ||
-      r->monotonic_now == NULL || r->evaluation_time_us == 0u ||
-      r->planning_deadline_monotonic_us <= r->evaluation_time_us ||
-      !finite3(r->start_position_ned_m) || !finite3(r->start_velocity_ned_mps) ||
+      r->monotonic_now == NULL || r->evaluation_time_us == 0u)
+    return M5_PLANNER_INVALID_INPUT;
+  if (r->planning_deadline_monotonic_us <= r->evaluation_time_us)
+    return M5_PLANNER_DEADLINE_MISSED;
+  if (!finite3(r->start_position_ned_m) || !finite3(r->start_velocity_ned_mps) ||
       !finite3(r->start_acceleration_ned_mps2) || !finite3(r->goal_position_ned_m) ||
       !isfinite(r->start_yaw_rad) || !isfinite(r->start_yaw_rate_radps) ||
       !isfinite(r->goal_yaw_rad) || !isfinite(r->acceptance_radius_m) ||
@@ -731,6 +733,7 @@ M5PlannerResult m5_kinodynamic_astar_plan(const M5AstarRequest *r,
   uint32_t root_key;
   float root_h;
   uint64_t last_now;
+  uint8_t horizon_exhausted = 0u;
   const M5KinodynamicPrimitive *primitives;
   if (path != NULL) memset(path, 0, sizeof(*path));
   if (stats != NULL) {
@@ -802,7 +805,7 @@ M5PlannerResult m5_kinodynamic_astar_plan(const M5AstarRequest *r,
     uint8_t current_velocity_bin, current_yaw_bin, current_time_bin;
     uint8_t primitive_id;
     if (w->open_count == 0u) {
-      result = M5_PLANNER_NO_PATH;
+      result = horizon_exhausted ? M5_PLANNER_CAPACITY_EXCEEDED : M5_PLANNER_NO_PATH;
       break;
     }
     if (stats->expanded_nodes >= M5_ASTAR_MAX_EXPANSIONS) {
@@ -842,6 +845,12 @@ M5PlannerResult m5_kinodynamic_astar_plan(const M5AstarRequest *r,
       uint8_t velocity_bin, yaw_bin_next;
       float next_h, next_g;
       if (stats->generated_edges != UINT16_MAX) stats->generated_edges++;
+      if (current_time_bin + primitives[primitive_id].duration_us / 200000u >
+          M5_ASTAR_MAX_TIME_BINS) {
+        horizon_exhausted = 1u;
+        if (stats->rejected_edges != UINT16_MAX) stats->rejected_edges++;
+        continue;
+      }
       if (!make_edge(r, &current, current_id, &primitives[primitive_id],
                      q, &next_key, next_position, next_velocity,
                      &next_yaw, &next_time_bin)) {
