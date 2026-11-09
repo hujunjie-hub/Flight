@@ -100,3 +100,24 @@ M5 时标回归包括超出 6.2 s 的 Mission/Return 拒绝。
 - 飞行状态仍为 `FLIGHT_RELEASE_NOT_AUTHORIZED`。
 
 唯一验收状态台账为 `spec/09_需求验证实施与发布管理.md`；本报告仅记录实现边界和复现入口。
+
+
+## 5. CI evidence and exact scope
+
+The implementation baseline \`b9832c8ce1e8accb3c1e5591c02d4637c28e2d99\` completed GitHub Actions run [42589657670](https://github.com/hujunjie-hub/Flight/actions/runs/42589657670) successfully:
+
+- M4 Host: 927 checks, 0 failures.
+- M5 Host: 8,054 checks, 0 failures.
+- M4/M5 integration: 1,000 checks, 0 failures.
+- M5 Host AddressSanitizer/UndefinedBehaviorSanitizer: passed.
+- M4/M5 integration AddressSanitizer/UndefinedBehaviorSanitizer: passed.
+- Cortex-M7 production-source compile check and MPC RAM checks: passed.
+- Source-layout, OSQP source-lock and time-service jobs: passed.
+
+Artifacts:
+- [M4/M5 Host regression evidence](https://github.com/hujunjie-hub/Flight/actions/runs/42589657670/artifacts/13660916940)
+- [Cortex-M7 compile evidence](https://github.com/hujunjie-hub/Flight/actions/runs/42589657670/artifacts/13660637382)
+
+Important scope distinction: this successful run contains 31 named M5 scenarios. The 32nd scenario, which adds nonzero start/end velocity and acceleration boundary checks, was added later in commit \`63f831d69718f1f77488440095b241dce3a670be\`; its subsequent CI run was still queued at the time this report was updated. Do not treat that later test as passed until its exact commit's CI completes.
+
+The ARM job compiles the explicit M4/M5 production source list and checks the existing Cortex-M7/MPC build. It does not compile or execute the Host-only optimizer kernel on H723. No target link, H723 optimizer runtime, WCET/RTA, stack watermark, PIL/HIL or flight evidence is implied.
