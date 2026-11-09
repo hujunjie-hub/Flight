@@ -1278,6 +1278,7 @@ static void test_m5_kinodynamic_key_and_primitive_manifest(void)
 
   table = m5_kinodynamic_primitive_table(&count);
   CHECK(table != NULL && count == 60u);
+  CHECK(m5_kinodynamic_primitive_table_validate());
   CHECK(table[0].kind == M5_PRIMITIVE_TRANSLATE && table[0].dir == 0u &&
         table[0].speed_id == 0u && table[0].duration_us == 200000u);
   CHECK(table[31].dir == 7u && table[31].speed_id == 1u &&
