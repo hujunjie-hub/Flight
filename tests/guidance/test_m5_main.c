@@ -1503,6 +1503,30 @@ static void test_m5_time_scaler_bounded_growth(void)
   CHECK(timed.path.total_cost_s == 0.8f);
 }
 
+static void test_m5_time_scaler_enforces_yaw_rate(void)
+{
+  PlannerFx fx;
+  M5TimeScaledPath timed;
+  const uint64_t now = 9475000u;
+  planner_fx_init(&fx, now);
+  fx.path.segment_count = 1u;
+  fx.path.map_revision = fx.map.map_revision;
+  fx.path.total_cost_s = 0.8f;
+  fx.path.offset_us[0] = 0u;
+  fx.path.offset_us[1] = 800000u;
+  fx.path.position_ned_m[0][0] = fx.path.position_ned_m[1][0] = -1.75f;
+  fx.path.position_ned_m[0][1] = fx.path.position_ned_m[1][1] = -1.75f;
+  fx.path.position_ned_m[0][2] = fx.path.position_ned_m[1][2] = -1.75f;
+  fx.path.yaw_rad[0] = 0.0f;
+  fx.path.yaw_rad[1] = 0.3926990817f;
+  fx.path.primitive_index[0] = 49u; /* one yaw bin, 800 ms primitive */
+  fx.envelope.max_yaw_rate_radps = 0.5f;
+  CHECK(m5_time_scaler_build(&fx.path, &fx.config, &fx.envelope,
+      &fx.navigation, now, &timed) == M5_TIME_SCALER_OK);
+  CHECK(timed.attempts[0] == 4u);
+  CHECK(timed.path.offset_us[1] >= 1600000u);
+}
+
 static void test_m5_time_scaler_capacity_and_envelope_fail_closed(void)
 {
   PlannerFx fx;
@@ -1895,6 +1919,7 @@ int main(void)
     {"m5_map_batch_fail_closed", test_m5_map_batch_validation_is_fail_closed},
     {"m5_astar_key_primitives", test_m5_kinodynamic_key_and_primitive_manifest},
     {"m5_time_scaler_bounded_growth", test_m5_time_scaler_bounded_growth},
+    {"m5_time_scaler_yaw_rate", test_m5_time_scaler_enforces_yaw_rate},
     {"m5_time_scaler_capacity_envelope", test_m5_time_scaler_capacity_and_envelope_fail_closed},
     {"m5_time_scaler_global_vector_limits", test_m5_time_scaler_enforces_global_vector_limits},
     {"m5_smoother_minimum_jerk_continuity", test_m5_smoother_minimum_jerk_continuity},
