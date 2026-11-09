@@ -46,17 +46,21 @@ static uint8_t config_and_limits_valid(const ProductGuidanceConfig *config,
                                        float acceleration_limit[3],
                                        float jerk_limit[3],
                                        float *max_linear_velocity,
-                                       float *max_linear_acceleration)
+                                       float *max_linear_acceleration,
+                                       float *max_yaw_rate)
 {
   unsigned axis;
   const uint32_t required_mask = PRODUCT_ENVELOPE_VALID_VELOCITY |
       PRODUCT_ENVELOPE_VALID_ACCELERATION | PRODUCT_ENVELOPE_VALID_JERK;
   if (config == NULL || envelope == NULL || nav == NULL ||
       max_linear_velocity == NULL || max_linear_acceleration == NULL ||
+      max_yaw_rate == NULL ||
       !isfinite(envelope->max_linear_speed_mps) ||
       envelope->max_linear_speed_mps <= 0.0f ||
       !isfinite(envelope->max_linear_accel_mps2) ||
       envelope->max_linear_accel_mps2 <= 0.0f ||
+      !isfinite(envelope->max_yaw_rate_radps) ||
+      envelope->max_yaw_rate_radps <= 0.0f ||
       config->profile_hash != PRODUCT_PROFILE_ID ||
       config->config_version == 0u || config->parameter_hash == 0u ||
       !guidance_header_ok(&envelope->header, &nav->header,
@@ -66,6 +70,7 @@ static uint8_t config_and_limits_valid(const ProductGuidanceConfig *config,
 
   *max_linear_velocity = envelope->max_linear_speed_mps;
   *max_linear_acceleration = envelope->max_linear_accel_mps2;
+  *max_yaw_rate = envelope->max_yaw_rate_radps;
   for (axis = 0u; axis < 3u; ++axis) {
     float cfg_v = config->payload.max_velocity_ned_mps[axis];
     float cfg_a = config->payload.max_acceleration_ned_mps2[axis];
@@ -133,7 +138,8 @@ static uint8_t segment_bounds_ok(const M5AstarPath *path, unsigned segment,
                                  float duration_s, const float v_limit[3],
                                  const float a_limit[3], const float j_limit[3],
                                  float max_linear_velocity,
-                                 float max_linear_acceleration)
+                                 float max_linear_acceleration,
+                                 float max_yaw_rate)
 {
   float velocity_squared = 0.0f, acceleration_squared = 0.0f;
   unsigned axis, derivative;
@@ -165,6 +171,19 @@ static uint8_t segment_bounds_ok(const M5AstarPath *path, unsigned segment,
   if (sqrtf(velocity_squared) > max_linear_velocity + M5_TIME_BOUND_TOL ||
       sqrtf(acceleration_squared) >
           max_linear_acceleration + M5_TIME_BOUND_TOL) return 0u;
+  {
+    float yaw_start = path->yaw_rad[segment];
+    float yaw_end = yaw_start + remainderf(
+        path->yaw_rad[segment + 1u] - path->yaw_rad[segment], 6.28318530717958647692f);
+    float lower, upper;
+    GuidanceQuintic yaw;
+    guidance_quintic_boundary(yaw_start, path->yaw_rate_radps[segment], 0.0f,
+        yaw_end, path->yaw_rate_radps[segment + 1u], 0.0f, duration_s, &yaw);
+    if (!guidance_quintic_bounds(&yaw, 0.0f, duration_s, 1u, &lower, &upper) ||
+        !isfinite(lower) || !isfinite(upper) ||
+        lower < -max_yaw_rate - M5_TIME_BOUND_TOL ||
+        upper > max_yaw_rate + M5_TIME_BOUND_TOL) return 0u;
+  }
   return 1u;
 }
 
@@ -176,6 +195,7 @@ M5TimeScalerResult m5_time_scaler_build(
   M5TimeScaledPath candidate;
   float velocity_limit[3], acceleration_limit[3], jerk_limit[3];
   float max_linear_velocity = 0.0f, max_linear_acceleration = 0.0f;
+  float max_yaw_rate = 0.0f;
   uint32_t total_duration_us = 0u;
   unsigned segment, axis;
   if (output != NULL) memset(output, 0, sizeof(*output));
@@ -188,7 +208,8 @@ M5TimeScalerResult m5_time_scaler_build(
     return M5_TIME_SCALER_INPUT_STALE;
   if (!config_and_limits_valid(config, envelope, navigation, now_us,
                                velocity_limit, acceleration_limit, jerk_limit,
-                               &max_linear_velocity, &max_linear_acceleration) ||
+                               &max_linear_velocity, &max_linear_acceleration,
+                               &max_yaw_rate) ||
       !validate_astar_path(path))
     return M5_TIME_SCALER_INVALID_INPUT;
 
@@ -199,6 +220,8 @@ M5TimeScalerResult m5_time_scaler_build(
   for (segment = 0u; segment < path->segment_count; ++segment) {
     float required_s = M5_TIME_BIN_S;
     float distance_squared = 0.0f;
+    float yaw_delta = fabsf(remainderf(path->yaw_rad[segment + 1u] -
+        path->yaw_rad[segment], 6.28318530717958647692f));
     uint32_t ticks;
     uint32_t accepted_duration_us = 0u;
     uint8_t accepted_attempt = 0u;
@@ -214,8 +237,9 @@ M5TimeScalerResult m5_time_scaler_build(
       required_s = fmaxf(required_s,
           fmaxf(velocity_time, fmaxf(acceleration_time, jerk_time)));
     }
-    if (!isfinite(required_s) || !isfinite(distance_squared))
-      return M5_TIME_SCALER_INVALID_INPUT;
+    if (!isfinite(required_s) || !isfinite(distance_squared) ||
+        !isfinite(yaw_delta)) return M5_TIME_SCALER_INVALID_INPUT;
+    required_s = fmaxf(required_s, yaw_delta / max_yaw_rate);
     {
       float distance = sqrtf(distance_squared);
       required_s = fmaxf(required_s, distance / max_linear_velocity);
@@ -233,7 +257,8 @@ M5TimeScalerResult m5_time_scaler_build(
       duration_s = (float)duration_us * 1e-6f;
       if (segment_bounds_ok(path, segment, duration_s, velocity_limit,
                             acceleration_limit, jerk_limit,
-                            max_linear_velocity, max_linear_acceleration)) {
+                            max_linear_velocity, max_linear_acceleration,
+                            max_yaw_rate)) {
         accepted_duration_us = duration_us;
         accepted_attempt = attempt;
         break;
