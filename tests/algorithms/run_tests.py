@@ -81,18 +81,37 @@ results = {
 lock = json.loads((
     ROOT / 'middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/UPSTREAM_LOCK.json'
 ).read_text())
+if lock.get('schema_version') != 2 or lock.get('hash_algorithm') != 'git-blob-sha1':
+    raise SystemExit('Unsupported OSQP source-lock schema or hash algorithm')
 osqp_root = ROOT / 'middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/generated'
 osqp_mismatches = []
-for rel, digest in sorted(lock['files'].items()):
+for rel, entry in sorted(lock['files'].items()):
     path = osqp_root / rel
     if not path.is_file():
-        osqp_mismatches.append((rel, digest, 'MISSING'))
+        osqp_mismatches.append((rel, entry.get('git_blob_sha1', 'MISSING'), 'FILE_MISSING'))
         continue
-    actual = hashlib.sha256(path.read_bytes()).hexdigest()
-    if actual != digest:
-        osqp_mismatches.append((rel, digest, actual))
+    content = path.read_bytes()
+    git_object = b'blob ' + str(len(content)).encode('ascii') + b'\\0' + content
+    actual = hashlib.sha1(git_object).hexdigest()
+    expected = entry.get('git_blob_sha1')
+    if actual != expected:
+        osqp_mismatches.append((rel, expected, actual))
+        continue
+    provenance = entry.get('provenance')
+    if provenance == 'upstream':
+        upstream = entry.get('upstream', {})
+        if upstream.get('blob_sha1') != expected:
+            osqp_mismatches.append((rel, 'UPSTREAM_PROVENANCE_MISMATCH', upstream.get('blob_sha1')))
+    elif provenance == 'local_patch':
+        if not entry.get('upstream', {}).get('blob_sha1') or not entry.get('patch_summary'):
+            osqp_mismatches.append((rel, 'PATCH_METADATA_REQUIRED', 'MISSING'))
+    elif provenance == 'generated':
+        if not entry.get('generator'):
+            osqp_mismatches.append((rel, 'GENERATOR_METADATA_REQUIRED', 'MISSING'))
+    else:
+        osqp_mismatches.append((rel, 'KNOWN_PROVENANCE_REQUIRED', str(provenance)))
 if osqp_mismatches:
-    print('OSQP embedded source lock mismatches:')
+    print('OSQP embedded source/provenance lock mismatches:')
     for rel, expected, actual in osqp_mismatches:
         print(f'  {rel}: expected={expected} actual={actual}')
     raise SystemExit(f'{len(osqp_mismatches)} OSQP source lock mismatch(es)')

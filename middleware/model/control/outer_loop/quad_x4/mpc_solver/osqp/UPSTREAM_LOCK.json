@@ -1,62 +1,477 @@
 {
-  "version": "1.0.0",
-  "generator": "osqp Python 1.0.0",
-  "mode": 2,
-  "float": true,
-  "variables": 15,
-  "constraints": 190,
-  "p_nnz": 45,
-  "a_nnz": 702,
-  "max_iter": 80,
-  "adaptive_rho_interval": 25,
-  "license": "Apache-2.0",
-  "scaling": 0,
-  "rho_is_vec": false,
-  "local_modifications": "Symbolic index arrays const in Flash; static pointer casts; QDLDL numeric refactor verifies fixed L indices; embedded unused certificate buffers alias their delta work vectors.",
-  "source": "https://github.com/osqp/osqp/tree/v1.0.0",
+  "schema_version": 2,
+  "hash_algorithm": "git-blob-sha1",
+  "description": "Pinned provenance and exact Git blob identities for the embedded OSQP/QDLDL files used by the quad_x4 MPC solver. Git blob IDs are computed over 'blob <size>\\\\0<content>'.",
+  "upstreams": {
+    "osqp": {
+      "repository": "osqp/osqp",
+      "ref": "v1.0.0",
+      "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523"
+    },
+    "qdldl": {
+      "repository": "osqp/qdldl",
+      "ref": "v0.1.8",
+      "tree_sha": "138fdac58b9cd1c4137ff1b99152c8108a6cff5b"
+    }
+  },
   "files": {
-    "inc/private/algebra_impl.h": "959ec180af6e1423f35722a3a9e662eba97aa884d7831a37292ce602d5e3eab0",
-    "inc/private/algebra_matrix.h": "adc11ae9fea44184765fe5ed8e9c7fad84e86844e88c28863e28201a0669d6e0",
-    "inc/private/algebra_vector.h": "87676b5fb188ca7cc2fd7414185f970d43774c19464c0d537875e2a8265eac70",
-    "inc/private/auxil.h": "b8963bbcb1ba543eb9d60abacca08c6b6bb16e9746fdc562b6300b082755ead2",
-    "inc/private/csc_math.h": "f3dbf39ffaf5274b4edbe880a2fa0f8471d349b6135e7ff2ca28c6fd07709a01",
-    "inc/private/csc_utils.h": "7d63f367197793f527116fd22e8cf4ffa641d2ac8821218beea5d70b8b59a233",
-    "inc/private/error.h": "5e1cb17b4104a3b47e38afaf9ddf192def242061d748dd7957525ac45bfd2719",
-    "inc/private/glob_opts.h": "1e5dd85a2329bf90ab438b115194eb1e76ccd6b269490e046411f563097bd21d",
-    "inc/private/kkt.h": "8fb1fb76ab12276228022a53411cf71820e83b620b4680a63f88baa82173ae0d",
-    "inc/private/lin_alg.h": "ace0e4460e223bab11df2753738785bcf51caf55f144c49dfe289415e2c657bf",
-    "inc/private/printing.h": "b75ec1b7b87107d9c11df9d45b9566ca5d5fea916c6fb9e541abcf893b5ee1f6",
-    "inc/private/profilers.h": "1b2192e5bdee9abfce7695b257cc42285b3c965b2a00672db0d3a2791d2da10f",
-    "inc/private/qdldl.h": "ba6a569c47e4d951ceb3eed7b9c0344b8ccb0e4913f535da2c86372ed654823d",
-    "inc/private/qdldl_interface.h": "481622c847afe6caf1cb408ad5ed9115b0ea1383e64f466eb8d0761934cf80a1",
-    "inc/private/qdldl_types.h": "dc21275dfb431c4712646d8c229ef9ce21ff7f08086aa721e8ff68596d7ab458",
-    "inc/private/qdldl_version.h": "144db8f98b3e5f5214ade27b7d1491c196620ff9e41d4af6a0a4b443f872c9f4",
-    "inc/private/scaling.h": "b8e66bdf9fbaff7520834575a2982ff5a980ed55ed17a6479208241d456249ff",
-    "inc/private/timing.h": "ca252f4cc298ba3afeac1862a93b4cf28f2ef0d9b260b0dd3cb0af07444ddff7",
-    "inc/private/types.h": "78723a6b220966c3e1b50c396989e368649136e0cb430c95a7a4a8a26d8a3d02",
-    "inc/private/util.h": "b2a751d5f1ab76e5478db78a7c56371b683bff672e6e1f08f6b6bb0470da5e58",
-    "inc/private/version.h": "3f53be61dd463641ba05acffea1bf7c02c94d7a92e9cc26fa200046e5cec763a",
-    "inc/public/osqp.h": "8f922d456eb1cbb68be5a4950d77c5d04ca2b5efd79b1eaf363ce05372b37759",
-    "inc/public/osqp_api_constants.h": "fd51215ce5f6e57b4a9565f30b7c667c6365ab5b043ae0f3991230d7e6e4cd97",
-    "inc/public/osqp_api_functions.h": "870625312308fd22ca60b893ed2dbdfd5da831650b9d240c11502d6898440270",
-    "inc/public/osqp_api_types.h": "98b2d3825ecd272950146e75ad1a47f97acdeb0d1e154d812cdbee3333835c7d",
-    "inc/public/osqp_export_define.h": "f81ad3766bad061d92ff6a726ea8cae1b5c7a36c4472add649e7af395d195d43",
-    "osqp_configure.h": "2bb2431281dba6fae2eae6fd775d9db78c7016dd7569e3b8b4de0cec76cb45f0",
-    "quad_workspace.c": "5fc1c8dc9196c7f2264cb2abfa73d8aef2b899c5b9af9e06890d07d2713d756d",
-    "quad_workspace.h": "0d8dcc9804cfaa88bad8b305291acaea783ab54ba70a1f6501d96ebc9874f687",
-    "src/algebra_libs.c": "950cdd61ba8e1da7b2f49f0965cf42bbe63d8d4b4f99d123654f94f17384fb1b",
-    "src/auxil.c": "f1fbd7eb6cd08d04659fccd67bd8d3879b1c4e9f1a9878d15a679ff1874b4ff8",
-    "src/csc_math.c": "1e6dd624c09a707be71a725929bfeb126bf2242aa5202c369a4b32e8b91dfdc2",
-    "src/csc_utils.c": "b006ef3ad79855c2451ceb074e7424eb33e5d733f5315e4bf4db44073060594b",
-    "src/error.c": "047dc6f5555982a0d9e12db94bab65f194d78bc2cd23ad990fa9e0a97acba9fa",
-    "src/kkt.c": "3082a617c4dfb1fe4a8d73cafaa934ac2b460004bbaa34633d5fe2315613f1f1",
-    "src/matrix.c": "e4a37e550ace19105babccc6c8108507108474354fac4e8db6cabecfef42db36",
-    "src/osqp_api.c": "0f5a36cb59614c0962aa5f0793b36a40f5b100b259e615cafa9a8e4e618a0df4",
-    "src/qdldl.c": "17dc3e6c1f8e021b66725d3cd08d56970977760e0623deeb465f685b050284bb",
-    "src/qdldl_interface.c": "468c8c5e802e0575f481ab7034b1c71430a5bff94d2beedd89067c5dd4b45d71",
-    "src/scaling.c": "a4a4190a138e516d07b88dca03d9c0fc6639f37a466a77fc59cd22da2af931a2",
-    "src/util.c": "5bbaa12e7944e27cf98a12051aa61ba5179d6eac37c3ebf53cfcb979cafc8988",
-    "src/vector.c": "4eb0b9632b9f9a01434a91d0d43e7976d7311e182b5a88a384fc881e2d349ac0"
+    "inc/private/algebra_impl.h": {
+      "git_blob_sha1": "e38924cd077b9f0391704bf82e6838d6cb7347b9",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/builtin/algebra_impl.h",
+        "blob_sha1": "e38924cd077b9f0391704bf82e6838d6cb7347b9"
+      }
+    },
+    "inc/private/algebra_matrix.h": {
+      "git_blob_sha1": "336a9d82e5eb97234597f8953a7b84803a91419d",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/algebra_matrix.h",
+        "blob_sha1": "336a9d82e5eb97234597f8953a7b84803a91419d"
+      }
+    },
+    "inc/private/algebra_vector.h": {
+      "git_blob_sha1": "4759d73b2ed0dd4329dfdd0d4d2883fcd7e62092",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/algebra_vector.h",
+        "blob_sha1": "4759d73b2ed0dd4329dfdd0d4d2883fcd7e62092"
+      }
+    },
+    "inc/private/auxil.h": {
+      "git_blob_sha1": "658042eb210d530e55b0036939f2a1e606e028c4",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/auxil.h",
+        "blob_sha1": "658042eb210d530e55b0036939f2a1e606e028c4"
+      }
+    },
+    "inc/private/csc_math.h": {
+      "git_blob_sha1": "dba0fd3e8021bca774a5cdd98aef59aef124135b",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/_common/csc_math.h",
+        "blob_sha1": "dba0fd3e8021bca774a5cdd98aef59aef124135b"
+      }
+    },
+    "inc/private/csc_utils.h": {
+      "git_blob_sha1": "d953e4eeec3901c955534c2285b9adcd6c0e2d24",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/_common/csc_utils.h",
+        "blob_sha1": "d953e4eeec3901c955534c2285b9adcd6c0e2d24"
+      }
+    },
+    "inc/private/error.h": {
+      "git_blob_sha1": "866d49613fe4f6d6606ce8876c3e31cc9c737e57",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/error.h",
+        "blob_sha1": "866d49613fe4f6d6606ce8876c3e31cc9c737e57"
+      }
+    },
+    "inc/private/glob_opts.h": {
+      "git_blob_sha1": "ff7df9fd5c81c0173eca092a68c12999c48d9e85",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/glob_opts.h",
+        "blob_sha1": "ff7df9fd5c81c0173eca092a68c12999c48d9e85"
+      }
+    },
+    "inc/private/kkt.h": {
+      "git_blob_sha1": "e59feb19fbfae804e1c405c21bd4a64db8a668ce",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/_common/kkt.h",
+        "blob_sha1": "e59feb19fbfae804e1c405c21bd4a64db8a668ce"
+      }
+    },
+    "inc/private/lin_alg.h": {
+      "git_blob_sha1": "7cd2a37bbae3f5fe43dc38d5239416df0e7ce176",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/lin_alg.h",
+        "blob_sha1": "7cd2a37bbae3f5fe43dc38d5239416df0e7ce176"
+      }
+    },
+    "inc/private/printing.h": {
+      "git_blob_sha1": "fce31e2c19c2c380aa6b7ec8d53f5ff5fbdb5b31",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/printing.h",
+        "blob_sha1": "fce31e2c19c2c380aa6b7ec8d53f5ff5fbdb5b31"
+      }
+    },
+    "inc/private/profilers.h": {
+      "git_blob_sha1": "7d4f5e81cb228d8483228e5dede4c833ac2bad16",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/profilers.h",
+        "blob_sha1": "7d4f5e81cb228d8483228e5dede4c833ac2bad16"
+      }
+    },
+    "inc/private/qdldl.h": {
+      "git_blob_sha1": "6e32b0b71b955045491cc8f28d973fbe7ba4c5a9",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/qdldl",
+        "ref": "v0.1.8",
+        "tree_sha": "138fdac58b9cd1c4137ff1b99152c8108a6cff5b",
+        "path": "include/qdldl.h",
+        "blob_sha1": "6e32b0b71b955045491cc8f28d973fbe7ba4c5a9"
+      }
+    },
+    "inc/private/qdldl_interface.h": {
+      "git_blob_sha1": "41d0fa8948bc16849e75161bf6dc538824fd05ed",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/_common/lin_sys/qdldl/qdldl_interface.h",
+        "blob_sha1": "41d0fa8948bc16849e75161bf6dc538824fd05ed"
+      }
+    },
+    "inc/private/qdldl_types.h": {
+      "git_blob_sha1": "62c36756b0ffbd23830afdcad8ae28178a4ff9ba",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/_common/lin_sys/qdldl/qdldl_codegen_types.h.in",
+        "blob_sha1": "62c36756b0ffbd23830afdcad8ae28178a4ff9ba"
+      }
+    },
+    "inc/private/qdldl_version.h": {
+      "git_blob_sha1": "5d4bbf77fda181cec099bf12a2e4cae71a4e943b",
+      "provenance": "generated",
+      "template": {
+        "repository": "osqp/qdldl",
+        "ref": "v0.1.8",
+        "tree_sha": "138fdac58b9cd1c4137ff1b99152c8108a6cff5b",
+        "path": "configure/qdldl_version.h.in",
+        "blob_sha1": "fc04eca3da0c99315a4a2a78733b7bbd37e2482b"
+      },
+      "generator": "QDLDL v0.1.8 version-header generation",
+      "note": "Generated version constants are pinned to QDLDL 0.1.8."
+    },
+    "inc/private/scaling.h": {
+      "git_blob_sha1": "d047d7a2443432d60a9eb461fb109f9e7f671d7f",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/scaling.h",
+        "blob_sha1": "d047d7a2443432d60a9eb461fb109f9e7f671d7f"
+      }
+    },
+    "inc/private/timing.h": {
+      "git_blob_sha1": "8e66773a833c90b2e9f2190c0ed98662ef858f15",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/timing.h",
+        "blob_sha1": "8e66773a833c90b2e9f2190c0ed98662ef858f15"
+      }
+    },
+    "inc/private/types.h": {
+      "git_blob_sha1": "59dd6d4be4035d1fad3ac121b738400738d08436",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/types.h",
+        "blob_sha1": "59dd6d4be4035d1fad3ac121b738400738d08436"
+      }
+    },
+    "inc/private/util.h": {
+      "git_blob_sha1": "7baf1efa02b7a0cecbbfd7e69b765afd452b7306",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/util.h",
+        "blob_sha1": "7baf1efa02b7a0cecbbfd7e69b765afd452b7306"
+      }
+    },
+    "inc/private/version.h": {
+      "git_blob_sha1": "fc083cb51372a49e9b518c68e60d459db37946f6",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/private/version.h",
+        "blob_sha1": "fc083cb51372a49e9b518c68e60d459db37946f6"
+      }
+    },
+    "inc/public/osqp.h": {
+      "git_blob_sha1": "62e1de011017d37a3022d26e8466079a7bde0b99",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/public/osqp.h",
+        "blob_sha1": "62e1de011017d37a3022d26e8466079a7bde0b99"
+      }
+    },
+    "inc/public/osqp_api_constants.h": {
+      "git_blob_sha1": "11eb3a8ec2f9dbce21ecd802017a60f74f764a2f",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/public/osqp_api_constants.h",
+        "blob_sha1": "11eb3a8ec2f9dbce21ecd802017a60f74f764a2f"
+      }
+    },
+    "inc/public/osqp_api_functions.h": {
+      "git_blob_sha1": "526ce76dc8651d4a1bb77dbb63395abf07d137f8",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/public/osqp_api_functions.h",
+        "blob_sha1": "526ce76dc8651d4a1bb77dbb63395abf07d137f8"
+      }
+    },
+    "inc/public/osqp_api_types.h": {
+      "git_blob_sha1": "94d8755205952d69a7eefd5e6c608e5c804eedd5",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/public/osqp_api_types.h",
+        "blob_sha1": "94d8755205952d69a7eefd5e6c608e5c804eedd5"
+      }
+    },
+    "inc/public/osqp_export_define.h": {
+      "git_blob_sha1": "7e813022b35792a469162bec440e32b5ee29744b",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "include/public/osqp_export_define.h",
+        "blob_sha1": "7e813022b35792a469162bec440e32b5ee29744b"
+      }
+    },
+    "osqp_configure.h": {
+      "git_blob_sha1": "4cc5d802e3c6fe228b3260ea752330c10d7f7713",
+      "provenance": "generated",
+      "template": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "configure/osqp_configure.h.in",
+        "blob_sha1": "e24cecd3984d11077677a05771d83026d2cf6f53"
+      },
+      "generator": "OSQP v1.0.0 configuration generation",
+      "note": "Generated for the embedded quad_x4 solver configuration; OSQP_EMBEDDED_MODE=2, OSQP_USE_FLOAT, built-in algebra."
+    },
+    "quad_workspace.c": {
+      "git_blob_sha1": "460b84292f478822f28d2aebbb62e8cabf3facb7",
+      "provenance": "generated",
+      "generator": "OSQP v1.0.0 embedded code generation",
+      "note": "Generated MPC workspace for the quad_x4 controller QP. Workspace arrays and dimensions are part of the generated artifact; regenerate only from the reviewed QP model and solver settings."
+    },
+    "quad_workspace.h": {
+      "git_blob_sha1": "219737d95f6affb550edbcdd9a85fd81a43881ed",
+      "provenance": "generated",
+      "generator": "OSQP v1.0.0 embedded code generation",
+      "note": "Generated MPC workspace for the quad_x4 controller QP. Workspace arrays and dimensions are part of the generated artifact; regenerate only from the reviewed QP model and solver settings."
+    },
+    "src/algebra_libs.c": {
+      "git_blob_sha1": "ceb5a06ae09631f8048970f56690e03f40ea90c3",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/builtin/algebra_libs.c",
+        "blob_sha1": "ceb5a06ae09631f8048970f56690e03f40ea90c3"
+      }
+    },
+    "src/auxil.c": {
+      "git_blob_sha1": "fbca9f4d8da5535f4f46432d2f73712b3c7b403f",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "src/auxil.c",
+        "blob_sha1": "fbca9f4d8da5535f4f46432d2f73712b3c7b403f"
+      }
+    },
+    "src/csc_math.c": {
+      "git_blob_sha1": "32a5478e67c56890edcabe7a637dddeb8d2d1107",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/_common/csc_math.c",
+        "blob_sha1": "32a5478e67c56890edcabe7a637dddeb8d2d1107"
+      }
+    },
+    "src/csc_utils.c": {
+      "git_blob_sha1": "478ce92cf9b8ed85782f1598e1c15bc4657b4368",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/_common/csc_utils.c",
+        "blob_sha1": "478ce92cf9b8ed85782f1598e1c15bc4657b4368"
+      }
+    },
+    "src/error.c": {
+      "git_blob_sha1": "4cc252e445b36d6f4635784bb775003ab4a8b1c3",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "src/error.c",
+        "blob_sha1": "4cc252e445b36d6f4635784bb775003ab4a8b1c3"
+      }
+    },
+    "src/kkt.c": {
+      "git_blob_sha1": "c4f33a19f424dbf190da984aa13ac7c7205b9f79",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/_common/kkt.c",
+        "blob_sha1": "c4f33a19f424dbf190da984aa13ac7c7205b9f79"
+      }
+    },
+    "src/matrix.c": {
+      "git_blob_sha1": "b3dafc68b8a6461da35c3b97471e1eeb3c8f6d67",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/builtin/matrix.c",
+        "blob_sha1": "b3dafc68b8a6461da35c3b97471e1eeb3c8f6d67"
+      }
+    },
+    "src/osqp_api.c": {
+      "git_blob_sha1": "57b59240e968d91bac39943f8c506dac601a5d2d",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "src/osqp_api.c",
+        "blob_sha1": "57b59240e968d91bac39943f8c506dac601a5d2d"
+      }
+    },
+    "src/qdldl.c": {
+      "git_blob_sha1": "fa6b2c6387700b1fd84c326b8443895ca52c7da9",
+      "provenance": "local_patch",
+      "upstream": {
+        "repository": "osqp/qdldl",
+        "ref": "v0.1.8",
+        "tree_sha": "138fdac58b9cd1c4137ff1b99152c8108a6cff5b",
+        "path": "src/qdldl.c",
+        "blob_sha1": "59bc4eb1af52f0ca4f980b31a5f29bd968e465f6"
+      },
+      "patch_summary": "Preserves the precomputed symbolic LDL structure during numeric refactorization: the three upstream writes to Lp[0], Lp[i+1], and Li[tmpIdx] are replaced by equality checks that return -1 if the generated L structure would change."
+    },
+    "src/qdldl_interface.c": {
+      "git_blob_sha1": "6af63855f573c06cb60330dbdd3c0fa0496210f4",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/_common/lin_sys/qdldl/qdldl_interface.c",
+        "blob_sha1": "6af63855f573c06cb60330dbdd3c0fa0496210f4"
+      }
+    },
+    "src/scaling.c": {
+      "git_blob_sha1": "d93512d1c2e57018741dce175371ce27b59853c6",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "src/scaling.c",
+        "blob_sha1": "d93512d1c2e57018741dce175371ce27b59853c6"
+      }
+    },
+    "src/util.c": {
+      "git_blob_sha1": "65b34576bf136263a6e0d26a029310740363a199",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "src/util.c",
+        "blob_sha1": "65b34576bf136263a6e0d26a029310740363a199"
+      }
+    },
+    "src/vector.c": {
+      "git_blob_sha1": "1b31950fdf9b2854b288f9b8f1fcc445114fbed0",
+      "provenance": "upstream",
+      "upstream": {
+        "repository": "osqp/osqp",
+        "ref": "v1.0.0",
+        "tree_sha": "236713ce9a56c182ac3230d52108f952afce1523",
+        "path": "algebra/builtin/vector.c",
+        "blob_sha1": "1b31950fdf9b2854b288f9b8f1fcc445114fbed0"
+      }
+    }
   },
   "host_only_files": [
     "CMakeLists.txt",
@@ -65,5 +480,10 @@
     "emosqp.c",
     "setup.py"
   ],
-  "host_only_files_note": "Local pybind11 wrapper and OSQP packaging/build helpers are host tooling, not part of the embedded solver source lock."
+  "local_modifications": [
+    "src/qdldl.c: reject changes to precomputed symbolic LDL indices during numeric refactorization; exact patch is recorded in the per-file provenance entry.",
+    "quad_workspace.c: generated symbolic index arrays are const so they reside in read-only flash; API-boundary casts preserve the upstream OSQP structure ABI.",
+    "quad_workspace.c: the two OSQP infeasibility-certificate buffers alias existing delta work vectors to reduce static RAM; this is an intentional generated-workspace memory trade-off and must be regression-tested."
+  ],
+  "validation_policy": "CI verifies each checked-in embedded file against its pinned Git blob ID. Upstream-identical files must also match the pinned upstream repository tree. Local patches and generated files are explicitly identified and are not silently reclassified as upstream."
 }
