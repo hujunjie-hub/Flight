@@ -116,7 +116,7 @@ uint32_t telemetry_link_poll_rc_channels(uint16_t channels[16], uint8_t *link_qu
   return elrs_open() ? elrs_poll_channels(channels, link_quality) : 0u;
 }
 
-bool telemetry_link_send_rc_bind(void)
+bool telemetry_link_request_rc_bind(void)
 {
   return elrs_send_bind();
 }
