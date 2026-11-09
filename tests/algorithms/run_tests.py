@@ -81,12 +81,21 @@ results = {
 lock = json.loads((
     ROOT / 'middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/UPSTREAM_LOCK.json'
 ).read_text())
-for rel, digest in lock['files'].items():
-    actual = hashlib.sha256((
-        ROOT / 'middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/generated' / rel
-    ).read_bytes()).hexdigest()
+osqp_root = ROOT / 'middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/generated'
+osqp_mismatches = []
+for rel, digest in sorted(lock['files'].items()):
+    path = osqp_root / rel
+    if not path.is_file():
+        osqp_mismatches.append((rel, digest, 'MISSING'))
+        continue
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
     if actual != digest:
-        raise SystemExit(f'OSQP generated source differs from upstream lock: {rel}')
+        osqp_mismatches.append((rel, digest, actual))
+if osqp_mismatches:
+    print('OSQP embedded source lock mismatches:')
+    for rel, expected, actual in osqp_mismatches:
+        print(f'  {rel}: expected={expected} actual={actual}')
+    raise SystemExit(f'{len(osqp_mismatches)} OSQP source lock mismatch(es)')
 
 
 def run(cmd):
