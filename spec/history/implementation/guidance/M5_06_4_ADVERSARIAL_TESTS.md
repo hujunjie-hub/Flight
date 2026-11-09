@@ -41,7 +41,7 @@
 
 ## 最新证据
 
-- CI：[Run #360](https://github.com/hujunjie-hub/Flight/actions/runs/42630463108)
+- CI：[最新 Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42630463108)
 - Commit：`ffc597b12c825c0897f263502b754d7eb1c8a267`
 - M4 Host：927 / 0 failures
 - M5 Host：8,371 / 0 failures
