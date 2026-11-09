@@ -14,7 +14,6 @@
 #include "trajectory_planning/m5_local_map.h"
 #include "trajectory_planning/m5_kinodynamic_astar.h"
 #include "trajectory_planning/m5_path_smoother.h"
-#include "trajectory_planning/m5_path_smoother.h"
 
 #define T_BOOT 0x1122334455667788ull
 #define T_EPOCH 3u
