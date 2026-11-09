@@ -75,19 +75,24 @@ Status mpc_solve(const ControllerInput *in,
   float box = e->max_total_thrust_n / (1.73205080757f * cfg->mass_kg);
   ProductMotionPoint reference[20], anchor;
   int col, row, i, j, k, n;
+  Status reference_status;
   if (!model || !isfinite(box) || box < CONTROL_GRAVITY_MPS2 ||
       e->min_total_thrust_n / cfg->mass_kg > CONTROL_GRAVITY_MPS2)
     return STATUS_MODEL_OUT_OF_DOMAIN;
-  if (control_sample_reference(in->reference,
-                   in->control_time_us +
-                       (uint64_t)(cfg->actuation_preview_delay_s * 1e6f),
-                   &anchor))
-    return STATUS_STALE_DATA;
+  reference_status = control_sample_reference(
+      in->reference,
+      in->control_time_us +
+          (uint64_t)(cfg->actuation_preview_delay_s * 1e6f),
+      &anchor);
+  if (reference_status)
+    return reference_status;
   for (k = 0; k < 20; ++k) {
     uint64_t time = in->control_time_us + (uint64_t)(k + 1) * 20000u +
                     (uint64_t)(cfg->actuation_preview_delay_s * 1e6f);
-    if (control_sample_reference(in->reference, time, &reference[k]))
-      return STATUS_STALE_DATA;
+    reference_status = control_sample_reference(in->reference, time,
+                                                &reference[k]);
+    if (reference_status)
+      return reference_status;
   }
   memset(q, 0, sizeof(q));
   for (col = 0; col < 15; ++col) {

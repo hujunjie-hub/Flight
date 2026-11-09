@@ -3,8 +3,6 @@
 #include "ins_interface.h"
 #include "control_interface.h"
 #include "attitude_rate_control/controller_internal.h"
-#include "osqp.h"
-#include "quad_workspace.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -340,27 +338,10 @@ static void test_mpc_axis_and_failure_regressions() {
     f.ref.anchor.point.position_ned_m[axis] = target;
     for (auto &point : f.ref.points)
       point.point.position_ned_m[axis] = target;
-    const Status axis_status = control_outer_update(&f.in);
-    if (axis_status != STATUS_OK) {
-      std::printf("MPC axis regression axis=%d status=%u\n", axis,
-                  static_cast<unsigned>(axis_status));
-      std::printf("OSQP info status=%d iter=%d prim=%g dual=%g x=(%g,%g,%g)\n",
-                  static_cast<int>(quad_solver.info->status_val),
-                  static_cast<int>(quad_solver.info->iter),
-                  static_cast<double>(quad_solver.info->prim_res),
-                  static_cast<double>(quad_solver.info->dual_res),
-                  static_cast<double>(quad_solver.solution->x[0]),
-                  static_cast<double>(quad_solver.solution->x[1]),
-                  static_cast<double>(quad_solver.solution->x[2]));
-    }
-    CHECK(axis_status == STATUS_OK);
+    CHECK(control_outer_update(&f.in) == STATUS_OK);
     check_mpc_snapshot_feasible(f);
     MpcSnapshot snapshot{};
     CHECK(mpc_read(&snapshot));
-    if (snapshot.acceleration[axis] * target <= 0.0f)
-      std::printf("MPC axis response axis=%d target=%g accel=%g solver=%u\\n",
-                  axis, target, snapshot.acceleration[axis],
-                  snapshot.solver_status);
     CHECK(snapshot.acceleration[axis] * target > 0.0f);
   }
 
@@ -391,40 +372,8 @@ static void test_mpc_axis_and_failure_regressions() {
   Fixture invalid_reference;
   invalid_reference.ref.points[10].point.position_ned_m[0] =
       std::numeric_limits<float>::quiet_NaN();
-  uint32_t invalid_epoch = 0;
-  uint16_t invalid_mode = 0;
-  const Status validation_status = controller_validate_input(
-      &invalid_reference.in, &invalid_epoch, &invalid_mode);
-  for (unsigned sample_index = 0; sample_index < 20; ++sample_index) {
-    ProductMotionPoint sampled{};
-    const uint64_t sample_time = invalid_reference.in.control_time_us +
-        (sample_index + 1u) * 20000u +
-        static_cast<uint64_t>(m6.config.payload.actuation_preview_delay_s * 1e6f);
-    const Status sample_status =
-        control_sample_reference(&invalid_reference.ref, sample_time, &sampled);
-    if (sample_status != STATUS_OK)
-      std::printf("MPC horizon sample index=%u status=%u time=%llu\\n",
-                  sample_index, static_cast<unsigned>(sample_status),
-                  static_cast<unsigned long long>(sample_time));
-  }
-  const Status invalid_status = control_outer_update(&invalid_reference.in);
-  if (invalid_status != STATUS_NUMERIC_ERROR) {
-    ProductMotionPoint sampled{};
-    const Status sample_status = control_sample_reference(
-        &invalid_reference.ref,
-        invalid_reference.in.control_time_us + 220000u, &sampled);
-    std::printf("MPC invalid-reference status=%u validate=%u direct_sample=%u "
-                "control=%llu eval=%llu ref_sample=%llu now=%llu\\n",
-                static_cast<unsigned>(invalid_status),
-                static_cast<unsigned>(validation_status),
-                static_cast<unsigned>(sample_status),
-                static_cast<unsigned long long>(invalid_reference.in.control_time_us),
-                static_cast<unsigned long long>(invalid_reference.in.evaluation_time_us),
-                static_cast<unsigned long long>(invalid_reference.ref.header.timestamp_sample_us),
-                static_cast<unsigned long long>(clock_value.monotonic_us));
-  }
-  CHECK(invalid_status == STATUS_NUMERIC_ERROR);
-  CHECK(mpc_read(&failed));
+  CHECK(control_outer_update(&invalid_reference.in) == STATUS_NUMERIC_ERROR);
+    CHECK(mpc_read(&failed));
   CHECK(failed.expires_at_us == 0);
   CHECK(failed.solver_status == CONTROL_SOLVER_NUMERICAL_FAILURE);
 }
