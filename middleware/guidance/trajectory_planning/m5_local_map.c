@@ -360,8 +360,9 @@ Status m5_local_map_ingest(M5LocalMap *map, const NavigationSnapshot *nav,
     }
   }
   map->last_ingest_us = now_us;
-  if (map->source_deadline_us == 0u || earliest_deadline < map->source_deadline_us)
-    map->source_deadline_us = earliest_deadline;
+  /* Each non-empty batch refreshes the aggregate lease. Cells not touched by
+     this batch still age independently and become STALE after 500 ms. */
+  map->source_deadline_us = earliest_deadline;
   map->map_revision++;
   if (map->map_revision == 0u) map->map_revision = 1u;
   return STATUS_OK;
