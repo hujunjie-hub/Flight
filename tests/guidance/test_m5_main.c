@@ -1523,8 +1523,8 @@ static void test_m5_time_scaler_enforces_yaw_rate(void)
   fx.envelope.max_yaw_rate_radps = 0.5f;
   CHECK(m5_time_scaler_build(&fx.path, &fx.config, &fx.envelope,
       &fx.navigation, now, &timed) == M5_TIME_SCALER_OK);
-  CHECK(timed.attempts[0] == 4u);
-  CHECK(timed.path.offset_us[1] >= 1600000u);
+  CHECK(timed.attempts[0] == 8u);
+  CHECK(timed.path.offset_us[1] >= 4800000u);
 }
 
 static void test_m5_time_scaler_capacity_and_envelope_fail_closed(void)
