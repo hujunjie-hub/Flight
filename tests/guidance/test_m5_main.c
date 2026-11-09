@@ -2322,31 +2322,31 @@ static void test_m5_safety_work_budget_exhaustion_rejected(void)
   M5TrajectorySafetyStatus status;
   safety_fx_init(&fx, 42000000u);
 
-  /* Large but finite Host-only envelope makes every interval scan a broad,
-     fully in-map FREE voxel volume. Repetition exhausts the cell-check budget
-     without triggering an obstacle, map-edge, or dynamics rejection first. */
+  /* Host-only stress envelope: each 20ms segment sweeps a broad but fully
+     in-map FREE volume. The test targets the voxel-check counter, not a
+     collision, map-edge, or dynamics rejection. */
   for (axis = 0u; axis < 3u; ++axis) {
     fx.base.nav.core.position_ned_m[axis] = 0.0f;
     fx.base.nav.core.velocity_ned_mps[axis] = 0.0f;
     fx.base.nav.core.acceleration_ned_mps2[axis] = 0.0f;
-    fx.base.env.vehicle_extension.max_velocity_ned_mps[axis] = 250.0f;
-    fx.base.env.vehicle_extension.max_acceleration_ned_mps2[axis] = 40000.0f;
+    fx.base.env.vehicle_extension.max_velocity_ned_mps[axis] = 300.0f;
+    fx.base.env.vehicle_extension.max_acceleration_ned_mps2[axis] = 60000.0f;
   }
-  fx.base.env.max_linear_speed_mps = 250.0f;
-  fx.base.env.max_linear_accel_mps2 = 40000.0f;
+  fx.base.env.max_linear_speed_mps = 300.0f;
+  fx.base.env.max_linear_accel_mps2 = 60000.0f;
   safety_map_reset(&fx);
 
   safety_point_set(&fx.reference.anchor, 0.0f, 0.0f, 0.0f,
                    0.0f, 0.0f, 0.0f);
   for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
-    float x = (i % 2u == 0u) ? 1.1f : -1.1f;
+    float x = (i % 2u == 0u) ? 0.5f : -0.5f;
     fx.reference.points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
     safety_point_set(&fx.reference.points[i], x, 0.0f, 0.0f,
                      0.0f, 0.0f, 0.0f);
   }
 
   status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
-  printf("M5-06 budget probe: status=%u reason=%u work=%u cells=%u\\n",
+  printf("M5-06 cell-budget probe: status=%u reason=%u work=%u cells=%u\n",
       (unsigned)status, (unsigned)fx.result.reason_code,
       (unsigned)fx.result.work_units, (unsigned)fx.result.cell_checks);
   CHECK(status == M5_SAFETY_BUDGET_EXCEEDED);
