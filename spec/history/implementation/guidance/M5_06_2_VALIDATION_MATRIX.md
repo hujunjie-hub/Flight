@@ -12,16 +12,16 @@
 ## 最新 CI 证据
 
 - Workflow：Host validation
-- Run：[Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42637434996)
-- Commit：`27630aec8a0e9f982890267cc84b8de3d11148c2`
+- Run：[Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42638931948)
+- Commit：`c35e6497e483ff2c0925612786d4ca8eb6acb851`
 - 结果：**全部 jobs success**
 
 | CI 项目 | 实际结果 |
 |---|---:|
 | M4 Host | 927 checks / 0 failures |
-| M5 Host | 8,430 checks / 0 failures |
+| M5 Host | 8,458 checks / 0 failures |
 | M4/M5 Integration | 1,000 checks / 0 failures |
-| M5 ASan/UBSan | 8,430 checks / 0 failures |
+| M5 ASan/UBSan | 8,458 checks / 0 failures |
 | M4/M5 Integration ASan/UBSan | 1,000 checks / 0 failures |
 | Cortex-M7 compile and MPC RAM checks | PASS |
 | Navigation and control host tests | PASS |
@@ -50,6 +50,15 @@
 | S06-015 | track 重复 ID | INVALID | Host PASS |
 | S06-032 | track flags/source metadata 非法 | STALE | Host PASS：fail-closed |
 | S06-033 | 存在动态 track 但缺少正的加速度上界 | INVALID | Host PASS：fail-closed |
+| S06-034 | 导航 state_epoch 与参考/地图不匹配 | INVALID | Host PASS |
+| S06-035 | 导航 origin_id 与参考/地图不匹配 | INVALID | Host PASS |
+| S06-036 | 导航消息 frame_id 非 LOCAL_NED | INVALID | Host PASS |
+| S06-037 | 围栏 origin_id 与导航不匹配 | INVALID | Host PASS |
+| S06-038 | 围栏存在重复相邻顶点/退化边 | INVALID | Host PASS |
+| S06-039 | 动态 track sample 时间在未来 | STALE | Host PASS |
+| S06-040 | 动态 track sample 超过陈旧阈值 | STALE | Host PASS |
+| S06-041 | 动态 track 位置含 NaN | STALE | Host PASS |
+| S06-042 | 动态 track 半径为负值 | STALE | Host PASS |
 | S06-016 | KEEP_IN 连续轨迹越界，端点在围栏内 | GEOFENCE_VIOLATION | Host PASS |
 | S06-017 | KEEP_OUT 连续穿越，端点安全 | GEOFENCE_VIOLATION | Host PASS |
 | S06-018 | 围栏自交几何 | INVALID | Host PASS；重复顶点/边界退化待补 |
@@ -70,7 +79,7 @@
 ## 仍未关闭的审查项
 
 1. 独立复核 Bernstein 变换、浮点外向舍入和连续几何距离下界；当前不是形式化证明。
-2. 补齐导航 epoch/origin/frame 不匹配、track 过旧/未来 sample 与数值极值、围栏退化几何、工作栈容量压力、地图边界、擦边碰撞和数值极值测试。
+2. 补齐导航/围栏 frame 组合不匹配、围栏共线/零面积退化、动态速度非有限值与最大预测时域边界、工作栈容量压力、地图边界、擦边碰撞和数值极值测试。
 3. 对动态障碍物加速度上界进行更多目标类别/传感器标定和参数敏感性分析。
 4. M5-07 尚未完成，M5-06 PASS 尚未成为 M6 不可绕过的发布门禁。
 5. H723 实机仍需真实传感器标定、WCET/RTA、RAM/栈、HIL 和逐级场地安全验证。
