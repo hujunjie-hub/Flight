@@ -2671,6 +2671,96 @@ static void test_m5_safety_random_polygon_dynamic_track_fuzz(void)
   }
 }
 
+
+static void safety_set_far_dynamic_track(
+    M5DynamicTrack *track, uint32_t id, uint64_t now,
+    float x, float y, float z, float vx, float vy, float vz)
+{
+  memset(track, 0, sizeof(*track));
+  track->id = id;
+  track->source_id = 2u;
+  track->sample_us = now;
+  track->expires_us = now + M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US;
+  track->position_ned_m[0] = x;
+  track->position_ned_m[1] = y;
+  track->position_ned_m[2] = z;
+  track->velocity_ned_mps[0] = vx;
+  track->velocity_ned_mps[1] = vy;
+  track->velocity_ned_mps[2] = vz;
+  track->radius_m = 0.05f;
+  track->position_std_m = 0.01f;
+  track->velocity_std_mps = 0.01f;
+}
+
+static void test_m5_safety_multi_track_all_slots_and_fail_closed(void)
+{
+  SafetyFx fx;
+  uint32_t seed = 0x8A41D2C7u;
+  unsigned trial, i;
+
+  for (trial = 0u; trial < 16u; ++trial) {
+    unsigned track_count = 1u + (trial % M5_MAP_MAX_TRACKS);
+    uint64_t now = 67000000ull + (uint64_t)trial * 1000000ull;
+    safety_fx_init(&fx, now);
+
+    for (i = 0u; i < track_count; ++i) {
+      float sx = ((i & 1u) != 0u) ? -1.0f : 1.0f;
+      float sy = ((i & 2u) != 0u) ? -1.0f : 1.0f;
+      float x = sx * (2.8f + fabsf(safety_fuzz_signed_unit(&seed)) * 0.1f);
+      float y = sy * (2.8f + fabsf(safety_fuzz_signed_unit(&seed)) * 0.1f);
+      float vx = safety_fuzz_signed_unit(&seed) * 0.2f;
+      float vy = safety_fuzz_signed_unit(&seed) * 0.2f;
+      safety_set_far_dynamic_track(&fx.map.tracks[i],
+          400u + trial * M5_MAP_MAX_TRACKS + i, now,
+          x, y, 3.0f, vx, vy, 0.0f);
+    }
+
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+        &fx.result) == M5_SAFETY_PASS);
+    CHECK(fx.result.passed == 1u);
+    CHECK(fx.result.track_checks ==
+        track_count * PRODUCT_PREVIEW_COUNT);
+
+    /* A single future-dated member invalidates the complete multi-track set. */
+    fx.map.tracks[track_count - 1u].sample_us = now + 1u;
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+        &fx.result) == M5_SAFETY_STALE);
+    CHECK(fx.result.passed == 0u);
+  }
+
+  /* All eight slots are consumed, and duplicate identity must reject the set. */
+  safety_fx_init(&fx, 84000000u);
+  for (i = 0u; i < M5_MAP_MAX_TRACKS; ++i) {
+    float sx = ((i & 1u) != 0u) ? -1.0f : 1.0f;
+    float sy = ((i & 2u) != 0u) ? -1.0f : 1.0f;
+    safety_set_far_dynamic_track(&fx.map.tracks[i], 500u + i,
+        fx.base.now, sx * 3.0f, sy * 3.0f, 3.0f, 0.0f, 0.0f, 0.0f);
+  }
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_PASS);
+  CHECK(fx.result.track_checks ==
+      M5_MAP_MAX_TRACKS * PRODUCT_PREVIEW_COUNT);
+  fx.map.tracks[M5_MAP_MAX_TRACKS - 1u].id = fx.map.tracks[0].id;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+
+  /* One colliding member among seven distant tracks must reject the path. */
+  safety_fx_init(&fx, 85000000u);
+  for (i = 0u; i < M5_MAP_MAX_TRACKS; ++i) {
+    float sx = ((i & 1u) != 0u) ? -1.0f : 1.0f;
+    float sy = ((i & 2u) != 0u) ? -1.0f : 1.0f;
+    safety_set_far_dynamic_track(&fx.map.tracks[i], 600u + i,
+        fx.base.now, sx * 3.0f, sy * 3.0f, 3.0f, 0.0f, 0.0f, 0.0f);
+  }
+  fx.map.tracks[5].position_ned_m[0] = 0.0f;
+  fx.map.tracks[5].position_ned_m[1] = 0.0f;
+  fx.map.tracks[5].position_ned_m[2] = 0.0f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_DYNAMIC_COLLISION);
+  CHECK(fx.result.passed == 0u);
+}
+
 static void test_m5_safety_static_free_reference_passes(void)
 {
   SafetyFx fx;
@@ -3698,6 +3788,7 @@ int main(void)
     {"m5_safety_geofence_adversarial_vertices", test_m5_safety_geofence_adversarial_vertices_rejected},
     {"m5_safety_bernstein_bounds_randomized", test_m5_safety_bernstein_bounds_randomized},
     {"m5_safety_bernstein_bounds_invalid", test_m5_safety_bernstein_bounds_invalid_inputs},
+    {"m5_safety_multi_track_all_slots", test_m5_safety_multi_track_all_slots_and_fail_closed},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
