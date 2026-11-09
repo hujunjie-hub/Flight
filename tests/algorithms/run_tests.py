@@ -235,7 +235,7 @@ for target in targets:
         if ram > 32768:
             raise SystemExit(f'MPC solver static RAM exceeds 32 KiB: {ram}')
         task_source = (ROOT / 'applications/tasks/mpc/task_mpc.c').read_text()
-        stack_match = re.search(r'\\btask_mpc_stack\\s*\\[\\s*(\\d+)\\s*\\]', task_source)
+        stack_match = re.search(r'\btask_mpc_stack\s*\[\s*(\d+)\s*\]', task_source)
         if not stack_match:
             raise SystemExit('Cannot determine the statically allocated MPC worker stack')
         worker_stack = int(stack_match.group(1))
