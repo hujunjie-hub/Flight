@@ -1,5 +1,5 @@
 /*
- * M5-05 bounded Host/SIL time parameterization.
+ * M5-04 bounded Host/SIL time parameterization.
  *
  * Each segment is rebuilt from the same endpoint p/v/a boundary states. Its
  * duration grows on the 200 ms lattice until Bernstein v/a/jerk bounds pass.
@@ -44,12 +44,19 @@ static uint8_t config_and_limits_valid(const ProductGuidanceConfig *config,
                                        uint64_t now_us,
                                        float velocity_limit[3],
                                        float acceleration_limit[3],
-                                       float jerk_limit[3])
+                                       float jerk_limit[3],
+                                       float *max_linear_velocity,
+                                       float *max_linear_acceleration)
 {
   unsigned axis;
   const uint32_t required_mask = PRODUCT_ENVELOPE_VALID_VELOCITY |
       PRODUCT_ENVELOPE_VALID_ACCELERATION | PRODUCT_ENVELOPE_VALID_JERK;
   if (config == NULL || envelope == NULL || nav == NULL ||
+      max_linear_velocity == NULL || max_linear_acceleration == NULL ||
+      !isfinite(envelope->max_linear_speed_mps) ||
+      envelope->max_linear_speed_mps <= 0.0f ||
+      !isfinite(envelope->max_linear_accel_mps2) ||
+      envelope->max_linear_accel_mps2 <= 0.0f ||
       config->profile_hash != PRODUCT_PROFILE_ID ||
       config->config_version == 0u || config->parameter_hash == 0u ||
       !guidance_header_ok(&envelope->header, &nav->header,
@@ -57,6 +64,8 @@ static uint8_t config_and_limits_valid(const ProductGuidanceConfig *config,
       (envelope->vehicle_extension.valid_mask & required_mask) != required_mask)
     return 0u;
 
+  *max_linear_velocity = envelope->max_linear_speed_mps;
+  *max_linear_acceleration = envelope->max_linear_accel_mps2;
   for (axis = 0u; axis < 3u; ++axis) {
     float cfg_v = config->payload.max_velocity_ned_mps[axis];
     float cfg_a = config->payload.max_acceleration_ned_mps2[axis];
@@ -113,7 +122,8 @@ static uint8_t validate_astar_path(const M5AstarPath *path)
 
 static uint32_t round_up_time_ticks(float required_s)
 {
-  float ticks_f = ceilf(required_s / M5_TIME_BIN_S - 1e-6f);
+  /* Never round a required duration down: an extra bin is conservative. */
+  float ticks_f = ceilf(required_s / M5_TIME_BIN_S);
   if (!isfinite(ticks_f) || ticks_f < 1.0f) return 1u;
   if (ticks_f > 31.0f) return 32u;
   return (uint32_t)ticks_f;
@@ -121,8 +131,11 @@ static uint32_t round_up_time_ticks(float required_s)
 
 static uint8_t segment_bounds_ok(const M5AstarPath *path, unsigned segment,
                                  float duration_s, const float v_limit[3],
-                                 const float a_limit[3], const float j_limit[3])
+                                 const float a_limit[3], const float j_limit[3],
+                                 float max_linear_velocity,
+                                 float max_linear_acceleration)
 {
+  float velocity_squared = 0.0f, acceleration_squared = 0.0f;
   unsigned axis, derivative;
   for (axis = 0u; axis < 3u; ++axis) {
     GuidanceQuintic q;
@@ -136,14 +149,22 @@ static uint8_t segment_bounds_ok(const M5AstarPath *path, unsigned segment,
     const float limits[3] = {v_limit[axis], a_limit[axis], j_limit[axis]};
     guidance_quintic_boundary(p0, v0, a0, p1, v1, a1, duration_s, &q);
     for (derivative = 1u; derivative <= 3u; ++derivative) {
+      float bound;
       if (!guidance_quintic_bounds(&q, 0.0f, duration_s,
                                    (uint8_t)derivative, &lower, &upper) ||
           !isfinite(lower) || !isfinite(upper) ||
           lower < -limits[derivative - 1u] - M5_TIME_BOUND_TOL ||
           upper > limits[derivative - 1u] + M5_TIME_BOUND_TOL)
         return 0u;
+      bound = fmaxf(fabsf(lower), fabsf(upper));
+      if (derivative == 1u) velocity_squared += bound * bound;
+      if (derivative == 2u) acceleration_squared += bound * bound;
     }
   }
+  /* Per-axis limits do not imply the contracted 3-D vector limits. */
+  if (sqrtf(velocity_squared) > max_linear_velocity + M5_TIME_BOUND_TOL ||
+      sqrtf(acceleration_squared) >
+          max_linear_acceleration + M5_TIME_BOUND_TOL) return 0u;
   return 1u;
 }
 
@@ -154,6 +175,7 @@ M5TimeScalerResult m5_time_scaler_build(
 {
   M5TimeScaledPath candidate;
   float velocity_limit[3], acceleration_limit[3], jerk_limit[3];
+  float max_linear_velocity = 0.0f, max_linear_acceleration = 0.0f;
   uint32_t total_duration_us = 0u;
   unsigned segment, axis;
   if (output != NULL) memset(output, 0, sizeof(*output));
@@ -165,7 +187,8 @@ M5TimeScalerResult m5_time_scaler_build(
                           MSG_SAFETY_ENVELOPE, now_us))
     return M5_TIME_SCALER_INPUT_STALE;
   if (!config_and_limits_valid(config, envelope, navigation, now_us,
-                               velocity_limit, acceleration_limit, jerk_limit) ||
+                               velocity_limit, acceleration_limit, jerk_limit,
+                               &max_linear_velocity, &max_linear_acceleration) ||
       !validate_astar_path(path))
     return M5_TIME_SCALER_INVALID_INPUT;
 
@@ -175,6 +198,7 @@ M5TimeScalerResult m5_time_scaler_build(
 
   for (segment = 0u; segment < path->segment_count; ++segment) {
     float required_s = M5_TIME_BIN_S;
+    float distance_squared = 0.0f;
     uint32_t ticks;
     uint32_t accepted_duration_us = 0u;
     uint8_t accepted_attempt = 0u;
@@ -186,10 +210,18 @@ M5TimeScalerResult m5_time_scaler_build(
       velocity_time = distance / velocity_limit[axis];
       acceleration_time = sqrtf(distance / acceleration_limit[axis]);
       jerk_time = cbrtf(distance / jerk_limit[axis]);
+      distance_squared += distance * distance;
       required_s = fmaxf(required_s,
           fmaxf(velocity_time, fmaxf(acceleration_time, jerk_time)));
     }
-    if (!isfinite(required_s)) return M5_TIME_SCALER_INVALID_INPUT;
+    if (!isfinite(required_s) || !isfinite(distance_squared))
+      return M5_TIME_SCALER_INVALID_INPUT;
+    {
+      float distance = sqrtf(distance_squared);
+      required_s = fmaxf(required_s, distance / max_linear_velocity);
+      required_s = fmaxf(required_s,
+          sqrtf(distance / max_linear_acceleration));
+    }
     ticks = round_up_time_ticks(required_s);
 
     for (uint8_t attempt = 1u; attempt <= M5_TIME_SCALER_MAX_ATTEMPTS; ++attempt) {
@@ -200,7 +232,8 @@ M5TimeScalerResult m5_time_scaler_build(
       duration_us = ticks * GUIDANCE_TIME_BIN_US;
       duration_s = (float)duration_us * 1e-6f;
       if (segment_bounds_ok(path, segment, duration_s, velocity_limit,
-                            acceleration_limit, jerk_limit)) {
+                            acceleration_limit, jerk_limit,
+                            max_linear_velocity, max_linear_acceleration)) {
         accepted_duration_us = duration_us;
         accepted_attempt = attempt;
         break;
