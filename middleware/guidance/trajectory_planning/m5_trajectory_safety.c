@@ -262,6 +262,15 @@ static uint8_t validate_reference_shape(
   *proof_end_us = r->header.timestamp_sample_us + preview_us +
                   (uint64_t)in->response_delay_us;
 
+  /* The reference and authority must remain valid through the entire
+     preview plus response-delay horizon, not merely at validation time. */
+  if (r->header.valid_until_us < *proof_end_us ||
+      dir->header.valid_until_us < *proof_end_us ||
+      dir->directive_expires_at_us < *proof_end_us ||
+      env->header.valid_until_us < *proof_end_us) {
+    return 0u;
+  }
+
   if (in->map->initialized == 0u || in->map->valid == 0u ||
       in->map->degraded != 0u || in->map->reserved0 != 0u ||
       !finite3(in->map->center_ned_m) ||
