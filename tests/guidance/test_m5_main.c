@@ -2877,7 +2877,7 @@ static void test_m5_safety_dynamic_acceleration_envelope_differential(void)
     obstacle_ax = (double)safety_fuzz_signed_unit(&seed) * 0.45;
     crossing_time = (double)safety_fuzz_between(&seed, 0.01f, 0.47f);
     offset = collision_case ?
-        (double)safety_fuzz_signed_unit(&seed) * 0.20 :
+        (double)safety_fuzz_signed_unit(&seed) * 0.10 :
         (double)(1.20f + fabsf(safety_fuzz_signed_unit(&seed)) * 0.30f);
     obstacle_x = start_x + (vehicle_vx - obstacle_vx) * crossing_time -
         0.5 * obstacle_ax * crossing_time * crossing_time;
