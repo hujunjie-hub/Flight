@@ -19,6 +19,9 @@ struct Source {
   uint64_t window_start=0, last_evaluated_time=0;
   uint32_t last_evaluated_sequence=0, evaluated_kind_mask=0;
   uint32_t mapping_domain=0,mapping_epoch=0;
+  bool gap_seen=false;
+  uint32_t gap_first_sequence=0,gap_last_sequence=0,gap_reason=0;
+  uint64_t gap_last_good_time=0,gap_next_sample_time=0;
 };
 struct EstimatorCores {
   kfg::QuadCore active, shadow;
@@ -1206,15 +1209,65 @@ extern "C" Status ins_model_get_health(EstimatorHealth *out) {
 extern "C" Status ins_model_push_gap(const SensorDataGapEvent *event) {
   if (!nav_ptr || !nav.initialized)
     return STATUS_NOT_READY;
-  if (!event || !same_clock(&event->header, &nav.snapshot.header))
+  ClockInstant now{};
+  if (!event || !clock_now(now) ||
+      !header_valid(&event->header, now.monotonic_us) ||
+      !same_clock(&event->header, &nav.snapshot.header) ||
+      event->header.message_type != MSG_SENSOR_DATA_GAP_EVENT ||
+      !event->sensor_instance_id ||
+      (event->last_missing_sequence - event->first_missing_sequence) > 0x7fffffffu ||
+      (event->last_good_sample_time_us && event->next_sample_time_us &&
+       event->last_good_sample_time_us > event->next_sample_time_us))
     return STATUS_INVALID_ARGUMENT;
+
+  Source *source = find_source(event->sensor_instance_id);
+  if (!source)
+    return STATUS_NOT_PERMITTED;
+  if (source->logical_source && source->logical_source != event->header.source_id)
+    return STATUS_INVALID_ARGUMENT;
+  if (event->header.source_clock_domain_id) {
+    if (!mapping_current(event->header.source_clock_domain_id,
+                         event->header.source_mapping_epoch, now.monotonic_us))
+      return STATUS_STALE_DATA;
+  } else if (event->header.source_mapping_epoch) {
+    return STATUS_INVALID_ARGUMENT;
+  }
+
+  /* M2 may retry delivery. A gap is identified by sensor + missing range +
+     reason + sample-time endpoints, not by the transport header sequence. */
+  if (source->gap_seen &&
+      source->gap_first_sequence == event->first_missing_sequence &&
+      source->gap_last_sequence == event->last_missing_sequence &&
+      source->gap_reason == event->reason_code &&
+      source->gap_last_good_time == event->last_good_sample_time_us &&
+      source->gap_next_sample_time == event->next_sample_time_us)
+    return STATUS_OK;
+
+  source->logical_source = event->header.source_id;
+  source->gap_seen = true;
+  source->gap_first_sequence = event->first_missing_sequence;
+  source->gap_last_sequence = event->last_missing_sequence;
+  source->gap_reason = event->reason_code;
+  source->gap_last_good_time = event->last_good_sample_time_us;
+  source->gap_next_sample_time = event->next_sample_time_us;
+  clear_evidence(*source);
+
   if (event->sensor_instance_id == nav.last_imu.sensor_instance_id) {
-    nav.lost = true;
-    nav.builder.reset();
+    if (nav.ready)
+      nav.lost = true;
+    else {
+      reset_alignment();
+      nav.builder.reset();
+    }
     nav.pending = false;
-    nav.cursor.cancel(); nav.probe_cursor.cancel(); nav.probe.queued=false;
+    nav.pending_start = UINT64_MAX;
+    nav.cursor.cancel();
+    nav.probe_cursor.cancel();
+    nav.probe.queued = false;
   }
   reject(STATUS_STALE_DATA);
+  /* Publish the loss immediately; do not wait for the next periodic update. */
+  publish(now.monotonic_us);
   return STATUS_OK;
 }
 extern "C" Status

@@ -758,6 +758,59 @@ static void test_navigation() {
   CHECK(estimator_get_snapshot(&snapshot) ==
         STATUS_OK); // invalid reconfiguration is atomic
 }
+static void test_navigation_gap_event_dedup() {
+  clock_value.monotonic_us += 100000;
+  ProductEstimatorConfig config{};
+  ins_sim_config(&config);
+  CHECK(estimator_init(&config) == STATUS_OK);
+  policy(10);
+  for (unsigned i = 1; i <= 1000; ++i) {
+    clock_value.monotonic_us += 1000;
+    auto sample = imu(i);
+    const Status status = estimator_push_imu(&sample);
+    CHECK(status == (i < 1000 ? STATUS_NOT_READY : STATUS_OK));
+  }
+
+  SensorDataGapEvent gap{};
+  gap.header = header(SOURCE_IMU, FRAME_BODY_FRD);
+  gap.header.message_type = MSG_SENSOR_DATA_GAP_EVENT;
+  gap.header.sequence = 7001;
+  gap.sensor_instance_id = 10;
+  gap.first_missing_sequence = 1001;
+  gap.last_missing_sequence = 1003;
+  gap.reason_code = 1;
+  gap.last_good_sample_time_us = clock_value.monotonic_us - 1000;
+  gap.next_sample_time_us = clock_value.monotonic_us + 1000;
+
+  EstimatorHealth before{}, after{};
+  CHECK(estimator_get_health(&before) == STATUS_OK);
+  auto malformed = gap;
+  malformed.header.message_type = MSG_SENSOR_DIAGNOSTIC;
+  CHECK(estimator_push_gap(&malformed) == STATUS_INVALID_ARGUMENT);
+
+  CHECK(estimator_push_gap(&gap) == STATUS_OK);
+  NavigationCapability capability{};
+  CHECK(estimator_get_capability(&capability) == STATUS_OK);
+  CHECK(capability.capability_mask == 0);
+  CHECK(capability.solution_state == NAV_SOLUTION_INVALID);
+  CHECK(estimator_get_health(&after) == STATUS_OK);
+  CHECK(after.rejected_measurement_count ==
+        before.rejected_measurement_count + 1);
+
+  /* Same M2 gap delivered again is idempotent, including health counters. */
+  CHECK(estimator_push_gap(&gap) == STATUS_OK);
+  CHECK(estimator_get_health(&after) == STATUS_OK);
+  CHECK(after.rejected_measurement_count ==
+        before.rejected_measurement_count + 1);
+
+  auto reversed = gap;
+  reversed.header.sequence++;
+  reversed.first_missing_sequence = 1004;
+  reversed.last_missing_sequence = 1003;
+  CHECK(estimator_push_gap(&reversed) == STATUS_INVALID_ARGUMENT);
+  CHECK(estimator_stop() == STATUS_OK);
+}
+
 static void test_shadow_probation() {
   clock_value.monotonic_us=10000000;
   ProductEstimatorConfig config{};ins_sim_config(&config);
@@ -831,6 +884,7 @@ int main() {
   test_mpc_multiaxis_reference_regressions();
   test_mpc_repeated_workspace_update();
   test_navigation();
+  test_navigation_gap_event_dedup();
   test_shadow_probation();
   std::printf("controller_navigation: %u checks, %u failures\n", checks,
               failures);
