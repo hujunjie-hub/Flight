@@ -1447,6 +1447,19 @@ static void test_m5_astar_unknown_space_and_deadline_fail_closed(void)
   CHECK(!m5_local_map_voxel_state(&fx.map, M5_MAP_CELL_COUNT, now, &state));
 }
 
+static void test_m5_astar_rejects_future_stale_map_cells(void)
+{
+  PlannerFx fx;
+  const uint64_t now = 8500000u;
+  planner_fx_init(&fx, now);
+  fx.map.source_deadline_us = now + 300000u;
+  CHECK(m5_local_map_is_ready(&fx.map, &fx.navigation, now));
+  CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
+      &fx.path, &fx.stats) != M5_PLANNER_OK);
+  CHECK(fx.path.segment_count == 0u);
+  CHECK(fx.stats.rejected_edges > 0u);
+}
+
 static void test_m5_astar_rejects_stale_map_and_obstacle_barrier(void)
 {
   PlannerFx fx;
@@ -1535,6 +1548,7 @@ int main(void)
     {"m5_astar_key_primitives", test_m5_kinodynamic_key_and_primitive_manifest},
     {"m5_astar_one_edge_deterministic", test_m5_astar_finds_deterministic_one_edge_path},
     {"m5_astar_unknown_deadline", test_m5_astar_unknown_space_and_deadline_fail_closed},
+    {"m5_astar_future_stale_map", test_m5_astar_rejects_future_stale_map_cells},
     {"m5_astar_stale_obstacle_barrier", test_m5_astar_rejects_stale_map_and_obstacle_barrier},
   };
   size_t i;
