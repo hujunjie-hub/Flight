@@ -2324,39 +2324,32 @@ static void test_m5_safety_dfs_work_unit_budget_exhaustion(void)
   M5TrajectorySafetyStatus status;
   safety_fx_init(&fx, 43000000u);
 
-  /* A single UNKNOWN voxel sits just outside the true inflated path. Each
-     coarse interval is unresolved, but depth-3 subdivision proves clearance.
-     Repeating this over 24 intervals exhausts DFS work units, not cell checks. */
+  /* Constant 0.5m/s path passes 0.2mm outside the inflated UNKNOWN voxel.
+     Each 20ms interval needs depth-5 subdivision to prove clearance; repeated
+     intervals exhaust the DFS work-unit budget before the voxel-check budget. */
   fx.base.nav.core.position_ned_m[0] = 0.0f;
-  fx.base.nav.core.position_ned_m[1] = 0.25f;
+  fx.base.nav.core.position_ned_m[1] = 0.3498f;
   fx.base.nav.core.position_ned_m[2] = 0.0f;
-  for (axis = 0u; axis < 3u; ++axis) {
-    fx.base.nav.core.velocity_ned_mps[axis] = 0.0f;
+  fx.base.nav.core.velocity_ned_mps[0] = 0.5f;
+  fx.base.nav.core.velocity_ned_mps[1] = 0.0f;
+  fx.base.nav.core.velocity_ned_mps[2] = 0.0f;
+  for (axis = 0u; axis < 3u; ++axis)
     fx.base.nav.core.acceleration_ned_mps2[axis] = 0.0f;
-    fx.base.env.vehicle_extension.max_velocity_ned_mps[axis] = 60.0f;
-    fx.base.env.vehicle_extension.max_acceleration_ned_mps2[axis] = 12000.0f;
-  }
-  fx.base.env.max_linear_speed_mps = 60.0f;
-  fx.base.env.max_linear_accel_mps2 = 12000.0f;
   safety_map_reset(&fx);
   CHECK(m5_local_map_world_to_voxel(&fx.map, unknown_cell, &voxel));
   fx.map.cells[voxel].state = M5_MAP_CELL_UNKNOWN;
   fx.map.cells[voxel].log_odds = 0;
   fx.map.cells[voxel].source_mask = 0u;
 
-  safety_point_set(&fx.reference.anchor, 0.0f, 0.25f, 0.0f,
-                   0.0f, 0.0f, 0.0f);
+  safety_point_set(&fx.reference.anchor, 0.0f, 0.3498f, 0.0f,
+                   0.5f, 0.0f, 0.0f);
   for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
-    float x = (i % 2u == 0u) ? 0.1f : -0.1f;
     fx.reference.points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
-    safety_point_set(&fx.reference.points[i], x, 0.25f, 0.0f,
-                     0.0f, 0.0f, 0.0f);
+    safety_point_set(&fx.reference.points[i], (float)(i + 1u) * 0.01f,
+                     0.3498f, 0.0f, 0.5f, 0.0f, 0.0f);
   }
 
   status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
-  printf("M5-06 DFS-budget probe: status=%u reason=%u work=%u cells=%u\n",
-      (unsigned)status, (unsigned)fx.result.reason_code,
-      (unsigned)fx.result.work_units, (unsigned)fx.result.cell_checks);
   CHECK(status == M5_SAFETY_BUDGET_EXCEEDED);
   CHECK(fx.result.passed == 0u);
   CHECK(fx.result.work_units == M5_SAFETY_MAX_WORK_UNITS + 1u);
