@@ -12,16 +12,16 @@
 ## 最新 CI 证据
 
 - Workflow：Host validation
-- Run：[Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42630463108)
-- Commit：`ffc597b12c825c0897f263502b754d7eb1c8a267`
+- Run：[Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/42632671853)
+- Commit：`377c877affd6fc3765113763bedb0cc20dd5cd6b`
 - 结果：**全部 jobs success**
 
 | CI 项目 | 实际结果 |
 |---|---:|
 | M4 Host | 927 checks / 0 failures |
-| M5 Host | 8,377 checks / 0 failures |
+| M5 Host | 8,384 checks / 0 failures |
 | M4/M5 Integration | 1,000 checks / 0 failures |
-| M5 ASan/UBSan | 8,377 checks / 0 failures |
+| M5 ASan/UBSan | 8,384 checks / 0 failures |
 | M4/M5 Integration ASan/UBSan | 1,000 checks / 0 failures |
 | Cortex-M7 compile and MPC RAM checks | PASS |
 | Navigation and control host tests | PASS |
@@ -54,7 +54,7 @@
 | S06-019 | 导航缺少所需 valid bit | INVALID | Host PASS；epoch/origin/frame 不匹配待补 |
 | S06-020 | response delay 超过配置上限 | INVALID | Host PASS |
 | S06-021 | 静态地图 cell-check 预算超过 8192 | BUDGET_EXCEEDED | Host PASS：8193 次时 fail-closed |
-| S06-022 | DFS work-unit 预算 256 耗尽 | BUDGET_EXCEEDED | 待补独立可达用例 |
+| S06-022 | DFS work-unit 预算 256 耗尽 | BUDGET_EXCEEDED | Host PASS：第 257 个工作单元触发 fail-closed，cell-check 预算未耗尽 |
 | S06-023 | 工作栈容量边界和最大细分压力 | CAPACITY/BUDGET 拒绝 | 待补 |
 | S06-024 | 工作栈固定 512B 编译期断言 | 编译通过 | Host/Cortex-M7 CI PASS |
 | S06-025 | Host ASan/UBSan | 无内存或未定义行为错误 | CI PASS；fuzz 待补 |
@@ -68,7 +68,7 @@
 ## 仍未关闭的审查项
 
 1. 独立复核 Bernstein 变换、浮点外向舍入和连续几何距离下界；当前不是形式化证明。
-2. 补齐导航 epoch/origin/frame 不匹配、围栏退化几何、DFS work-unit 预算耗尽、工作栈容量压力、地图边界、擦边碰撞和数值极值测试。
+2. 补齐导航 epoch/origin/frame 不匹配、围栏退化几何、工作栈容量压力、地图边界、擦边碰撞和数值极值测试。
 3. 对动态障碍物加速度上界进行更多目标类别/传感器标定和参数敏感性分析。
 4. M5-07 尚未完成，M5-06 PASS 尚未成为 M6 不可绕过的发布门禁。
 5. H723 实机仍需真实传感器标定、WCET/RTA、RAM/栈、HIL 和逐级场地安全验证。
