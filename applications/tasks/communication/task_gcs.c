@@ -151,7 +151,7 @@ static void handle_calibration_capture(const uint8_t *p, uint8_t *ack)
       snprintf(error, sizeof(error), "RC bind: stop calibration first");
     } else if (last_bind_us != 0u && now - last_bind_us < 3000000u) {
       snprintf(error, sizeof(error), "RC bind: retry in 3 seconds");
-    } else if (telemetry_link_send_rc_bind()) {
+    } else if (telemetry_link_request_rc_bind()) {
       last_bind_us = now;
       accepted = true;
       gcs_status_text(6, "CRSF bind request sent");
