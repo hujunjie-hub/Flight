@@ -173,6 +173,7 @@ static uint8_t update_free_ray(M5LocalMap *map, const ProductObstacleObservation
 {
   float delta[3], length;
   unsigned axis, count, i;
+  uint16_t previous_voxel = UINT16_MAX;
   for (axis = 0u; axis < 3u; ++axis)
     delta[axis] = o->ray_end_ned_m[axis] - o->ray_start_ned_m[axis];
   length = sqrtf(delta[0]*delta[0] + delta[1]*delta[1] + delta[2]*delta[2]);
@@ -187,8 +188,12 @@ static uint8_t update_free_ray(M5LocalMap *map, const ProductObstacleObservation
     for (axis = 0u; axis < 3u; ++axis)
       p[axis] = o->ray_start_ned_m[axis] + u * delta[axis];
     if (!m5_local_map_world_to_voxel(p, &voxel)) return 0u;
-    update_cell(map, voxel, -2, (uint16_t)o->sensor_instance_id,
-                o->header.timestamp_sample_us);
+    /* Multiple ray samples in one cell are one observation, not independent hits. */
+    if (voxel != previous_voxel) {
+      update_cell(map, voxel, -2, (uint16_t)o->sensor_instance_id,
+                  o->header.timestamp_sample_us);
+      previous_voxel = voxel;
+    }
   }
   return 1u;
 }
