@@ -41,8 +41,8 @@
 
 ## 最新证据
 
-- CI：[Run #360](https://github.com/hujunjie-hub/Flight/actions/runs/42620286760)
-- Commit：`6cf9aa117eff21c29a8985ddb93660236cad762b`
+- CI：[Run #360](https://github.com/hujunjie-hub/Flight/actions/runs/42630463108)
+- Commit：`ffc597b12c825c0897f263502b754d7eb1c8a267`
 - M4 Host：927 / 0 failures
 - M5 Host：8,371 / 0 failures
 - M4/M5 Integration：1,000 / 0 failures
@@ -52,6 +52,8 @@
 - 全部 workflow jobs：success
 
 ## 下一批必须补齐
+
+1. DFS work-unit 预算 256 耗尽与工作栈容量压力用例（当前已覆盖 cell-check 预算 8192，二者是独立计数器）。
 
 1. 导航 epoch、origin、frame 不匹配组合。
 2. 围栏重复顶点、退化边、边界擦边和垂直高度边界。
