@@ -134,15 +134,17 @@ uint8_t m5_kinodynamic_velocity_bin(uint8_t bin, float v[3])
   return 1u;
 }
 
-static uint8_t nearest_voxel(const float p[3], uint16_t *voxel)
+static uint8_t nearest_voxel(const M5LocalMap *map, const float p[3], uint16_t *voxel)
 {
   int index[3];
   unsigned axis;
-  if (p == NULL || voxel == NULL || !finite3(p)) return 0u;
+  if (map == NULL || p == NULL || voxel == NULL || !finite3(p) ||
+      !finite3(map->center_ned_m)) return 0u;
   for (axis = 0u; axis < 3u; ++axis) {
+    float relative = p[axis] - map->center_ned_m[axis];
     float coordinate;
-    if (p[axis] < -4.0f || p[axis] >= 4.0f) return 0u;
-    coordinate = (p[axis] + 3.75f) / 0.5f;
+    if (!isfinite(relative) || relative < -4.0f || relative >= 4.0f) return 0u;
+    coordinate = (relative + 3.75f) / 0.5f;
     /* Exact half-cell ties choose the smaller voxel index. */
     index[axis] = (int)ceilf(coordinate - 0.5f - 1e-7f);
     if (index[axis] < 0) index[axis] = 0;
@@ -334,7 +336,7 @@ static uint8_t node_state(const M5AstarRequest *r, const M5AstarNode *node,
   if (!m5_kinodynamic_decode_key(node->key, &voxel, velocity_bin, yaw_bin, time_bin))
     return 0u;
   if (id != 0u) {
-    m5_local_map_voxel_center(voxel, p);
+    m5_local_map_voxel_center(r->map, voxel, p);
     (void)m5_kinodynamic_velocity_bin(*velocity_bin, v);
     a[0] = a[1] = a[2] = 0.0f;
     *yaw = yaw_bin_angle(*yaw_bin);
@@ -448,8 +450,8 @@ static uint8_t make_edge(const M5AstarRequest *r, const M5AstarNode *node,
     if (primitive->kind == M5_PRIMITIVE_WAIT) average_velocity = 0.0f;
     end_position[axis] = p0[axis] + average_velocity * duration;
   }
-  if (!nearest_voxel(end_position, &end_voxel)) return 0u;
-  m5_local_map_voxel_center(end_voxel, end_position);
+  if (!nearest_voxel(r->map, end_position, &end_voxel)) return 0u;
+  m5_local_map_voxel_center(r->map, end_voxel, end_position);
 
   for (axis = 0u; axis < 3u; ++axis)
     guidance_quintic_boundary(p0[axis], v0[axis], a0[axis], end_position[axis],
@@ -658,8 +660,8 @@ static M5PlannerResult validate_request(const M5AstarRequest *r)
         !isfinite(r->guidance_config->payload.max_jerk_ned_mps3[axis]) ||
         r->guidance_config->payload.max_jerk_ned_mps3[axis] <= 0.0f) return M5_PLANNER_INVALID_INPUT;
   }
-  if (!nearest_voxel(r->start_position_ned_m, &start_voxel) ||
-      !nearest_voxel(r->goal_position_ned_m, &goal_voxel)) return M5_PLANNER_OUT_OF_RANGE;
+  if (!nearest_voxel(r->map, r->start_position_ned_m, &start_voxel) ||
+      !nearest_voxel(r->map, r->goal_position_ned_m, &goal_voxel)) return M5_PLANNER_OUT_OF_RANGE;
   if (r->map->tracks[0].id != 0u || r->map->tracks[1].id != 0u ||
       r->map->tracks[2].id != 0u || r->map->tracks[3].id != 0u ||
       r->map->tracks[4].id != 0u || r->map->tracks[5].id != 0u ||
@@ -693,7 +695,7 @@ static uint8_t add_or_update_node(const M5AstarRequest *r, M5AstarWorkspace *w,
   if (slot == M5_ASTAR_EMPTY_NODE ||
       !m5_kinodynamic_decode_key(key, &voxel, &velocity_bin, &yaw_bin, &time_bin))
     return 0u;
-  m5_local_map_voxel_center(voxel, p);
+  m5_local_map_voxel_center(r->map, voxel, p);
   yaw = yaw_bin_angle(yaw_bin);
   h = heuristic(r, p, yaw);
   if (!isfinite(h) || !isfinite(g)) return 0u;
@@ -770,7 +772,7 @@ static M5PlannerResult reconstruct_path(const M5AstarRequest *r,
                                    &velocity_bin, &yaw_bin, &time_bin) ||
         !m5_kinodynamic_velocity_bin(velocity_bin, velocity))
       return M5_PLANNER_CAPACITY_EXCEEDED;
-    m5_local_map_voxel_center(voxel, candidate.position_ned_m[i]);
+    m5_local_map_voxel_center(r->map, voxel, candidate.position_ned_m[i]);
     memcpy(candidate.velocity_ned_mps[i], velocity, sizeof(velocity));
     candidate.acceleration_ned_mps2[i][0] = 0.0f;
     candidate.acceleration_ned_mps2[i][1] = 0.0f;
@@ -820,7 +822,7 @@ M5PlannerResult m5_kinodynamic_astar_plan(const M5AstarRequest *r,
   memset(w, 0, sizeof(*w));
   for (root_id = 0u; root_id < M5_ASTAR_HASH_CAPACITY; ++root_id)
     w->hash_slots[root_id] = M5_ASTAR_EMPTY_NODE;
-  if (!nearest_voxel(r->start_position_ned_m, &root_voxel)) {
+  if (!nearest_voxel(r->map, r->start_position_ned_m, &root_voxel)) {
     stats->result = M5_PLANNER_OUT_OF_RANGE;
     return M5_PLANNER_OUT_OF_RANGE;
   }
