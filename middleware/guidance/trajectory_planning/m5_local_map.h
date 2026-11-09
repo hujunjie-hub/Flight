@@ -1,5 +1,5 @@
 /*
- * M5-02 fixed local map for Host/SIL advanced planning.
+ * M5-02 fixed-capacity rolling local map for Host/SIL advanced planning.
  *
  * This module is deliberately excluded from the H723/NONE production profile.
  * It owns copies of observations; it never retains Port input pointers.
