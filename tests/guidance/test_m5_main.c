@@ -343,6 +343,22 @@ static void test_mission_reference_and_token(void)
   CHECK(guidance_stop() == STATUS_OK);
 }
 
+static void test_mission_uses_final_time_bin_before_rejecting(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx.dir.operation_code = PRODUCT_OP_MISSION;
+  fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
+  fx_mission(&fx, 1u, 1u, 0u);
+  fx.mission.mission.waypoints[0].position_ned_m[0] = 3.25f;
+  fx.mission.mission.waypoints[0].speed_limit_mps = 1.0f;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.feasibility.feasible == 1u);
+  CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_READY);
+  CHECK(fx.out.reference.header.validity_flags != 0u);
+  CHECK(guidance_stop() == STATUS_OK);
+}
+
 static void test_mission_leg_beyond_time_window_rejected(void)
 {
   Fx fx;
@@ -1032,6 +1048,7 @@ int main(void)
     {"landing_alignment_and_speed", test_landing_aligns_and_limits_final_descent},
     {"trajectory_handoff_acceleration", test_trajectory_handoff_uses_active_reference_acceleration},
     {"mission_reference_token", test_mission_reference_and_token},
+    {"mission_final_time_bin", test_mission_uses_final_time_bin_before_rejecting},
     {"mission_leg_time_window_reject", test_mission_leg_beyond_time_window_rejected},
     {"return_time_window_reject", test_return_leg_beyond_time_window_rejected},
     {"hold_at_end_of_long_leg", test_hold_at_end_of_long_leg},
