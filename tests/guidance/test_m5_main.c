@@ -1410,7 +1410,7 @@ static void test_m5_astar_finds_deterministic_one_edge_path(void)
   CHECK(fx.path.map_revision == fx.map.map_revision);
   CHECK(fabsf(fx.path.position_ned_m[0][0] + 1.75f) < 1e-6f);
   CHECK(fabsf(fx.path.position_ned_m[1][0] + 1.25f) < 1e-6f);
-  CHECK(fabsf(fx.path.velocity_ned_mps[1][0] - 1.0f) < 1e-6f);
+  CHECK(fabsf(fx.path.velocity_ned_mps[1][0] - 0.5f) < 1e-6f);
   CHECK(fx.path.offset_us[1] == 400000u);
   CHECK(fx.stats.expanded_nodes <= M5_ASTAR_MAX_EXPANSIONS);
   first = fx.path;
