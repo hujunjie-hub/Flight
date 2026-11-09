@@ -16,9 +16,12 @@ static float quantize_duration_up(float seconds)
 {
     double ticks;
     if (!isfinite(seconds) || seconds <= 0.0f) return INFINITY;
-    ticks = ceil((double)seconds / 0.2 - 2e-7);
-    if (!isfinite(ticks) || ticks < 1.0 || ticks > 31.0) return INFINITY;
-    return (float)(ticks * 0.2);
+    {
+        const double time_bin_s = (double)GUIDANCE_TIME_BIN_US * 1e-6;
+        ticks = ceil((double)seconds / time_bin_s - 2e-7);
+        if (!isfinite(ticks) || ticks < 1.0 || ticks > GUIDANCE_MAX_TIME_BINS) return INFINITY;
+        return (float)(ticks * time_bin_s);
+    }
 }
 
 static uint8_t target(const GuidanceInput *in, GuidanceState *s, float p[3], float *yaw)
