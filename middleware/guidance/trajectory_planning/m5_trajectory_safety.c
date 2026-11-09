@@ -822,7 +822,10 @@ static uint8_t compute_inflation(
   const NavigationSnapshot *nav = in->navigation;
   float position_std[3], velocity_std[3];
   float home_std[3] = {0.0f, 0.0f, 0.0f};
+  /* Bound uncertainty at the far edge of this sub-interval and through
+     the response delay, not only at the interval midpoint. */
   double uncertainty_horizon = (double)horizon_mid_s +
+      (double)curve->half_duration_s +
       (double)in->response_delay_us * 1e-6;
   double delay_s = (double)in->response_delay_us * 1e-6;
   unsigned axis;
