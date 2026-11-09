@@ -2399,6 +2399,72 @@ static void test_m5_safety_dynamic_track_negative_radius_rejected(void)
   CHECK(fx.result.passed == 0u);
 }
 
+static void test_m5_safety_dynamic_track_nonfinite_velocity_rejected(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+  safety_fx_init(&fx, 33970000u);
+  track = &fx.map.tracks[0];
+  track->id = 32u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now;
+  track->expires_us = fx.base.now + 1000000u;
+  track->velocity_ned_mps[2] = INFINITY;
+  track->radius_m = 0.05f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STALE);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_map_edge_fails_closed(void)
+{
+  SafetyFx fx;
+  unsigned i;
+  safety_fx_init(&fx, 33980000u);
+  fx.base.nav.core.position_ned_m[0] = 3.9f;
+  safety_point_set(&fx.reference.anchor, 3.9f, 0.0f, 0.0f,
+                   0.0f, 0.0f, 0.0f);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    fx.reference.points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+    safety_point_set(&fx.reference.points[i], 3.9f, 0.0f, 0.0f,
+                     0.0f, 0.0f, 0.0f);
+  }
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_UNKNOWN);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_geofence_collinear_vertices_rejected(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 40550000u);
+  fill_header(&fx.fence.header, MSG_PRODUCT_GEOFENCE_SNAPSHOT,
+              SOURCE_M4, fx.base.now);
+  fx.fence.fence_id = 6u;
+  fx.fence.frame_id = FRAME_LOCAL_NED;
+  fx.fence.origin_id = T_ORIGIN;
+  fx.fence.state_epoch = T_STATE_EPOCH;
+  fx.fence.validity = PRODUCT_GEOFENCE_VALID;
+  fx.fence.kind = PRODUCT_GEOFENCE_KEEP_IN;
+  fx.fence.vertex_count = 4u;
+  fx.fence.vertices_ne_m[0][0] = -1.0f;
+  fx.fence.vertices_ne_m[0][1] = 0.0f;
+  fx.fence.vertices_ne_m[1][0] = 0.0f;
+  fx.fence.vertices_ne_m[1][1] = 0.0f;
+  fx.fence.vertices_ne_m[2][0] = 1.0f;
+  fx.fence.vertices_ne_m[2][1] = 0.0f;
+  fx.fence.vertices_ne_m[3][0] = 2.0f;
+  fx.fence.vertices_ne_m[3][1] = 0.0f;
+  fx.fence.min_height_above_home_m = 0.0f;
+  fx.fence.max_height_above_home_m = 50.0f;
+  fx.input.geofences = &fx.fence;
+  fx.input.geofence_count = 1u;
+  CHECK(!fence_geometry_valid(&fx.fence));
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
 static void test_m5_safety_response_delay_limit_rejected(void)
 {
   SafetyFx fx;
@@ -2899,6 +2965,9 @@ int main(void)
     {"m5_safety_track_overage", test_m5_safety_dynamic_track_overage_rejected},
     {"m5_safety_track_nonfinite", test_m5_safety_dynamic_track_nonfinite_position_rejected},
     {"m5_safety_track_negative_radius", test_m5_safety_dynamic_track_negative_radius_rejected},
+    {"m5_safety_track_nonfinite_velocity", test_m5_safety_dynamic_track_nonfinite_velocity_rejected},
+    {"m5_safety_map_edge", test_m5_safety_map_edge_fails_closed},
+    {"m5_safety_fence_collinear", test_m5_safety_geofence_collinear_vertices_rejected},
     {"m5_safety_response_limit", test_m5_safety_response_delay_limit_rejected},
     {"m5_safety_preview_count", test_m5_safety_preview_count_mismatch_rejected},
     {"m5_safety_inf_reject", test_m5_safety_infinite_preview_rejected},
