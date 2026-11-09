@@ -25,16 +25,16 @@
 | S06-071 | 2,048 组随机点到 AABB 距离下界，随机半径/rounding error；面、棱、角精确接触与非法输入 | 下界不超过独立 double oracle；接触距离为 0 | Host + ASan/UBSan PASS；run 42658820703 |
 | S06-072 | 512 组动态相对运动/加速度/速度不确定度组合，每组 33 个时刻检查 sweep 上界 | 全采样相对位移≤sweep 上界；非法参数拒绝 | Host + ASan/UBSan PASS；run 42658820703 |
 | S06-073 | 零位置/速度/加速度五次曲线，20ms 区间，检查 outward interval 控制点和边界 | position hull 覆盖精确零值，速度/加速度上界有效 | Host + ASan/UBSan PASS；run 42660981911 |
-| S06-074 | 64 组静态 voxel 线性扫掠差分；32 组实际碰撞、32 组安全近失；独立点到 AABB 距离 oracle | 碰撞返回 STATIC_COLLISION；净空组返回 PASS | Host + ASan/UBSan PASS；run 42718225825 |
-| S06-075 | 64 组动态障碍物恒速相对运动差分；32 组碰撞、32 组远离；解析最近接近时刻 oracle | 碰撞返回 DYNAMIC_COLLISION；安全组返回 PASS | Host + ASan/UBSan PASS；run 42718225825 |
-| S06-076 | 64 组动态障碍物有界加速度差分；实际加速度≤0.45m/s²、批准测试上界0.5m/s²；每组257个时刻独立采样 | 32 组碰撞拒绝，32 组安全轨迹 PASS | Host + ASan/UBSan PASS；run 42718225825 |
-| S06-077 | 静态占用 voxel 位于相邻 20ms 预览区间接缝；高速轨迹触发自适应细分 | STATIC_COLLISION；工作量统计包含细分工作单元 | Host + ASan/UBSan PASS；run 42718225825 |
-| S06-078 | 动态障碍物分别在自适应细分内部及 20ms 预览接缝穿越车辆轨迹 | DYNAMIC_COLLISION；不得因区间分段漏检 | Host + ASan/UBSan PASS；run 42718225825 |
+| S06-074 | 64 组静态 voxel 线性扫掠差分；32 组实际碰撞、32 组安全近失；独立点到 AABB 距离 oracle | 碰撞返回 STATIC_COLLISION；净空组返回 PASS | Host + ASan/UBSan PASS；run 42718861676 |
+| S06-075 | 64 组动态障碍物恒速相对运动差分；32 组碰撞、32 组远离；解析最近接近时刻 oracle | 碰撞返回 DYNAMIC_COLLISION；安全组返回 PASS | Host + ASan/UBSan PASS；run 42718861676 |
+| S06-076 | 64 组动态障碍物有界加速度差分；实际加速度≤0.45m/s²、批准测试上界0.5m/s²；每组257个时刻独立采样 | 32 组碰撞拒绝，32 组安全轨迹 PASS | Host + ASan/UBSan PASS；run 42718861676 |
+| S06-077 | 静态占用 voxel 位于相邻 20ms 预览区间接缝；高速轨迹触发自适应细分 | STATIC_COLLISION；工作量统计包含细分工作单元 | Host + ASan/UBSan PASS；run 42718861676 |
+| S06-078 | 动态障碍物分别在自适应细分内部及 20ms 预览接缝穿越车辆轨迹 | DYNAMIC_COLLISION；不得因区间分段漏检 | Host + ASan/UBSan PASS；run 42718861676 |
 
 ## 最新 CI 证据
 
 - Workflow：Host validation
-- Run：[Host validation #433](https://github.com/hujunjie-hub/Flight/actions/runs/42718225825)
+- Run：[Host validation #433](https://github.com/hujunjie-hub/Flight/actions/runs/42718861676)
 - Commit：`d06920f254611732fe971d5f60bfeb6431b8d6f6`
 - 结果：**全部 jobs success**
 
@@ -122,10 +122,10 @@ ARM 静态检查报告：MPC RAM 29,252 bytes、worker stack 8,192 bytes、最�
 | S06-062 | 动态障碍物有限但极大位置/速度不确定度组合导致计算界溢出 | NUMERIC_FAILURE | Host PASS；run 42650028230 |
 | S06-063 | 固定种子 32 组有效静态轨迹（位置保持在 map readiness 半径内）与 offset 单点破坏 | PASS invariant / INVALID | Host PASS；32 组有效/无效属性对；run 42650028230 |
 
-## 最新 CI 证据
+## 前序 CI 证据（S06-073 前）
 
 - Run: [Host validation #425](https://github.com/hujunjie-hub/Flight/actions/runs/42660981911)
-- Commit: `3cc58e8683d504b3f12615406d8713274054dbad`
+- Code commit: `3cc58e8683d504b3f12615406d8713274054dbad`
 - M4 Host: 927 checks / 0 failures
 - M5 Host: 260,119 checks / 0 failures
 - M4/M5 Integration: 1,000 checks / 0 failures
@@ -139,7 +139,7 @@ ARM 静态检查报告：MPC RAM 29,252 bytes、worker stack 8,192 bytes、最�
 1. 独立复核 Bernstein 变换、浮点外向舍入和连续几何距离下界；当前不是形式化证明。
 2. 已增加静态 voxel 线性扫掠、动态恒速/有界加速度相对运动的端到端差分，以及静态/动态区间接缝和自适应细分碰撞用例。下一步仍需扩展至任意五次 Hermite 曲线的独立连续距离 oracle、精确擦边/切触边界和最小反例归档；当前有限采样 oracle 不等同形式化证明。
 3. 对 interval arithmetic 的 IEEE-754/编译器舍入假设进行独立审查，并为区间运算增加可复现边界与溢出用例。
-3. 对动态障碍物加速度上界进行更多目标类别/传感器标定和参数敏感性分析。
+4. 对动态障碍物加速度上界进行更多目标类别/传感器标定和参数敏感性分析。
 4. M5-07 尚未完成，M5-06 PASS 尚未成为 M6 不可绕过的发布门禁。
 5. H723 实机仍需真实传感器标定、WCET/RTA、RAM/栈、HIL 和逐级场地安全验证。
 

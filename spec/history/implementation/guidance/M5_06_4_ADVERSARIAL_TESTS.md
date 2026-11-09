@@ -76,8 +76,8 @@
 
 ## 最新证据
 
-- CI：[Host validation #433](https://github.com/hujunjie-hub/Flight/actions/runs/42718225825)
-- Commit：`d06920f254611732fe971d5f60bfeb6431b8d6f6`
+- CI：[Host validation #433](https://github.com/hujunjie-hub/Flight/actions/runs/42718861676)
+- Docs HEAD：`595a87909b484c8c33b03c44f8d933dcff05b41f`；validated code commit：`d06920f254611732fe971d5f60bfeb6431b8d6f6`
 - M4 Host：927 / 0 failures
 - M5 Host：261,285 / 0 failures
 - M4/M5 Integration：1,000 / 0 failures
@@ -93,7 +93,7 @@
 
 ## 本轮新增测试结果
 
-S06-074..078 静态/动态端到端扫掠差分、加速度包络、预览接缝与自适应细分用例均在 run `42718225825` 的 Host/ASan/UBSan 回归通过。S06-053..063 已在新 Head 执行通过：reference/map time_epoch、directive frame、动态 sample age/预测租约、地图预测时域、围栏高度边界/退化高度、uint64 proof horizon 溢出、有限极值计算溢出及固定 seed 32 组属性测试。首轮 fixture 缺陷已修正；以上结果仅代表 Host/SIL 与 Cortex-M7 编译检查，不是 H723 实机避障放行。
+S06-074..078 静态/动态端到端扫掠差分、加速度包络、预览接缝与自适应细分用例均在 run `42718861676` 的 Host/ASan/UBSan 回归通过。S06-053..063 已在新 Head 执行通过：reference/map time_epoch、directive frame、动态 sample age/预测租约、地图预测时域、围栏高度边界/退化高度、uint64 proof horizon 溢出、有限极值计算溢出及固定 seed 32 组属性测试。首轮 fixture 缺陷已修正；以上结果仅代表 Host/SIL 与 Cortex-M7 编译检查，不是 H723 实机避障放行。
 
 ## 下一批必须补齐
 
