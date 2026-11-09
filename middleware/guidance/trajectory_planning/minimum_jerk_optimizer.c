@@ -215,8 +215,9 @@ uint8_t guidance_minimum_jerk_optimize(
     GuidanceQuintic output[GUIDANCE_MIN_JERK_MAX_SEGMENTS][3],
     double *initial_cost, double *optimized_cost)
 {
-  double total_duration = 0.0, total_initial = 0.0, total_optimized = 0.0;
+  double total_duration, total_initial = 0.0, total_optimized = 0.0;
   double scale;
+  uint16_t total_ticks = 0u;
   uint8_t axis, segment, knot, variable_count;
 
   if (output != NULL) {
@@ -257,14 +258,16 @@ uint8_t guidance_minimum_jerk_optimize(
     }
     ticks = duration / 0.2;
     nearest_ticks = floor(ticks + 0.5);
-    if (fabs(ticks - nearest_ticks) > 1e-4) {
+    if (fabs(ticks - nearest_ticks) > 1e-6 ||
+        nearest_ticks < 1.0 || nearest_ticks > 31.0) {
       return 0u;
     }
-    total_duration += duration;
+    total_ticks = (uint16_t)(total_ticks + (uint16_t)nearest_ticks);
+    if (total_ticks > 31u) {
+      return 0u;
+    }
   }
-  if (!isfinite(total_duration) || total_duration > 6.2 + 1e-5) {
-    return 0u;
-  }
+  total_duration = (double)total_ticks * 0.2;
 
   scale = total_duration / segment_count;
   if (!isfinite(scale) || scale <= 0.0) {
