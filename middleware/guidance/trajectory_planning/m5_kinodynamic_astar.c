@@ -419,7 +419,8 @@ static uint8_t dynamic_track_clear(const M5AstarRequest *r, const M5DynamicTrack
                                    float curve_t1, float elapsed_start_s)
 {
   float lo[3], hi[3], center[3], distance2 = 0.0f, speed2 = 0.0f;
-  float dt_mid, half_dt, radius;
+  float dt_mid, half_dt, radius, nav_position_std2 = 0.0f, nav_velocity_std2 = 0.0f;
+  float nav_horizon_s, nav_position_std, nav_velocity_std;
   uint64_t abs_start, abs_end, abs_mid;
   unsigned axis;
   if (track->id == 0u) return 1u;
@@ -431,9 +432,22 @@ static uint8_t dynamic_track_clear(const M5AstarRequest *r, const M5DynamicTrack
   abs_mid = abs_start + (abs_end - abs_start) / 2u;
   dt_mid = (float)(abs_mid - track->sample_us) * 1e-6f;
   half_dt = (float)(abs_end - abs_start) * 0.5e-6f;
+  for (axis = 0u; axis < 3u; ++axis) {
+    float ps = r->navigation->core.position_std_m[axis];
+    float vs = r->navigation->core.velocity_std_mps[axis];
+    if (!isfinite(ps) || ps < 0.0f || !isfinite(vs) || vs < 0.0f) return 0u;
+    nav_position_std2 += ps * ps;
+    nav_velocity_std2 += vs * vs;
+  }
+  nav_position_std = sqrtf(nav_position_std2);
+  nav_velocity_std = sqrtf(nav_velocity_std2);
+  nav_horizon_s = (float)(r->evaluation_time_us -
+      r->navigation->header.timestamp_sample_us) * 1e-6f +
+      elapsed_start_s + 0.5f * (curve_t0 + curve_t1);
   radius = track->radius_m + r->map->vehicle_radius_m + r->map->clearance_margin_m +
       r->map->uncertainty_inflation_factor *
-        (track->position_std_m + track->velocity_std_mps * dt_mid);
+        (track->position_std_m + track->velocity_std_mps * dt_mid +
+         nav_position_std + nav_horizon_s * nav_velocity_std);
   for (axis = 0u; axis < 3u; ++axis) {
     float v = track->velocity_ned_mps[axis];
     center[axis] = track->position_ned_m[axis] + v * dt_mid;
