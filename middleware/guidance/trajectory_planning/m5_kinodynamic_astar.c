@@ -4,6 +4,8 @@
  * Search state, memory, primitive ordering and tie-breaking are fixed by
  * spec/04 §7. H723/NONE does not compile or allocate this planner.
  */
+
+#if defined(FLIGHT_M5_HOST_PLANNER)
 #include <math.h>
 #include <string.h>
 #include "guidance_update/guidance_internal.h"
@@ -838,3 +840,5 @@ search_done:
   stats->result = result;
   return result;
 }
+
+#endif /* FLIGHT_M5_HOST_PLANNER */
