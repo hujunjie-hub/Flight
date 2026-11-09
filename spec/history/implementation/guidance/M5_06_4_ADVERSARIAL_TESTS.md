@@ -49,6 +49,15 @@
 
 使膨胀覆盖整个子区间最远时刻及响应延迟。动态 track 预测原本已包含子区间半宽。
 
+## 新增几何差分与组合 Fuzz（新 Head CI 待验证）
+
+- 128 个固定 seed 平面点：将 KEEP_IN/KEEP_OUT 方形围栏 clearance 与独立解析距离公式对照，误差阈值 1e-5m。
+- 16 组轻微扰动凸四边形与动态 track 联合验证，要求几何合法且连续轨迹通过。
+- 32 组动态 track 属性测试扩展：在有效 PASS 基线上分别破坏速度不确定度、预览 offset、map time_epoch、track sample timestamp，必须 fail-closed。
+- DFS 栈保护测试明确断言 29 项容量、最大深度 5、workspace≤512B，并保留前后 canary。
+
+以上为新增测试源码，待新 Head CI 执行。
+
 ## 最新证据
 
 - CI：[Host validation #405](https://github.com/hujunjie-hub/Flight/actions/runs/42650028230)
@@ -68,9 +77,10 @@ S06-053..063 已在新 Head 执行通过：reference/map time_epoch、directive 
 
 ## 下一批必须补齐
 
-1. 随机凸/凹多边形与动态 track 的组合 Fuzz，保存 seed 与最小反例。
-2. 独立几何参考实现/差分测试，复核 fence clearance、Bernstein bounds、浮点外向舍入和连续距离下界。
-3. 更大规模的动态 track 状态/时间戳组合属性测试。
+1. 执行并关闭 S06-064..066 的 Host/ASan/UBSan/ARM CI。
+2. 将解析 oracle 扩展到随机凹多边形、边界点/共线点，并保存失败 seed 与最小反例。
+3. 对 Bernstein bounds、浮点外向舍入和连续距离下界建立独立参考实现/差分测试。
+4. 扩大多 track 时间戳、预测 lease、source identity 与相对运动组合 Fuzz。
 4. 动态障碍物加速度上界的传感器/目标类别标定与参数敏感性分析。
 5. DFS 深度与最大工作栈压力；两个独立预算（work-unit、cell-check）均已由可达用例验证。
 6. 随机/属性 fuzz，并对关键几何边界建立可复现最小反例。

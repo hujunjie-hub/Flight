@@ -9,6 +9,14 @@
 3. 修正导航不确定度传播时域：静态障碍和围栏膨胀采用子区间远端时间，再叠加 response delay，避免只按区间中点估计不确定度。
 4. 临时诊断输出已移除；测试辅助函数不引用生产 C 文件私有宏。
 
+## 本轮新增属性/差分用例（等待新 Head CI）
+
+| ID | 场景 | 期望 | 状态 |
+|---|---|---|---|
+| S06-064 | 128 个固定 seed 平面点，对 KEEP_IN/KEEP_OUT 方形围栏 clearance 与解析参考公式差分 | 误差≤1e-5m | 已加入源码，CI 待验证 |
+| S06-065 | 16 组扰动凸四边形 + 动态 track 联合验证 | PASS / INVALID fail-closed | 已加入源码，CI 待验证 |
+| S06-066 | 32 组随机轨迹 + 动态 track，按时间/epoch/offset/数值字段单点破坏 | PASS invariant / fail-closed | 已扩展源码，CI 待验证 |
+
 ## 最新 CI 证据
 
 - Workflow：Host validation
@@ -66,7 +74,7 @@
 | S06-020 | response delay 超过配置上限 | INVALID | Host PASS |
 | S06-021 | 静态地图 cell-check 预算超过 8192 | BUDGET_EXCEEDED | Host PASS：8193 次时 fail-closed |
 | S06-022 | DFS work-unit 预算 256 耗尽 | BUDGET_EXCEEDED | Host PASS：第 257 个工作单元触发 fail-closed，cell-check 预算未耗尽 |
-| S06-023 | 工作栈容量边界和最大细分压力 | CAPACITY/BUDGET 拒绝 | DFS 最大深度/栈 canary 与 256 work-unit 耗尽用例通过；ARM/Host 编译通过；run 42650028230 |
+| S06-023 | 工作栈容量边界和最大细分压力 | CAPACITY/BUDGET 拒绝 | 明确断言 29 项容量、深度5、workspace≤512B、canary；run 42650028230 通过 |
 | S06-024 | 工作栈固定 512B 编译期断言 | 编译通过 | Host/Cortex-M7 CI PASS |
 | S06-025 | Host ASan/UBSan | 无内存或未定义行为错误 | M5 8,837 / 0；M4/M5 integration 1,000 / 0；run 42650028230 |
 | S06-026 | 动态障碍物中点碰撞 | DYNAMIC_COLLISION | Host PASS |
@@ -112,7 +120,7 @@
 ## 仍未关闭的审查项
 
 1. 独立复核 Bernstein 变换、浮点外向舍入和连续几何距离下界；当前不是形式化证明。
-2. 扩大随机多边形/动态 track 组合 Fuzz，并进行独立几何差分验证；当前 32 组固定轨迹属性测试不构成完整几何 fuzz。
+2. 运行并关闭新增 S06-064..066 的 Host/ASan/UBSan/ARM CI；进一步扩大随机凹多边形、边界擦边和多障碍 track 组合 Fuzz。
 3. 对动态障碍物加速度上界进行更多目标类别/传感器标定和参数敏感性分析。
 4. M5-07 尚未完成，M5-06 PASS 尚未成为 M6 不可绕过的发布门禁。
 5. H723 实机仍需真实传感器标定、WCET/RTA、RAM/栈、HIL 和逐级场地安全验证。

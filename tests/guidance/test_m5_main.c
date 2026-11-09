@@ -2227,6 +2227,7 @@ static void test_m5_safety_deterministic_property_fuzz(void)
   unsigned i;
 
   for (i = 0u; i < 32u; ++i) {
+    M5DynamicTrack *track;
     M5TrajectorySafetyStatus status;
     unsigned bad_index;
     uint64_t now = 59000000ull + (uint64_t)i * 1000000ull;
@@ -2236,6 +2237,21 @@ static void test_m5_safety_deterministic_property_fuzz(void)
 
     safety_fx_init(&fx, now);
     safety_set_constant_position(&fx, x, y, z);
+    track = &fx.map.tracks[0];
+    track->id = 100u + i;
+    track->source_id = 2u;
+    track->sample_us = now;
+    track->expires_us = now + M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US;
+    track->position_ned_m[0] = 3.0f + safety_fuzz_signed_unit(&seed) * 0.2f;
+    track->position_ned_m[1] = 3.0f + safety_fuzz_signed_unit(&seed) * 0.2f;
+    track->position_ned_m[2] = 3.0f;
+    track->velocity_ned_mps[0] = safety_fuzz_signed_unit(&seed) * 0.2f;
+    track->velocity_ned_mps[1] = safety_fuzz_signed_unit(&seed) * 0.2f;
+    track->velocity_ned_mps[2] = safety_fuzz_signed_unit(&seed) * 0.2f;
+    track->radius_m = 0.05f;
+    track->position_std_m = 0.01f;
+    track->velocity_std_mps = 0.01f;
+
     status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
     CHECK(status == M5_SAFETY_PASS);
     CHECK(fx.result.passed == 1u);
@@ -2244,13 +2260,125 @@ static void test_m5_safety_deterministic_property_fuzz(void)
         PRODUCT_PREVIEW_COUNT * PRODUCT_PREVIEW_STEP_US);
     CHECK(fx.result.work_units <= M5_SAFETY_MAX_WORK_UNITS);
     CHECK(fx.result.cell_checks <= M5_SAFETY_MAX_CELL_CHECKS);
+    CHECK(fx.result.track_checks > 0u);
 
     bad_index = (unsigned)(safety_fuzz_next(&seed) % PRODUCT_PREVIEW_COUNT);
-    fx.reference.points[bad_index].offset_us++;
+    switch (i % 4u) {
+      case 0u:
+        track->velocity_std_mps = NAN;
+        break;
+      case 1u:
+        fx.reference.points[bad_index].offset_us++;
+        break;
+      case 2u:
+        fx.map.time_epoch++;
+        break;
+      default:
+        track->sample_us = now + 1u;
+        break;
+    }
     status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
-    CHECK(status == M5_SAFETY_INVALID);
+    CHECK(status != M5_SAFETY_PASS);
     CHECK(fx.result.passed == 0u);
     CHECK(fx.result.status == (uint8_t)status);
+  }
+}
+
+static float safety_square_clearance_reference(
+    float x, float y, float half_extent, float margin, uint8_t kind)
+{
+  double ax = fabs((double)x), ay = fabs((double)y);
+  double dx = fmax(0.0, ax - half_extent);
+  double dy = fmax(0.0, ay - half_extent);
+  uint8_t inside = (uint8_t)(ax <= half_extent && ay <= half_extent);
+  double signed_clearance = inside ?
+      fmin((double)half_extent - ax, (double)half_extent - ay) :
+      -sqrt(dx * dx + dy * dy);
+  if (kind == PRODUCT_GEOFENCE_KEEP_OUT) signed_clearance = -signed_clearance;
+  return (float)(signed_clearance - margin);
+}
+
+static void test_m5_safety_geometry_clearance_reference(void)
+{
+  ProductGeofenceSnapshot fence;
+  uint32_t seed = 0x0640C1EAu;
+  unsigned i;
+  memset(&fence, 0, sizeof(fence));
+  fence.kind = PRODUCT_GEOFENCE_KEEP_IN;
+  fence.vertex_count = 4u;
+  fence.horizontal_margin_m = 0.12f;
+  fence.vertices_ne_m[0][0] = -2.0f;
+  fence.vertices_ne_m[0][1] = -2.0f;
+  fence.vertices_ne_m[1][0] = 2.0f;
+  fence.vertices_ne_m[1][1] = -2.0f;
+  fence.vertices_ne_m[2][0] = 2.0f;
+  fence.vertices_ne_m[2][1] = 2.0f;
+  fence.vertices_ne_m[3][0] = -2.0f;
+  fence.vertices_ne_m[3][1] = 2.0f;
+
+  for (i = 0u; i < 128u; ++i) {
+    float x = safety_fuzz_signed_unit(&seed) * 15.0f;
+    float y = safety_fuzz_signed_unit(&seed) * 15.0f;
+    float actual, expected;
+    fence.kind = PRODUCT_GEOFENCE_KEEP_IN;
+    actual = fence_clearance(&fence, x, y);
+    expected = safety_square_clearance_reference(
+        x, y, 2.0f, fence.horizontal_margin_m, fence.kind);
+    CHECK(isfinite(actual));
+    CHECK(fabsf(actual - expected) <= 0.00001f);
+
+    fence.kind = PRODUCT_GEOFENCE_KEEP_OUT;
+    actual = fence_clearance(&fence, x, y);
+    expected = safety_square_clearance_reference(
+        x, y, 2.0f, fence.horizontal_margin_m, fence.kind);
+    CHECK(isfinite(actual));
+    CHECK(fabsf(actual - expected) <= 0.00001f);
+  }
+}
+
+static void test_m5_safety_random_polygon_dynamic_track_fuzz(void)
+{
+  SafetyFx fx;
+  uint32_t seed = 0x65A17F03u;
+  unsigned i, vertex;
+
+  for (i = 0u; i < 16u; ++i) {
+    M5DynamicTrack *track;
+    M5TrajectorySafetyStatus status;
+    uint64_t now = 64000000ull + (uint64_t)i * 1000000ull;
+
+    safety_fx_init(&fx, now);
+    safety_set_constant_position(&fx, 0.0f, 0.0f, -1.0f);
+    safety_map_reset(&fx);
+    safety_set_keep_in_fence(&fx, 0.0f, 4.0f, 0.10f);
+    for (vertex = 0u; vertex < 4u; ++vertex) {
+      fx.fence.vertices_ne_m[vertex][0] +=
+          safety_fuzz_signed_unit(&seed) * 0.25f;
+      fx.fence.vertices_ne_m[vertex][1] +=
+          safety_fuzz_signed_unit(&seed) * 0.25f;
+    }
+
+    track = &fx.map.tracks[0];
+    track->id = 200u + i;
+    track->source_id = 2u;
+    track->sample_us = now;
+    track->expires_us = now + M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US;
+    track->position_ned_m[0] = 3.0f + safety_fuzz_signed_unit(&seed) * 0.2f;
+    track->position_ned_m[1] = 3.0f + safety_fuzz_signed_unit(&seed) * 0.2f;
+    track->position_ned_m[2] = 3.0f;
+    track->velocity_ned_mps[0] = safety_fuzz_signed_unit(&seed) * 0.2f;
+    track->velocity_ned_mps[1] = safety_fuzz_signed_unit(&seed) * 0.2f;
+    track->velocity_ned_mps[2] = safety_fuzz_signed_unit(&seed) * 0.2f;
+    track->radius_m = 0.05f;
+    track->position_std_m = 0.01f;
+    track->velocity_std_mps = 0.01f;
+
+    CHECK(fence_geometry_valid(&fx.fence));
+    status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
+    CHECK(status == M5_SAFETY_PASS);
+    CHECK(fx.result.passed == 1u);
+    CHECK(fx.result.track_checks > 0u);
+    CHECK(fx.result.geofence_checks > 0u);
   }
 }
 
@@ -2891,6 +3019,9 @@ static void test_m5_safety_dfs_max_depth_stack_guard(void)
   guarded.after = 0xA60C5AFEul;
   CHECK(M5_SAFETY_STACK_CAPACITY ==
         M5_SAFETY_INTERVAL_COUNT + M5_SAFETY_MAX_DEPTH);
+  CHECK(M5_SAFETY_STACK_CAPACITY == 29u);
+  CHECK(sizeof(guarded.workspace.stack) / sizeof(guarded.workspace.stack[0]) == 29u);
+  CHECK(sizeof(guarded.workspace) <= 512u);
   status = m5_trajectory_safety_validate(&fx.input, &guarded.workspace,
                                          &fx.result);
   CHECK(status == M5_SAFETY_UNKNOWN);
@@ -3273,6 +3404,8 @@ int main(void)
     {"m5_safety_preview_time_overflow", test_m5_safety_preview_time_overflow_rejected},
     {"m5_safety_numeric_finite_extreme", test_m5_safety_finite_numeric_extreme_rejected},
     {"m5_safety_property_fuzz", test_m5_safety_deterministic_property_fuzz},
+    {"m5_safety_geometry_clearance_reference", test_m5_safety_geometry_clearance_reference},
+    {"m5_safety_random_polygon_dynamic_track_fuzz", test_m5_safety_random_polygon_dynamic_track_fuzz},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
