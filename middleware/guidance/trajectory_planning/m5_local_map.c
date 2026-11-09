@@ -30,34 +30,85 @@ static uint8_t nav_context_valid(const NavigationSnapshot *nav, uint64_t now_us)
       h->timestamp_sample_us <= h->timestamp_publish_us &&
       h->timestamp_publish_us <= now_us && h->valid_until_us > now_us &&
       now_us - h->timestamp_sample_us <= 5000u &&
-      nav->origin_id != 0u && nav->state_epoch != 0u);
+      nav->origin_id != 0u && nav->state_epoch != 0u &&
+      finite3(nav->core.position_ned_m));
 }
 
-uint8_t m5_local_map_world_to_voxel(const float p[3], uint16_t *voxel)
+uint8_t m5_local_map_world_to_voxel(const M5LocalMap *map, const float p[3],
+                                     uint16_t *voxel)
 {
+  float relative[3];
   int ix, iy, iz;
-  if (p == NULL || voxel == NULL || !finite3(p)) return 0u;
-  if (p[0] < -M5_MAP_HALF_EXTENT_M || p[0] >= M5_MAP_HALF_EXTENT_M ||
-      p[1] < -M5_MAP_HALF_EXTENT_M || p[1] >= M5_MAP_HALF_EXTENT_M ||
-      p[2] < -M5_MAP_HALF_EXTENT_M || p[2] >= M5_MAP_HALF_EXTENT_M) return 0u;
-  ix = (int)floorf((p[0] + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
-  iy = (int)floorf((p[1] + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
-  iz = (int)floorf((p[2] + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
+  unsigned axis;
+  if (map == NULL || map->initialized == 0u || p == NULL || voxel == NULL ||
+      !finite3(p) || !finite3(map->center_ned_m)) return 0u;
+  for (axis = 0u; axis < 3u; ++axis)
+    relative[axis] = p[axis] - map->center_ned_m[axis];
+  if (relative[0] < -M5_MAP_HALF_EXTENT_M || relative[0] >= M5_MAP_HALF_EXTENT_M ||
+      relative[1] < -M5_MAP_HALF_EXTENT_M || relative[1] >= M5_MAP_HALF_EXTENT_M ||
+      relative[2] < -M5_MAP_HALF_EXTENT_M || relative[2] >= M5_MAP_HALF_EXTENT_M) return 0u;
+  ix = (int)floorf((relative[0] + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
+  iy = (int)floorf((relative[1] + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
+  iz = (int)floorf((relative[2] + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
   if (ix < 0 || iy < 0 || iz < 0 || ix >= 16 || iy >= 16 || iz >= 16) return 0u;
   *voxel = (uint16_t)((iz * 16 + iy) * 16 + ix);
   return 1u;
 }
 
-void m5_local_map_voxel_center(uint16_t voxel, float p[3])
+void m5_local_map_voxel_center(const M5LocalMap *map, uint16_t voxel, float p[3])
 {
   uint16_t ix, iy, iz;
-  if (p == NULL || voxel >= M5_MAP_CELL_COUNT) return;
+  if (map == NULL || p == NULL || voxel >= M5_MAP_CELL_COUNT) return;
   ix = (uint16_t)(voxel % 16u);
   iy = (uint16_t)((voxel / 16u) % 16u);
   iz = (uint16_t)(voxel / 256u);
-  p[0] = -3.75f + 0.5f * (float)ix;
-  p[1] = -3.75f + 0.5f * (float)iy;
-  p[2] = -3.75f + 0.5f * (float)iz;
+  p[0] = map->center_ned_m[0] - 3.75f + 0.5f * (float)ix;
+  p[1] = map->center_ned_m[1] - 3.75f + 0.5f * (float)iy;
+  p[2] = map->center_ned_m[2] - 3.75f + 0.5f * (float)iz;
+}
+
+static void roll_map_to_position(M5LocalMap *map, const float position_ned_m[3])
+{
+  M5MapCell shifted[M5_MAP_CELL_COUNT];
+  int shift[3];
+  unsigned axis, x, y, z;
+  uint8_t changed = 0u, clear_all = 0u;
+  for (axis = 0u; axis < 3u; ++axis) {
+    float delta = position_ned_m[axis] - map->center_ned_m[axis];
+    if (!isfinite(delta)) return;
+    if (fabsf(delta) >= (2.0f * M5_MAP_HALF_EXTENT_M)) {
+      clear_all = 1u;
+      shift[axis] = 0;
+    } else {
+      shift[axis] = (int)roundf(delta / M5_MAP_CELL_SIZE_M);
+      if (shift[axis] != 0) changed = 1u;
+    }
+  }
+  if (!changed && !clear_all) return;
+  if (clear_all || abs(shift[0]) >= 16 || abs(shift[1]) >= 16 || abs(shift[2]) >= 16) {
+    memset(map->cells, 0, sizeof(map->cells));
+    memcpy(map->center_ned_m, position_ned_m, sizeof(map->center_ned_m));
+  } else {
+    memset(shifted, 0, sizeof(shifted));
+    for (z = 0u; z < 16u; ++z)
+      for (y = 0u; y < 16u; ++y)
+        for (x = 0u; x < 16u; ++x) {
+          int nx = (int)x - shift[0];
+          int ny = (int)y - shift[1];
+          int nz = (int)z - shift[2];
+          if (nx >= 0 && nx < 16 && ny >= 0 && ny < 16 && nz >= 0 && nz < 16) {
+            uint16_t old_index = (uint16_t)((z * 16u + y) * 16u + x);
+            uint16_t new_index = (uint16_t)(((unsigned)nz * 16u + (unsigned)ny) * 16u +
+                                             (unsigned)nx);
+            shifted[new_index] = map->cells[old_index];
+          }
+        }
+    memcpy(map->cells, shifted, sizeof(map->cells));
+    for (axis = 0u; axis < 3u; ++axis)
+      map->center_ned_m[axis] += (float)shift[axis] * M5_MAP_CELL_SIZE_M;
+  }
+  map->map_revision++;
+  if (map->map_revision == 0u) map->map_revision = 1u;
 }
 
 static uint8_t context_matches(const M5LocalMap *map, const NavigationSnapshot *nav)
@@ -91,10 +142,12 @@ Status m5_local_map_init(M5LocalMap *map, const NavigationSnapshot *nav,
   map->vehicle_radius_m = vehicle_radius_m;
   map->clearance_margin_m = clearance_margin_m;
   map->uncertainty_inflation_factor = uncertainty_inflation_factor;
+  memcpy(map->center_ned_m, nav->core.position_ned_m, sizeof(map->center_ned_m));
   return STATUS_OK;
 }
 
-static uint8_t observation_valid(const ProductObstacleObservation *o,
+static uint8_t observation_valid(const M5LocalMap *map,
+                                 const ProductObstacleObservation *o,
                                  const NavigationSnapshot *nav, uint64_t now_us)
 {
   unsigned axis;
@@ -115,11 +168,11 @@ static uint8_t observation_valid(const ProductObstacleObservation *o,
   if (o->observation_kind == PRODUCT_OBS_FREE_SPACE_RAY) {
     uint16_t voxel;
     if (o->source_health != PRODUCT_OBS_SOURCE_NORMAL ||
-        !m5_local_map_world_to_voxel(o->ray_start_ned_m, &voxel) ||
-        !m5_local_map_world_to_voxel(o->ray_end_ned_m, &voxel)) return 0u;
+        !m5_local_map_world_to_voxel(map, o->ray_start_ned_m, &voxel) ||
+        !m5_local_map_world_to_voxel(map, o->ray_end_ned_m, &voxel)) return 0u;
   } else {
     uint16_t voxel;
-    if (!m5_local_map_world_to_voxel(o->obstacle_center_ned_m, &voxel) ||
+    if (!m5_local_map_world_to_voxel(map, o->obstacle_center_ned_m, &voxel) ||
         (o->shape_kind != PRODUCT_OBS_SHAPE_POINT &&
          o->shape_kind != PRODUCT_OBS_SHAPE_SPHERE &&
          o->shape_kind != PRODUCT_OBS_SHAPE_AABB) ||
@@ -193,7 +246,7 @@ static uint8_t update_free_ray(M5LocalMap *map, const ProductObstacleObservation
     float u = (float)i / (float)count;
     for (axis = 0u; axis < 3u; ++axis)
       p[axis] = o->ray_start_ned_m[axis] + u * delta[axis];
-    if (!m5_local_map_world_to_voxel(p, &voxel)) return 0u;
+    if (!m5_local_map_world_to_voxel(map, p, &voxel)) return 0u;
     /* Multiple ray samples in one cell are one observation, not independent hits. */
     if (voxel != previous_voxel) {
       update_cell(map, voxel, -2, (uint16_t)o->sensor_instance_id,
@@ -210,7 +263,7 @@ static uint8_t update_occupied(M5LocalMap *map, const ProductObstacleObservation
   int lo[3], hi[3];
   unsigned axis, ix, iy, iz;
   uint16_t center_voxel;
-  if (!m5_local_map_world_to_voxel(o->obstacle_center_ned_m, &center_voxel)) return 0u;
+  if (!m5_local_map_world_to_voxel(map, o->obstacle_center_ned_m, &center_voxel)) return 0u;
   if (o->shape_kind == PRODUCT_OBS_SHAPE_POINT) {
     half[0] = half[1] = half[2] = 0.0f;
   } else if (o->shape_kind == PRODUCT_OBS_SHAPE_SPHERE) {
@@ -224,8 +277,8 @@ static uint8_t update_occupied(M5LocalMap *map, const ProductObstacleObservation
     half[axis] += map->uncertainty_inflation_factor * o->position_std_m[axis];
     low[axis] = o->obstacle_center_ned_m[axis] - half[axis];
     high[axis] = o->obstacle_center_ned_m[axis] + half[axis];
-    lo[axis] = (int)floorf((low[axis] + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
-    hi[axis] = (int)floorf((high[axis] + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
+    lo[axis] = (int)floorf((low[axis] - map->center_ned_m[axis] + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
+    hi[axis] = (int)floorf((high[axis] - map->center_ned_m[axis] + M5_MAP_HALF_EXTENT_M) / M5_MAP_CELL_SIZE_M);
     if (lo[axis] < 0) lo[axis] = 0;
     if (hi[axis] > 15) hi[axis] = 15;
   }
@@ -283,6 +336,7 @@ Status m5_local_map_ingest(M5LocalMap *map, const NavigationSnapshot *nav,
   uint64_t earliest_deadline = UINT64_MAX;
   unsigned i, j;
   if (map == NULL || map->initialized == 0u) return STATUS_NOT_READY;
+  if (map->valid == 0u) return STATUS_NOT_PERMITTED;
   if (!nav_context_valid(nav, now_us)) {
     map->valid = 0u;
     return STATUS_STALE_DATA;
@@ -299,6 +353,7 @@ Status m5_local_map_ingest(M5LocalMap *map, const NavigationSnapshot *nav,
     map->valid = 0u;
     return STATUS_BUFFER_FULL;
   }
+  roll_map_to_position(map, nav->core.position_ned_m);
   if (count == 0u) return STATUS_OK;
   /* A map cannot outlive any source that contributed to its current cells.
      Once that lease expires, discard the old map before accepting a fresh batch. */
@@ -315,7 +370,7 @@ Status m5_local_map_ingest(M5LocalMap *map, const NavigationSnapshot *nav,
   for (i = 0u; i < count; ++i) {
     const ProductObstacleObservation *o = &observations[i];
     float speed2 = 0.0f;
-    if (!observation_valid(o, nav, now_us)) {
+    if (!observation_valid(map, o, nav, now_us)) {
       map->valid = 0u;
       return (o->source_health == PRODUCT_OBS_SOURCE_REJECT) ?
           STATUS_NOT_PERMITTED : STATUS_STALE_DATA;
@@ -379,6 +434,9 @@ uint8_t m5_local_map_is_ready(const M5LocalMap *map, const NavigationSnapshot *n
 {
   if (map == NULL || map->initialized == 0u || map->valid == 0u ||
       !nav_context_valid(nav, now_us) || !context_matches(map, nav) ||
+      fabsf(nav->core.position_ned_m[0] - map->center_ned_m[0]) > 0.2501f ||
+      fabsf(nav->core.position_ned_m[1] - map->center_ned_m[1]) > 0.2501f ||
+      fabsf(nav->core.position_ned_m[2] - map->center_ned_m[2]) > 0.2501f ||
       map->last_ingest_us == 0u || now_us < map->last_ingest_us ||
       now_us - map->last_ingest_us > M5_MAP_STALE_US ||
       map->source_deadline_us <= now_us ||
@@ -424,7 +482,7 @@ Status m5_local_map_query(const M5LocalMap *map, const float position[3],
 {
   uint16_t voxel;
   if (map == NULL || position == NULL || state == NULL) return STATUS_INVALID_ARGUMENT;
-  if (!m5_local_map_world_to_voxel(position, &voxel)) {
+  if (!m5_local_map_world_to_voxel(map, position, &voxel)) {
     *state = M5_MAP_CELL_INVALID;
     return STATUS_OUT_OF_RANGE;
   }
