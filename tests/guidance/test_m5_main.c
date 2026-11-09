@@ -1049,6 +1049,7 @@ static void planner_nav_init(NavigationSnapshot *nav, uint64_t now_us)
   fill_header(&nav->header, MSG_NAVIGATION_SNAPSHOT, SOURCE_M3, now_us);
   nav->state_epoch = T_STATE_EPOCH;
   nav->origin_id = T_ORIGIN;
+  nav->core.valid_mask = 0xFFu;
   nav->core.q_nb_wxyz[0] = 1.0f;
   for (axis = 0u; axis < 3u; ++axis) {
     nav->core.position_std_m[axis] = 0.01f;
