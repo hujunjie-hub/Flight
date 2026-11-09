@@ -61,6 +61,8 @@ static uint8_t config_and_limits_valid(const ProductGuidanceConfig *config,
       envelope->max_linear_accel_mps2 <= 0.0f ||
       !isfinite(envelope->max_yaw_rate_radps) ||
       envelope->max_yaw_rate_radps <= 0.0f ||
+      !isfinite(envelope->max_angular_rate_radps) ||
+      envelope->max_angular_rate_radps <= 0.0f ||
       config->profile_hash != PRODUCT_PROFILE_ID ||
       config->config_version == 0u || config->parameter_hash == 0u ||
       !guidance_header_ok(&envelope->header, &nav->header,
@@ -70,7 +72,8 @@ static uint8_t config_and_limits_valid(const ProductGuidanceConfig *config,
 
   *max_linear_velocity = envelope->max_linear_speed_mps;
   *max_linear_acceleration = envelope->max_linear_accel_mps2;
-  *max_yaw_rate = envelope->max_yaw_rate_radps;
+  *max_yaw_rate = fminf(envelope->max_yaw_rate_radps,
+                                envelope->max_angular_rate_radps);
   for (axis = 0u; axis < 3u; ++axis) {
     float cfg_v = config->payload.max_velocity_ned_mps[axis];
     float cfg_a = config->payload.max_acceleration_ned_mps2[axis];
