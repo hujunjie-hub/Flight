@@ -25,19 +25,21 @@ static uint8_t quintic_finite(const GuidanceQuintic *q)
   return 1u;
 }
 
-static M5SmootherResult validate_path(const M5AstarPath *path,
+static M5SmootherResult validate_path(const M5TimeScaledPath *timed_path,
                                       const M5LocalMap *map,
                                       const NavigationSnapshot *navigation,
                                       uint64_t now_us,
                                       uint32_t *total_duration_us)
 {
+  const M5AstarPath *path;
   uint8_t primitive_count = 0u;
   const M5KinodynamicPrimitive *primitives;
   uint32_t total = 0u;
   unsigned i;
-  if (path == NULL || map == NULL || navigation == NULL ||
+  if (timed_path == NULL || map == NULL || navigation == NULL ||
       total_duration_us == NULL || now_us == 0u)
     return M5_SMOOTHER_INVALID_INPUT;
+  path = &timed_path->path;
   if (path->segment_count == 0u) return M5_SMOOTHER_INVALID_INPUT;
   if (path->segment_count > M5_SMOOTHER_MAX_SEGMENTS)
     return M5_SMOOTHER_CAPACITY_EXCEEDED;
@@ -73,10 +75,11 @@ static M5SmootherResult validate_path(const M5AstarPath *path,
     if (duration < GUIDANCE_TIME_BIN_US ||
         duration % GUIDANCE_TIME_BIN_US != 0u ||
         duration > GUIDANCE_MAX_DURATION_US ||
-        total > GUIDANCE_MAX_DURATION_US - duration ||
-        path->primitive_index[i] >= primitive_count)
+        total > GUIDANCE_MAX_DURATION_US - duration)
       return M5_SMOOTHER_CAPACITY_EXCEEDED;
-    if (primitives[path->primitive_index[i]].duration_us != duration)
+    if (path->primitive_index[i] >= primitive_count ||
+        timed_path->attempts[i] == 0u ||
+        timed_path->attempts[i] > M5_TIME_SCALER_MAX_ATTEMPTS)
       return M5_SMOOTHER_INVALID_INPUT;
     total += duration;
   }
@@ -129,10 +132,11 @@ static uint8_t build_yaw_quintics(const M5AstarPath *path,
 }
 
 M5SmootherResult m5_path_smoother_build(
-    const M5AstarPath *path, const M5LocalMap *map,
+    const M5TimeScaledPath *timed_path, const M5LocalMap *map,
     const NavigationSnapshot *navigation, uint64_t now_us,
     GuidanceMinimumJerkWorkspace *workspace, M5SmoothedTrajectory *output)
 {
+  const M5AstarPath *path;
   M5SmoothedTrajectory candidate;
   float duration_s[M5_SMOOTHER_MAX_SEGMENTS] = {0.0f};
   double initial_cost = 0.0, optimized_cost = 0.0;
@@ -142,8 +146,10 @@ M5SmootherResult m5_path_smoother_build(
   unsigned segment;
 
   if (output != NULL) memset(output, 0, sizeof(*output));
-  if (workspace == NULL || output == NULL) return M5_SMOOTHER_INVALID_INPUT;
-  validation = validate_path(path, map, navigation, now_us, &total_duration_us);
+  if (workspace == NULL || output == NULL || timed_path == NULL)
+    return M5_SMOOTHER_INVALID_INPUT;
+  path = &timed_path->path;
+  validation = validate_path(timed_path, map, navigation, now_us, &total_duration_us);
   if (validation != M5_SMOOTHER_OK) return validation;
 
   memset(&candidate, 0, sizeof(candidate));
