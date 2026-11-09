@@ -14,6 +14,7 @@
 #include "trajectory_planning/m5_local_map.h"
 #include "trajectory_planning/m5_kinodynamic_astar.h"
 #include "trajectory_planning/m5_path_smoother.h"
+#include "trajectory_planning/m5_time_scaler.h"
 
 #define T_BOOT 0x1122334455667788ull
 #define T_EPOCH 3u
@@ -1481,14 +1482,59 @@ static void smoother_fx_path_init(PlannerFx *fx, uint64_t now_us)
   fx->path.primitive_index[1] = 3u;
 }
 
+static uint8_t smoother_fx_time_scale(PlannerFx *fx, uint64_t now_us,
+                                      M5TimeScaledPath *timed_path)
+{
+  return (uint8_t)(m5_time_scaler_build(&fx->path, &fx->config, &fx->envelope,
+      &fx->navigation, now_us, timed_path) == M5_TIME_SCALER_OK);
+}
+
+static void test_m5_time_scaler_bounded_growth(void)
+{
+  PlannerFx fx;
+  M5TimeScaledPath timed;
+  const uint64_t now = 9400000u;
+  smoother_fx_path_init(&fx, now);
+  CHECK(smoother_fx_time_scale(&fx, now, &timed));
+  CHECK(timed.path.segment_count == 2u);
+  CHECK(timed.attempts[0] == 2u && timed.attempts[1] == 2u);
+  CHECK(timed.path.offset_us[1] == 400000u);
+  CHECK(timed.path.offset_us[2] == 800000u);
+  CHECK(timed.path.total_cost_s == 0.8f);
+}
+
+static void test_m5_time_scaler_capacity_and_envelope_fail_closed(void)
+{
+  PlannerFx fx;
+  M5TimeScaledPath timed;
+  const uint64_t now = 9450000u;
+  smoother_fx_path_init(&fx, now);
+  for (unsigned axis = 0u; axis < 3u; ++axis) {
+    fx.config.payload.max_velocity_ned_mps[axis] = 0.01f;
+    fx.config.payload.max_acceleration_ned_mps2[axis] = 0.01f;
+    fx.config.payload.max_jerk_ned_mps3[axis] = 0.01f;
+    fx.envelope.vehicle_extension.max_velocity_ned_mps[axis] = 0.01f;
+    fx.envelope.vehicle_extension.max_acceleration_ned_mps2[axis] = 0.01f;
+    fx.envelope.vehicle_extension.max_jerk_ned_mps3[axis] = 0.01f;
+  }
+  CHECK(m5_time_scaler_build(&fx.path, &fx.config, &fx.envelope,
+      &fx.navigation, now, &timed) == M5_TIME_SCALER_CAPACITY_EXCEEDED);
+  smoother_fx_path_init(&fx, now);
+  fx.envelope.vehicle_extension.valid_mask &= ~PRODUCT_ENVELOPE_VALID_JERK;
+  CHECK(m5_time_scaler_build(&fx.path, &fx.config, &fx.envelope,
+      &fx.navigation, now, &timed) == M5_TIME_SCALER_INVALID_INPUT);
+}
+
 static void test_m5_smoother_minimum_jerk_continuity(void)
 {
   PlannerFx fx;
   GuidanceMinimumJerkWorkspace workspace;
+  M5TimeScaledPath timed;
   M5SmoothedTrajectory output;
   const uint64_t now = 9500000u;
   smoother_fx_path_init(&fx, now);
-  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+  CHECK(smoother_fx_time_scale(&fx, now, &timed));
+  CHECK(m5_path_smoother_build(&timed, &fx.map, &fx.navigation, now,
       &workspace, &output) == M5_SMOOTHER_OK);
   CHECK(output.segment_count == 2u);
   CHECK(output.fallback_used == 0u);
@@ -1511,19 +1557,22 @@ static void test_m5_smoother_rejects_stale_and_invalid_path(void)
 {
   PlannerFx fx;
   GuidanceMinimumJerkWorkspace workspace;
+  M5TimeScaledPath timed;
   M5SmoothedTrajectory output;
   const uint64_t now = 9600000u;
   smoother_fx_path_init(&fx, now);
-  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+  CHECK(smoother_fx_time_scale(&fx, now, &timed));
+  CHECK(m5_path_smoother_build(&timed, &fx.map, &fx.navigation, now,
       &workspace, &output) == M5_SMOOTHER_OK);
   fx.map.map_revision++;
-  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+  CHECK(m5_path_smoother_build(&timed, &fx.map, &fx.navigation, now,
       &workspace, &output) == M5_SMOOTHER_INPUT_STALE);
   CHECK(output.segment_count == 0u);
 
   smoother_fx_path_init(&fx, now);
-  fx.path.offset_us[1] = 450000u;
-  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+  CHECK(smoother_fx_time_scale(&fx, now, &timed));
+  timed.path.offset_us[1] = 450000u;
+  CHECK(m5_path_smoother_build(&timed, &fx.map, &fx.navigation, now,
       &workspace, &output) == M5_SMOOTHER_CAPACITY_EXCEEDED);
   CHECK(output.segment_count == 0u);
 }
@@ -1661,12 +1710,15 @@ static void test_m5_smoother_builds_single_edge_candidate(void)
 {
   PlannerFx fx;
   GuidanceMinimumJerkWorkspace workspace;
+  M5TimeScaledPath timed;
   M5SmoothedTrajectory output;
   const uint64_t now = 10000000u;
   planner_fx_init(&fx, now);
   CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
       &fx.path, &fx.stats) == M5_PLANNER_OK);
-  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+  CHECK(m5_time_scaler_build(&fx.path, &fx.config, &fx.envelope,
+      &fx.navigation, now, &timed) == M5_TIME_SCALER_OK);
+  CHECK(m5_path_smoother_build(&timed, &fx.map, &fx.navigation, now,
       &workspace, &output) == M5_SMOOTHER_OK);
   CHECK(output.segment_count == 1u);
   CHECK(output.fallback_used == 0u);
@@ -1686,6 +1738,7 @@ static void test_m5_smoother_optimizes_two_segment_path_continuously(void)
 {
   PlannerFx fx;
   GuidanceMinimumJerkWorkspace workspace;
+  M5TimeScaledPath timed;
   M5SmoothedTrajectory output;
   const uint64_t now = 11000000u;
   float left_velocity, right_velocity, left_acceleration, right_acceleration;
@@ -1704,7 +1757,9 @@ static void test_m5_smoother_optimizes_two_segment_path_continuously(void)
   fx.path.velocity_ned_mps[2][0] = 0.0f;
   fx.path.primitive_index[0] = 1u;
   fx.path.primitive_index[1] = 1u;
-  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+  CHECK(m5_time_scaler_build(&fx.path, &fx.config, &fx.envelope,
+      &fx.navigation, now, &timed) == M5_TIME_SCALER_OK);
+  CHECK(m5_path_smoother_build(&timed, &fx.map, &fx.navigation, now,
       &workspace, &output) == M5_SMOOTHER_OK);
   CHECK(output.segment_count == 2u && output.fallback_used == 0u);
   CHECK(output.total_duration_us == 800000u);
@@ -1723,23 +1778,26 @@ static void test_m5_smoother_rejects_stale_and_mismatched_paths(void)
 {
   PlannerFx fx;
   GuidanceMinimumJerkWorkspace workspace;
+  M5TimeScaledPath timed;
   M5SmoothedTrajectory output;
   const uint64_t now = 12000000u;
   planner_fx_init(&fx, now);
   CHECK(m5_kinodynamic_astar_plan(&fx.request, &fx.workspace,
       &fx.path, &fx.stats) == M5_PLANNER_OK);
+  CHECK(m5_time_scaler_build(&fx.path, &fx.config, &fx.envelope,
+      &fx.navigation, now, &timed) == M5_TIME_SCALER_OK);
   fx.map.map_revision++;
-  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+  CHECK(m5_path_smoother_build(&timed, &fx.map, &fx.navigation, now,
       &workspace, &output) == M5_SMOOTHER_INPUT_STALE);
   CHECK(output.segment_count == 0u);
-  fx.map.map_revision = fx.path.map_revision;
-  fx.path.offset_us[1] += 200000u;
-  fx.path.total_cost_s += 0.2f;
-  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
-      &workspace, &output) == M5_SMOOTHER_INVALID_INPUT);
+  fx.map.map_revision = timed.path.map_revision;
+  timed.path.offset_us[1] += 100000u;
+  timed.path.total_cost_s += 0.1f;
+  CHECK(m5_path_smoother_build(&timed, &fx.map, &fx.navigation, now,
+      &workspace, &output) == M5_SMOOTHER_CAPACITY_EXCEEDED);
   CHECK(output.segment_count == 0u);
-  fx.path.segment_count = (uint8_t)(M5_SMOOTHER_MAX_SEGMENTS + 1u);
-  CHECK(m5_path_smoother_build(&fx.path, &fx.map, &fx.navigation, now,
+  timed.path.segment_count = (uint8_t)(M5_SMOOTHER_MAX_SEGMENTS + 1u);
+  CHECK(m5_path_smoother_build(&timed, &fx.map, &fx.navigation, now,
       &workspace, &output) == M5_SMOOTHER_CAPACITY_EXCEEDED);
   CHECK(output.segment_count == 0u);
 }
@@ -1793,6 +1851,8 @@ int main(void)
     {"m5_map_epoch_reject", test_m5_map_epoch_reset_and_reject_source},
     {"m5_map_batch_fail_closed", test_m5_map_batch_validation_is_fail_closed},
     {"m5_astar_key_primitives", test_m5_kinodynamic_key_and_primitive_manifest},
+    {"m5_time_scaler_bounded_growth", test_m5_time_scaler_bounded_growth},
+    {"m5_time_scaler_capacity_envelope", test_m5_time_scaler_capacity_and_envelope_fail_closed},
     {"m5_smoother_minimum_jerk_continuity", test_m5_smoother_minimum_jerk_continuity},
     {"m5_smoother_stale_invalid", test_m5_smoother_rejects_stale_and_invalid_path},
     {"m5_astar_one_edge_deterministic", test_m5_astar_finds_deterministic_one_edge_path},
