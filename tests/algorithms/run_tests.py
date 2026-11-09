@@ -91,7 +91,10 @@ for rel, entry in sorted(lock['files'].items()):
         osqp_mismatches.append((rel, entry.get('git_blob_sha1', 'MISSING'), 'FILE_MISSING'))
         continue
     content = path.read_bytes()
-    git_object = b'blob ' + str(len(content)).encode('ascii') + b'\\0' + content
+    # Git object identity includes a NUL byte after the '<type> <size>' header.
+if hashlib.sha1(b'blob 3' + bytes((0,)) + b'abc').hexdigest() != 'f2ba8f84ab5c1bce84a7b441cb1959cfc7093b7f':
+    raise SystemExit('Git blob SHA-1 self-test failed')
+git_object = b'blob ' + str(len(content)).encode('ascii') + bytes((0,)) + content
     actual = hashlib.sha1(git_object).hexdigest()
     expected = entry.get('git_blob_sha1')
     if actual != expected:
