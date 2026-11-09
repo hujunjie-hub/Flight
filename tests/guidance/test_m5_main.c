@@ -2207,7 +2207,7 @@ static void test_m5_safety_finite_numeric_extreme_rejected(void)
   track->expires_us = fx.base.now + M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US;
   track->position_ned_m[0] = 3.0f;
   track->velocity_ned_mps[0] = 0.0f;
-  track->position_std_m = 2.0e38f;
+  track->position_std_m = 3.4e38f;
   track->velocity_std_mps = 3.0e38f;
   track->radius_m = 0.05f;
   CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
