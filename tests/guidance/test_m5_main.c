@@ -1954,43 +1954,201 @@ static void safety_fx_init(SafetyFx *fx, uint64_t now_us)
   fx->input.evaluation_time_us = now_us;
 }
 
+static uint8_t safety_test_header_ok(const ContractHeader *h,
+                                     const ContractHeader *nav,
+                                     uint16_t message_type,
+                                     uint64_t now_us,
+                                     uint64_t minimum_valid_until_us)
+{
+  return (uint8_t)(h != NULL && nav != NULL &&
+      h->message_type == message_type &&
+      h->profile_id == PRODUCT_PROFILE_ID &&
+      h->schema_major == CONTRACT_SCHEMA_MAJOR &&
+      h->schema_minor == CONTRACT_SCHEMA_MINOR &&
+      h->boot_id != 0u && h->boot_id == nav->boot_id &&
+      h->time_epoch != 0u && h->time_epoch == nav->time_epoch &&
+      h->frame_id == FRAME_LOCAL_NED &&
+      h->clock_domain_id == CLOCK_DOMAIN_FCU_MONOTONIC &&
+      (h->validity_flags & (VALIDITY_PAYLOAD_VALID | VALIDITY_TIME_VALID)) ==
+          (VALIDITY_PAYLOAD_VALID | VALIDITY_TIME_VALID) &&
+      h->timestamp_sample_us <= h->timestamp_publish_us &&
+      h->timestamp_publish_us <= now_us &&
+      h->valid_until_us > now_us &&
+      h->valid_until_us >= minimum_valid_until_us);
+}
+
+static void safety_test_print_shape_diagnostics(const SafetyFx *fx)
+{
+  const NavigationSnapshot *nav = &fx->base.nav;
+  const MotionReference *ref = &fx->reference;
+  const VehicleDirective *dir = &fx->base.dir;
+  const SafetyEnvelope *env = &fx->base.env;
+  const M5LocalMap *map = &fx->map;
+  const uint64_t now = fx->input.evaluation_time_us;
+  const uint64_t preview = (uint64_t)PRODUCT_PREVIEW_COUNT *
+                           PRODUCT_PREVIEW_STEP_US;
+  const uint64_t proof_end = ref->header.timestamp_sample_us + preview +
+                             fx->input.response_delay_us;
+  unsigned i, axis;
+  int nav_ok, ref_ok, dir_ok, env_ok, envelope_ok, map_ok;
+  int anchor_ok, anchor_match, points_ok = 1, grid_ok = 1, ttl_ok;
+  int nav_data_ok, directive_data_ok, ref_data_ok;
+  nav_ok = safety_test_header_ok(&nav->header, &nav->header,
+      MSG_NAVIGATION_SNAPSHOT, now, now + 1u);
+  ref_ok = safety_test_header_ok(&ref->header, &nav->header,
+      MSG_MOTION_REFERENCE, now, now + 1u);
+  dir_ok = safety_test_header_ok(&dir->header, &nav->header,
+      MSG_VEHICLE_DIRECTIVE, now, now + 1u);
+  env_ok = safety_test_header_ok(&env->header, &nav->header,
+      MSG_SAFETY_ENVELOPE, now, now + 1u);
+  nav_data_ok = nav->header.timestamp_sample_us <= now &&
+      now - nav->header.timestamp_sample_us <= 5000u &&
+      nav->state_epoch != 0u && nav->origin_id != 0u &&
+      (nav->core.valid_mask & (NAV_VALID_HORIZONTAL_POSITION |
+       NAV_VALID_VERTICAL_POSITION | NAV_VALID_HORIZONTAL_VELOCITY |
+       NAV_VALID_VERTICAL_VELOCITY | NAV_VALID_ACCELERATION)) ==
+       (NAV_VALID_HORIZONTAL_POSITION | NAV_VALID_VERTICAL_POSITION |
+        NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY |
+        NAV_VALID_ACCELERATION) &&
+      isfinite(nav->core.position_ned_m[0]) &&
+      isfinite(nav->core.position_ned_m[1]) &&
+      isfinite(nav->core.position_ned_m[2]) &&
+      isfinite(nav->core.velocity_ned_mps[0]) &&
+      isfinite(nav->core.velocity_ned_mps[1]) &&
+      isfinite(nav->core.velocity_ned_mps[2]) &&
+      isfinite(nav->core.acceleration_ned_mps2[0]) &&
+      isfinite(nav->core.acceleration_ned_mps2[1]) &&
+      isfinite(nav->core.acceleration_ned_mps2[2]) &&
+      isfinite(nav->core.position_std_m[0]) &&
+      isfinite(nav->core.position_std_m[1]) &&
+      isfinite(nav->core.position_std_m[2]) &&
+      isfinite(nav->core.velocity_std_mps[0]) &&
+      isfinite(nav->core.velocity_std_mps[1]) &&
+      isfinite(nav->core.velocity_std_mps[2]);
+  ref_data_ok = ref->header.source_id == SOURCE_M5 &&
+      ref->header.timestamp_sample_us == nav->header.timestamp_sample_us &&
+      ref->reference_id != 0u && ref->reference_epoch != 0u &&
+      ref->state_epoch == nav->state_epoch && ref->origin_id == nav->origin_id &&
+      ref->authority_epoch != 0u && ref->directive_epoch != 0u &&
+      ref->point_count == PRODUCT_PREVIEW_COUNT &&
+      ref->reference_kind == GUIDANCE_REFERENCE_TRAJECTORY &&
+      ref->reserved == 0u && ref->anchor.offset_us == 0u;
+  directive_data_ok = dir->directive_expires_at_us > now &&
+      dir->state_epoch == nav->state_epoch &&
+      dir->directive_epoch == ref->directive_epoch &&
+      dir->authority_epoch == ref->authority_epoch &&
+      (dir->guidance_mode_code == PRODUCT_GUIDANCE_MODE_POS_HOLD ||
+       dir->guidance_mode_code == PRODUCT_GUIDANCE_MODE_TRAJECTORY) &&
+      dir->safety_envelope_id == env->safety_envelope_id &&
+      (dir->operation_code == PRODUCT_OP_PILOT ||
+       dir->operation_code == PRODUCT_OP_HOLD ||
+       dir->operation_code == PRODUCT_OP_MISSION ||
+       dir->operation_code == PRODUCT_OP_RETURN ||
+       dir->operation_code == PRODUCT_OP_LAND ||
+       dir->operation_code == PRODUCT_OP_SAFE_ACTION);
+  envelope_ok = (env->vehicle_extension.valid_mask &
+      (PRODUCT_ENVELOPE_VALID_VELOCITY | PRODUCT_ENVELOPE_VALID_ACCELERATION)) ==
+      (PRODUCT_ENVELOPE_VALID_VELOCITY | PRODUCT_ENVELOPE_VALID_ACCELERATION) &&
+      env->safety_envelope_id != 0u &&
+      isfinite(env->max_linear_speed_mps) && env->max_linear_speed_mps > 0.0f &&
+      isfinite(env->max_linear_accel_mps2) && env->max_linear_accel_mps2 > 0.0f;
+  for (axis = 0u; axis < 3u; ++axis) {
+    envelope_ok = envelope_ok &&
+        isfinite(env->vehicle_extension.max_velocity_ned_mps[axis]) &&
+        env->vehicle_extension.max_velocity_ned_mps[axis] > 0.0f &&
+        isfinite(env->vehicle_extension.max_acceleration_ned_mps2[axis]) &&
+        env->vehicle_extension.max_acceleration_ned_mps2[axis] > 0.0f;
+  }
+  map_ok = map->initialized != 0u && map->valid != 0u &&
+      map->degraded == 0u && map->reserved0 == 0u &&
+      map->map_revision == fx->input.expected_map_revision &&
+      map->boot_id == nav->header.boot_id &&
+      map->time_epoch == nav->header.time_epoch &&
+      map->origin_id == nav->origin_id && map->state_epoch == nav->state_epoch &&
+      map->max_dynamic_prediction_us >= M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US &&
+      isfinite(map->vehicle_radius_m) && map->vehicle_radius_m > 0.0f &&
+      isfinite(map->clearance_margin_m) && map->clearance_margin_m >= 0.0f &&
+      isfinite(map->uncertainty_inflation_factor) &&
+      map->uncertainty_inflation_factor > 0.0f &&
+      map->source_deadline_us >= proof_end &&
+      m5_local_map_is_ready(map, nav, now);
+  anchor_ok = ref->anchor.valid_mask == 0x1Fu &&
+      ref->anchor.point.valid_mask == 0x1Fu &&
+      isfinite(ref->anchor.point.position_ned_m[0]) &&
+      isfinite(ref->anchor.point.position_ned_m[1]) &&
+      isfinite(ref->anchor.point.position_ned_m[2]) &&
+      isfinite(ref->anchor.point.velocity_ned_mps[0]) &&
+      isfinite(ref->anchor.point.velocity_ned_mps[1]) &&
+      isfinite(ref->anchor.point.velocity_ned_mps[2]) &&
+      isfinite(ref->anchor.point.acceleration_ned_mps2[0]) &&
+      isfinite(ref->anchor.point.acceleration_ned_mps2[1]) &&
+      isfinite(ref->anchor.point.acceleration_ned_mps2[2]) &&
+      isfinite(ref->anchor.point.yaw_rad) &&
+      isfinite(ref->anchor.point.yaw_rate_radps);
+  anchor_match = 1;
+  for (axis = 0u; axis < 3u; ++axis) {
+    if (fabsf(ref->anchor.point.position_ned_m[axis] -
+              nav->core.position_ned_m[axis]) > 0.05f ||
+        fabsf(ref->anchor.point.velocity_ned_mps[axis] -
+              nav->core.velocity_ned_mps[axis]) > 0.10f ||
+        fabsf(ref->anchor.point.acceleration_ned_mps2[axis] -
+              nav->core.acceleration_ned_mps2[axis]) > 0.25f) anchor_match = 0;
+    if (!isfinite(map->center_ned_m[axis]) ||
+        fabsf(map->center_ned_m[axis] / M5_MAP_CELL_SIZE_M -
+              roundf(map->center_ned_m[axis] / M5_MAP_CELL_SIZE_M)) > 1e-4f)
+      grid_ok = 0;
+  }
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    const MotionReferencePoint *p = &ref->points[i];
+    if (p->offset_us != (i + 1u) * PRODUCT_PREVIEW_STEP_US ||
+        p->valid_mask != 0x1Fu || p->point.valid_mask != 0x1Fu ||
+        !isfinite(p->point.position_ned_m[0]) ||
+        !isfinite(p->point.position_ned_m[1]) ||
+        !isfinite(p->point.position_ned_m[2]) ||
+        !isfinite(p->point.velocity_ned_mps[0]) ||
+        !isfinite(p->point.velocity_ned_mps[1]) ||
+        !isfinite(p->point.velocity_ned_mps[2]) ||
+        !isfinite(p->point.acceleration_ned_mps2[0]) ||
+        !isfinite(p->point.acceleration_ned_mps2[1]) ||
+        !isfinite(p->point.acceleration_ned_mps2[2]) ||
+        !isfinite(p->point.yaw_rad) || !isfinite(p->point.yaw_rate_radps))
+      points_ok = 0;
+  }
+  ttl_ok = ref->header.valid_until_us >= proof_end &&
+      dir->header.valid_until_us >= proof_end &&
+      dir->directive_expires_at_us >= proof_end &&
+      env->header.valid_until_us >= proof_end;
+  printf("M5-06 shape flags: nav_hdr=%d nav_data=%d ref_hdr=%d ref_data=%d "
+         "dir_hdr=%d dir_data=%d env_hdr=%d env_data=%d map=%d anchor=%d "
+         "anchor_match=%d grid=%d points=%d ttl=%d fence_count=%u "
+         "proof_end=%llu nav_valid=%u nav_pos=(%.3f,%.3f,%.3f) "
+         "anchor_pos=(%.3f,%.3f,%.3f) anchor_vel=(%.3f,%.3f,%.3f) "
+         "nav_vel=(%.3f,%.3f,%.3f)\\n",
+         nav_ok, nav_data_ok, ref_ok, ref_data_ok, dir_ok, directive_data_ok,
+         env_ok, envelope_ok, map_ok, anchor_ok, anchor_match, grid_ok,
+         points_ok, ttl_ok, (unsigned)fx->input.geofence_count,
+         (unsigned long long)proof_end,
+         (unsigned)nav->core.valid_mask,
+         (double)nav->core.position_ned_m[0], (double)nav->core.position_ned_m[1],
+         (double)nav->core.position_ned_m[2],
+         (double)ref->anchor.point.position_ned_m[0],
+         (double)ref->anchor.point.position_ned_m[1],
+         (double)ref->anchor.point.position_ned_m[2],
+         (double)ref->anchor.point.velocity_ned_mps[0],
+         (double)ref->anchor.point.velocity_ned_mps[1],
+         (double)ref->anchor.point.velocity_ned_mps[2],
+         (double)nav->core.velocity_ned_mps[0],
+         (double)nav->core.velocity_ned_mps[1],
+         (double)nav->core.velocity_ned_mps[2]);
+}
+
 static void test_m5_safety_static_free_reference_passes(void)
 {
   SafetyFx fx;
   M5TrajectorySafetyStatus status;
   safety_fx_init(&fx, 20000000u);
   status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
-  printf("M5-06 fixture status=%u reason=%u passed=%u map_ready=%u "
-         "navmask=%u reqmask=%u refsrc=%u expectedsrc=%u "
-         "refcount=%u expectedcount=%u refkind=%u expectedkind=%u refreserved=%u "
-         "anchoroff=%u anchormask=%u/%u dir_mode=%u op=%u dir_epoch=%u ref_dir_epoch=%u "
-         "dir_auth=%u ref_auth=%u dir_state=%u nav_state=%u env_id=%u dir_env_id=%u "
-         "envmask=%u map_boot=%llu nav_boot=%llu map_time=%lu nav_time=%lu "
-         "map_radius=%.3f map_margin=%.3f map_uncertainty=%.3f map_prediction=%lu "
-         "input_reserved=%u fence_count=%u response=%lu max_dyn_accel=%.3f\n",
-         (unsigned)status, (unsigned)fx.result.reason_code,
-         (unsigned)fx.result.passed,
-         (unsigned)m5_local_map_is_ready(&fx.map, &fx.base.nav, fx.input.evaluation_time_us),
-         (unsigned)fx.base.nav.core.valid_mask, (unsigned)(NAV_VALID_HORIZONTAL_POSITION | NAV_VALID_VERTICAL_POSITION | NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY | NAV_VALID_ACCELERATION),
-         (unsigned)fx.reference.header.source_id, (unsigned)SOURCE_M5,
-         (unsigned)fx.reference.point_count, (unsigned)M5_SAFETY_INTERVAL_COUNT,
-         (unsigned)fx.reference.reference_kind, (unsigned)GUIDANCE_REFERENCE_TRAJECTORY,
-         (unsigned)fx.reference.reserved, (unsigned)fx.reference.anchor.offset_us,
-         (unsigned)fx.reference.anchor.valid_mask, (unsigned)fx.reference.anchor.point.valid_mask,
-         (unsigned)fx.base.dir.guidance_mode_code, (unsigned)fx.base.dir.operation_code,
-         (unsigned)fx.base.dir.directive_epoch, (unsigned)fx.reference.directive_epoch,
-         (unsigned)fx.base.dir.authority_epoch, (unsigned)fx.reference.authority_epoch,
-         (unsigned)fx.base.dir.state_epoch, (unsigned)fx.base.nav.state_epoch,
-         (unsigned)fx.base.env.safety_envelope_id, (unsigned)fx.base.dir.safety_envelope_id,
-         (unsigned)fx.base.env.vehicle_extension.valid_mask,
-         (unsigned long long)fx.map.boot_id, (unsigned long long)fx.base.nav.header.boot_id,
-         (unsigned long)fx.map.time_epoch, (unsigned long)fx.base.nav.header.time_epoch,
-         (double)fx.map.vehicle_radius_m, (double)fx.map.clearance_margin_m,
-         (double)fx.map.uncertainty_inflation_factor,
-         (unsigned long)fx.map.max_dynamic_prediction_us,
-         (unsigned)fx.input.reserved0, (unsigned)fx.input.geofence_count,
-         (unsigned long)fx.input.response_delay_us,
-         (double)fx.input.max_dynamic_obstacle_accel_mps2);
+  if (status != M5_SAFETY_PASS) safety_test_print_shape_diagnostics(&fx);
   CHECK(status == M5_SAFETY_PASS);
   CHECK(fx.result.passed == 1u);
   CHECK(fx.result.work_units == PRODUCT_PREVIEW_COUNT);
