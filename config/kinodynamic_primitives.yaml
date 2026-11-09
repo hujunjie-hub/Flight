@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "capacity": 64,
+  "entry_count": 60,
+  "entry_size_bytes": 16,
+  "groups": [
+    {
+      "kind": "TRANSLATE",
+      "dirs": [0, 1, 2, 3, 4, 5, 6, 7],
+      "speeds_mps": [0.5, 1.0],
+      "duration_us": [200000, 400000]
+    },
+    {
+      "kind": "CARDINAL_FAST",
+      "dirs": [0, 1, 2, 3],
+      "speeds_mps": [2.0],
+      "duration_us": [200000, 400000]
+    },
+    {
+      "kind": "VERTICAL",
+      "dirs": [0, 1],
+      "speeds_mps": [0.5, 1.0],
+      "duration_us": [200000, 400000]
+    },
+    {
+      "kind": "YAW",
+      "dirs": [
+        {"dir": 0, "sign": -1},
+        {"dir": 1, "sign": 1}
+      ],
+      "yaw_bin_steps": [1, 2],
+      "duration_us": [400000, 800000]
+    },
+    {
+      "kind": "WAIT",
+      "dirs": [0],
+      "duration_us": [200000, 400000]
+    },
+    {
+      "kind": "BRAKE",
+      "dirs": [0],
+      "duration_us": [200000, 400000]
+    }
+  ],
+  "velocity_bins": {
+    "horizontal_directions": 8,
+    "horizontal_speeds_mps": [0.5, 1.0, 2.0],
+    "vertical_up_mps": [0.5, 1.0],
+    "vertical_down_mps": [0.5, 1.0],
+    "yaw_bins": 16,
+    "time_bin_us": 200000,
+    "max_time_bins": 31
+  },
+  "reserved_entries_zero_filled": 4
+}
