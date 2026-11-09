@@ -377,7 +377,7 @@ static uint8_t validate_reference_shape(
   return (uint8_t)(*valid_until_us > in->evaluation_time_us);
 }
 
-static double evaluate_bernstein(const double control[6], unsigned degree, double u)
+static double evaluate_bernstein(const double *control, unsigned degree, double u)
 {
   double work[6];
   unsigned i, level;
