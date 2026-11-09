@@ -571,7 +571,11 @@ static int edge_map_clear(const M5AstarRequest *r, const GuidanceQuintic q[4],
           for (ix = (unsigned)x0; ix <= (unsigned)x1; ++ix) {
             uint16_t voxel = (uint16_t)((iz * 16u + iy) * 16u + ix);
             uint8_t state;
-            if (!m5_local_map_voxel_state(r->map, voxel, r->evaluation_time_us, &state) ||
+            uint64_t elapsed_us = (uint64_t)((edge_start_s + t1) * 1e6f);
+            uint64_t query_time_us;
+            if (r->evaluation_time_us > UINT64_MAX - elapsed_us) return 0;
+            query_time_us = r->evaluation_time_us + elapsed_us;
+            if (!m5_local_map_voxel_state(r->map, voxel, query_time_us, &state) ||
                 state != M5_MAP_CELL_FREE_CONFIRMED) return 0;
           }
     }
