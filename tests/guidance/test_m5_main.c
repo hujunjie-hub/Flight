@@ -1478,8 +1478,8 @@ static void smoother_fx_path_init(PlannerFx *fx, uint64_t now_us)
     fx->path.yaw_rad[knot] = 0.0f;
     fx->path.yaw_rate_radps[knot] = 0.0f;
   }
-  fx->path.primitive_index[0] = 0u;
-  fx->path.primitive_index[1] = 1u;
+  fx->path.primitive_index[0] = 3u;
+  fx->path.primitive_index[1] = 3u;
 }
 
 static void test_m5_smoother_minimum_jerk_continuity(void)
