@@ -32,10 +32,13 @@ jobs:
 
       - name: Check Python validation scripts
         run: |
-          python -m py_compile tools/check_layout.py tests/algorithms/run_tests.py tests/algorithms/test_source_lock.py middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/source_lock.py tests/runtime/run_tests.py tests/runtime/verify_firmware.py tests/drivers/check_drivers.py
+          python -m py_compile tools/check_layout.py tests/algorithms/run_tests.py tests/algorithms/test_source_lock.py middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/source_lock.py tests/runtime/run_tests.py tests/runtime/verify_firmware.py tests/drivers/check_drivers.py tools/guidance/generate_kinodynamic_primitives.py
 
       - name: Check source layout
         run: python tools/check_layout.py
+
+      - name: Check generated Kinodynamic primitive table
+        run: python tools/guidance/generate_kinodynamic_primitives.py --check
 
       - name: Test OSQP source-lock generator
         run: python tests/algorithms/test_source_lock.py
