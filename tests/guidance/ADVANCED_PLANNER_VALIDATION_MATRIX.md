@@ -9,13 +9,13 @@
 当前固件基线为 H723、OBSTACLE_SOURCE_MODE=NONE、BENCH_INHIBIT。必须区分以下两条验证路径：
 
 - **H723 / NONE：** 使用有界五次轨迹和围栏验证；不分配局部地图或 A* arena。任务若要求障碍避让保证，必须拒绝并报告障碍保证不可用。不得生成全 FREE 地图，也不得把障碍几何检查记为 PASS。
-- **Host / SIL：** 已增加独立 minimum-jerk 数学内核；完整地图、时空 Kinodynamic A*、动态障碍验证及 M5-06 集成仍待实现。Host 合成数据只能证明算法在模型假设下的行为，不能证明 H723 实时性或真实传感器能力。
+- **Host / SIL：** 已增加 M5-02 车辆中心滚动局部地图、M5-03 固定容量 Kinodynamic A*、M5-04 minimum-jerk 路径平滑候选接口及独立数学内核。A* 对动态 track 做有限预测窗口内的边级保守检查；这不等于 M5-06 独立连续碰撞证明。M5-05 有界时标器、M5-06 独立轨迹/连续碰撞验证、M5→M6 发布集成仍待实现。Host 合成数据只能证明算法在模型假设下的行为，不能证明 H723 实时性或真实传感器能力。
 - **ONBOARD_SENSOR：** 当前不支持；没有用户批准的传感器、安装、时间/坐标和质量证据前，不得开启在线避障。
 - **Companion：** 只能作为可选地图/障碍/路径建议来源；不能成为基础任务依赖，也不能直通 M6/M7。
 
-当前代码已覆盖基础参考生成、输入授权/时效、Epoch、连续围栏、Bernstein 动力学边界和 NONE 模式避障任务拒绝。当前生产切片尚不包含完整 A*/局部地图/动态障碍管线，也没有完整 M4→M5→M6→M7→Plant 运行期闭环。对应测试不得因接口或文档存在而标记通过。
+当前代码已覆盖基础参考生成、输入授权/时效、Epoch、连续围栏、Bernstein 动力学边界和 NONE 模式避障任务拒绝；Host/SIL 另有 M5-02/03/04 内核及对应回归用例。H723/NONE 生产切片仍不包含地图/A*/平滑器 arena，也没有完整 M4→M5→M6→M7→Plant 运行期闭环。M5-06 未完成前，Host A* 的边级地图检查不能记作独立连续碰撞 PASS。对应测试不得因接口或文档存在而标记通过。
 
-当前 tests/guidance/test_m5_main.c 登记 33 个 Host 场景。其实际执行结果以对应 commit 的 CI 日志为准；历史交付报告不能替代当前分支复跑。
+当前 tests/guidance/test_m5_main.c 登记 52 个 Host 场景。其实际执行结果以对应 commit 的 CI 日志为准；历史交付报告不能替代当前分支复跑。
 
 ## 2. 状态与证据规则
 
@@ -44,7 +44,7 @@
 
 ## 4. Kinodynamic A* 与局部地图矩阵（仅 Host/SIL）
 
-本组在对应模块尚未实现前保持 NOT_RUN；不能用 NONE 模式的围栏测试代替 A* 或地图测试。
+本组已有 M5-02/M5-03 Host/SIL 内核和自动化用例；具体验证状态仍以 spec/09 的证据台账为准。不能用 NONE 模式的围栏测试代替 A* 或地图测试，也不能把 A* 边级检查代替 M5-06 独立连续碰撞验证。
 
 | ID | 输入/场景 | 预期结果 | 失败判据 | 自动化与证据 | 当前状态 |
 |---|---|---|---|---|---|
@@ -191,23 +191,39 @@ Host/SIL 高级 A*/地图/动态障碍测试入口须随对应实现一并提交
 
 ## 12. 2026-11-09 实施切片与边界
 
-### M5-04：有界时间参数化
+### M5-02：Host/SIL rolling local map
 
-- 所有 M5 单次规划请求统一使用 200ms 时间格，最多 31 格、总时长不超过 6.2s；最多执行 16 次有界可行性尝试。
-- 不再为 Mission/Return 设置 240s 特例。超出局部规划窗口的 Mission/Return 请求 fail-closed，不能发布截断或超长参考。
-- M4 必须负责把长距离任务拆成新的、逐项授权的中间航点/任务段。当前尚未实现 M4 自动分段，因此长航段能力仍受限，不能宣称长距离任务完整可用。
+- 固定16×16×16、0.5m/cell、最多8条动态track；地图中心按0.5m lattice跟随NavigationSnapshot滚动，重叠cell按世界坐标保留，新暴露区域清为UNKNOWN，单轴滚动达到8m整图清空。
+- cell 500ms无有效更新转STALE；aggregate source lease每个有效非空批次刷新，cell仍按自身时间戳/源有效期过期。地图查询和A*未来到达时刻检查均fail-closed。
+- sensor_instance_id完整32位保留；动态障碍observation_id在同一传感器内必须稳定标识同一目标。Host/SIL only，H723/NONE不编入。
 
-### M5-05：Host/SIL Minimum-jerk 数学内核
+### M5-03：Host/SIL Kinodynamic A*
 
-- 新增 \`middleware/guidance/trajectory_planning/minimum_jerk_optimizer.c\`，仅在 \`FLIGHT_M5_HOST_PLANNER\` 下编译；H723/NONE 不调用该内核、不分配其 workspace，仍使用直接有界 quintic。
-- 固定最多 8 段、14 个内部变量；内部 knot 位置固定，只优化内部 knot 速度/加速度，起止 p/v/a 固定。
-- 目标为三轴 \`Σ∫ jerk² dt\`。局部段二次型组装为带宽 3 的块三对角 SPD 系统，使用固定维数 Cholesky 求解。
-- 调用者提供固定 workspace；workspace 编译期大小上限 2304B。内核无 heap 分配；输出在所有轴均成功后一次性复制，失败时输出保持清零。
-- 内核只生成数学轨迹候选，不验证速度/加速度/jerk、推力/倾角、围栏或障碍；必须经过独立 M5-06 验证后才可进入 M5 Publisher。当前尚未接入 A* 路径、M5-06、原子回退和实际 MotionReference 发布链。
+- 固定60项primitive manifest由config/kinodynamic_primitives.yaml生成；CI --check，运行时校验kind/dir/speed_id/duration_id及保留项。
+- 固定Node/Open512、Hash1024、每请求最多512扩展、每节点最多64边检查、路径最多8段；key包含voxel/velocity/yaw/time完整状态。
+- 每条边执行五次动力学边界和保守swept voxel/动态track检查；地图cell按边绝对到达时间检查有效性。超时、容量、NO_PATH、输入过期分开返回。
+- 仅Host/SIL；A*边级检查不是M5-06独立连续碰撞证明，不改变H723/NONE生产能力。
+
+### M5-04：Host/SIL minimum-jerk path smoother
+
+- 新增m5_path_smoother.c/h，消费M5-03路径；map_revision、地图有效性、knot自由状态、primitive索引和段时长必须一致。
+- 使用现有minimum_jerk_optimizer.c固定8段/2304B workspace数学内核，内部knot位置固定，优化内部速度/加速度；yaw单独用连续五次边界条件构造。
+- 优化失败时只可输出同一路径初始quintic并标记FALLBACK；输出是候选，不是MotionReference，必须通过M5-06后才能交给M5 Publisher/M6。
+- 当前直接使用A* primitive时长；正式有界时标器仍属M5-05。
+
+### M5-05：有界时间参数化（待实现）
+
+- 所有M5单次规划请求统一使用200ms时间格，最多31格、总时长不超过6.2s；最多16次有界可行性尝试。
+- 不再为Mission/Return设置240s特例。超出局部规划窗口的请求fail-closed；M4自动分段尚未实现，长航段能力仍受限。
+
+### M5-06：独立轨迹/连续碰撞验证（待实现）
+
+- 对最终实际消费的anchor+24 Hermite曲线执行独立动力学、围栏、静态/动态障碍和不确定度/延迟验证。
+- UNKNOWN、过期、预算耗尽或无法证明安全均拒绝；M5-04优化结果和fallback初始曲线都必须重新验证，未验证候选不得发布。
 
 ### 已增加的 Host 用例
 
-33 个命名场景中新增：单段边界、双段连续性与目标下降、非等时长多轴、8 段确定性、非法输入/时间格、三轴目标函数求和、非零起止速度/加速度、最终 6.2s 时间格尝试。长 Mission/Return 超出 6.2s 的请求现验证为拒绝；另新增验证确保 1.25 倍增长越过上限时仍会尝试最终 6.2s 时间格。
+当前登记52个命名场景，覆盖基础轨迹/授权/围栏、minimum-jerk数学内核、滚动地图/源租约/epoch/批次拒绝、primitive/key校验、A*确定性/地图过期/障碍屏障/截止时间，以及M5-04平滑连续性和stale/invalid输入。具体通过状态以对应commit的CI日志和spec/09证据台账为准。
 
 ### 验收边界
 
