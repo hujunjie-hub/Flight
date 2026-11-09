@@ -30,6 +30,64 @@ const M5KinodynamicPrimitive *m5_kinodynamic_primitive_table(uint8_t *count)
   return m5_kinodynamic_primitives;
 }
 
+static uint8_t primitive_descriptor_valid(const M5KinodynamicPrimitive *p)
+{
+  uint32_t expected_duration;
+  float expected_speed = 0.0f, expected_yaw_rate = 0.0f;
+  if (p == NULL || !isfinite(p->target_speed) || !isfinite(p->yaw_rate_hint))
+    return 0u;
+
+  switch (p->kind) {
+    case M5_PRIMITIVE_TRANSLATE:
+      if (p->dir > 7u || p->speed_id > 2u || p->duration_id > 1u) return 0u;
+      if (p->speed_id == 2u && p->dir > 3u) return 0u;
+      expected_speed = (p->speed_id == 0u) ? 0.5f :
+                       (p->speed_id == 1u) ? 1.0f : 2.0f;
+      expected_duration = (p->duration_id == 0u) ? 200000u : 400000u;
+      break;
+    case M5_PRIMITIVE_VERTICAL:
+      if (p->dir > 1u || p->speed_id > 1u || p->duration_id > 1u) return 0u;
+      expected_speed = (p->speed_id == 0u) ? 0.5f : 1.0f;
+      expected_duration = (p->duration_id == 0u) ? 200000u : 400000u;
+      break;
+    case M5_PRIMITIVE_YAW:
+      if (p->dir > 1u || p->speed_id < 1u || p->speed_id > 2u ||
+          p->duration_id < 2u || p->duration_id > 3u) return 0u;
+      expected_duration = (p->duration_id == 2u) ? 400000u : 800000u;
+      expected_yaw_rate = (p->dir == 0u ? -1.0f : 1.0f) *
+          (float)p->speed_id * (M5_ASTAR_TWO_PI / 16.0f) /
+          ((float)expected_duration * 1e-6f);
+      break;
+    case M5_PRIMITIVE_WAIT:
+    case M5_PRIMITIVE_BRAKE:
+      if (p->dir != 0u || p->speed_id != 0u || p->duration_id > 1u) return 0u;
+      expected_duration = (p->duration_id == 0u) ? 200000u : 400000u;
+      break;
+    default:
+      return 0u;
+  }
+  return (uint8_t)(p->duration_us == expected_duration &&
+      fabsf(p->target_speed - expected_speed) <= 1e-6f &&
+      fabsf(p->yaw_rate_hint - expected_yaw_rate) <= 1e-5f);
+}
+
+uint8_t m5_kinodynamic_primitive_table_validate(void)
+{
+  unsigned i;
+  if (M5_KINODYNAMIC_PRIMITIVE_COUNT != 60u ||
+      M5_KINODYNAMIC_PRIMITIVE_CAPACITY != 64u) return 0u;
+  for (i = 0u; i < M5_KINODYNAMIC_PRIMITIVE_COUNT; ++i)
+    if (!primitive_descriptor_valid(&m5_kinodynamic_primitives[i])) return 0u;
+  for (i = M5_KINODYNAMIC_PRIMITIVE_COUNT;
+       i < M5_KINODYNAMIC_PRIMITIVE_CAPACITY; ++i) {
+    const M5KinodynamicPrimitive *p = &m5_kinodynamic_primitives[i];
+    if (p->kind != 0u || p->dir != 0u || p->speed_id != 0u ||
+        p->duration_id != 0u || p->target_speed != 0.0f ||
+        p->yaw_rate_hint != 0.0f || p->duration_us != 0u) return 0u;
+  }
+  return 1u;
+}
+
 uint32_t m5_kinodynamic_encode_key(uint16_t voxel, uint8_t velocity_bin,
                                    uint8_t yaw_bin, uint8_t time_bin)
 {
@@ -794,7 +852,7 @@ M5PlannerResult m5_kinodynamic_astar_plan(const M5AstarRequest *r,
     return M5_PLANNER_CAPACITY_EXCEEDED;
   }
   primitives = m5_kinodynamic_primitive_table(&primitive_count);
-  if (primitive_count != 60u) {
+  if (primitive_count != 60u || !m5_kinodynamic_primitive_table_validate()) {
     stats->result = M5_PLANNER_INVALID_INPUT;
     return M5_PLANNER_INVALID_INPUT;
   }
