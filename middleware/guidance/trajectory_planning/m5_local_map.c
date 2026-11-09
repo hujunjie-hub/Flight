@@ -3,6 +3,8 @@
  *
  * Host/SIL only. The H723/NONE profile neither compiles nor allocates this map.
  */
+
+#if defined(FLIGHT_M5_HOST_PLANNER)
 #include <math.h>
 #include <string.h>
 #include "guidance_update/guidance_internal.h"
@@ -398,3 +400,5 @@ Status m5_local_map_query(const M5LocalMap *map, const float position[3],
   if (!m5_local_map_voxel_state(map, voxel, now_us, state)) return STATUS_INVALID_ARGUMENT;
   return (*state == M5_MAP_CELL_INVALID) ? STATUS_NOT_PERMITTED : STATUS_OK;
 }
+
+#endif /* FLIGHT_M5_HOST_PLANNER */
