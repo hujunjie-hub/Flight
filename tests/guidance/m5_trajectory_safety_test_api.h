@@ -34,4 +34,9 @@ uint8_t m5_trajectory_safety_test_curve_eval(
     float velocity[3],
     float acceleration[3]);
 
+uint8_t m5_trajectory_safety_test_rounding_bounds(
+    double value, float *lower, float *upper);
+float m5_trajectory_safety_test_norm_lower_bound(
+    double x, double y, double z);
+
 #endif /* M5_TRAJECTORY_SAFETY_TEST_API_H */

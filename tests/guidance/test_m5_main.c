@@ -2785,6 +2785,55 @@ static void test_m5_safety_multi_track_all_slots_and_fail_closed(void)
   CHECK(fx.result.passed == 0u);
 }
 
+
+static void test_m5_safety_outward_rounding_and_norm_lower(void)
+{
+  uint32_t seed = 0xD15A6E71u;
+  unsigned i;
+
+  for (i = 0u; i < 1024u; ++i) {
+    int exponent = -151 + (int)(safety_fuzz_next(&seed) % 279u);
+    double mantissa = 0.5 + 0.5 * (double)safety_fuzz_unit(&seed);
+    double sign = ((safety_fuzz_next(&seed) & 1u) != 0u) ? -1.0 : 1.0;
+    double value = sign * ldexp(mantissa, exponent);
+    float lower = 0.0f, upper = 0.0f;
+    CHECK(m5_trajectory_safety_test_rounding_bounds(value, &lower, &upper));
+    CHECK((double)lower <= value);
+    CHECK((double)upper >= value);
+    CHECK(lower <= upper);
+  }
+
+  for (i = 0u; i < 512u; ++i) {
+    double component[3];
+    double exact;
+    float lower;
+    unsigned axis;
+    for (axis = 0u; axis < 3u; ++axis) {
+      int exponent = -149 + (int)(safety_fuzz_next(&seed) % 277u);
+      double mantissa = 0.5 + 0.5 * (double)safety_fuzz_unit(&seed);
+      double sign = ((safety_fuzz_next(&seed) & 1u) != 0u) ? -1.0 : 1.0;
+      component[axis] = sign * ldexp(mantissa, exponent);
+    }
+    exact = sqrt(component[0] * component[0] +
+                 component[1] * component[1] +
+                 component[2] * component[2]);
+    lower = m5_trajectory_safety_test_norm_lower_bound(
+        component[0], component[1], component[2]);
+    CHECK(isfinite(lower));
+    CHECK(lower >= 0.0f);
+    CHECK((double)lower <= exact);
+  }
+
+  {
+    float lower = 0.0f, upper = 0.0f;
+    CHECK(!m5_trajectory_safety_test_rounding_bounds(NAN, &lower, &upper));
+    CHECK(!m5_trajectory_safety_test_rounding_bounds(INFINITY, &lower, &upper));
+    CHECK(!m5_trajectory_safety_test_rounding_bounds(1.0e300, &lower, &upper));
+    CHECK(isfinite(m5_trajectory_safety_test_norm_lower_bound(
+        1.0e300, -1.0e300, 1.0e300)));
+  }
+}
+
 static void test_m5_safety_static_free_reference_passes(void)
 {
   SafetyFx fx;
@@ -3813,6 +3862,7 @@ int main(void)
     {"m5_safety_bernstein_bounds_randomized", test_m5_safety_bernstein_bounds_randomized},
     {"m5_safety_bernstein_bounds_invalid", test_m5_safety_bernstein_bounds_invalid_inputs},
     {"m5_safety_multi_track_all_slots", test_m5_safety_multi_track_all_slots_and_fail_closed},
+    {"m5_safety_outward_rounding_norm_lower", test_m5_safety_outward_rounding_and_norm_lower},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {

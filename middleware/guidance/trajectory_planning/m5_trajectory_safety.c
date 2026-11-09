@@ -1179,6 +1179,21 @@ uint8_t m5_trajectory_safety_test_curve_eval(
   return 1u;
 }
 
+
+uint8_t m5_trajectory_safety_test_rounding_bounds(
+    double value, float *lower, float *upper)
+{
+  if (lower == NULL || upper == NULL || !isfinite(value)) return 0u;
+  *lower = round_down_float(value);
+  *upper = round_up_float(value);
+  return (uint8_t)(isfinite(*lower) && isfinite(*upper) && *lower <= *upper);
+}
+
+float m5_trajectory_safety_test_norm_lower_bound(
+    double x, double y, double z)
+{
+  return norm3_lower(x, y, z);
+}
 #endif /* FLIGHT_M5_SAFETY_TEST_API */
 
 #endif /* FLIGHT_M5_HOST_PLANNER */
