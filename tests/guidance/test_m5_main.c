@@ -1108,7 +1108,8 @@ static void test_m5_map_initial_origin_is_cell_aligned(void)
   CHECK(fabsf(map.center_ned_m[0] - 0.0f) < 1e-6f);
   CHECK(fabsf(map.center_ned_m[1] + 0.5f) < 1e-6f);
   CHECK(fabsf(map.center_ned_m[2] - 1.0f) < 1e-6f);
-  CHECK(m5_local_map_is_ready(&map, &nav, now));
+  /* Geometry is initialized, but no observation batch has made the map ready. */
+  CHECK(!m5_local_map_is_ready(&map, &nav, now));
 }
 
 static void test_m5_map_roll_preserves_world_cells(void)
