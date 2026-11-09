@@ -32,6 +32,7 @@ static M5SmootherResult validate_path(const M5AstarPath *path,
                                       uint32_t *total_duration_us)
 {
   uint8_t primitive_count = 0u;
+  const M5KinodynamicPrimitive *primitives;
   uint32_t total = 0u;
   unsigned i;
   if (path == NULL || map == NULL || navigation == NULL ||
@@ -46,8 +47,9 @@ static M5SmootherResult validate_path(const M5AstarPath *path,
   if (path->offset_us[0] != 0u || !isfinite(path->total_cost_s) ||
       path->total_cost_s <= 0.0f)
     return M5_SMOOTHER_INVALID_INPUT;
-  (void)m5_kinodynamic_primitive_table(&primitive_count);
-  if (primitive_count != 60u || !m5_kinodynamic_primitive_table_validate())
+  primitives = m5_kinodynamic_primitive_table(&primitive_count);
+  if (primitives == NULL || primitive_count != 60u ||
+      !m5_kinodynamic_primitive_table_validate())
     return M5_SMOOTHER_INVALID_INPUT;
 
   for (i = 0u; i <= path->segment_count; ++i) {
@@ -66,7 +68,8 @@ static M5SmootherResult validate_path(const M5AstarPath *path,
         duration % GUIDANCE_TIME_BIN_US != 0u ||
         duration > GUIDANCE_MAX_DURATION_US ||
         total > GUIDANCE_MAX_DURATION_US - duration ||
-        path->primitive_index[i] >= primitive_count)
+        path->primitive_index[i] >= primitive_count ||
+        primitives[path->primitive_index[i]].duration_us != duration)
       return M5_SMOOTHER_CAPACITY_EXCEEDED;
     total += duration;
   }
