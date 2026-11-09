@@ -1,0 +1,62 @@
+name: Host validation
+
+on:
+  push:
+    branches:
+      - main
+      - "opt/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-time:
+    name: Source layout and time-service tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check Python validation scripts
+        run: |
+          python -m py_compile tools/check_layout.py tests/algorithms/run_tests.py tests/runtime/run_tests.py tests/runtime/verify_firmware.py tests/drivers/check_drivers.py
+
+      - name: Check source layout
+        run: python tools/check_layout.py
+
+      - name: Build time-service host test
+        run: |
+          gcc -std=c99 -O2 -Wall -Wextra -Werror \
+            -Imiddleware/contracts -Isensor_device/time_base \
+            sensor_device/time_base/systime.c tests/time/test_time_service.c \
+            -o /tmp/test_time_service
+
+      - name: Run time-service host test
+        run: /tmp/test_time_service
+
+  algorithm-host:
+    name: Navigation and control host tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install host compiler
+        run: sudo apt-get update && sudo apt-get install -y g++
+
+      - name: Run algorithm and M3 bridge tests
+        run: python tests/algorithms/run_tests.py --target host
