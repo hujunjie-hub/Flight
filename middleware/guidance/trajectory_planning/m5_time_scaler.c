@@ -157,7 +157,8 @@ M5TimeScalerResult m5_time_scaler_build(
   uint32_t total_duration_us = 0u;
   unsigned segment, axis;
   if (output != NULL) memset(output, 0, sizeof(*output));
-  if (output == NULL || path == NULL) return M5_TIME_SCALER_INVALID_INPUT;
+  if (output == NULL || path == NULL || config == NULL || envelope == NULL ||
+      navigation == NULL) return M5_TIME_SCALER_INVALID_INPUT;
   if (!navigation_valid(navigation, now_us))
     return M5_TIME_SCALER_INPUT_STALE;
   if (!guidance_header_ok(&envelope->header, &navigation->header,
