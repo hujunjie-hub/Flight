@@ -2334,6 +2334,71 @@ static void test_m5_safety_dynamic_track_requires_acceleration_bound(void)
   CHECK(fx.result.passed == 0u);
 }
 
+static void test_m5_safety_dynamic_track_future_sample_rejected(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+  safety_fx_init(&fx, 33700000u);
+  track = &fx.map.tracks[0];
+  track->id = 28u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now + 1u;
+  track->expires_us = fx.base.now + 1000000u;
+  track->radius_m = 0.05f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STALE);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_dynamic_track_overage_rejected(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+  safety_fx_init(&fx, 33800000u);
+  track = &fx.map.tracks[0];
+  track->id = 29u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now - M5_MAP_STALE_US - 1u;
+  track->expires_us = fx.base.now + 1000000u;
+  track->radius_m = 0.05f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STALE);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_dynamic_track_nonfinite_position_rejected(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+  safety_fx_init(&fx, 33900000u);
+  track = &fx.map.tracks[0];
+  track->id = 30u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now;
+  track->expires_us = fx.base.now + 1000000u;
+  track->position_ned_m[1] = NAN;
+  track->radius_m = 0.05f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STALE);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_dynamic_track_negative_radius_rejected(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+  safety_fx_init(&fx, 33950000u);
+  track = &fx.map.tracks[0];
+  track->id = 31u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now;
+  track->expires_us = fx.base.now + 1000000u;
+  track->radius_m = -0.01f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STALE);
+  CHECK(fx.result.passed == 0u);
+}
+
 static void test_m5_safety_response_delay_limit_rejected(void)
 {
   SafetyFx fx;
@@ -2830,6 +2895,10 @@ int main(void)
     {"m5_safety_duplicate_track", test_m5_safety_duplicate_dynamic_track_rejected},
     {"m5_safety_track_metadata", test_m5_safety_dynamic_track_invalid_metadata_fails_closed},
     {"m5_safety_track_accel_bound_required", test_m5_safety_dynamic_track_requires_acceleration_bound},
+    {"m5_safety_track_future_sample", test_m5_safety_dynamic_track_future_sample_rejected},
+    {"m5_safety_track_overage", test_m5_safety_dynamic_track_overage_rejected},
+    {"m5_safety_track_nonfinite", test_m5_safety_dynamic_track_nonfinite_position_rejected},
+    {"m5_safety_track_negative_radius", test_m5_safety_dynamic_track_negative_radius_rejected},
     {"m5_safety_response_limit", test_m5_safety_response_delay_limit_rejected},
     {"m5_safety_preview_count", test_m5_safety_preview_count_mismatch_rejected},
     {"m5_safety_inf_reject", test_m5_safety_infinite_preview_rejected},
