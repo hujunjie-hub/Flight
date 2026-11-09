@@ -14,7 +14,7 @@ out="build/m5_host"
 mkdir -p "${out}"
 
 cflags=(
-  -std=c11 -Wall -Wextra -Werror
+  -std=c11 -Wall -Wextra -Werror -DFLIGHT_M5_HOST_PLANNER
   -Imiddleware/model/fms
   -Imiddleware/contracts
   -Imiddleware/guidance
