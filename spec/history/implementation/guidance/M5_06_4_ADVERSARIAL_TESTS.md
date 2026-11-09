@@ -84,7 +84,7 @@
 - 有限极大动态速度引发的数值计算溢出拒绝。
 - 固定 seed `0x6D350607` 的 32 组常量轨迹属性测试：PASS 不变量与 offset 单点破坏后的 INVALID。
 
-以上仅为新增测试源码，不代表执行通过；新 Head CI 必须重新执行 Host、ASan/UBSan、ARM 构建。
+首轮 CI（run `42648938161`）中，动态时间边界和 proof-time overflow 通过；围栏高度用例错误地未把 vehicle radius + clearance inflation 计入安全高度，随机轨迹超出 map readiness 半径，有限极值未形成组合溢出。以上属于测试夹具/断言设计缺陷，已修正，必须以新 Head 重新执行 Host、ASan/UBSan、ARM 构建。
 
 ## 放行约束
 

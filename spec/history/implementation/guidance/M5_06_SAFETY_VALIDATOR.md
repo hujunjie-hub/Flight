@@ -22,6 +22,8 @@
 
 ## 最新 Host/SIL 证据
 
+- 最新新增边界测试首次运行 `42648938161`：Source/time、Navigation/Control、M4 Host、Cortex-M7 编译均通过；M5 Host 因本轮新增围栏/属性 Fuzz/极值测试夹具设计问题失败，Integration 与 ASan/UBSan 因 M5 Host 失败而被跳过。修正提交后的 CI 必须重新验证。
+
 - GitHub Actions：[Host validation latest](https://github.com/hujunjie-hub/Flight/actions/runs/42638931948)
 - Commit：`c35e6497e483ff2c0925612786d4ca8eb6acb851`
 - M4 Host：927 checks / 0 failures
@@ -40,7 +42,7 @@ response_delay_us 必须覆盖感知数据年龄、验证/调度延迟和控制/
 
 ## 本轮追加边界测试（新 Head CI 待验证）
 
-新增动态时间边界、围栏上下高度 margin/退化高度、uint64 proof horizon 溢出、有限极大动态速度数值溢出，以及固定 seed 32 组属性测试。具体用例见 `M5_06_2_VALIDATION_MATRIX.md` S06-056..063。源码已提交，不能在取得新 Head CI 证据前标记 PASS。
+新增动态时间边界、围栏上下高度 margin/退化高度、uint64 proof horizon 溢出、有限极大动态不确定度数值溢出，以及固定 seed 32 组属性测试。首轮 CI 已暴露测试夹具问题：围栏高度需叠加机体半径/净空膨胀，随机轨迹须保持在 map readiness 半径内；已修正并等待新 Head CI 复验。具体见验证矩阵 S06-056..063。
 
 ## 未完成项
 

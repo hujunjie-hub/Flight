@@ -84,18 +84,18 @@
 | S06-054 | LocalMap time_epoch 失配 | INVALID | 已加入测试源，CI 待验证 |
 | S06-055 | Directive header frame_id 失配 | INVALID | 已加入测试源，CI 待验证 |
 
-## 本轮新增边界用例（新 Head CI 待验证）
+## 本轮新增边界用例（首轮 CI 发现测试夹具问题，已修正并等待复验）
 
 | ID | 场景 | 期望 | 当前结果 |
 |---|---|---|---|
 | S06-056 | 动态 track sample age 恰为 500ms / 超 1us | PASS / STALE | 已加入源码，CI 待验证 |
 | S06-057 | 动态预测租约恰为 1s / 超 1us | PASS / STALE | 已加入源码，CI 待验证 |
 | S06-058 | 地图预测能力低于 1s 最低要求 | INVALID | 已加入源码，CI 待验证 |
-| S06-059 | 围栏最小/最大高度含 0.15m 垂直 margin | 内侧 PASS、外侧拒绝 | 已加入源码，CI 待验证 |
+| S06-059 | 围栏最小/最大高度，计入 0.15m 垂直 margin + 0.15m 机体/净空膨胀 | 安全内侧 PASS、边界外拒绝 | 首轮 CI 暴露 fixture 忽略膨胀距离，已修正坐标与断言；新 Head 待验证 |
 | S06-060 | 围栏零高度区间 | INVALID | 已加入源码，CI 待验证 |
 | S06-061 | 24×20ms proof horizon 的 uint64 加法溢出 | INVALID | 已加入源码，CI 待验证 |
-| S06-062 | 动态障碍物有限但极大速度导致计算界溢出 | NUMERIC_FAILURE | 已加入源码，CI 待验证 |
-| S06-063 | 固定种子 32 组有效静态轨迹与 offset 单点破坏 | PASS invariant / INVALID | 已加入源码，CI 待验证 |
+| S06-062 | 动态障碍物有限但极大位置/速度不确定度导致计算界溢出 | NUMERIC_FAILURE | 首轮 CI 未触发速度单值溢出；已改为组合不确定度溢出用例，新 Head 待验证 |
+| S06-063 | 固定种子 32 组有效静态轨迹（位置保持在 map readiness 半径内）与 offset 单点破坏 | PASS invariant / INVALID | 首轮 CI 发现随机点超出 map readiness 约束，已收窄输入域，新 Head 待验证 |
 
 ## 仍未关闭的审查项
 
