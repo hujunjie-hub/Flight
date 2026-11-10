@@ -43,6 +43,7 @@ static uint8_t task_mpc_stack[8192] __attribute__((aligned(8)));
 static void task_mpc_entry(void *parameter)
 {
     rt_tick_t last = rt_tick_get();
+    mpc_note_worker(runtime_now_us(), 2);
     (void)parameter;
     while (runtime_running()) {
         task_mpc_step();

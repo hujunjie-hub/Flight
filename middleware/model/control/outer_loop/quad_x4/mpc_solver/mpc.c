@@ -32,6 +32,10 @@ void mpc_seed(const float a[3], uint32_t sequence) {
   }
 }
 void mpc_note_worker(uint64_t now_us, int ready) {
+  if (ready == 2) {   /* entry marker: the task was scheduled this tick */
+    mpc_run_stats.entry_calls++;
+    return;
+  }
   mpc_run_stats.worker_ticks++;
   mpc_run_stats.last_worker_us = now_us;
   if (!ready) mpc_run_stats.worker_skips++;
