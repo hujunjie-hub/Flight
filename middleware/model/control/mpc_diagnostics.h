@@ -107,6 +107,22 @@ typedef struct {
  * returns how many were copied; `total`, when non-NULL, receives the number of
  * jobs recorded so far, so a serializer can page through the buffer without
  * allocating it twice. */
+/* Time-resolved consumption trace.  The aggregate counters say how often the
+ * snapshot was used, not when, and the ground-phase question ("did the MPC
+ * acceleration lift the vehicle before TAKEOFF?") needs the ordering.  Only the
+ * takeoff window is recorded, so the buffer stays small. */
+#define MPC_TRACE_CAPACITY 3000
+#define MPC_TRACE_FIRST_US 4000000u
+#define MPC_TRACE_LAST_US  6300000u
+typedef struct {
+  uint32_t time_us;
+  uint32_t backup;   /* 1 = PD fallback was used, 0 = the snapshot was used */
+  float mpc[3];
+  float pd[3];
+} MpcUseTrace;
+
+uint32_t mpc_copy_use_trace(MpcUseTrace *out, uint32_t capacity);
+
 uint32_t mpc_copy_job_records(uint32_t first, MpcJobRecord *out,
                               uint32_t capacity, uint32_t *total);
 uint32_t mpc_job_record_count(void);

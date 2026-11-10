@@ -5,6 +5,24 @@ static MpcSnapshot cached_mpc;
 /* Why the 1 kHz consumer accepted or rejected the snapshot.  Diagnostics only:
  * every clause below already decided the fallback before it is counted. */
 static MpcConsumerStats consumer_stats;
+#if defined(FLIGHT_HOST_TEST)
+static MpcUseTrace use_trace[MPC_TRACE_CAPACITY];
+static uint32_t use_trace_written;
+#endif
+
+uint32_t mpc_copy_use_trace(MpcUseTrace *out, uint32_t capacity)
+{
+#if defined(FLIGHT_HOST_TEST)
+  uint32_t count = use_trace_written;
+  if (count > capacity) count = capacity;
+  if (out && count) memcpy(out, use_trace, count * sizeof(use_trace[0]));
+  return count;
+#else
+  (void)out;
+  (void)capacity;
+  return 0u;
+#endif
+}
 
 void mpc_copy_consumer_stats(MpcConsumerStats *out)
 {
@@ -204,6 +222,25 @@ Status position_control_track(const ControllerInput *in, uint32_t epoch,
         consumer_stats.diff_max_abs[i] = magnitude;
     }
   }
+#if defined(FLIGHT_HOST_TEST)
+  if (in->evaluation_time_us >= MPC_TRACE_FIRST_US &&
+      in->evaluation_time_us <= MPC_TRACE_LAST_US &&
+      use_trace_written < MPC_TRACE_CAPACITY) {
+    MpcUseTrace *row = &use_trace[use_trace_written++];
+    row->time_us = (uint32_t)in->evaluation_time_us;
+    row->backup = (uint32_t)backup;
+    for (i = 0; i < 3; ++i) {
+      row->mpc[i] = cached_mpc.acceleration[i];
+      row->pd[i] = ref.acceleration_ned_mps2[i] +
+                   c->fallback_kp_per_s2[i] *
+                       (ref.position_ned_m[i] -
+                        in->navigation->core.position_ned_m[i]) +
+                   c->fallback_kd_per_s[i] *
+                       (ref.velocity_ned_mps[i] -
+                        in->navigation->core.velocity_ned_mps[i]);
+    }
+  }
+#endif
   s = control_limit_acceleration(requested, m6.previous_accel, dt, in->safety_envelope, a);
   if (s) {
     consumer_stats.limit_rejected++;
