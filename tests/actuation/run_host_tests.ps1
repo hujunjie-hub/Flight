@@ -85,6 +85,7 @@ $report = [ordered]@{
         'M7-14 the completing receipt is ZERO_TARGET_APPLIED with zero thrust'
         'M7-15 zero thrust is confirmed within 105.5 ms of acceptance'
         'M7-16 DISARMED follows only the zero receipt and output stays zero'
+        'M7-17 repeated certificates are idempotent and cannot restart the ramp'
     )
     permit_lifecycle = if ($result -eq 'PASS') { 'PASS' } else { 'FAIL' }
     frame_apply_500us = if ($result -eq 'PASS') { 'PASS' } else { 'FAIL' }

@@ -374,6 +374,28 @@ static void case_ground_stop(void) {
           "predicted apply time %llu exceeds the 105.5 ms budget",
           (unsigned long long)actuator_guard_ground_stop_predicted_us());
 
+    /* M7-17: a publisher repeats its certificate every cycle. A repeat must be
+     * idempotent, and a different rate mid-ramp must be refused, so start_us
+     * cannot drift and hide an overrun. */
+    set_now(t + ACTUATOR_GROUND_STOP_FRAME_US);
+    CHECK(actuator_guard_ground_stop(&certificate, t + ACTUATOR_GROUND_STOP_FRAME_US) == STATUS_OK,
+          "a repeated certificate was rejected mid-ramp");
+    CHECK(actuator_guard_ground_stop_start_us() == start,
+          "a repeated certificate restarted the transaction clock");
+    {
+        /* With a 10 N frame limit only 100 N/s fits the apply-time budget, so a
+         * different rate is refused by the budget check before the mid-ramp rule
+         * can see it. What matters here is that it is refused and the running
+         * transaction keeps its own clock. */
+        GroundStopCertificate other = make_ground_stop(t + ACTUATOR_GROUND_STOP_FRAME_US,
+                                                       ACTUATOR_GROUND_STOP_CODE_ZERO,
+                                                       ACTUATOR_GROUND_STOP_LIFECYCLE_DISARMING, 50.0f);
+        CHECK(actuator_guard_ground_stop(&other, t + ACTUATOR_GROUND_STOP_FRAME_US) != STATUS_OK,
+              "a different ramp rate was accepted mid-ramp");
+        CHECK(actuator_guard_ground_stop_start_us() == start,
+              "a refused certificate moved the transaction clock");
+    }
+
     /* M7-12/13: every frame steps down by at most ramp*dt and never jumps. */
     previous = 10.0f;
     while (frames < 80u) {

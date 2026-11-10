@@ -231,6 +231,14 @@ Status actuator_guard_ground_stop(const GroundStopCertificate *c,uint64_t now) {
   /* Refuse a rate that cannot meet the apply-time budget from the configured
    * maximum thrust instead of silently overrunning it later. */
   if(worst_us>(float)ACTUATOR_GROUND_STOP_MAX_APPLY_US) return STATUS_OUT_OF_RANGE;
+  /* Publishers repeat their message every cycle. A repeat of the running
+   * transaction must not restart it: moving start_us forward would push the
+   * apply-time budget with it and hide an overrun. A different stop code or rate
+   * mid-ramp is a new transaction and is refused rather than silently applied. */
+  if(gs.active) {
+    if(c->stop_code!=gs.stop_code || c->ramp_nps!=gs.ramp_nps) return STATUS_NOT_PERMITTED;
+    return STATUS_OK;
+  }
   gs.active=1; gs.latched=0; gs.overrun=0;
   gs.stop_code=c->stop_code; gs.ramp_nps=c->ramp_nps;
   gs.start_us=now; gs.predicted_us=(uint64_t)worst_us;
