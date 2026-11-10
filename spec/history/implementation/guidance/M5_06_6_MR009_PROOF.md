@@ -292,3 +292,10 @@ S06-112 用真实 C binary32 系数和 Fraction 连续最大值（端点 + 驻�
 案例中欠界，作为负向对照。S06-113 把时间转换与 C gamma_2 谓词提取为共享函数，
 正常输入 PASS，错误局部时间、4*gamma_2、错误段时长 FAIL。
 MR-009 仍为 WAITING_INDEPENDENT_REVIEW，未 APPROVED。
+
+## 21. R16：Jerk 三类上界与时间注入的实际误差
+
+R16 将 validator 的 jerk 上界拆成 Bernstein 原区间、幂基尾段、consumer binary32
+三类。S06-112 分别对 Fraction 连续最大值验证，组件检查 1080 次；总界为三者最大。
+S06-113 用 additive-seconds 参数注入 4×γ₂，实测 error/γ₂ 为 3.618–4.059，而不是
+整数微秒截断产生的 1 微秒误差。MR-009 仍未 APPROVED。

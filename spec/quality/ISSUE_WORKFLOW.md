@@ -103,3 +103,11 @@ Safety impact / fail-closed:
 Blocker / exit criteria:
 Next action / owner:
 ```
+
+## 11. R16 本地临时登记与复验规则
+
+Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”只用于保留复验证据；
+不得将它描述为已发布 GitHub Issue。每条必须保留原始失败日志和 draft。状态最多到
+`FIXED_WAITING_RETEST`，必须由独立审查者在 GitHub Issue 上复验后才能进入
+`VERIFIED/CLOSED`。R16 的 `FLIGHT-LOCAL-22`（4,128 B 栈）保持 `OPEN/BLOCKED`，
+不得用降低安全要求或压缩缓冲区的方式关闭。

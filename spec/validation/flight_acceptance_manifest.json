@@ -525,8 +525,8 @@
       "seed": "deterministic",
       "cases": 1,
       "status_at_code_baseline": "PASS",
-      "oracle": "test API and validator consume fms_quad_x4_policy via fms_product_build_safety_envelope; config validation (version/hash/policy/mask/NaN) shared with FMS init; no static test copy",
-      "local_run": "M5-06-R15-20261110"
+      "oracle": "test API and validator consume fms_quad_x4_policy via fms_product_build_safety_envelope; profile_id/profile_hash/config_version/parameter_hash and negative config cases share the FMS init validation",
+      "local_run": "M5-06-R16-20261110"
     },
     {
       "id": "S06-112",
@@ -537,27 +537,32 @@
       "wrong_tail_checked": 300,
       "wrong_tail_underbound": 248,
       "status_at_code_baseline": "PASS",
-      "oracle": "real C binary32 c3/c4/c5; endpoints + stationary s*=-c4/(5c5); gamma_2 tail; production bound >= exact with no tolerance; old Bernstein-as-power tail under-bounds",
-      "local_run": "M5-06-R15-20261110"
+      "oracle": "separate Bernstein original, power-basis tail, consumer binary32 bounds; each checked against exact Fraction endpoints+stationary maximum with no tolerance; total=max; old Bernstein-as-power tail under-bounds",
+      "local_run": "M5-06-R16-20261110",
+      "component_checks": 1080,
+      "tail_cases": 360
     },
     {
       "id": "S06-113",
       "name": "C-side time conversion injection",
       "seed": "deterministic",
-      "cases": 82,
+      "cases": 76,
       "status_at_code_baseline": "PASS",
-      "oracle": "production control_reference_convert_local_time + C gamma_2 predicate; normal PASS, wrong local/4x gamma_2/wrong duration FAIL",
-      "local_run": "M5-06-R15-20261110"
+      "oracle": "production control_reference_convert_local_time_ex additive-seconds injection; C gamma_2 predicate; normal PASS, wrong local/4x gamma_2/wrong duration FAIL; actual error ratio recorded",
+      "local_run": "M5-06-R16-20261110",
+      "actual_error_checks": 18,
+      "mode2_error_over_gamma2_min": 3.618080472981205,
+      "mode2_error_over_gamma2_max": 4.059050992445377
     }
   ],
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
-      "R15 corrected the R14b jerk tail: Bernstein-to-power conversion and u_tail=1+gamma_2*ratio; S06-112 verifies the production bound against exact Fraction maxima without tolerance.",
-      "R15 added S06-113, a shared production C local-time conversion and gamma_2 predicate with wrong-local/4x-gamma_2/wrong-duration injection.",
-      "R15 removed Python V_MAX/A_MAX/per-axis duplicates and classifies legal/stress cases with the real product envelope including extended-interval jerk (S06-104/105/107).",
+      "R16 exposes separate Bernstein/tail/consumer jerk bounds and verifies each against exact Fraction continuous maxima (S06-112: 360 checked, 1080 component checks, 0 failures).",
+      "R16 injects exact additive seconds through the production conversion and records actual error; S06-113 confirms 3.618-4.059x gamma_2 for the 4x case, not a 1-us substitute.",
+      "R16 returns active interval/local_us/global_us directly from the production locator (S06-108 wrong_local=72) and rejects nonzero wrong profile_hash (S06-111).",
+      "R16 worst validator stack chain is 4,128 B > 4,096 B; Planner Worker productization remains BLOCKED.",
       "REVOKED: the R7 differential tests are not valid evidence; S06-100..102 remain NOT_RUN and feasibility is NOT ESTABLISHED.",
-      "SUPERSEDED: the R9/R10 fixed-factor infeasibility conclusions are revoked and must not be cited.",
       "MR-009 is FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW; it is not APPROVED.",
       "Independent mathematical review MR-001..MR-008 is not yet APPROVED.",
       "M5-07 gate integration is not complete.",
@@ -657,11 +662,12 @@
   },
   "previous_commit_pass_inherited": false,
   "latest_local_validation": {
-    "run_id": "M5-06-R15-20261110",
-    "validated_code_commit": "a2fd81a44a9f2c6e4ac36917beea1f6a645f3f4f",
-    "head": "a2fd81a44a9f2c6e4ac36917beea1f6a645f3f4f",
-    "archive_head_sha": "3415bf1508e3a3415c66f27696a2d10f3ec1b5c0b855f5a21da7e306ecd8f33e",
-    "archive_zip_sha256": "PENDING_ZIP_SHA256",
+    "run_id": "M5-06-R16-20261110",
+    "validated_code_commit": "fa1de8f78c2e29eda741ac32985fd38a8c4ee5de",
+    "head": "fa1de8f78c2e29eda741ac32985fd38a8c4ee5de",
+    "archive_head_sha": "PENDING_ARCHIVE_ZIP_SHA256",
+    "archive_commit_sha": "PENDING_ARCHIVE_COMMIT",
+    "archive_zip_sha256": "PENDING_ARCHIVE_ZIP_SHA256",
     "branch": "opt/stage-02-m5-06-safety-validator",
     "scope": "LOCAL_EXECUTION_ONLY",
     "github_ci": "NOT_RUN_FOR_THIS_HEAD",
@@ -677,9 +683,14 @@
     "blocked_items": [
       "scons_link"
     ],
-    "note": "validated_code_commit and archive_commit_sha are different commits; archive_head_sha is the SHA256 of the delivered ZIP (recorded after archive creation; a ZIP cannot contain its own hash). The archive contains SHA256SUMS.txt for its files. Local results are never reported as GitHub CI success.",
-    "archive_commit_sha": "bf1118cd3653cfec1ef63281b835b503a78fa8d2"
+    "note": "validated_code_commit and archive_commit_sha are different commits; archive_head_sha/archive_zip_sha256 record the delivered ZIP SHA256 outside the ZIP because a ZIP cannot contain its own hash. Local results are never reported as GitHub CI success."
   },
   "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
-  "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112)"
+  "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112 three separate bounds)",
+  "stack_budget": {
+    "validator_worst_chain_bytes": 4128,
+    "planner_worker_limit_bytes": 4096,
+    "status": "EXCEEDED_BLOCKED",
+    "record": "build/validation/analysis_p2.md"
+  }
 }

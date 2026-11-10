@@ -347,3 +347,15 @@ S06-104 在产品包线（|v| ≤ 4 m/s、|a| ≤ 2.5 m/s²、20 ms）下，用�
   测试 API 共用；正常 PASS，错误局部时间/4*gamma_2/错误段时长 FAIL。
 - 这不构成 MR-009 的 APPROVED；独立审查仍需确认扩展尾段、驻点和 consumer
   多项式覆盖关系。
+
+## R16：三类 jerk 上界与真实时间注入（2026-11-11）
+
+- `curve_bounds()` 分别输出 Bernstein 原区间、幂基尾段、consumer binary32
+  三类 jerk 上界；总界取三者最大值。测试 API
+  `m5_trajectory_safety_test_curve_jerk_components()` 分别返回。
+- S06-112：360 cases、1080 component checks、20 fail-closed；每类界分别对
+  Fraction 连续最大值验证，无容差；旧 Bernstein-as-power 公式 248/300 欠界。
+- S06-113：生产转换增加 additive-seconds 重载，测试注入精确 4×γ₂；实际
+  error/γ₂ 为 3.618–4.059，证明不是 1 微秒替代；76 checks。
+- S06-108 由生产 locator 直接返回 active/local_us/global_us；wrong_local=72。
+- 产品 config 增加非零错误 profile_hash 拒绝；profile_id 由 C API 返回。

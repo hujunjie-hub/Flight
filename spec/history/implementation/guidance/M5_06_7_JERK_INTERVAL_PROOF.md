@@ -117,3 +117,21 @@ Horner 求上界。该上界与 validator 的 Bernstein 原区间、幂基尾段
 - 不把本记录当作 MR-009 APPROVED；MR-009 仍为 WAITING_INDEPENDENT_REVIEW。
 - 不把 Host/SIL 结果当作 H723 实时、栈水位、HIL 或飞行结果。
 - 不改变产品 jerk 限制（当前 QUAD_X4 为 16/16/8 m/s³）。
+
+## 9. R16 三类上界的独立记录
+
+R16 在 `M5SafetyCurveBounds` 中分开保存：
+
+```text
+jerk_bernstein_bound  : Bernstein 原区间 [0,1] 凸包
+jerk_tail_bound      : 幂基尾段 [1, u_tail]
+jerk_consumer_bound  : consumer binary32 多项式 [s0, s_tail]
+jerk_axis_bound      : 上述三者最大值
+```
+
+`m5_trajectory_safety_test_curve_jerk_components()` 分别返回四组值。S06-112
+对每类界单独检查：Bernstein 对 `[s0,s1]` 的 Fraction 最大值、尾段对
+`[s1,s_tail]`、consumer 对 `[s0,s_tail]`；component_checks=1080，0 failures。
+`min_slack` 非负；零曲线的最小 slack 为 binary32 最小次正规数（向上取整）。
+
+S06-113 不改变本证明；它验证时间转换的注入误差，不是 jerk 证明的一部分。
