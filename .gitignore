@@ -42,3 +42,6 @@ RTE/
 settings/
 *.uvguix*
 cconfig.h
+
+# Local validation evidence archives (never commit)
+work/validation/archives/
