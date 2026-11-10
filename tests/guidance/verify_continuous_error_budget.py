@@ -43,6 +43,17 @@ def up(value):
     return Fraction(result)
 
 
+def sqrt_up(value):
+    """Outward binary32 square root checked in exact arithmetic."""
+    if value <= 0:
+        return Fraction(0)
+    candidate = f32(float(value) ** 0.5)
+    while Fraction(candidate) ** 2 < value:
+        candidate = struct.unpack('f', struct.pack(
+            'I', struct.unpack('I', struct.pack('f', candidate))[0] + 1))[0]
+    return Fraction(candidate)
+
+
 def float_coefficients(p0, v0, a0, p1, v1, a1, h):
     p0, v0, a0 = f32(p0), f32(v0), f32(a0)
     p1, v1, a1 = f32(p1), f32(v1), f32(a1)
@@ -97,11 +108,11 @@ def gamma_up(n):
     return nu / (1 - nu) * (1 + Fraction(1, 1 << 52)) ** 2
 
 
-def budget(start_p, start_v, start_a, end_p, end_v, end_a, h):
+def budget(start_p, start_v, start_a, end_p, end_v, end_a, h, step_us):
     """Return per-component 3-D budgets (E_coeff, E_horner, E_subnormal, E_time)."""
-    s_max = Fraction(f32(h))
-    delta_s = GAMMA2 * s_max
-    s_eval = s_max + delta_s
+    t_max = Fraction(step_us, 1000000)
+    delta_s = GAMMA2 * t_max
+    s_eval = max(t_max, Fraction(f32(h))) + delta_s
     components = [Fraction(0), Fraction(0), Fraction(0), Fraction(0)]
     for axis in range(3):
         consumer = [Fraction(f32(value)) for value in float_coefficients(
@@ -119,7 +130,7 @@ def budget(start_p, start_v, start_a, end_p, end_v, end_a, h):
         time = delta_s * derivative
         for index, value in enumerate((coefficient, horner, subnormal, time)):
             components[index] += value * value
-    return tuple(up(sqrt(float(value))) for value in components)
+    return tuple(sqrt_up(value) for value in components)
 
 
 class Probes:
@@ -166,18 +177,24 @@ def exact_vector(state, h, s):
     return out
 
 
-def envelope_legal(state, h):
+def envelope_legal(state, h, step_us):
+    """Per-axis and 3-D norm limits on the physical interval."""
+    t_max = Fraction(step_us, 1000000)
+    speed_sq = Fraction(0)
+    accel_sq = Fraction(0)
     for axis in range(3):
         exact = exact_coefficients(state[0][axis], state[1][axis], state[2][axis],
                                    state[3][axis], state[4][axis], state[5][axis], h)
         velocity = [Fraction(k) * exact[k] for k in range(1, 6)]
         acceleration = [Fraction(k * (k - 1)) * exact[k] for k in range(2, 6)]
-        if bernstein(velocity, Fraction(f32(h))) > Fraction(f32(V_MAX)):
+        v_bound = bernstein(velocity, t_max)
+        a_bound = bernstein(acceleration, t_max)
+        if v_bound > Fraction(f32(V_MAX)) or a_bound > Fraction(f32(A_MAX)):
             return False
-        if bernstein(acceleration, Fraction(f32(h))) > Fraction(f32(A_MAX)):
-            return False
-    return True
-
+        speed_sq += v_bound * v_bound
+        accel_sq += a_bound * a_bound
+    return (speed_sq <= Fraction(f32(V_MAX)) ** 2 and
+            accel_sq <= Fraction(f32(A_MAX)) ** 2)
 
 def main():
     if len(sys.argv) < 2:
@@ -201,9 +218,9 @@ def main():
             v1 = [f32(v0[i] + a0[i] * h + 0.5 * jerk[i] * h * h) for i in range(3)]
             a1 = [f32(a0[i] + jerk[i] * h) for i in range(3)]
             state = (p0, v0, a0, p1, v1, a1)
-            if not envelope_legal(state, h):
+            if not envelope_legal(state, h, step_us):
                 continue
-            components = budget(*state, h)
+            components = budget(*state, h, step_us)
             total = sum(components)
             for index, value in enumerate(components):
                 component_max[index] = max(component_max[index], float(value))

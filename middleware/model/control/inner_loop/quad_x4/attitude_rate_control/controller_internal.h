@@ -56,6 +56,12 @@ Status control_allocate_from_previous(const float inv[4][4], const float eff[4][
                                       const float lo[4], const float hi[4],
                                       float min_thrust, float max_thrust, ControlAllocation *out);
 /* Shared segment lookup: production and test hooks use this same function. */
+/* Shared quintic coefficient generation (production and test hooks). */
+void control_reference_hermite_coefficients(const float p0[3], const float v0[3],
+                                            const float a0[3], const float p1[3],
+                                            const float v1[3], const float a1[3],
+                                            float h, float c[3][6]);
+
 Status control_reference_locate_segment(const MotionReference *ref, uint64_t time,
                                         const MotionReferencePoint **a,
                                         const MotionReferencePoint **b,

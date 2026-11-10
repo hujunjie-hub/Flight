@@ -125,21 +125,22 @@ def phase_a(probes, report):
     failures = []
     for step_us in STEPS:
         h = Fraction(f32(f32(step_us) * f32(1e-6)))
-        delta_s = GAMMA2 * h
-        s_eval_max = h + delta_s
+        t_max = Fraction(step_us, 1000000)
+        delta_s = GAMMA2 * t_max
+        s_eval_max = max(t_max, h) + delta_s
         for offset_us in range(step_us + 1):
             value = ctypes.c_float()
             if not probes.time(step_us, offset_us, ctypes.byref(value)):
                 failures.append(f"time probe failed step={step_us} offset={offset_us}")
                 continue
             s_c = Fraction(value.value)
-            s_exact = h * Fraction(offset_us, step_us)
+            s_exact = Fraction(offset_us, 1000000)
             checked += 1
             if abs(s_c - s_exact) > GAMMA2 * s_exact:
                 failures.append(f"step={step_us} offset={offset_us}: time > gamma_2")
             if s_c < max(Fraction(0), s_exact - delta_s) or s_c > s_eval_max:
                 failures.append(f"step={step_us} offset={offset_us}: outside interval")
-            max_ratio = max(max_ratio, abs(s_c - s_exact) / h)
+            max_ratio = max(max_ratio, abs(s_c - s_exact) / t_max)
     report["phase_a"] = {"checked": checked, "max_ratio": float(max_ratio),
                          "failures": failures[:5]}
     return failures

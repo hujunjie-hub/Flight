@@ -40,12 +40,33 @@ Status control_reference_locate_segment(const MotionReference *ref, uint64_t tim
   return STATUS_OK;
 }
 
+/* Quintic Hermite coefficients in actual seconds. Production and the M5-06 test
+   hooks both call this function, so there is exactly one coefficient formula. */
+void control_reference_hermite_coefficients(const float p0[3], const float v0[3],
+                                            const float a0[3], const float p1[3],
+                                            const float v1[3], const float a1[3],
+                                            float h, float c[3][6]) {
+  unsigned j;
+  for (j = 0; j < 3; ++j) {
+    float d = (p1[j] - p0[j]) - h * v0[j] - .5f * h * h * a0[j];
+    float v = v1[j] - v0[j] - h * a0[j];
+    float ac = a1[j] - a0[j];
+    c[j][0] = p0[j];
+    c[j][1] = v0[j];
+    c[j][2] = .5f * a0[j];
+    c[j][3] = 10 * d / (h * h * h) - 4 * v / (h * h) + ac / (2 * h);
+    c[j][4] = -15 * d / (h * h * h * h) + 7 * v / (h * h * h) - ac / (h * h);
+    c[j][5] = 6 * d / (h * h * h * h * h) - 3 * v / (h * h * h * h) +
+              ac / (2 * h * h * h);
+  }
+}
+
 Status control_sample_reference(const MotionReference *ref, uint64_t time,
                     ProductMotionPoint *out) {
   const MotionReferencePoint *a, *b;
   uint32_t step_us;
   unsigned j;
-  float s, h, c[6];
+  float s, h, c[3][6];
   Status status;
   if (!ref || !out)
     return STATUS_INVALID_ARGUMENT;
@@ -55,26 +76,23 @@ Status control_sample_reference(const MotionReference *ref, uint64_t time,
   h = step_us * 1e-6f;
   memset(out, 0, sizeof(*out));
   out->valid_mask = 31;
+  control_reference_hermite_coefficients(a->point.position_ned_m,
+                                         a->point.velocity_ned_mps,
+                                         a->point.acceleration_ned_mps2,
+                                         b->point.position_ned_m,
+                                         b->point.velocity_ned_mps,
+                                         b->point.acceleration_ned_mps2,
+                                         h, c);
   for (j = 0; j < 3; ++j) {
-    /* Quintic Hermite in actual seconds, matches p/v/a at both endpoints. */
-    float p0 = a->point.position_ned_m[j], v0 = a->point.velocity_ned_mps[j],
-          a0 = a->point.acceleration_ned_mps2[j];
-    float d = (b->point.position_ned_m[j] - p0) - h * v0 - .5f * h * h * a0;
-    float v = b->point.velocity_ned_mps[j] - v0 - h * a0,
-          ac = b->point.acceleration_ned_mps2[j] - a0;
-    c[0] = p0;
-    c[1] = v0;
-    c[2] = .5f * a0;
-    c[3] = 10 * d / (h * h * h) - 4 * v / (h * h) + ac / (2 * h);
-    c[4] = -15 * d / (h * h * h * h) + 7 * v / (h * h * h) - ac / (h * h);
-    c[5] = 6 * d / (h * h * h * h * h) - 3 * v / (h * h * h * h) +
-           ac / (2 * h * h * h);
     out->position_ned_m[j] =
-        ((((c[5] * s + c[4]) * s + c[3]) * s + c[2]) * s + c[1]) * s + c[0];
+        ((((c[j][5] * s + c[j][4]) * s + c[j][3]) * s + c[j][2]) * s +
+         c[j][1]) * s + c[j][0];
     out->velocity_ned_mps[j] =
-        (((5 * c[5] * s + 4 * c[4]) * s + 3 * c[3]) * s + 2 * c[2]) * s + c[1];
+        (((5 * c[j][5] * s + 4 * c[j][4]) * s + 3 * c[j][3]) * s +
+         2 * c[j][2]) * s + c[j][1];
     out->acceleration_ned_mps2[j] =
-        ((20 * c[5] * s + 12 * c[4]) * s + 6 * c[3]) * s + 2 * c[2];
+        ((20 * c[j][5] * s + 12 * c[j][4]) * s + 6 * c[j][3]) * s +
+        2 * c[j][2];
   }
   {
     float dy = remainderf(b->point.yaw_rad - a->point.yaw_rad, 6.28318530718f),

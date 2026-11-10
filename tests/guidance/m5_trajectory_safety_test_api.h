@@ -110,4 +110,19 @@ uint8_t m5_trajectory_safety_test_consumer_local_seconds(
     uint32_t step_us, uint32_t interval, uint32_t offset_us, uint64_t base_us,
     float *seconds);
 
+/* Actual binary32 coefficients produced by the shared production function. */
+uint8_t m5_trajectory_safety_test_consumer_coefficients(
+    uint32_t step_us, uint32_t interval, const float start_position[3],
+    const float start_velocity[3], const float start_acceleration[3],
+    const float end_position[3], const float end_velocity[3],
+    const float end_acceleration[3], float coefficients[18]);
+
+/* Full consumer output (position, velocity, acceleration) plus the local time. */
+uint8_t m5_trajectory_safety_test_consumer_full_sample(
+    uint32_t step_us, uint32_t interval, uint32_t offset_us, uint64_t base_us,
+    const float start_position[3], const float start_velocity[3],
+    const float start_acceleration[3], const float end_position[3],
+    const float end_velocity[3], const float end_acceleration[3],
+    float position[3], float velocity[3], float acceleration[3], float *seconds);
+
 #endif /* M5_TRAJECTORY_SAFETY_TEST_API_H */

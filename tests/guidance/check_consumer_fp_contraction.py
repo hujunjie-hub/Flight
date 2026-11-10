@@ -151,9 +151,15 @@ def check_model_against_source(source=None):
         for token in tokens:
             if token not in source:
                 missing.append(f"{section}: {token}")
+    import hashlib
+    sources = {}
+    for path in (VALIDATOR, CONSUMER):
+        sources[str(path.relative_to(ROOT)).replace("\\", "/")] = hashlib.sha256(
+            path.read_bytes()).hexdigest()
     return {
         "status": "MATCH" if not missing else "MISMATCH",
         "source": str(VALIDATOR.relative_to(ROOT)).replace("\\", "/"),
+        "source_sha256": sources,
         "missing_tokens": missing,
         "note": ("Report fields are derived from tokens that must exist in the "
                  "compiled validator source; a mismatch fails the check."),
@@ -229,9 +235,9 @@ def main():
             "horner_term": "gamma_n * sum |cf_i| * s^i with gamma_n = n*u/(1-n*u)",
             "horner_roundings": {"position": 10, "velocity": 12,
                                  "acceleration": 10},
-            "time_term": "gamma_2 * s_max * |d^k p/ds^k|(s_eval_max) with "
-                         "gamma_2 = 2u/(1-2u), s_exact = h*(offset/step)",
-            "evaluation_interval": "s_eval_max = s_max + gamma_2*s_max",
+            "time_term": "gamma_2 * t_max * |d^k p/ds^k|(s_eval_max) with "
+                         "gamma_2 = 2u/(1-2u), s_exact = local_us/1e6, t_max = step_us/1e6",
+            "evaluation_interval": "s_eval_max = max(t_max, h) + gamma_2*t_max",
             "subnormal_term": "n * 2^-149 * max(1, s_eval_max)^n",
         },
         "model_check": model,

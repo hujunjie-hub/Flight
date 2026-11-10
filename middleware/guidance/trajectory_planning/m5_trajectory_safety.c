@@ -2442,6 +2442,82 @@ uint8_t m5_trajectory_safety_test_consumer_local_seconds(
   return (uint8_t)isfinite(*seconds);
 }
 
+extern void control_reference_hermite_coefficients(
+    const float p0[3], const float v0[3], const float a0[3], const float p1[3],
+    const float v1[3], const float a1[3], float h, float c[3][6]);
+
+uint8_t m5_trajectory_safety_test_consumer_coefficients(
+    uint32_t step_us, uint32_t interval, const float start_position[3],
+    const float start_velocity[3], const float start_acceleration[3],
+    const float end_position[3], const float end_velocity[3],
+    const float end_acceleration[3], float coefficients[18])
+{
+  float c[3][6];
+  unsigned axis, k;
+
+  if (coefficients == NULL || start_position == NULL || start_velocity == NULL ||
+      start_acceleration == NULL || end_position == NULL ||
+      end_velocity == NULL || end_acceleration == NULL) return 0u;
+  if (interval >= PRODUCT_PREVIEW_COUNT) return 0u;
+  if (step_us != (uint32_t)PRODUCT_PREVIEW_STEP_US &&
+      step_us != (uint32_t)PRODUCT_ROUTE_PREVIEW_STEP_US) return 0u;
+  control_reference_hermite_coefficients(start_position, start_velocity,
+                                         start_acceleration, end_position,
+                                         end_velocity, end_acceleration,
+                                         (float)step_us * 1e-6f, c);
+  for (axis = 0u; axis < 3u; ++axis)
+    for (k = 0u; k < 6u; ++k)
+      coefficients[axis * 6u + k] = c[axis][k];
+  return 1u;
+}
+
+uint8_t m5_trajectory_safety_test_consumer_full_sample(
+    uint32_t step_us, uint32_t interval, uint32_t offset_us, uint64_t base_us,
+    const float start_position[3], const float start_velocity[3],
+    const float start_acceleration[3], const float end_position[3],
+    const float end_velocity[3], const float end_acceleration[3],
+    float position[3], float velocity[3], float acceleration[3], float *seconds)
+{
+  MotionReference reference;
+  ProductMotionPoint sampled;
+  const MotionReferencePoint *a = NULL;
+  const MotionReferencePoint *b = NULL;
+  uint32_t measured_step = 0u;
+  float local_seconds = 0.0f;
+  uint64_t time;
+  unsigned axis;
+
+  if (position == NULL || velocity == NULL || acceleration == NULL ||
+      seconds == NULL) return 0u;
+  if (interval >= PRODUCT_PREVIEW_COUNT || offset_us > step_us) return 0u;
+  if (step_us != (uint32_t)PRODUCT_PREVIEW_STEP_US &&
+      step_us != (uint32_t)PRODUCT_ROUTE_PREVIEW_STEP_US) return 0u;
+  safety_test_fill_reference(&reference, step_us, base_us);
+  a = interval == 0u ? &reference.anchor : &reference.points[interval - 1u];
+  b = &reference.points[interval];
+  {
+    MotionReferencePoint *start_point = interval == 0u
+        ? &reference.anchor : &reference.points[interval - 1u];
+    safety_test_set_state(start_point, start_position, start_velocity,
+                          start_acceleration);
+  }
+  safety_test_set_state(&reference.points[interval], end_position, end_velocity,
+                        end_acceleration);
+  time = base_us + (uint64_t)interval * step_us + offset_us;
+  if (control_sample_reference(&reference, time, &sampled) != STATUS_OK) return 0u;
+  if (control_reference_locate_segment(&reference, time, &a, &b, &local_seconds,
+                                       &measured_step) != STATUS_OK) return 0u;
+  if (measured_step != step_us) return 0u;
+  for (axis = 0u; axis < 3u; ++axis) {
+    position[axis] = sampled.position_ned_m[axis];
+    velocity[axis] = sampled.velocity_ned_mps[axis];
+    acceleration[axis] = sampled.acceleration_ned_mps2[axis];
+  }
+  *seconds = local_seconds;
+  return (uint8_t)(isfinite(local_seconds) && isfinite(position[0]) &&
+                   isfinite(velocity[0]) && isfinite(acceleration[0]));
+}
+
 #endif /* FLIGHT_M5_SAFETY_TEST_API */
 
 #endif /* FLIGHT_M5_HOST_PLANNER */

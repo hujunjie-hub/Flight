@@ -39,13 +39,16 @@ def main():
     outside = 0
 
     for step_us in STEPS:
+        # Physical time reference: the microsecond count is exact, so
+        # step_us/1e6 is the true segment duration. h is only the binary32 value
+        # the consumer computes and must not be used as the reference.
         h = consumer_seconds(step_us)
-        s_max = h
+        s_max = Fraction(step_us, 1000000)
         delta_s = GAMMA2 * s_max
-        s_eval_max = s_max + delta_s
+        s_eval_max = max(s_max, Fraction(h)) + delta_s
         for offset_us in range(step_us + 1):
             s_c = consumer_seconds(offset_us)
-            s_exact = h * Fraction(offset_us, step_us)
+            s_exact = Fraction(offset_us, 1000000)
             error = abs(s_c - s_exact)
             checked += 1
             if error > GAMMA2 * s_exact:

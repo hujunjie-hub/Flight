@@ -99,18 +99,32 @@ def bernstein_bound(coefficients, s_max):
 
 
 
-def envelope_legal(start_p, start_v, start_a, end_p, end_v, end_a, h):
-    """Continuous check that the curve itself stays inside the product envelope."""
+def envelope_legal(start_p, start_v, start_a, end_p, end_v, end_a, h, step_us):
+    """Product envelope: per-axis AND 3-D norm limits on [0, t_max].
+
+    Three axes at the per-axis limit (4 m/s each) are not legal because the 3-D
+    norm would be ~6.9 m/s; both checks are required."""
+    t_max = Fraction(step_us, 1000000)
+    speed_sq = Fraction(0)
+    accel_sq = Fraction(0)
     for axis in range(3):
         exact = exact_coefficients(start_p[axis], start_v[axis], start_a[axis],
                                    end_p[axis], end_v[axis], end_a[axis], h)
         velocity = [Fraction(k) * exact[k] for k in range(1, 6)]
         acceleration = [Fraction(k * (k - 1)) * exact[k] for k in range(2, 6)]
-        if bernstein_bound(velocity, Fraction(f32(h))) > Fraction(f32(V_MAX)):
-            return False
-        if bernstein_bound(acceleration, Fraction(f32(h))) > Fraction(f32(A_MAX)):
-            return False
-    return True
+        v_bound = bernstein_bound(velocity, t_max)
+        a_bound = bernstein_bound(acceleration, t_max)
+        if v_bound > Fraction(f32(V_MAX)):
+            return False, "per-axis velocity"
+        if a_bound > Fraction(f32(A_MAX)):
+            return False, "per-axis acceleration"
+        speed_sq += v_bound * v_bound
+        accel_sq += a_bound * a_bound
+    if speed_sq > Fraction(f32(V_MAX)) ** 2:
+        return False, "3-D speed norm"
+    if accel_sq > Fraction(f32(A_MAX)) ** 2:
+        return False, "3-D acceleration norm"
+    return True, ""
 
 def continuous_bound(start_p, start_v, start_a, end_p, end_v, end_a, h):
     worst = Fraction(0)
@@ -167,6 +181,9 @@ def main():
     worst_case = None
     model_ok = True
     cases = 0
+    candidates = 0
+    legal_cases = 0
+    rejected = {}
     for step_us in STEPS:
         h = f32(step_us * f32(1e-6))
         states = []
@@ -199,8 +216,12 @@ def main():
                 [f32(rnd.uniform(-A_MAX, A_MAX)) for _ in range(3)],
                 [f32(rnd.uniform(-20.0, 20.0)) for _ in range(3)]))
         for state in states:
-            if not envelope_legal(*state, h):
+            candidates += 1
+            legal, reason = envelope_legal(*state, h, step_us)
+            if not legal:
+                rejected[reason] = rejected.get(reason, 0) + 1
                 continue
+            legal_cases += 1
             cases += 1
             if cases % 37 == 0 and not verify_model(probes, step_us, state):
                 model_ok = False
@@ -245,9 +266,12 @@ def main():
         "seed": f"0x{SEED:X}",
         "steps": list(STEPS),
         "cases": cases,
+        "candidates": candidates,
+        "legal_cases": legal_cases,
+        "rejected": rejected,
         "random_cases_per_step": RANDOM_CASES,
         "model_matches_c_consumer": model_ok,
-        "continuous_bound_m": float(worst),
+        "coefficient_error_bound_m": float(worst),
         "worst_case": worst_case,
         "channels": channels,
         "verdict": "MATHEMATICAL_FEASIBILITY_NOT_ESTABLISHED",
