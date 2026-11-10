@@ -58,7 +58,7 @@ static float norm3_upper(const float v[3])
 
 | ID | 场景 | 独立 oracle / 断言 | Seed | 状态 |
 |---|---|---|---|---|
-| S06-080 | norm3 上/下界在 float ULP 边界、零、次正规数、极端尺度的差分 | MPFR（或有明确误差证明的独立高精度实现）；upper 不低估、lower 不高估 | 0x6D350680 | NOT_RUN |
+| S06-080 | norm3 上/下界在 float ULP 边界、零、次正规数、极端尺度的差分 | Fraction 精确有理数平方范数 oracle；upper 不低估、lower 不高估 | 0x6D350680 | IMPLEMENTED / CI_PENDING |
 | S06-081 | 动态相对运动端到端连续最小距离，覆盖恒速解析最近点、恒加速度相对运动及不确定度膨胀 | 独立解析解 + 区间分支定界；记录最小反例，不以固定时间采样作为唯一 oracle | 0x6D350681 | NOT_RUN |
 | S06-082 | 动态障碍物精确相切、内外各 1 ULP、相邻预览区间接缝 | 解析最小距离与生产 PASS/碰撞分类一致；相切按保守规则拒绝 | 0x6D350682 | NOT_RUN |
 | S06-083 | 动态障碍物在自适应细分的分裂点前、恰在分裂点、分裂点后各 1 ULP | 对整段与分段独立 oracle 等价；任一段未证明必须 fail-closed | 0x6D350683 | NOT_RUN |
