@@ -178,3 +178,32 @@ Run #499 evidence:
 - Integration and sanitizers skipped because the M5 Host step failed.
 
 Run #501 is triggered by commit `0349587`; status must be rechecked before declaring the fixes validated. M5-06 remains BLOCKED.
+
+ 
+## 9. CI #509 verified result (2026-11-10)
+
+Verified commit: `0c761964d4bc6cfeec73ba60464657db450743ee`. GitHub Actions run #509 completed with conclusion SUCCESS; all four jobs passed.
+
+| Job / suite | Result |
+|---|---:|
+| M4 Host | 927 checks / 0 failures |
+| M5 Host | 269,207 checks / 0 failures |
+| M4/M5 Integration | 1,000 checks / 0 failures |
+| M5 ASan/UBSan | 269,207 checks / 0 failures |
+| Integration ASan/UBSan | 1,000 checks / 0 failures |
+| Source layout / time-service | PASS |
+| Navigation / control | PASS |
+| Cortex-M7 compile and MPC RAM checks | PASS |
+
+Independent Fraction oracles:
+- S06-080: binary32 upper-bound 10,007 cases and binary64 lower-bound 10,007 cases; seed `0x6D350680`.
+- S06-084: predicted-position exact Fraction oracle 10,007 cases; seed `0x6D350684`.
+
+Cortex-M7 compile evidence:
+- M5 Host/SIL-only translation unit compiled for Cortex-M7 as an object only; it is not linked into the product.
+- MPC RAM 29,252 B; worker stack 8,192 B; largest static frame 2,024 B.
+- This is compiler/architecture compatibility evidence only, not H723 runtime WCET, target RAM/stack watermark, HIL, or flight validation.
+
+S06-083 test correction: the initial LIFO work stack processes interval zero first. A successful adaptive collision therefore correctly needs only two work units (parent + child), not more than the 24 preview intervals. The test now asserts `work_units > 1` and all three exact/±1 ULP cases pass.
+
+Status: **HOST/SIL AND CORTEX-M7 COMPILE VALIDATION PASS at #509**. This does not close MR-008's independent mathematical proof review, does not authorize M5-07, and does not authorize H723 obstacle avoidance. Remaining open items are listed below.
