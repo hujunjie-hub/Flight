@@ -163,7 +163,7 @@ ARM 静态检查报告：MPC RAM 29,252 bytes、worker stack 8,192 bytes、最�
 | S06-082 | 动态障碍物精确相切、内外 1 ULP、相邻预览接缝 | 相切保守拒绝，分类与独立 oracle 一致 | NOT_RUN；seed `0x6D350682` |
 | S06-083 | 自适应细分点前/恰在/后 1 ULP 的动态碰撞 | 整段/分段 oracle 一致，未证明则 fail-closed | NOT_RUN；seed `0x6D350683` |
 
-**当前阻塞：** MR-004（sqrt 上界误差契约）和 MR-007（显式浮点编译约束）未关闭。现有 #438 的 Cortex-M7 证据包含 MPC RAM 检查及 M4/M5 生产源交叉编译；M5-06 验证器本身由 `FLIGHT_M5_HOST_PLANNER` 编译门控，不能把该 ARM 编译结果表述为 M5-06 验证器已在 Cortex-M7 目标上编译或可运行。新的 ARM 证据必须区分编译目标、源文件清单、RAM 统计对象和 Host-only 模块边界。
+**当前阻塞：** MR-004 的新 bit-search 证明及 Fraction oracle 尚待独立审查和本轮 CI；MR-007 的浮点 flags 与工具链记录已实现，但需 CI 证据确认。当前 `arm_build_check.sh` 已将 M5-06 Host-only validator 源交叉编译为 Cortex-M7 object（不进入产品链接）；不得将该对象编译等同于目标运行、WCET 或实机 RAM/stack 验收。MPC RAM 数字仍只代表 MPC 资源。
 
 当前审查状态：**BLOCKED / REVIEW_INCOMPLETE**。S06-080..083 尚未执行；没有新的 CI run 或新的数学审查批准。M5-07 不得开始。
 
