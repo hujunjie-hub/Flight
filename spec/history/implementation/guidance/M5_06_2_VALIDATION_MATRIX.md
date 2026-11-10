@@ -175,3 +175,14 @@ ARM 静态检查报告：MPC RAM 29,252 bytes、worker stack 8,192 bytes、最�
 - 接入：`tests/guidance/run_host_tests.sh` 在常规及 ASan/UBSan 主测试之后构建独立 Host shared object，并运行精确 oracle（oracle DSO 不启用 sanitizer，避免 Python 进程 ASan runtime preload 顺序依赖）。
 
 状态：**IMPLEMENTED / CI_PENDING**。当前没有本次提交的成功 CI 证据；不得把实现或测试代码存在等同测试 PASS。
+ 
+## S06-080..083 源码实现复核（2026-11-10；CI 尚待验证）
+
+| ID | 实际源码覆盖 | 当前状态 |
+|---|---|---|
+| S06-080 | Fraction 精确平方范数 oracle：binary32 上界 10,007 组 + binary64 下界 10,007 组；固定 seed `0x6D350680` | IMPLEMENTED / CI_PENDING；最近扩展 commit `61dbc4c` |
+| S06-081 | 64 组恒速最近点解析差分 + 64 组恒加速度端点/驻点/根候选点解析差分；seed `0xD1FF0610`、`0x6D350681` | IMPLEMENTED / CI_PENDING；恒加速度 oracle 使用 long double，不是区间证明 |
+| S06-082 | 精确切触、内侧/外侧 1 ULP、安全净空及 20ms seam 精确/±1 ULP 动态碰撞 | IMPLEMENTED / CI_PENDING；外侧 1 ULP 保守拒绝允许 |
+| S06-083 | 自适应细分中点碰撞，起点精确/±1 ULP 三组；断言 work_units 确认细分被执行 | IMPLEMENTED / CI_PENDING；尚未形成整段/分段独立 oracle 等价证明 |
+
+以上为源码存在性和测试断言静态检查，不是测试执行证据。必须等待新 commit 的 Host、ASan/UBSan、Cortex-M7 compile workflow 全部实际结果；任何失败需记录完整输入与最小反例。
