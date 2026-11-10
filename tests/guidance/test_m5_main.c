@@ -2760,6 +2760,48 @@ static void safety_set_far_dynamic_track(
   track->velocity_std_mps = 0.01f;
 }
 
+static void test_m5_safety_dynamic_prediction_large_epoch_invariance(void)
+{
+  SafetyFx low_epoch, high_epoch;
+  M5DynamicTrack *low_track, *high_track;
+  M5TrajectorySafetyStatus low_status, high_status;
+  const uint64_t low_now = 180000000ull;
+  const uint64_t high_now = UINT64_MAX - 1000000000ull;
+
+  safety_fx_init(&low_epoch, low_now);
+  safety_fx_init(&high_epoch, high_now);
+  safety_set_constant_position(&low_epoch, 0.0f, 0.0f, 0.0f);
+  safety_set_constant_position(&high_epoch, 0.0f, 0.0f, 0.0f);
+
+  low_track = &low_epoch.map.tracks[0];
+  high_track = &high_epoch.map.tracks[0];
+  safety_set_far_dynamic_track(low_track, 1190u, low_now,
+      3.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f);
+  safety_set_far_dynamic_track(high_track, 1190u, high_now,
+      3.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f);
+
+  low_track->sample_us -= 100000u;
+  low_track->expires_us = low_track->sample_us +
+      M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US;
+  high_track->sample_us -= 100000u;
+  high_track->expires_us = high_track->sample_us +
+      M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US;
+  low_track->position_std_m = high_track->position_std_m = 0.0f;
+  low_track->velocity_std_mps = high_track->velocity_std_mps = 0.0f;
+
+  low_status = m5_trajectory_safety_validate(
+      &low_epoch.input, &low_epoch.workspace, &low_epoch.result);
+  high_status = m5_trajectory_safety_validate(
+      &high_epoch.input, &high_epoch.workspace, &high_epoch.result);
+
+  CHECK(low_status == M5_SAFETY_PASS);
+  CHECK(high_status == low_status);
+  CHECK(low_epoch.result.track_checks == PRODUCT_PREVIEW_COUNT);
+  CHECK(high_epoch.result.track_checks == low_epoch.result.track_checks);
+  CHECK(high_epoch.result.passed == low_epoch.result.passed);
+}
+
+
 static void test_m5_safety_dynamic_collision_at_adaptive_and_preview_boundaries(void)
 {
   SafetyFx fx;
@@ -4830,6 +4872,7 @@ int main(void)
     {"m5_safety_norm_ulp_boundaries", test_m5_safety_norm_ulp_boundaries},
     {"m5_safety_point_aabb_distance_oracle", test_m5_safety_point_aabb_distance_lower_oracle},
     {"m5_safety_dynamic_relative_sweep_oracle", test_m5_safety_dynamic_relative_sweep_oracle},
+    {"m5_safety_dynamic_prediction_large_epoch_invariance", test_m5_safety_dynamic_prediction_large_epoch_invariance},
     {"m5_safety_dynamic_adaptive_preview_boundaries", test_m5_safety_dynamic_collision_at_adaptive_and_preview_boundaries},
     {"m5_safety_dynamic_continuous_distance_differential", test_m5_safety_dynamic_continuous_distance_differential},
     {"m5_safety_dynamic_constant_acceleration_continuous_oracle", test_m5_safety_dynamic_constant_acceleration_continuous_oracle},
