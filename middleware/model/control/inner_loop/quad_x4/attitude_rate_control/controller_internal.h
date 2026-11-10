@@ -56,9 +56,14 @@ Status control_allocate_from_previous(const float inv[4][4], const float eff[4][
                                       const float lo[4], const float hi[4],
                                       float min_thrust, float max_thrust, ControlAllocation *out);
 /* Shared segment lookup: production and test hooks use this same function. */
-/* Single local-time conversion (normally seconds_per_us = 1e-6f). */
+/* Single local-time conversion (normally seconds_per_us = 1e-6f). The _ex
+   variant is the same production conversion with an explicit additive time
+   error used only by the M5-06 test hooks. */
 float control_reference_convert_local_time(uint64_t local_us,
                                            float seconds_per_us);
+float control_reference_convert_local_time_ex(uint64_t local_us,
+                                              float seconds_per_us,
+                                              double additive_seconds);
 /* C-side gamma_2 predicate used by the M5-06 time-error test path. */
 uint8_t control_reference_time_within_gamma2(float local_seconds,
                                              uint64_t local_us);

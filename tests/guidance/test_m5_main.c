@@ -5614,15 +5614,18 @@ static void test_m5_safety_product_envelope_source(void)
   CHECK(accel == envelope.max_linear_accel_mps2);
   {
     uint32_t valid_mask, envelope_id, config_version, parameter_hash, profile_hash;
+    uint32_t profile_id;
     float v2[3], a2[3], j2[3];
     CHECK(m5_trajectory_safety_test_product_envelope(
         &speed, &accel, v2, a2, j2, &valid_mask, &envelope_id,
-        &config_version, &parameter_hash, &profile_hash));
+        &config_version, &parameter_hash, &profile_hash, &profile_id));
     CHECK(valid_mask == envelope.vehicle_extension.valid_mask);
     CHECK(envelope_id == envelope.safety_envelope_id);
     CHECK(config_version == config.config_version);
     CHECK(parameter_hash == config.parameter_hash);
     CHECK(profile_hash == config.profile_hash);
+    CHECK(profile_id == envelope.header.profile_id);
+    CHECK(profile_id == PRODUCT_PROFILE_ID);
   }
   for (axis = 0u; axis < 3u; ++axis) {
     CHECK(velocity[axis] ==
@@ -5651,6 +5654,7 @@ static void test_m5_safety_consumer_time_error_c_path(void)
 {
   static const uint32_t steps[2] = {20000u, 40000u};
   static const uint32_t intervals[3] = {0u, 11u, 23u};
+  const double gamma2 = (2.0 * 0x1p-24) / (1.0 - 2.0 * 0x1p-24);
   unsigned s, i, k;
 
   for (s = 0u; s < 2u; ++s) {
@@ -5659,21 +5663,36 @@ static void test_m5_safety_consumer_time_error_c_path(void)
       for (k = 0u; k < 4u; ++k) {
         float seconds = 0.0f;
         uint8_t within = 0u;
+        double true_seconds = 0.0, error = 0.0;
+        const double bound = gamma2 * ((double)offsets[k] / 1000000.0);
         CHECK(m5_trajectory_safety_test_time_conversion(
-            steps[s], intervals[i], offsets[k], 0u, &seconds, &within));
+            steps[s], intervals[i], offsets[k], 0u, &seconds, &within,
+            &true_seconds, &error));
         CHECK(within == 1u);
-        CHECK(m5_trajectory_safety_test_time_conversion(
-            steps[s], intervals[i], offsets[k], 2u, &seconds, &within));
-        CHECK(within == 0u);
+        CHECK(error <= bound);
         if (offsets[k] > 0u) {
           CHECK(m5_trajectory_safety_test_time_conversion(
-              steps[s], intervals[i], offsets[k], 3u, &seconds, &within));
+              steps[s], intervals[i], offsets[k], 2u, &seconds, &within,
+              &true_seconds, &error));
           CHECK(within == 0u);
+          if (true_seconds > 0.0) {
+            CHECK(error > 3.0 * bound);
+            CHECK(error < 5.0 * bound);
+          }
+        }
+        if (offsets[k] > 0u) {
+          CHECK(m5_trajectory_safety_test_time_conversion(
+              steps[s], intervals[i], offsets[k], 3u, &seconds, &within,
+              &true_seconds, &error));
+          CHECK(within == 0u);
+          CHECK(error > bound);
         }
         if ((uint64_t)intervals[i] * steps[s] + offsets[k] != offsets[k]) {
           CHECK(m5_trajectory_safety_test_time_conversion(
-              steps[s], intervals[i], offsets[k], 1u, &seconds, &within));
+              steps[s], intervals[i], offsets[k], 1u, &seconds, &within,
+              &true_seconds, &error));
           CHECK(within == 0u);
+          CHECK(error > bound);
         }
       }
     }
@@ -5700,6 +5719,10 @@ static void test_m5_safety_product_config_validation(void)
 
   fms_model_default_config(&config);
   config.profile_hash = 0u;
+  CHECK(fms_product_validate_config(&config) != STATUS_OK);
+
+  fms_model_default_config(&config);
+  config.profile_hash = 0xDEADBEEFu;
   CHECK(fms_product_validate_config(&config) != STATUS_OK);
 
   fms_model_default_config(&config);

@@ -108,6 +108,9 @@ typedef struct {
   float velocity_axis_bound[3];
   float acceleration_axis_bound[3];
   float jerk_axis_bound[3];
+  float jerk_bernstein_bound[3];
+  float jerk_tail_bound[3];
+  float jerk_consumer_bound[3];
   float velocity_mid_norm;
   float position_rounding_error_m;
   float velocity_rounding_error_mps;
@@ -1342,10 +1345,15 @@ static uint8_t curve_bounds(
       if (consumer_value.valid == 0u) return 0u;
       consumer_abs = interval_abs_max(consumer_value);
 
+      bounds->jerk_bernstein_bound[axis] = round_up_float(bernstein_abs);
+      bounds->jerk_tail_bound[axis] = round_up_float(tail_abs);
+      bounds->jerk_consumer_bound[axis] = round_up_float(consumer_abs);
       jerk_abs = fmax(bernstein_abs, fmax(tail_abs, consumer_abs));
-
       bounds->jerk_axis_bound[axis] = round_up_float(jerk_abs);
-      if (!isfinite(bounds->jerk_axis_bound[axis])) return 0u;
+      if (!isfinite(bounds->jerk_axis_bound[axis]) ||
+          !isfinite(bounds->jerk_bernstein_bound[axis]) ||
+          !isfinite(bounds->jerk_tail_bound[axis]) ||
+          !isfinite(bounds->jerk_consumer_bound[axis])) return 0u;
     }
     bounds->position_low[axis] = round_down_float(position_low);
     bounds->position_high[axis] = round_up_float(position_high);
@@ -2238,6 +2246,63 @@ uint8_t m5_trajectory_safety_test_curve_jerk(
 }
 
 
+uint8_t m5_trajectory_safety_test_curve_jerk_components(
+    const float start_position[3],
+    const float start_velocity[3],
+    const float start_acceleration[3],
+    const float end_position[3],
+    const float end_velocity[3],
+    const float end_acceleration[3],
+    float duration_s,
+    float u0,
+    float u1,
+    float bernstein_bound[3],
+    float tail_bound[3],
+    float consumer_bound[3],
+    float total_bound[3])
+{
+  MotionReferencePoint start, end;
+  M5SafetyBezier bezier;
+  M5SafetyCurveBounds bounds;
+  double local_duration;
+  unsigned axis;
+
+  if (start_position == NULL || start_velocity == NULL ||
+      start_acceleration == NULL || end_position == NULL ||
+      end_velocity == NULL || end_acceleration == NULL ||
+      bernstein_bound == NULL || tail_bound == NULL ||
+      consumer_bound == NULL || total_bound == NULL ||
+      !finite3(start_position) || !finite3(start_velocity) ||
+      !finite3(start_acceleration) || !finite3(end_position) ||
+      !finite3(end_velocity) || !finite3(end_acceleration) ||
+      !isfinite(duration_s) || duration_s <= 0.0f ||
+      !isfinite(u0) || !isfinite(u1) || u0 < 0.0f ||
+      u1 > 1.0f || u1 <= u0) return 0u;
+
+  memset(&start, 0, sizeof(start));
+  memset(&end, 0, sizeof(end));
+  for (axis = 0u; axis < 3u; ++axis) {
+    start.point.position_ned_m[axis] = start_position[axis];
+    start.point.velocity_ned_mps[axis] = start_velocity[axis];
+    start.point.acceleration_ned_mps2[axis] = start_acceleration[axis];
+    end.point.position_ned_m[axis] = end_position[axis];
+    end.point.velocity_ned_mps[axis] = end_velocity[axis];
+    end.point.acceleration_ned_mps2[axis] = end_acceleration[axis];
+  }
+  if (!build_curve(&start, &end, (double)duration_s,
+                   (float)u0, (float)u1, &bezier)) return 0u;
+  local_duration = (double)duration_s * ((double)u1 - (double)u0);
+  if (!curve_bounds(&bezier, local_duration, &bounds)) return 0u;
+  for (axis = 0u; axis < 3u; ++axis) {
+    bernstein_bound[axis] = bounds.jerk_bernstein_bound[axis];
+    tail_bound[axis] = bounds.jerk_tail_bound[axis];
+    consumer_bound[axis] = bounds.jerk_consumer_bound[axis];
+    total_bound[axis] = bounds.jerk_axis_bound[axis];
+  }
+  return 1u;
+}
+
+
 uint8_t m5_trajectory_safety_test_curve_eval(
     const float start_position[3],
     const float start_velocity[3],
@@ -2474,41 +2539,45 @@ extern Status control_sample_reference(const MotionReference *ref,
                                        ProductMotionPoint *out);
 extern float control_reference_convert_local_time(uint64_t local_us,
                                                   float seconds_per_us);
+extern float control_reference_convert_local_time_ex(uint64_t local_us,
+                                                     float seconds_per_us,
+                                                     double additive_seconds);
 extern uint8_t control_reference_time_within_gamma2(float local_seconds,
                                                     uint64_t local_us);
 
 uint8_t m5_trajectory_safety_test_time_conversion(
     uint32_t step_us, uint32_t interval, uint32_t offset_us, uint8_t mode,
-    float *seconds, uint8_t *within_gamma2)
+    float *seconds, uint8_t *within_gamma2, double *true_seconds,
+    double *actual_error)
 {
   uint64_t local_us;
   uint64_t true_local_us;
   float scale = 1e-6f;
-  double gamma2;
+  double additive_seconds = 0.0;
 
-  if (seconds == NULL || within_gamma2 == NULL ||
-      interval >= PRODUCT_PREVIEW_COUNT ||
+  if (seconds == NULL || within_gamma2 == NULL || true_seconds == NULL ||
+      actual_error == NULL || interval >= PRODUCT_PREVIEW_COUNT ||
       (step_us != (uint32_t)PRODUCT_PREVIEW_STEP_US &&
        step_us != (uint32_t)PRODUCT_ROUTE_PREVIEW_STEP_US) ||
       offset_us > step_us || mode > 3u) return 0u;
   true_local_us = offset_us;
   local_us = offset_us;
+  *true_seconds = (double)true_local_us / 1000000.0;
   if (mode == 1u) {
     local_us = (uint64_t)interval * step_us + offset_us;
   } else if (mode == 2u) {
-    gamma2 = gamma2_upper();
-    {
-      uint64_t error_us = (uint64_t)(4.0 * gamma2 * (double)offset_us);
-      if (error_us == 0u) error_us = 1u;
-      local_us += error_us;
-    }
+    /* Exact additive seconds, not an integer-microsecond substitute. */
+    additive_seconds = 4.0 * gamma2_upper() * *true_seconds;
   } else if (mode == 3u) {
     scale = 1e-6f * (float)step_us / (float)(step_us + 1000u);
   }
-  *seconds = control_reference_convert_local_time(local_us, scale);
+  *seconds = control_reference_convert_local_time_ex(
+      local_us, scale, additive_seconds);
   *within_gamma2 = control_reference_time_within_gamma2(*seconds,
                                                         true_local_us);
-  return (uint8_t)(isfinite(*seconds) && (*within_gamma2 <= 1u));
+  *actual_error = fabs((double)*seconds - *true_seconds);
+  return (uint8_t)(isfinite(*seconds) && (*within_gamma2 <= 1u) &&
+                   isfinite(*actual_error));
 }
 
 uint8_t m5_trajectory_safety_test_consumer_time(
@@ -2747,6 +2816,40 @@ uint8_t m5_trajectory_safety_test_consumer_full_sample(
                    isfinite(velocity[0]) && isfinite(acceleration[0]));
 }
 
+uint8_t m5_trajectory_safety_test_active_time(
+    uint32_t step_us, uint32_t interval, uint32_t offset_us, uint64_t base_us,
+    uint32_t *active_interval, uint64_t *local_us, uint64_t *global_us,
+    float *local_seconds)
+{
+  MotionReference reference;
+  const MotionReferencePoint *a = NULL;
+  const MotionReferencePoint *b = NULL;
+  uint32_t measured_step = 0u;
+  uint64_t time;
+  uint64_t global;
+  float seconds = 0.0f;
+
+  if (active_interval == NULL || local_us == NULL || global_us == NULL ||
+      local_seconds == NULL) return 0u;
+  if (step_us != (uint32_t)PRODUCT_PREVIEW_STEP_US &&
+      step_us != (uint32_t)PRODUCT_ROUTE_PREVIEW_STEP_US) return 0u;
+  if (interval >= PRODUCT_PREVIEW_COUNT || offset_us > step_us) return 0u;
+  safety_test_fill_reference(&reference, step_us, base_us);
+  global = (uint64_t)interval * step_us + offset_us;
+  time = base_us + global;
+  if (control_reference_locate_segment(&reference, time, &a, &b, &seconds,
+                                       &measured_step) != STATUS_OK)
+    return 0u;
+  if (measured_step != step_us || a == NULL) return 0u;
+  *active_interval = (a == &reference.anchor)
+                         ? 0u
+                         : (uint32_t)((a - reference.points) + 1);
+  *global_us = global;
+  *local_us = global - a->offset_us;
+  *local_seconds = seconds;
+  return (uint8_t)(isfinite(seconds) && *local_us <= global);
+}
+
 uint8_t m5_trajectory_safety_test_active_segment(
     uint32_t step_us, uint32_t interval, uint32_t offset_us, uint64_t base_us,
     const float start_position[3], const float start_velocity[3],
@@ -2811,7 +2914,7 @@ uint8_t m5_trajectory_safety_test_product_envelope(
     float max_velocity_ned_mps[3], float max_acceleration_ned_mps2[3],
     float max_jerk_ned_mps3[3], uint32_t *valid_mask,
     uint32_t *safety_envelope_id, uint32_t *config_version,
-    uint32_t *parameter_hash, uint32_t *profile_hash)
+    uint32_t *parameter_hash, uint32_t *profile_hash, uint32_t *profile_id)
 {
   ProductFmsConfig config;
   SafetyEnvelope envelope;
@@ -2821,7 +2924,8 @@ uint8_t m5_trajectory_safety_test_product_envelope(
       max_velocity_ned_mps == NULL || max_acceleration_ned_mps2 == NULL ||
       max_jerk_ned_mps3 == NULL || valid_mask == NULL ||
       safety_envelope_id == NULL || config_version == NULL ||
-      parameter_hash == NULL || profile_hash == NULL) return 0u;
+      parameter_hash == NULL || profile_hash == NULL ||
+      profile_id == NULL) return 0u;
   fms_model_default_config(&config);
   if (fms_product_validate_config(&config) != STATUS_OK) return 0u;
   if (fms_product_build_safety_envelope(&fms_quad_x4_policy, &config, 1u,
@@ -2849,6 +2953,7 @@ uint8_t m5_trajectory_safety_test_product_envelope(
   *config_version = config.config_version;
   *parameter_hash = config.parameter_hash;
   *profile_hash = config.profile_hash;
+  *profile_id = envelope.header.profile_id;
   return 1u;
 }
 
@@ -2858,10 +2963,12 @@ uint8_t m5_trajectory_safety_test_product_limits(
     float max_jerk_ned_mps3[3])
 {
   uint32_t valid_mask, envelope_id, config_version, parameter_hash, profile_hash;
+  uint32_t profile_id;
   return m5_trajectory_safety_test_product_envelope(
       max_linear_speed_mps, max_linear_accel_mps2, max_velocity_ned_mps,
       max_acceleration_ned_mps2, max_jerk_ned_mps3, &valid_mask,
-      &envelope_id, &config_version, &parameter_hash, &profile_hash);
+      &envelope_id, &config_version, &parameter_hash, &profile_hash,
+      &profile_id);
 }
 
 #endif /* FLIGHT_M5_SAFETY_TEST_API */

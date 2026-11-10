@@ -268,6 +268,7 @@ def main():
             "config_version": limits.config_version,
             "parameter_hash": limits.parameter_hash,
             "profile_hash": limits.profile_hash,
+            "profile_id": limits.profile_id,
         },
         "checked_samples": checked,
         "component_max_m": {

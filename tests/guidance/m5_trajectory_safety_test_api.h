@@ -33,6 +33,23 @@ uint8_t m5_trajectory_safety_test_curve_jerk(
     float u1,
     float jerk_axis_bound[3]);
 
+/* Separate bounds for the Bernstein original interval, the power-basis
+   gamma_2 tail, and the consumer binary32 polynomial. */
+uint8_t m5_trajectory_safety_test_curve_jerk_components(
+    const float start_position[3],
+    const float start_velocity[3],
+    const float start_acceleration[3],
+    const float end_position[3],
+    const float end_velocity[3],
+    const float end_acceleration[3],
+    float duration_s,
+    float u0,
+    float u1,
+    float bernstein_bound[3],
+    float tail_bound[3],
+    float consumer_bound[3],
+    float total_bound[3]);
+
 uint8_t m5_trajectory_safety_test_curve_eval(
     const float start_position[3],
     const float start_velocity[3],
@@ -102,6 +119,13 @@ uint8_t m5_trajectory_safety_test_interval_op(
     double b_low, double b_high,
     double *result_low, double *result_high);
 
+/* S06-108: production locator outputs the active segment, local_us and
+   global_us directly; Python does not recompute them. */
+uint8_t m5_trajectory_safety_test_active_time(
+    uint32_t step_us, uint32_t interval, uint32_t offset_us, uint64_t base_us,
+    uint32_t *active_interval, uint64_t *local_us, uint64_t *global_us,
+    float *local_seconds);
+
 /* S06-103: drive the real M6 control_sample_reference() with a unit-velocity
    linear reference so its x output is exactly the binary32 time s_c. */
 uint8_t m5_trajectory_safety_test_consumer_time(
@@ -112,7 +136,8 @@ uint8_t m5_trajectory_safety_test_consumer_time(
    2 +4*gamma_2, 3 wrong segment duration. */
 uint8_t m5_trajectory_safety_test_time_conversion(
     uint32_t step_us, uint32_t interval, uint32_t offset_us, uint8_t mode,
-    float *seconds, uint8_t *within_gamma2);
+    float *seconds, uint8_t *within_gamma2, double *true_seconds,
+    double *actual_error);
 
 /* S06-103 extension: arbitrary interval, base time and endpoint states.
    `seconds` is measured separately with a unit-velocity companion reference,
@@ -168,6 +193,6 @@ uint8_t m5_trajectory_safety_test_product_envelope(
     float max_velocity_ned_mps[3], float max_acceleration_ned_mps2[3],
     float max_jerk_ned_mps3[3], uint32_t *valid_mask,
     uint32_t *safety_envelope_id, uint32_t *config_version,
-    uint32_t *parameter_hash, uint32_t *profile_hash);
+    uint32_t *parameter_hash, uint32_t *profile_hash, uint32_t *profile_id);
 
 #endif /* M5_TRAJECTORY_SAFETY_TEST_API_H */

@@ -70,6 +70,14 @@ class Probes:
                               ctypes.c_uint64] + [pointer] * 6 + [
             pointer, pointer, pointer, ctypes.POINTER(ctypes.c_float)]
         self.full.restype = ctypes.c_uint8
+        self.active_time = library.m5_trajectory_safety_test_active_time
+        self.active_time.argtypes = [ctypes.c_uint32, ctypes.c_uint32,
+                                     ctypes.c_uint32, ctypes.c_uint64,
+                                     ctypes.POINTER(ctypes.c_uint32),
+                                     ctypes.POINTER(ctypes.c_uint64),
+                                     ctypes.POINTER(ctypes.c_uint64),
+                                     ctypes.POINTER(ctypes.c_float)]
+        self.active_time.restype = ctypes.c_uint8
 
 
 def run(probes, step_us, interval, base, offset_us, state):
@@ -78,9 +86,20 @@ def run(probes, step_us, interval, base, offset_us, state):
     coefficients = (ctypes.c_float * 18)()
     seconds = ctypes.c_float()
     active = ctypes.c_uint32()
+    local_us = ctypes.c_uint64()
+    global_us = ctypes.c_uint64()
+    local_seconds = ctypes.c_float()
+    active_from_time = ctypes.c_uint32()
+    if not probes.active_time(step_us, interval, offset_us, base,
+                              ctypes.byref(active_from_time),
+                              ctypes.byref(local_us), ctypes.byref(global_us),
+                              ctypes.byref(local_seconds)):
+        return None
     if not probes.active(step_us, interval, offset_us, base, *arrays, endpoints,
                          coefficients, ctypes.byref(seconds),
                          ctypes.byref(active)):
+        return None
+    if active.value != active_from_time.value:
         return None
     position = (ctypes.c_float * 3)()
     velocity = (ctypes.c_float * 3)()
@@ -95,14 +114,13 @@ def run(probes, step_us, interval, base, offset_us, state):
                                 endpoints[axis * 6 + 2], endpoints[axis * 6 + 3],
                                 endpoints[axis * 6 + 4], endpoints[axis * 6 + 5], h)
              for axis in range(3)]
-    global_us = interval * step_us + offset_us
-    local_us = global_us - active.value * step_us
     s_c = Fraction(seconds.value)
-    s_exact = Fraction(local_us, 1000000)
+    s_exact = Fraction(local_us.value, 1000000)
     measured = [Fraction(f32(position[axis])) for axis in range(3)]
     return {"c": c_series, "exact": exact, "measured": measured,
             "s_c": s_c, "s_exact": s_exact, "h": h, "active": active.value,
-            "global_us": global_us, "local_us": local_us}
+            "global_us": global_us.value, "local_us": local_us.value,
+            "local_seconds": local_seconds.value}
 
 
 def decompose_axes(data, coefficients=None, s_exact=None):

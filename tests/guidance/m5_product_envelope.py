@@ -19,7 +19,7 @@ def f32(value):
 class ProductEnvelope:
     def __init__(self, speed, accel, velocity, acceleration, jerk,
                  valid_mask, envelope_id, config_version, parameter_hash,
-                 profile_hash):
+                 profile_hash, profile_id):
         self.speed = speed
         self.accel = accel
         self.velocity = velocity
@@ -30,12 +30,14 @@ class ProductEnvelope:
         self.config_version = config_version
         self.parameter_hash = parameter_hash
         self.profile_hash = profile_hash
+        self.profile_id = profile_id
 
 
 def read_product_envelope(library):
     function = library.m5_trajectory_safety_test_product_envelope
     pointer = ctypes.POINTER(ctypes.c_float)
     function.argtypes = [pointer, pointer, pointer, pointer, pointer,
+                         ctypes.POINTER(ctypes.c_uint32),
                          ctypes.POINTER(ctypes.c_uint32),
                          ctypes.POINTER(ctypes.c_uint32),
                          ctypes.POINTER(ctypes.c_uint32),
@@ -52,10 +54,12 @@ def read_product_envelope(library):
     config_version = ctypes.c_uint32()
     parameter_hash = ctypes.c_uint32()
     profile_hash = ctypes.c_uint32()
+    profile_id = ctypes.c_uint32()
     if not function(ctypes.byref(speed), ctypes.byref(accel), velocity,
                     acceleration, jerk, ctypes.byref(valid_mask),
                     ctypes.byref(envelope_id), ctypes.byref(config_version),
-                    ctypes.byref(parameter_hash), ctypes.byref(profile_hash)):
+                    ctypes.byref(parameter_hash), ctypes.byref(profile_hash),
+                    ctypes.byref(profile_id)):
         raise SystemExit('product envelope API failed')
     if valid_mask.value != 0x7F or envelope_id.value == 0:
         raise SystemExit('product envelope identity/mask invalid')
@@ -68,7 +72,7 @@ def read_product_envelope(library):
         [float(jerk[i]) for i in range(3)],
         int(valid_mask.value), int(envelope_id.value),
         int(config_version.value), int(parameter_hash.value),
-        int(profile_hash.value))
+        int(profile_hash.value), int(profile_id.value))
 
 
 def exact_coefficients(p0, v0, a0, p1, v1, a1, h):

@@ -22,6 +22,9 @@ import sys
 from fractions import Fraction
 from math import comb
 
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
+from m5_product_envelope import exact_coefficients
+
 U = Fraction(1, 1 << 24)
 GAMMA2 = (2 * U) / (1 - 2 * U)
 STEPS = (20000, 40000)
@@ -97,6 +100,11 @@ class Probes:
         self.jerk.argtypes = [pointer] * 6 + [ctypes.c_float, ctypes.c_float,
                                               ctypes.c_float, pointer]
         self.jerk.restype = ctypes.c_uint8
+        self.components = library.m5_trajectory_safety_test_curve_jerk_components
+        self.components.argtypes = [pointer] * 6 + [
+            ctypes.c_float, ctypes.c_float, ctypes.c_float,
+            pointer, pointer, pointer, pointer]
+        self.components.restype = ctypes.c_uint8
 
 
 def main():
@@ -106,6 +114,8 @@ def main():
     checked = 0
     fail_closed_cases = 0
     tail_cases = 0
+    coverage = {name: {'min_slack': None, 'max_bound': 0.0}
+                for name in ('bernstein', 'tail', 'consumer', 'total')}
     failures = []
     wrong_underbound = 0
     wrong_checked = 0
@@ -122,16 +132,20 @@ def main():
                     if u1 <= u0:
                         continue
                     bound = (ctypes.c_float * 3)()
-                    if not probes.jerk(*arrays, ctypes.c_float(h),
-                                       ctypes.c_float(u0), ctypes.c_float(u1),
-                                       bound):
+                    bernstein = (ctypes.c_float * 3)()
+                    tail_bound = (ctypes.c_float * 3)()
+                    consumer = (ctypes.c_float * 3)()
+                    total = (ctypes.c_float * 3)()
+                    if not probes.components(*arrays, ctypes.c_float(h),
+                                             ctypes.c_float(u0), ctypes.c_float(u1),
+                                             bernstein, tail_bound, consumer, total):
                         # The subnormal fixture is intentionally outside the
                         # normal-range model; the validator must fail closed.
                         if state_index == len(STATES) - 1:
                             fail_closed_cases += 1
                             continue
                         failures.append(
-                            f'jerk API failed state={state_index} step={step_us} u=({u0},{u1})')
+                            f'jerk components API failed state={state_index} step={step_us} u=({u0},{u1})')
                         continue
                     duration = Fraction(f32(h)) * (Fraction(f32(u1)) -
                                                    Fraction(f32(u0)))
@@ -139,28 +153,51 @@ def main():
                     s1 = Fraction(f32(h)) * Fraction(f32(u1))
                     tail = s1 + GAMMA2 * s1
                     for axis in range(3):
-                        c = [Fraction(f32(coefficients[axis * 6 + k]))
-                             for k in range(6)]
-                        exact_body = exact_max(c, s0, s1)
-                        exact_tail = exact_max(c, s1, tail)
-                        exact = max(exact_body, exact_tail)
+                        c_consumer = [Fraction(f32(coefficients[axis * 6 + k]))
+                                      for k in range(6)]
+                        c_math = exact_coefficients(
+                            state[0][axis], state[1][axis], state[2][axis],
+                            state[3][axis], state[4][axis], state[5][axis], h)
+                        exact_body = exact_max(c_math, s0, s1)
+                        exact_tail = exact_max(c_math, s1, tail)
+                        exact_consumer = exact_max(c_consumer, s0, tail)
+                        exact = max(exact_body, exact_tail, exact_consumer)
                         checked += 1
                         tail_cases += 1
-                        if not (Fraction(f32(bound[axis])) >= exact_body):
+                        if not (Fraction(f32(bernstein[axis])) >= exact_body):
                             failures.append(
-                                f'bound<body step={step_us} u=({u0},{u1}) '
-                                f'axis={axis} bound={bound[axis]} '
+                                f'bernstein<body step={step_us} u=({u0},{u1}) '
+                                f'axis={axis} bound={bernstein[axis]} '
                                 f'exact={float(exact_body)}')
-                        if not (Fraction(f32(bound[axis])) >= exact_tail):
+                        if not (Fraction(f32(tail_bound[axis])) >= exact_tail):
                             failures.append(
-                                f'bound<tail step={step_us} u=({u0},{u1}) '
-                                f'axis={axis} bound={bound[axis]} '
+                                f'tail<tail_exact step={step_us} u=({u0},{u1}) '
+                                f'axis={axis} bound={tail_bound[axis]} '
                                 f'exact={float(exact_tail)}')
+                        if not (Fraction(f32(consumer[axis])) >= exact_consumer):
+                            failures.append(
+                                f'consumer<whole step={step_us} u=({u0},{u1}) '
+                                f'axis={axis} bound={consumer[axis]} '
+                                f'exact={float(exact_consumer)}')
+                        if not (Fraction(f32(total[axis])) >= exact):
+                            failures.append(
+                                f'total<whole step={step_us} u=({u0},{u1}) '
+                                f'axis={axis} bound={total[axis]} '
+                                f'exact={float(exact)}')
+                        for name, value, target in (
+                                ('bernstein', bernstein[axis], exact_body),
+                                ('tail', tail_bound[axis], exact_tail),
+                                ('consumer', consumer[axis], exact_consumer),
+                                ('total', total[axis], exact)):
+                            bound_fraction = Fraction(f32(value))
+                            slack = bound_fraction - target
+                            if coverage[name]['min_slack'] is None or                                     slack < coverage[name]['min_slack']:
+                                coverage[name]['min_slack'] = slack
+                            coverage[name]['max_bound'] = max(
+                                coverage[name]['max_bound'], float(bound_fraction))
                         # Negative control: the old tail conversion treats the
                         # Bernstein jerk controls as power coefficients.
-                        jc = jerk_bernstein_controls(
-                            [Fraction(f32(coefficients[axis * 6 + k]))
-                             for k in range(6)], f32(h))
+                        jc = jerk_bernstein_controls(c_math, f32(h))
                         ratio = s1 / duration
                         u_tail = Fraction(1) + GAMMA2 * ratio
                         if jc[2] != 0:
@@ -170,7 +207,7 @@ def main():
                             correct_tail = p0 + p1 * u_tail + p2 * u_tail * u_tail
                             wrong_tail = ((jc[2] * u_tail + jc[1]) * u_tail +
                                           jc[0])
-                            exact_tail = exact_max(c, s1, tail)
+                            exact_tail = exact_tail
                             wrong_checked += 1
                             if abs(wrong_tail) < exact_tail:
                                 wrong_underbound += 1
@@ -190,6 +227,9 @@ def main():
         'checked': checked,
         'fail_closed_cases': fail_closed_cases,
         'tail_cases': tail_cases,
+        'component_checks': checked * 3,
+        'coverage_slack': {name: {'min_slack': float(value['min_slack']) if value['min_slack'] is not None else None, 'max_bound': value['max_bound']} for name, value in coverage.items()},
+        'coverage_relation': 'bernstein[0,1] + tail[1,u_tail] + consumer[s0,s_tail]; total=max of all three',
         'wrong_tail_checked': wrong_checked,
         'wrong_tail_underbound': wrong_underbound,
         'failures': failures[:10],

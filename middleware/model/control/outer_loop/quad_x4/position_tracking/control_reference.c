@@ -4,10 +4,19 @@
 /* The single local-time conversion used by production and by the M5-06 test
    hooks. `seconds_per_us` is normally 1e-6f; a test may pass a deliberately
    wrong scale to exercise the gamma_2 check. */
+float control_reference_convert_local_time_ex(uint64_t local_us,
+                                              float seconds_per_us,
+                                              double additive_seconds)
+{
+  float base = (float)local_us * seconds_per_us;
+  if (additive_seconds == 0.0) return base;
+  return (float)((double)base + additive_seconds);
+}
+
 float control_reference_convert_local_time(uint64_t local_us,
                                            float seconds_per_us)
 {
-  return (float)local_us * seconds_per_us;
+  return control_reference_convert_local_time_ex(local_us, seconds_per_us, 0.0);
 }
 
 /* C-side gamma_2 predicate. The exact reference is local_us/1e6. */

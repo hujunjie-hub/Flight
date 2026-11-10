@@ -34,6 +34,9 @@ Status fms_product_validate_config(const ProductFmsConfig *config)
       config->profile_hash == 0u) {
     return STATUS_INVALID_ARGUMENT;
   }
+  if (config->profile_hash != PRODUCT_PROFILE_ID) {
+    return STATUS_PROFILE_MISMATCH;
+  }
   p = &config->payload;
   if (p->safety_policy_id != fms_quad_x4_policy.safety_policy_id) {
     return STATUS_PROFILE_MISMATCH;
