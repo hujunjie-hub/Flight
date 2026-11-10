@@ -257,6 +257,87 @@
       "cases": 10007,
       "status_at_code_baseline": "PASS",
       "oracle": "exact rational time/position enclosure and large-epoch invariance"
+    },
+    {
+      "id": "S06-085",
+      "name": "Exact Fraction coverage of the binary32 consumer envelope",
+      "seed": "0x6D350685",
+      "cases": 128,
+      "status_at_code_baseline": "PASS",
+      "oracle": "identical binary32 endpoints, consumer offset_us timing, exact rational reference; production envelope from the C API; uncovered=0, max gap/envelope 0.089",
+      "local_run": "M5-06-R4-20261110"
+    },
+    {
+      "id": "S06-086",
+      "name": "Real control_sample_reference vs validator curve",
+      "seed": "0x6D350686",
+      "cases": 45480,
+      "status_at_code_baseline": "PASS",
+      "oracle": "M6 consumer linked into the Host suite; 24 intervals x 33/17 samples x 3 axes x 3 quantities must stay inside the MR-009 envelope",
+      "local_run": "M5-06-R4-20261110"
+    },
+    {
+      "id": "S06-087",
+      "name": "Consumer static crossing rejected",
+      "seed": "deterministic",
+      "cases": 3,
+      "status_at_code_baseline": "PASS",
+      "oracle": "occupied cell on the consumed path -> STATIC_COLLISION",
+      "local_run": "M5-06-R4-20261110"
+    },
+    {
+      "id": "S06-088",
+      "name": "Consumer static clear companion passes",
+      "seed": "deterministic",
+      "cases": 2,
+      "status_at_code_baseline": "PASS",
+      "oracle": "same path, cell 0.25 m to the side -> PASS",
+      "local_run": "M5-06-R4-20261110"
+    },
+    {
+      "id": "S06-089",
+      "name": "Consumer preview seam collision",
+      "seed": "deterministic",
+      "cases": 2,
+      "status_at_code_baseline": "PASS",
+      "oracle": "cell exactly on the interval-15 preview knot -> STATIC_COLLISION",
+      "local_run": "M5-06-R4-20261110"
+    },
+    {
+      "id": "S06-090",
+      "name": "Consumer adaptive subdivision boundary",
+      "seed": "deterministic",
+      "cases": 5,
+      "status_at_code_baseline": "PASS",
+      "oracle": "0.16 m AABB clearance inside the unresolved band -> PASS with work_units > 24; 0.149 m -> STATIC_COLLISION",
+      "local_run": "M5-06-R4-20261110"
+    },
+    {
+      "id": "S06-091",
+      "name": "Consumer dynamic track boundary",
+      "seed": "deterministic",
+      "cases": 3,
+      "status_at_code_baseline": "PASS",
+      "oracle": "stationary track on the consumed path -> DYNAMIC_COLLISION",
+      "local_run": "M5-06-R4-20261110"
+    },
+    {
+      "id": "S06-092",
+      "name": "Consumer geofence boundary",
+      "seed": "deterministic",
+      "cases": 4,
+      "status_at_code_baseline": "PASS",
+      "oracle": "0.149 m half-width (inside the 0.15 m inflated boundary) -> GEOFENCE_VIOLATION; 0.20 m -> PASS",
+      "local_run": "M5-06-R4-20261110"
+    },
+    {
+      "id": "S06-093",
+      "name": "Consumer max-deviation reference rejected",
+      "seed": "0x6D350091",
+      "cases": 2,
+      "status_at_code_baseline": "PASS",
+      "oracle": "independent random p/v/a knots; obstacle placed on the consumer curve at interval 11 midpoint -> not PASS",
+      "local_run": "M5-06-R4-20261110"
     }
   ],
   "latest_verified_code_baseline": {
@@ -316,10 +397,23 @@
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
+      "MR-009 is FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW (S06-085..093); spec/ABI evidence re-baseline and RT-Thread package pinning need owner approval.",
       "Independent mathematical review MR-001..MR-008 is not yet APPROVED.",
       "M5-07 gate integration is not complete.",
       "H723 online obstacle avoidance is not authorized; current production profile is OBSTACLE_SOURCE_MODE=NONE and BENCH_INHIBIT."
     ],
     "next_milestone": "M5-07 only after M5-06 acceptance and explicit independent mathematical approval."
+  },
+  "m5_06_consumer_curve_bound": {
+    "mr_id": "MR-009",
+    "status": "FIX_IMPLEMENTED_WAITING_INDEPENDENT_REVIEW",
+    "position_roundings": 10,
+    "velocity_roundings": 12,
+    "acceleration_roundings": 10,
+    "gamma_model": "gamma_n = n*u/(1-n*u), u = 2^-24",
+    "coefficient_error_source": "outward interval coefficients, not binary64 nominal",
+    "velocity_mid_norm_includes_eval_error": true,
+    "fma_guard": "tests/guidance/check_consumer_fp_contraction.py",
+    "evidence": "build/m4_m5_implementation/evidence/m5_host.log"
   }
 }

@@ -76,3 +76,24 @@ python -c "import hashlib,subprocess; d=subprocess.check_output(['git','cat-file
 - `production_abi`：FAIL（`abi_lock.h` 的注册表哈希为 CRLF 值；布局一致）。
 - 未修改 `abi_lock.h`、`dialect_report.json` 或任何 spec 证据。
 - 该阻塞不阻止 M5-06 Host/SIL、Sanitizer 与 Cortex-M7 编译证据，但阻止“spec/ABI 证据可复现”这一验收项。
+
+## 7. 重基线变更建议（R4 新增）
+
+可复算的变更建议由 `python tools/analyze_eol_rebaseline.py` 生成，输出到 `build/validation/rebaseline_proposal/`：
+
+| 产物 | 内容 |
+|---|---|
+| `proposal.json` | 两个文件的 pinned / LF / CRLF / 建议值，ABI 对照结果，`abi_lock.h` 变更字段 |
+| `abi_lock.diff` | 只改 `ABI_LOCK_MESSAGE_REGISTRY_SHA256` 的一行 diff（未应用） |
+| `summary.md` | 供审批的表格摘要 |
+
+实测对照：
+
+| 对象 | 证据中钉住（CRLF） | 提交 blob（LF，建议值） |
+|---|---|---|
+| `spec/contracts/FCU.xml` | `1be7adc3…446ed` | `17d6e980…4321` |
+| `spec/contracts/message_registry.json` | `e2893aeb…bf41` | `dd06554c…49e7` |
+
+ABI 语义对照（`HEAD:tests/abi/evidence/abi_compare.json`）：**143 个类型、981 个字段偏移、0 个 mismatch**，ARM/Host 布局哈希 `12b64f63…` / `0edc9d8b…` 与 `abi_lock.h` 完全一致，确认这是行尾差异而不是 ABI 漂移。
+
+CI：新增 `spec-and-abi` job（`spec/tools/audit_spec.py --round 1` + `tests/abi/abi_report.py`）。由于已提交证据仍钉住 CRLF 哈希，该 job 目前标记 `continue-on-error: true`；重基线获批后必须去掉该标记，使其成为阻断门禁。

@@ -305,3 +305,61 @@ python tests/guidance/verify_curve_eval_gap.py
 **仍未关闭的部分：** 独立审查者需要确认 (a) `9u` 系数是否覆盖目标编译器的收缩行为（当前工具链实测无 FMA）、(b) 时间量化项的导数上界推导、(c) `s_max = h·u1` 的单调性论证。在这些确认前，MR-009 保持 OPEN，M5-06 整体保持 BLOCKED，M5-07 不得启动。
 
 
+
+ 
+## 12. MR-009 数学修正（2026-11-10，R4）
+
+R3 的包络有三处不满足严格误差模型，本轮按逐运算证明修正。
+
+### 12.1 Horner 舍入次数（R3 用 9u，实际至少 10 次）
+
+按 `control_reference.c` 中**分离乘加**（ARM 反汇编确认无 FMA）逐条计数：
+
+| 量 | 表达式 | 乘法 | 加法 | 合计 n |
+|---|---|---:|---:|---:|
+| position | `((((c5*s + c4)*s + c3)*s + c2)*s + c1)*s + c0` | 5 | 5 | **10** |
+| velocity | `(((5c5*s + 4c4)*s + 3c3)*s + 2c2)*s + c1` | 4 系数 + 4 次 `*s` = 8 | 4 | **12** |
+| acceleration | `((20c5*s + 12c4)*s + 6c3)*s + 2c2` | 4 系数 + 3 次 `*s` = 7 | 3 | **10** |
+
+误差项改为严格的 `γ_n = n·u/(1 − n·u)`（`u = 2^-24`），不再使用经验系数 9u。若目标编译器将来把乘加融合，n 只会变小（FMA 更精确），但系数计算会变化；`check_consumer_fp_contraction.py` 会在检测到 `vfma/vfms/vmla/vmls` 时失败并要求复核。
+
+### 12.2 系数误差改用区间系数
+
+R3 使用 `|cf[i] − c[i]|`，其中 `c[i]` 是 binary64 **标称**系数，不是精确数学值。现在改为使用验证器已有的向外区间系数 `c_i[i] = [low, high]`：
+
+```
+coef_err_i = max(|cf_i − c_i.low|, |cf_i − c_i.high|)   （向外取整）
+```
+
+position/velocity/acceleration 三组系数（velocity 为 `(k+1)·c_{k+1}`、acceleration 为 `(k+1)(k+2)·c_{k+2}` 的区间缩放）全部覆盖；减法、乘法、求和与最终相加均经 `nextafter` 向外。
+
+### 12.3 次正规、溢出与舍入模式
+
+`γ_n` 只在“无溢出、中间量处于正规范围、round-to-nearest”下成立。新增保守拒绝：
+
+- `Σ|c_i|·s^i > FLT_MAX/16` → 溢出风险，返回 +Inf → `NUMERIC_FAILURE`；
+- `0 < Σ|c_i|·s^i < FLT_MIN·1024` → 可能抵消进次正规区，返回 +Inf → 保守拒绝；
+- 系数为 0 的完全零曲线不触发上述拒绝（`Σ = 0`）；
+- 每种舍入再叠加 `n·2^-149` 的绝对下限，覆盖最终运算落在次正规区的情况；
+- round-to-nearest 假设由 `FLT_EVAL_METHOD == 0`、IEEE-754 静态断言、显式浮点编译 flags 和 FMA 检查共同约束；固件不修改 FPSCR 舍入模式。
+
+### 12.4 `velocity_mid_norm` 漏项
+
+`swept_radius` 取
+
+```
+min(speed_bound·h/2, |v_mid|·h/2 + 0.5·a·(h/2)²) + position_rounding_error
+```
+
+R3 只把 `eval_velocity_error` 加进 `speed_bound` 与 `velocity_rounding_error_mps`，没有加进 `velocity_mid_norm`，导致第二候选可能低估。现在 `velocity_mid2` 累加 `|v_mid| + eval_velocity_error` 的平方，两个候选各自独立成立后才取 `fmin`。
+
+### 12.5 修复后的覆盖证据
+
+| 测试 | 结果 |
+|---|---|
+| S06-085（Fraction 精确参考） | smooth 位置 `1.52e-05 m`、adversarial `1.41e-03 m`；`max gap/envelope = 0.089`；`uncovered = 0` |
+| S06-086（真实 `control_sample_reference`） | 314,731 checks / 0 failures（Host 与 ASan/UBSan） |
+| S06-087..093（端到端判定） | 静态穿越、接缝、动态障碍、围栏边界、自适应细分、最大偏差参考全部按预期拒绝或通过 |
+| FMA 检查 | `vfma/vfms/vmla/vmls = 0`（生产 flags） |
+
+**状态：FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW。** 独立审查仍需确认：`γ_n` 前提（正规数、无溢出、RN）、区间系数与 binary32 复刻的一致性、时间量化导数上界、`s_max = h·u1` 单调性。MR-009 未 APPROVED 前 M5-06 保持 BLOCKED，M5-07 不得启动。

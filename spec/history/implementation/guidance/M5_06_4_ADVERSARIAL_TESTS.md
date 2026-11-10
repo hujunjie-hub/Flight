@@ -236,3 +236,20 @@ long-double 恒加速度 oracle 仅覆盖其明确的 1D 运动模型；不得�
 
 实测：`314,687 checks / 0 failures`（Host 与 ASan/UBSan 相同）。该用例证明验证器现在覆盖的是控制器实际执行的曲线，而不只是同一条公式的 binary64 版本。
 
+
+ 
+## S06-087..093 端到端安全判定（2026-11-10，R4）
+
+这些用例直接调用 `m5_trajectory_safety_validate()`，障碍物要么由真实 `control_sample_reference()` 采样放置，要么精确落在预览接缝/膨胀边界上；其中任何一条被 PASS 都意味着控制器会飞入障碍物。
+
+| ID | 场景 | 构造 | 期望 |
+|---|---|---|---|
+| S06-087 | 静态穿越 | 占用栅格中心位于消费轨迹上（x=0.75，v=2 m/s） | `STATIC_COLLISION` |
+| S06-088 | 静态安全对照 | 同一轨迹，栅格横向偏 0.5 m（AABB 净空 0.25 m） | `PASS` |
+| S06-089 | 预览接缝 | 栅格中心恰在 interval-15 的 preview knot（v=2.5 m/s） | `STATIC_COLLISION` |
+| S06-090 | 自适应细分边界 | 净空 0.16 m（0.15 膨胀边界外、`0.15+swept` 未决带内）→ 必须细分后 PASS 且 `work_units > 24`；净空 0.149 m → `STATIC_COLLISION` | 两者分别 PASS / COLLISION |
+| S06-091 | 动态障碍边界 | 静止 track 位于消费轨迹中点、半径 0.05 m | `DYNAMIC_COLLISION` |
+| S06-092 | 围栏精确边界 | KEEP_IN 半宽 0.149 m（膨胀边界 0.15 m 内）→ 违规；0.20 m → PASS | `GEOFENCE_VIOLATION` / `PASS` |
+| S06-093 | 最大偏差参考 | 24 个 knot 的 p/v/a 独立随机（seed `0x6D350091`），障碍物放在 interval 11 中点的**消费**位置 | 不得 PASS |
+
+诚实边界：对运动参考，DFS 未决带（`speed·h/2⁵`）通常大于 MR-009 包络，因此这些用例证明的是**决策路径**（碰撞必须拒绝、安全必须通过），而不是“包络单独翻转判定”。包络本身的逐点覆盖由 S06-085（精确有理数）与 S06-086（真实 C 消费端）证明。

@@ -88,3 +88,15 @@
 | 安装流程 | DOCUMENTED |
 | 实际锁定与安装 | BLOCKED（等待版本批准与 env 工具） |
 | 固件链接证据 | BLOCKED（`packages/SConscript` 缺失） |
+
+## 7. R4 更新：候选版本与更严格校验
+
+- 新增 `spec/validation/rt_thread_packages_candidates.md`：三个包的上游 tag、commit 与文件级兼容性证据（`stm32h723xx.h`、`core_cm7.h` 均以 HTTP 200 核实）。
+- `tools/check_rt_packages_lock.py` 现在额外要求：
+  - `lock.status == RESOLVED` 且 `resolved_by` / `resolved_at_utc` 非空；
+  - `pinned_commit` 为 40 位十六进制；
+  - `CONFIG_PKG_USING_<NAME>_LATEST_VERSION` 必须已关闭；
+  - `.config` 版本与锁定版本完全一致；
+  - 锁文件不得包含已取消选择的包。
+- 新增 `tests/guidance/test_rt_packages_lock.py`：10 个负向用例，覆盖上述每条规则。
+- 当前三个包仍为 `latest`，校验器按设计继续 FAIL；在所有者批准版本并完成真实 `pkgs --update` 前不得改为 RESOLVED。
