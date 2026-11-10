@@ -166,3 +166,12 @@ ARM 静态检查报告：MPC RAM 29,252 bytes、worker stack 8,192 bytes、最�
 **当前阻塞：** MR-004（sqrt 上界误差契约）和 MR-007（显式浮点编译约束）未关闭。现有 #438 的 Cortex-M7 证据包含 MPC RAM 检查及 M4/M5 生产源交叉编译；M5-06 验证器本身由 `FLIGHT_M5_HOST_PLANNER` 编译门控，不能把该 ARM 编译结果表述为 M5-06 验证器已在 Cortex-M7 目标上编译或可运行。新的 ARM 证据必须区分编译目标、源文件清单、RAM 统计对象和 Host-only 模块边界。
 
 当前审查状态：**BLOCKED / REVIEW_INCOMPLETE**。S06-080..083 尚未执行；没有新的 CI run 或新的数学审查批准。M5-07 不得开始。
+
+## S06-080 实施状态更新（2026-11-10）
+
+- 生产实现：`sqrt_upper_float()` / `sqrt_lower_float()` 使用 binary32 正浮点位模式有界二分搜索；平方比较在 binary64 中执行，并依赖 binary32 平方可由 binary64 精确表示。
+- 编译契约：新增 binary32/binary64 指数范围、次正规数、`FLT_EVAL_METHOD == 0` 和 IEC 60559 编译期检查。
+- 独立 oracle：新增 `tests/guidance/verify_norm_bounds.py`，以 Python `Fraction` 对 binary32 输入的平方和进行精确有理数比较；固定 seed `0x6D350680`，7 组边界向量 + 10,000 组有限 binary32 位模式。
+- 接入：`tests/guidance/run_host_tests.sh` 在常规及 ASan/UBSan 主测试之后构建独立 Host shared object，并运行精确 oracle（oracle DSO 不启用 sanitizer，避免 Python 进程 ASan runtime preload 顺序依赖）。
+
+状态：**IMPLEMENTED / CI_PENDING**。当前没有本次提交的成功 CI 证据；不得把实现或测试代码存在等同测试 PASS。
