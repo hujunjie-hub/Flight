@@ -34,9 +34,10 @@ gcc "${cflags[@]}" ${EXTRA_CFLAGS:-} \
 # oracle. The primary C suite above still runs with EXTRA_CFLAGS (including
 # ASan/UBSan in the sanitizer job); loading an ASan DSO into Python would
 # otherwise depend on runtime preload order.
-gcc "${cflags[@]}" -fPIC -shared \
+gcc "${cflags[@]}" -fPIC -shared -Wl,--no-undefined \
   middleware/model/fms/geofence_geometry/geofence_geometry.c \
   middleware/guidance/*/*.c \
+  tests/guidance/test_m5_main.c \
   -lm -o "${out}/libm5_safety_oracle.so"
 
 "${out}/m5_host_tests"
