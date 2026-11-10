@@ -29,8 +29,8 @@ from pathlib import Path
 SEED = 0x6D350104
 STEPS = (20000, 40000)
 RANDOM_CASES = 400
-V_MAX = 4.0
-A_MAX = 2.5
+V_MAX = 8.0
+A_MAX = 4.0
 P_MAX = 2.0
 FACTOR = 4
 

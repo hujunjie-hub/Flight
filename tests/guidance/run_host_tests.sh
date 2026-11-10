@@ -19,6 +19,7 @@ cflags=(
   -ffp-contract=off -frounding-math -fexcess-precision=standard
   -DFLIGHT_M5_HOST_PLANNER -DFLIGHT_M5_SAFETY_TEST_API
   -Imiddleware/model/fms
+  -Imiddleware/model/fms/quad_x4
   -Imiddleware/contracts
   -Imiddleware/guidance
   -Itests/guidance
@@ -30,9 +31,11 @@ cflags=(
 )
 
 consumer_src=middleware/model/control/outer_loop/quad_x4/position_tracking/control_reference.c
+product_config_src=middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c
 
 gcc "${cflags[@]}" ${EXTRA_CFLAGS:-} \
   middleware/model/fms/geofence_geometry/geofence_geometry.c \
+  "${product_config_src}" \
   middleware/guidance/*/*.c \
   "${consumer_src}" \
   tests/guidance/test_m5_main.c \
@@ -44,6 +47,7 @@ gcc "${cflags[@]}" ${EXTRA_CFLAGS:-} \
 # otherwise depend on runtime preload order.
 gcc "${cflags[@]}" -fPIC -shared -Wl,--no-undefined \
   middleware/model/fms/geofence_geometry/geofence_geometry.c \
+  "${product_config_src}" \
   middleware/guidance/*/*.c \
   "${consumer_src}" \
   tests/guidance/test_m5_main.c \

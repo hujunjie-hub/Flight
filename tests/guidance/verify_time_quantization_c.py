@@ -9,8 +9,9 @@ involved.
 Phase B (time and curve separated): for arbitrary intervals, base times and
 non-zero multi-axis endpoint states, the same C call returns the position and a
 companion measurement of s_c. The time error is checked against gamma_2 and the
-curve error is checked against the production envelope evaluated at that same
-s_c, so the two error sources are never merged into one verdict.
+measured total position error is checked against the continuous component
+budget from S06-105 (metres against metres), so a time ratio is never reported
+with the wrong dimension.
 """
 import ctypes
 import hashlib
@@ -19,6 +20,9 @@ import struct
 import sys
 from fractions import Fraction
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import verify_continuous_error_budget as budget_model
 
 STEPS = (20000, 40000)
 U = Fraction(1, 1 << 24)
@@ -163,7 +167,9 @@ def phase_b(probes, report):
     failures = []
     checked = 0
     max_time_ratio = Fraction(0)
-    max_curve_ratio = 0.0
+    max_total_error = Fraction(0)
+    max_total_ratio = Fraction(0)
+    max_budget_components = [Fraction(0), Fraction(0), Fraction(0), Fraction(0)]
     decomposition = {"coefficient": 0.0, "horner": 0.0, "time": 0.0}
     for step_us in STEPS:
         h = f32(step_us * f32(1e-6))
@@ -209,6 +215,12 @@ def phase_b(probes, report):
                             for axis in range(3)]
                         c_series = [[Fraction(f32(coefficients[axis * 6 + k]))
                                      for k in range(6)] for axis in range(3)]
+                        budget_components = budget_model.budget(
+                            *state, h, step_us, c_series)
+                        budget_total = sum(budget_components)
+                        for index, value in enumerate(budget_components):
+                            max_budget_components[index] = max(
+                                max_budget_components[index], value)
                         checked += 1
                         if abs(s_c - s_exact) > GAMMA2 * s_exact:
                             failures.append(
@@ -227,21 +239,28 @@ def phase_b(probes, report):
                             if total > e_coefficient + e_horner + e_time:
                                 failures.append(
                                     f"triangle {step_us}/{interval}/{offset_us} axis{axis}")
+                            if total > budget_total:
+                                failures.append(
+                                    f"total>budget {step_us}/{interval}/{offset_us} "
+                                    f"axis{axis}")
                             decomposition["coefficient"] = max(
                                 decomposition["coefficient"], float(e_coefficient))
                             decomposition["horner"] = max(
                                 decomposition["horner"], float(e_horner))
                             decomposition["time"] = max(
                                 decomposition["time"], float(e_time))
-                            if total > 0 and s_exact:
-                                max_curve_ratio = max(
-                                    max_curve_ratio,
-                                    float(total / (GAMMA2 * s_exact)))
+                            max_total_error = max(max_total_error, total)
+                            if budget_total > 0:
+                                max_total_ratio = max(
+                                    max_total_ratio, total / budget_total)
     report["phase_b"] = {"checked": checked,
                          "decomposition": decomposition,
                          "max_time_ratio": float(max_time_ratio),
                          "max_time_error_ratio": float(max_time_ratio) / float(GAMMA2) if GAMMA2 else 0.0,
-                         "max_total_error_over_gamma_time": max_curve_ratio,
+                         "max_total_error_m": float(max_total_error),
+                         "max_total_error_over_budget": float(max_total_ratio),
+                         "budget_components_m": [float(value) for value in
+                                                 max_budget_components],
                          "failures": failures[:10]}
     return failures
 

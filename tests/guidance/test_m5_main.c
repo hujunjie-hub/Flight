@@ -23,6 +23,10 @@
 #include "trajectory_planning/m5_time_scaler.h"
 #include "trajectory_planning/m5_trajectory_safety.h"
 #include "m5_trajectory_safety_test_api.h"
+/* The product SafetyEnvelope source is linked into the Host/SIL suite so the
+   M5-06 fixtures consume the real QUAD_X4 policy instead of a second table. */
+#include "fms_contract/fms_model.h"
+#include "flight_policy/fms_policy.h"
 /* MR-009: link the real M6 reference sampler, not a Python re-implementation. */
 #include "attitude_rate_control/controller_internal.h"
 
@@ -5524,6 +5528,213 @@ static void test_m5_safety_jerk_envelope(void)
   }
 }
 
+/* S06-110b: the R14 formula used 6 instead of 60 and a normalized gamma_2
+   tail, which under-bounds the true third derivative by up to 10x. This
+   deterministic curve has true max |jerk| = 18 m/s^3 (27 m/s^3 with the
+   conservative Bernstein bound), so a 16 m/s^3 product limit must reject it;
+   a permissive limit remains PASS. */
+static void test_m5_safety_jerk_interval_bound(void)
+{
+  SafetyFx fx;
+  static const float position[3] = {0.0f, 0.0f, -5.0f};
+  static const float velocity[3] = {0.0f, 0.0f, 0.0f};
+  static const float start_acceleration[3] = {0.03f, 0.0f, 0.0f};
+  static const float end_acceleration[3] = {-0.03f, 0.0f, 0.0f};
+  unsigned i;
+
+  safety_fx_init(&fx, 95500000u);
+  safety_generous_envelope(&fx, 1000.0f, 100000.0f);
+  fx.base.env.vehicle_extension.max_jerk_ned_mps3[0] = 16.0f;
+  fx.base.env.vehicle_extension.max_jerk_ned_mps3[1] = 1.0e9f;
+  fx.base.env.vehicle_extension.max_jerk_ned_mps3[2] = 1.0e9f;
+  for (i = 0u; i < 3u; ++i) {
+    fx.base.nav.core.position_ned_m[i] = position[i];
+    fx.base.nav.core.velocity_ned_mps[i] = velocity[i];
+    fx.base.nav.core.acceleration_ned_mps2[i] = start_acceleration[i];
+  }
+  safety_point_set_full(&fx.reference.anchor, position, velocity,
+                        start_acceleration);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i)
+    safety_point_set_full(&fx.reference.points[i], position, velocity,
+                          end_acceleration);
+  safety_map_reset(&fx);
+  safety_zero_uncertainty(&fx);
+
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_DYNAMICS_VIOLATION);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_DYNAMICS);
+
+  fx.base.env.vehicle_extension.max_jerk_ned_mps3[0] = 1.0e9f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_PASS);
+}
+
+/* S06-110c: a declared JERK constraint with a zero limit is not "no limit";
+   it is an invalid configuration and must fail closed. */
+static void test_m5_safety_jerk_zero_limit_invalid(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 95600000u);
+  safety_generous_envelope(&fx, 1000.0f, 100000.0f);
+  fx.base.env.vehicle_extension.max_jerk_ned_mps3[0] = 0.0f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_INVALID);
+  CHECK(fx.result.passed == 0u);
+}
+
+/* S06-111: the Host/SIL M5-06 suite links the real QUAD_X4 product builder.
+   The test API and the validator fixtures therefore see the same SafetyEnvelope
+   as the FMS, not the deleted static 4/2.5/20/10 copy. */
+static void test_m5_safety_product_envelope_source(void)
+{
+  SafetyFx fx;
+  ProductFmsConfig config;
+  SafetyEnvelope envelope;
+  unsigned axis;
+  float speed = 0.0f, accel = 0.0f;
+  float velocity[3], acceleration[3], jerk[3];
+
+  fms_model_default_config(&config);
+  CHECK(fms_product_build_safety_envelope(&fms_quad_x4_policy, &config, 1u,
+                                          &envelope) == STATUS_OK);
+  CHECK(envelope.safety_envelope_id == 1u);
+  CHECK((envelope.vehicle_extension.valid_mask & PRODUCT_ENVELOPE_VALID_JERK) != 0u);
+  CHECK(envelope.max_linear_speed_mps == fms_quad_x4_policy.default_max_speed_mps);
+  CHECK(envelope.max_linear_accel_mps2 == fms_quad_x4_policy.default_max_accel_mps2);
+  CHECK(envelope.vehicle_extension.max_jerk_ned_mps3[0] ==
+        fms_quad_x4_policy.default_max_accel_mps2 * 4.0f);
+  CHECK(envelope.vehicle_extension.max_jerk_ned_mps3[1] ==
+        fms_quad_x4_policy.default_max_accel_mps2 * 4.0f);
+  CHECK(envelope.vehicle_extension.max_jerk_ned_mps3[2] ==
+        fms_quad_x4_policy.default_max_accel_mps2 * 2.0f);
+
+  CHECK(m5_trajectory_safety_test_product_limits(
+      &speed, &accel, velocity, acceleration, jerk));
+  CHECK(speed == envelope.max_linear_speed_mps);
+  CHECK(accel == envelope.max_linear_accel_mps2);
+  for (axis = 0u; axis < 3u; ++axis) {
+    CHECK(velocity[axis] ==
+          envelope.vehicle_extension.max_velocity_ned_mps[axis]);
+    CHECK(acceleration[axis] ==
+          envelope.vehicle_extension.max_acceleration_ned_mps2[axis]);
+    CHECK(jerk[axis] == envelope.vehicle_extension.max_jerk_ned_mps3[axis]);
+  }
+
+  /* Consume the real product envelope in the validator. */
+  safety_fx_init(&fx, 95700000u);
+  fx.base.env = envelope;
+  fill_header(&fx.base.env.header, MSG_SAFETY_ENVELOPE, SOURCE_M4, fx.base.now);
+  safety_set_constant_position(&fx, 0.0f, 0.0f, -5.0f);
+  safety_map_reset(&fx);
+  safety_zero_uncertainty(&fx);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_PASS);
+}
+
+/* S06-108 C path: the real consumer is driven with a unit-velocity reference,
+   so its x output is exactly the binary32 local time. The same gamma_2
+   predicate used by the Python oracle is exercised in C, including a 4x
+   gamma_2 injection that must be rejected. */
+static void test_m5_safety_consumer_time_error_c_path(void)
+{
+  static const uint32_t steps[2] = {20000u, 40000u};
+  static const uint32_t offsets[4] = {0u, 10000u, 19999u, 20000u};
+  const double gamma2 = (2.0 * 0x1p-24) / (1.0 - 2.0 * 0x1p-24);
+  unsigned s, k, i;
+
+  for (s = 0u; s < 2u; ++s) {
+    MotionReference ref;
+    memset(&ref, 0, sizeof(ref));
+    ref.header.timestamp_sample_us = 1000000u;
+    ref.point_count = PRODUCT_PREVIEW_COUNT;
+    ref.anchor.offset_us = 0u;
+    safety_point_set(&ref.anchor, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+    for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+      float t = (float)((double)(i + 1u) * (double)steps[s] * 1.0e-6);
+      ref.points[i].offset_us = (i + 1u) * steps[s];
+      safety_point_set(&ref.points[i], t, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+    }
+    for (k = 0u; k < 4u; ++k) {
+      ProductMotionPoint out;
+      double s_c, s_exact, bound, injected;
+      uint32_t offset_us = offsets[k] <= steps[s] ? offsets[k] : steps[s];
+      CHECK(control_sample_reference(&ref, ref.header.timestamp_sample_us +
+                                     offset_us, &out) == STATUS_OK);
+      s_c = (double)out.position_ned_m[0];
+      s_exact = (double)offset_us / 1000000.0;
+      bound = gamma2 * s_exact;
+      CHECK(fabs(s_c - s_exact) <= bound);
+      if (s_exact > 0.0) {
+        injected = s_c + 4.0 * bound;
+        CHECK(fabs(injected - s_exact) > bound);
+      }
+    }
+  }
+}
+
+/* S06-110d: the continuous jerk bound must cover the analytic third
+   derivative on the whole sub-interval and on the consumer gamma_2 tail. The
+   states include the 6-vs-60 counterexample and near-product-limit axes. */
+static void test_m5_safety_jerk_bound_covers_analytic(void)
+{
+  static const float states[4][6][3] = {
+    {{0.0f, 0.0f, -5.0f}, {0.0f, 0.0f, 0.0f}, {0.03f, 0.0f, 0.0f},
+     {0.0f, 0.0f, -5.0f}, {0.0f, 0.0f, 0.0f}, {-0.03f, 0.0f, 0.0f}},
+    {{1.0f, -2.0f, -4.0f}, {2.0f, 1.0f, 0.5f}, {1.0f, 0.5f, 0.0f},
+     {1.05f, -1.98f, -4.0f}, {1.5f, 0.8f, 0.4f}, {0.5f, 0.2f, 0.0f}},
+    {{0.0f, 0.0f, -5.0f}, {0.0f, 0.0f, 0.0f}, {4.0f, 4.0f, 2.0f},
+     {0.1f, 0.1f, -5.0f}, {0.0f, 0.0f, 0.0f}, {-4.0f, -4.0f, -2.0f}},
+    {{-1.0f, 2.0f, -4.5f}, {0.0f, 3.5f, 0.0f}, {0.0f, -2.5f, 0.0f},
+     {-1.0f, 2.05f, -4.5f}, {0.0f, 2.0f, 0.0f}, {0.0f, -2.0f, 0.0f}},
+  };
+  static const float spans[5][2] = {
+    {0.0f, 1.0f}, {0.0f, 0.5f}, {0.25f, 0.75f}, {0.5f, 0.75f}, {0.75f, 1.0f}
+  };
+  const float h = (float)PRODUCT_PREVIEW_STEP_US * 1e-6f;
+  const double gamma2 = (2.0 * 0x1p-24) / (1.0 - 2.0 * 0x1p-24);
+  unsigned s, span, axis, sample;
+
+  for (s = 0u; s < 4u; ++s) {
+    float coefficients[3][6];
+    control_reference_hermite_coefficients(
+        states[s][0], states[s][1], states[s][2],
+        states[s][3], states[s][4], states[s][5], h, coefficients);
+    for (span = 0u; span < 5u; ++span) {
+      float u0 = spans[span][0], u1 = spans[span][1];
+      float bound[3];
+      unsigned tail_samples = 4u;
+      CHECK(m5_trajectory_safety_test_curve_jerk(
+          states[s][0], states[s][1], states[s][2],
+          states[s][3], states[s][4], states[s][5],
+          h, u0, u1, bound));
+      for (axis = 0u; axis < 3u; ++axis) {
+        CHECK(bound[axis] >= 0.0f);
+        CHECK(isfinite(bound[axis]));
+      }
+      for (sample = 0u; sample < 66u + tail_samples; ++sample) {
+        double u;
+        double t;
+        if (sample < 65u) {
+          u = (double)u0 + ((double)u1 - (double)u0) *
+              ((double)sample / 64.0);
+        } else {
+          double delta_u = gamma2 * (double)u1 /
+              ((double)u1 - (double)u0);
+          u = (double)u1 + delta_u *
+              ((double)(sample - 64u) / (double)tail_samples);
+        }
+        t = (double)h * u;
+        for (axis = 0u; axis < 3u; ++axis) {
+          double jerk = 6.0 * (double)coefficients[axis][3] +
+                        24.0 * (double)coefficients[axis][4] * t +
+                        60.0 * (double)coefficients[axis][5] * t * t;
+          CHECK(fabs(jerk) <= (double)bound[axis] * 1.000001 + 1e-7);
+        }
+      }
+    }
+  }
+}
+
 int main(void)
 {
   struct {
@@ -5670,6 +5881,11 @@ int main(void)
     {"m5_safety_envelope_dynamic_participation", test_m5_safety_envelope_dynamic_participation},
     {"m5_safety_envelope_geofence_participation", test_m5_safety_envelope_geofence_participation},
     {"m5_safety_jerk_envelope", test_m5_safety_jerk_envelope},
+    {"m5_safety_jerk_interval_bound", test_m5_safety_jerk_interval_bound},
+    {"m5_safety_jerk_bound_covers_analytic", test_m5_safety_jerk_bound_covers_analytic},
+    {"m5_safety_jerk_zero_limit", test_m5_safety_jerk_zero_limit_invalid},
+    {"m5_safety_product_envelope_source", test_m5_safety_product_envelope_source},
+    {"m5_safety_consumer_time_error_c", test_m5_safety_consumer_time_error_c_path},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {

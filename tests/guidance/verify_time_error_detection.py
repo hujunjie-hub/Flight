@@ -103,19 +103,42 @@ def run(probes, step_us, interval, base, offset_us, state):
             "s_c": s_c, "s_exact": s_exact, "h": h, "active": active.value}
 
 
-def decompose(data, coefficients=None, s_exact=None):
+def decompose_axes(data, coefficients=None, s_exact=None):
+    """Return per-axis exact rational components.
+
+    All quantities stay Fractions: the measured value and the C coefficients
+    are exact binary32 values, and s_exact is a rational number of seconds.
+    """
     coefficients = coefficients or data["c"]
     s_exact = data["s_exact"] if s_exact is None else s_exact
-    e_coefficient = e_horner = e_time = 0.0
+    e_coefficient = []
+    e_horner = []
+    e_time = []
     for axis in range(3):
         model = poly(coefficients[axis], data["s_c"])
         reference = poly(data["exact"][axis], data["s_c"])
         physical = poly(data["exact"][axis], s_exact)
         measured = data["measured"][axis]
-        e_coefficient = max(e_coefficient, float(abs(model - reference)))
-        e_horner = max(e_horner, float(abs(measured - model)))
-        e_time = max(e_time, float(abs(reference - physical)))
+        e_coefficient.append(abs(model - reference))
+        e_horner.append(abs(measured - model))
+        e_time.append(abs(reference - physical))
     return e_coefficient, e_horner, e_time
+
+
+def decompose(data, coefficients=None, s_exact=None):
+    """Worst-axis exact components; kept for the negative matrix."""
+    e_coefficient, e_horner, e_time = decompose_axes(data, coefficients, s_exact)
+    return max(e_coefficient), max(e_horner), max(e_time)
+
+
+def segment_coefficients(probes, step_us, target_interval, base, state):
+    """Coefficients of the active segment selected by the real C locator."""
+    if target_interval < 0 or target_interval >= 24:
+        return None
+    neighbour = run(probes, step_us, target_interval, base, 0, state)
+    if neighbour is None or neighbour["active"] != target_interval:
+        return None
+    return neighbour["c"]
 
 
 def main():
@@ -123,6 +146,8 @@ def main():
         raise SystemExit('usage: verify_time_error_detection.py <libm5_safety_oracle.so>')
     probes = Probes(sys.argv[1])
     checked = 0
+    coeff_mix_checked = 0
+    coeff_mix_skipped = 0
     failures = []
     for step_us in STEPS:
         for interval in INTERVALS:
@@ -137,14 +162,30 @@ def main():
                             continue
                         checked += 1
                         honest = decompose(data)
-                        # A/B: mix the neighbouring segment's coefficients.
-                        neighbour = run(probes, step_us, min(interval + 1, 23), base,
-                                        offset_us, state)
-                        if neighbour is not None and neighbour["c"] != data["c"]:
-                            mixed = decompose(data, coefficients=neighbour["c"])
-                            if mixed[1] <= max(2 * honest[1], 1e-9):
+                        # A/B: mix the previous and next segment's coefficients.
+                        # The corruption is detectable only when the coefficient
+                        # separation exceeds twice the honest coefficient error;
+                        # then the exact reverse triangle guarantees that the
+                        # mixed coefficient error is strictly larger.
+                        for direction in (-1, 1):
+                            neighbour = segment_coefficients(
+                                probes, step_us, data["active"] + direction,
+                                base, state)
+                            if neighbour is None or neighbour == data["c"]:
+                                continue
+                            separation = max(
+                                abs(poly(neighbour[axis], data["s_c"]) -
+                                    poly(data["c"][axis], data["s_c"]))
+                                for axis in range(3))
+                            if separation <= 2 * honest[0]:
+                                coeff_mix_skipped += 1
+                                continue
+                            coeff_mix_checked += 1
+                            mixed = decompose(data, coefficients=neighbour)
+                            if mixed[0] <= honest[0]:
                                 failures.append(
-                                    f"A/B mix not detected {step_us}/{interval}/{offset_us}")
+                                    f"A/B {direction:+d} mix not detected "
+                                    f"{step_us}/{interval}/{offset_us}")
                         # C: global offset used as local time. Only meaningful when
                         # the active segment is not the one the global offset names
                         # (interval > 0 or the seam at offset == step).
@@ -152,7 +193,7 @@ def main():
                         if data["active"] != interval:
                             wrong_local = decompose(
                                 data, s_exact=Fraction(global_us, 1000000))
-                            if wrong_local[2] <= max(2 * honest[2], 1e-12):
+                            if wrong_local[2] <= max(2 * honest[2], Fraction(1, 10 ** 12)):
                                 failures.append(
                                     f"C local-time error not detected "
                                     f"{step_us}/{interval}/{offset_us}")
@@ -171,13 +212,16 @@ def main():
                                 failures.append(
                                     f"D h-based reference outside gamma_2 "
                                     f"{step_us}/{interval}/{offset_us}")
-    print(f"M5_S06_108_TIME_ERROR_DETECTION cases={checked} failures={len(failures)}")
+    print(f"M5_S06_108_TIME_ERROR_DETECTION cases={checked} "
+          f"coeff_mix_checked={coeff_mix_checked} "
+          f"coeff_mix_skipped={coeff_mix_skipped} failures={len(failures)}")
     for failure in failures[:10]:
         print("FAIL:", failure)
     if failures:
         return 1
     print("M5_S06_108_TIME_ERROR_DETECTION_PASS "
-          "(real C, segment mix / local time / injected error rejected, h-based inside gamma_2)")
+          "(real C, bidirectional segment mix / local time / injected error "
+          "rejected, h-based inside gamma_2)")
     return 0
 
 

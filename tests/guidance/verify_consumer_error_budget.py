@@ -29,8 +29,8 @@ from pathlib import Path
 SEED = 0x6D350107
 STEPS = (20000, 40000)
 CASES = 150
-V_MAX = 4.0
-A_MAX = 2.5
+V_MAX = 8.0
+A_MAX = 4.0
 P_MAX = 2.0
 ROUNDINGS = (10, 12, 10)
 U = Fraction(1, 1 << 24)

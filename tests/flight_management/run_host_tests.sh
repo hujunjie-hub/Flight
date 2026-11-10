@@ -32,6 +32,7 @@ gcc "${cflags[@]}" ${EXTRA_CFLAGS:-} \
   middleware/model/fms/quad_x4/flight_safety/actuation_permit.c \
   middleware/model/fms/quad_x4/flight_safety/fms_safety.c \
   middleware/model/fms/quad_x4/flight_policy/quad_x4_fms.c \
+  middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c \
   tests/flight_management/test_m4_main.c \
   -lm -o "${out}/m4_host_tests"
 

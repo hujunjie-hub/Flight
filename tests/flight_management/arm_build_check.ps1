@@ -31,7 +31,8 @@ $sources = @(
   'middleware/model/fms/quad_x4/operator_authority/operator_authority.c',
   'middleware/model/fms/quad_x4/flight_safety/actuation_permit.c',
   'middleware/model/fms/quad_x4/flight_safety/fms_safety.c',
-  'middleware/model/fms/quad_x4/flight_policy/quad_x4_fms.c'
+  'middleware/model/fms/quad_x4/flight_policy/quad_x4_fms.c',
+  'middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c'
 )
 
 $objects = foreach ($src in $sources) {

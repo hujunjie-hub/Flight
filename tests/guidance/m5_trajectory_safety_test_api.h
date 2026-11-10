@@ -19,6 +19,20 @@ uint8_t m5_trajectory_safety_test_curve_bounds(
     float *speed_bound,
     float *acceleration_bound);
 
+/* Continuous third-derivative bound over [u0,u1] plus the consumer gamma_2
+   tail, per axis. */
+uint8_t m5_trajectory_safety_test_curve_jerk(
+    const float start_position[3],
+    const float start_velocity[3],
+    const float start_acceleration[3],
+    const float end_position[3],
+    const float end_velocity[3],
+    const float end_acceleration[3],
+    float duration_s,
+    float u0,
+    float u1,
+    float jerk_axis_bound[3]);
+
 uint8_t m5_trajectory_safety_test_curve_eval(
     const float start_position[3],
     const float start_velocity[3],

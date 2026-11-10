@@ -42,6 +42,13 @@ _Static_assert(sizeof(double) == sizeof(uint64_t),
 #include "trajectory_planning/m5_trajectory_safety.h"
 #include "messages/message_ids.h"
 #include "geofence_geometry/geofence_geometry.h"
+#if defined(FLIGHT_M5_SAFETY_TEST_API)
+/* The test API reads the production SafetyEnvelope source instead of keeping a
+   second copy of the product limits. This is Host/SIL-only; it does not link
+   the validator into the H723 product image. */
+#include "fms_contract/fms_model.h"
+#include "flight_policy/fms_policy.h"
+#endif
 
 _Static_assert(PRODUCT_PREVIEW_STEP_US <= 1000000u,
                "M5 safety preview step must stay within one second");
@@ -77,6 +84,13 @@ typedef struct {
   double position[3][6];
   double position_low[3][6];
   double position_high[3][6];
+  /* Physical local-time span of this sub-interval. */
+  double start_time_s;
+  double end_time_s;
+  /* Third derivative of the binary32 consumer polynomial in physical time:
+     jerk(s) = jerk_power[axis][2]*s^2 + jerk_power[axis][1]*s +
+               jerk_power[axis][0]. */
+  double jerk_power[3][3];
   /* Bounds on |binary32 consumer evaluation - exact polynomial| over the
      sub-interval, per axis and derivative order (MR-009). */
   double eval_position_error[3];
@@ -254,6 +268,18 @@ static double multiply_upper_nonnegative(double a, double b)
   if (a == 0.0 || b == 0.0) return 0.0;
   product = a * b;
   return nextafter(product, INFINITY);
+}
+
+/* gamma_2 = 2u/(1-2u), u = 2^-24, rounded upward. One definition so the
+   time-evaluation model has a single source. */
+static double gamma2_upper(void)
+{
+  double nu2 = 2.0 * 0x1p-24;
+  double gamma2;
+  nu2 = nextafter(nu2, INFINITY);
+  gamma2 = nu2 / (1.0 - nu2);
+  gamma2 = nextafter(gamma2, INFINITY);
+  return gamma2;
 }
 
 static double sum_square_upper(double sum, double value)
@@ -517,7 +543,7 @@ static uint8_t validate_envelope(const SafetyEnvelope *e)
         p->max_acceleration_ned_mps2[axis] <= 0.0f) return 0u;
     if ((p->valid_mask & PRODUCT_ENVELOPE_VALID_JERK) != 0u &&
         (!isfinite(p->max_jerk_ned_mps3[axis]) ||
-         p->max_jerk_ned_mps3[axis] < 0.0f)) return 0u;
+         p->max_jerk_ned_mps3[axis] <= 0.0f)) return 0u;
   }
   return 1u;
 }
@@ -898,6 +924,8 @@ static uint8_t build_curve(
   double t_power[6], dt_power[6];
   unsigned axis, i, k, j;
   if (!(dt > 0.0) || !isfinite(dt) || !isfinite(t0)) return 0u;
+  curve->start_time_s = t0;
+  curve->end_time_s = t0 + dt;
   t_power[0] = 1.0;
   dt_power[0] = 1.0;
   for (i = 1u; i <= 5u; ++i) {
@@ -1047,12 +1075,9 @@ static uint8_t build_curve(
         float cf[6], vf[6], af[6];
         M5SafetyInterval vc[6], ac[6];
         double s_max = h * (double)u1;
-        double nu2 = 2.0 * 0x1p-24;
-        double gamma2, delta_s, s_eval_max;
+        double gamma2 = gamma2_upper();
+        double delta_s, s_eval_max;
 
-        nu2 = nextafter(nu2, INFINITY);
-        gamma2 = nu2 / (1.0 - nu2);
-        gamma2 = nextafter(gamma2, INFINITY);
         delta_s = multiply_upper_nonnegative(gamma2, s_max);
         s_eval_max = add_upper_nonnegative(s_max, delta_s);
         if (!isfinite(s_eval_max) || !(s_eval_max > 0.0)) return 0u;
@@ -1067,6 +1092,9 @@ static uint8_t build_curve(
         if (!isfinite(s_eval_max)) return 0u;
 
         consumer_power_coefficients(a, b, (float)h, axis, cf);
+        curve->jerk_power[axis][0] = 6.0 * (double)cf[3];
+        curve->jerk_power[axis][1] = 24.0 * (double)cf[4];
+        curve->jerk_power[axis][2] = 60.0 * (double)cf[5];
         for (k = 0u; k < 6u; ++k) {
           vf[k] = 0.0f;
           af[k] = 0.0f;
@@ -1216,30 +1244,79 @@ static uint8_t curve_bounds(
       velocity_mid2 = sum_square_upper(velocity_mid2, velocity_mid_abs);
     }
 
-    /* Third derivative: the degree-5 Bernstein control points give a degree-3
-       jerk polynomial; its convex hull bounds |jerk| over [0, h]. The consumer
-       may evaluate slightly beyond h, so add the Bezier derivative bound over
-       the gamma_2 tail. */
+    /* Third derivative. A degree-5 Bernstein position has a degree-2 Bernstein
+       jerk with control points
+           60/d^3 * (B[k+3] - 3B[k+2] + 3B[k+1] - B[k]).
+       The convex hull bounds |jerk| on [0,1]; the consumer may evaluate past
+       the sub-interval end by gamma_2*s_end, so the same quadratic is evaluated
+       with interval arithmetic on the extended interval. The consumer's own
+       binary32 coefficients contribute a second quadratic in physical time.
+       Taking the maximum of both is conservative for the consumed reference. */
     {
-      const double *c = curve->position[axis];
-      double h3 = (double)duration_s * (double)duration_s * (double)duration_s;
-      double jerk_control[3];
+      M5SafetyInterval duration_i, duration_cubed, scale;
+      M5SafetyInterval jerk_control[3];
+      M5SafetyInterval u_i, tail_value;
+      M5SafetyInterval s_i, consumer_value;
+      double u_end, u_tail, s_tail, gamma2;
       double jerk_abs = 0.0;
-      double delta_jerk = 0.0;
       unsigned k;
-      if (!(h3 > 0.0) || !isfinite(h3)) return 0u;
-      for (k = 0u; k < 3u; ++k)
-        jerk_control[k] = 6.0 * (c[k + 3u] - 3.0 * c[k + 2u] +
-                                 3.0 * c[k + 1u] - c[k]) / h3;
+
+      duration_i = interval_bounds(
+          nextafter(duration_s, -INFINITY),
+          nextafter(duration_s, INFINITY));
+      duration_cubed = interval_mul(
+          interval_mul(duration_i, duration_i), duration_i);
+      scale = interval_div(interval_exact(60.0), duration_cubed);
+      if (duration_i.valid == 0u || duration_cubed.valid == 0u ||
+          scale.valid == 0u) return 0u;
+
       for (k = 0u; k < 3u; ++k) {
-        double magnitude = fabs(jerk_control[k]);
-        if (magnitude > jerk_abs) jerk_abs = magnitude;
-        if (k > 0u) {
-          double step = fabs(jerk_control[k] - jerk_control[k - 1u]);
-          if (step > delta_jerk) delta_jerk = step;
-        }
+        M5SafetyInterval delta3 = interval_sub(
+            interval_add(position_control[k + 3u],
+                         interval_scale(position_control[k + 1u], 3.0)),
+            interval_add(interval_scale(position_control[k + 2u], 3.0),
+                         position_control[k]));
+        jerk_control[k] = interval_mul(scale, delta3);
+        if (jerk_control[k].valid == 0u) return 0u;
+        jerk_abs = fmax(jerk_abs, interval_abs_max(jerk_control[k]));
       }
-      jerk_abs += 3.0 * delta_jerk * 1.1920929e-07; /* gamma_2 tail */
+
+      gamma2 = gamma2_upper();
+      /* Normalized consumer overshoot: u_tail = u_end + gamma_2*u_end. */
+      u_end = curve->end_time_s / duration_s;
+      u_end = nextafter(u_end, INFINITY);
+      u_tail = add_upper_nonnegative(u_end,
+          multiply_upper_nonnegative(gamma2, u_end));
+      if (!isfinite(u_tail) || u_tail < 1.0) return 0u;
+      if (u_tail > 1.0) {
+        u_i = interval_bounds(1.0, u_tail);
+        if (u_i.valid == 0u) return 0u;
+        tail_value = interval_add(
+            interval_mul(jerk_control[2], u_i), jerk_control[1]);
+        tail_value = interval_add(
+            interval_mul(tail_value, u_i), jerk_control[0]);
+        if (tail_value.valid == 0u) return 0u;
+        jerk_abs = fmax(jerk_abs, interval_abs_max(tail_value));
+      }
+
+      /* Consumer polynomial in physical seconds, using the exact binary32
+         coefficients returned by consumer_power_coefficients(). */
+      s_tail = add_upper_nonnegative(curve->end_time_s,
+          multiply_upper_nonnegative(gamma2, curve->end_time_s));
+      if (!isfinite(s_tail) || s_tail < curve->end_time_s) return 0u;
+      s_i = interval_bounds(
+          nextafter(curve->start_time_s, -INFINITY),
+          nextafter(s_tail, INFINITY));
+      if (s_i.valid == 0u) return 0u;
+      consumer_value = interval_add(
+          interval_mul(interval_exact(curve->jerk_power[axis][2]), s_i),
+          interval_exact(curve->jerk_power[axis][1]));
+      consumer_value = interval_add(
+          interval_mul(consumer_value, s_i),
+          interval_exact(curve->jerk_power[axis][0]));
+      if (consumer_value.valid == 0u) return 0u;
+      jerk_abs = fmax(jerk_abs, interval_abs_max(consumer_value));
+
       bounds->jerk_axis_bound[axis] = round_up_float(jerk_abs);
       if (!isfinite(bounds->jerk_axis_bound[axis])) return 0u;
     }
@@ -1925,10 +2002,10 @@ M5TrajectorySafetyStatus m5_trajectory_safety_validate(
           return reject(result, M5_SAFETY_DYNAMICS_VIOLATION,
                         M5_SAFETY_REASON_DYNAMICS, offset_us);
         }
-        /* JERK participates whenever the payload declares it (spec/02). */
+        /* JERK participates whenever the payload declares it (spec/02). A
+           limit of zero is rejected by validate_envelope(), never skipped. */
         if ((e->valid_mask & PRODUCT_ENVELOPE_VALID_JERK) != 0u &&
-            e->max_jerk_ned_mps3[axis] > 0.0f &&
-            curve.jerk_axis_bound[axis] > e->max_jerk_ned_mps3[axis] + 1e-4f) {
+            curve.jerk_axis_bound[axis] > e->max_jerk_ned_mps3[axis]) {
           return reject(result, M5_SAFETY_DYNAMICS_VIOLATION,
                         M5_SAFETY_REASON_DYNAMICS, offset_us);
         }
@@ -2081,6 +2158,55 @@ uint8_t m5_trajectory_safety_test_curve_bounds(
   }
   *speed_bound = bounds.speed_bound;
   *acceleration_bound = bounds.acceleration_bound;
+  return 1u;
+}
+
+
+uint8_t m5_trajectory_safety_test_curve_jerk(
+    const float start_position[3],
+    const float start_velocity[3],
+    const float start_acceleration[3],
+    const float end_position[3],
+    const float end_velocity[3],
+    const float end_acceleration[3],
+    float duration_s,
+    float u0,
+    float u1,
+    float jerk_axis_bound[3])
+{
+  MotionReferencePoint start, end;
+  M5SafetyBezier bezier;
+  M5SafetyCurveBounds bounds;
+  double local_duration;
+  unsigned axis;
+
+  if (start_position == NULL || start_velocity == NULL ||
+      start_acceleration == NULL || end_position == NULL ||
+      end_velocity == NULL || end_acceleration == NULL ||
+      jerk_axis_bound == NULL ||
+      !finite3(start_position) || !finite3(start_velocity) ||
+      !finite3(start_acceleration) || !finite3(end_position) ||
+      !finite3(end_velocity) || !finite3(end_acceleration) ||
+      !isfinite(duration_s) || duration_s <= 0.0f ||
+      !isfinite(u0) || !isfinite(u1) || u0 < 0.0f ||
+      u1 > 1.0f || u1 <= u0) return 0u;
+
+  memset(&start, 0, sizeof(start));
+  memset(&end, 0, sizeof(end));
+  for (axis = 0u; axis < 3u; ++axis) {
+    start.point.position_ned_m[axis] = start_position[axis];
+    start.point.velocity_ned_mps[axis] = start_velocity[axis];
+    start.point.acceleration_ned_mps2[axis] = start_acceleration[axis];
+    end.point.position_ned_m[axis] = end_position[axis];
+    end.point.velocity_ned_mps[axis] = end_velocity[axis];
+    end.point.acceleration_ned_mps2[axis] = end_acceleration[axis];
+  }
+  if (!build_curve(&start, &end, (double)duration_s,
+                   (float)u0, (float)u1, &bezier)) return 0u;
+  local_duration = (double)duration_s * ((double)u1 - (double)u0);
+  if (!curve_bounds(&bezier, local_duration, &bounds)) return 0u;
+  for (axis = 0u; axis < 3u; ++axis)
+    jerk_axis_bound[axis] = bounds.jerk_axis_bound[axis];
   return 1u;
 }
 
@@ -2620,36 +2746,32 @@ uint8_t m5_trajectory_safety_test_product_limits(
     float max_velocity_ned_mps[3], float max_acceleration_ned_mps2[3],
     float max_jerk_ned_mps3[3])
 {
-  static const SafetyEnvelope envelope = {
-      .safety_envelope_id = 1u,
-      .max_linear_speed_mps = 4.0f,
-      .max_linear_accel_mps2 = 2.5f,
-      .max_angular_rate_radps = 2.0f,
-      .max_yaw_rate_radps = 1.0f,
-      .vehicle_extension = {
-          .valid_mask = 0x7Fu,
-          .max_velocity_ned_mps = {4.0f, 4.0f, 2.0f},
-          .max_acceleration_ned_mps2 = {2.5f, 2.5f, 1.5f},
-          .max_jerk_ned_mps3 = {20.0f, 20.0f, 10.0f},
-          .max_tilt_rad = 0.6f,
-          .min_total_thrust_n = 0.0f,
-          .max_total_thrust_n = 40.0f,
-          .max_body_rate_frd_radps = {3.0f, 3.0f, 1.5f},
-          .min_height_above_home_m = 0.0f,
-          .max_height_above_home_m = 50.0f,
-      },
-  };
+  ProductFmsConfig config;
+  SafetyEnvelope envelope;
   unsigned axis;
   if (max_linear_speed_mps == NULL || max_linear_accel_mps2 == NULL ||
       max_velocity_ned_mps == NULL || max_acceleration_ned_mps2 == NULL ||
       max_jerk_ned_mps3 == NULL) return 0u;
+  fms_model_default_config(&config);
+  if (fms_product_build_safety_envelope(&fms_quad_x4_policy, &config, 1u,
+                                        &envelope) != STATUS_OK) {
+    return 0u;
+  }
+  if (envelope.safety_envelope_id == 0u ||
+      (envelope.vehicle_extension.valid_mask & PRODUCT_ENVELOPE_VALID_JERK) == 0u ||
+      !isfinite(envelope.max_linear_speed_mps) ||
+      !isfinite(envelope.max_linear_accel_mps2)) {
+    return 0u;
+  }
   *max_linear_speed_mps = envelope.max_linear_speed_mps;
   *max_linear_accel_mps2 = envelope.max_linear_accel_mps2;
   for (axis = 0u; axis < 3u; ++axis) {
-    max_velocity_ned_mps[axis] = envelope.vehicle_extension.max_velocity_ned_mps[axis];
+    max_velocity_ned_mps[axis] =
+        envelope.vehicle_extension.max_velocity_ned_mps[axis];
     max_acceleration_ned_mps2[axis] =
         envelope.vehicle_extension.max_acceleration_ned_mps2[axis];
-    max_jerk_ned_mps3[axis] = envelope.vehicle_extension.max_jerk_ned_mps3[axis];
+    max_jerk_ned_mps3[axis] =
+        envelope.vehicle_extension.max_jerk_ned_mps3[axis];
   }
   return 1u;
 }

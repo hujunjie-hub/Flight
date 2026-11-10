@@ -2,8 +2,9 @@
 
 For every combination of step (20/40 ms), interval (0/11/23), base timestamp and
 offset (0, mid, step-1, step) with non-zero p/v/a endpoints, the honest
-decomposition must satisfy the triangle inequality and the gamma_2 time bound,
-using the real C consumer and its actual binary32 coefficients.
+decomposition must satisfy the triangle inequality and the gamma_2 time bound
+using exact rational arithmetic. The C consumer and its actual binary32
+coefficients are the only measured inputs; no epsilon is used.
 """
 import ctypes
 import struct
@@ -37,15 +38,16 @@ def main():
                                 f"probe failed {step_us}/{interval}/{offset_us}")
                             continue
                         checked += 1
-                        e_coefficient, e_horner, e_time = base.decompose(data)
-                        total = 0.0
+                        e_coefficient, e_horner, e_time = base.decompose_axes(data)
                         for axis in range(3):
                             reference = base.poly(data["exact"][axis], data["s_exact"])
-                            total = max(total, float(abs(data["measured"][axis] -
-                                                         reference)))
-                        if total > e_coefficient + e_horner + e_time + 1e-12:
-                            failures.append(
-                                f"triangle {step_us}/{interval}/{offset_us}")
+                            total = abs(data["measured"][axis] - reference)
+                            bound = (e_coefficient[axis] + e_horner[axis] +
+                                     e_time[axis])
+                            if total > bound:
+                                failures.append(
+                                    f"triangle axis{axis} "
+                                    f"{step_us}/{interval}/{offset_us}")
                         if abs(data["s_c"] - data["s_exact"]) > GAMMA2 * data["s_exact"]:
                             failures.append(
                                 f"gamma_2 {step_us}/{interval}/{offset_us}")
