@@ -191,3 +191,12 @@ This closes the CI execution gap for these test suites at the verified commit. I
 ### S06-081 constant-acceleration reference correction
 
 The constant-acceleration differential now computes the continuous minimum analytically from endpoint, relative-velocity stationary, and relative-position zero candidates. The prior 513-point grid oracle has been removed. The analytic test covers its defined 1D constant-acceleration + fixed lateral-offset model; broader uncertainty and 3D acceleration interval proof remain open. Commit `a14b9f1`; CI_PENDING.
+
+ 
+## CI #509 对抗性回归状态（2026-11-10）
+
+代码基线 `0c761964d4bc6cfeec73ba60464657db450743ee` 对应 Host validation #509 全部 jobs success。M5 Host 269,207 checks / 0 failures，M5 ASan/UBSan 269,207 / 0；M4/M5 integration 与 integration sanitizer 均为 1,000 / 0。S06-082 的动态精确相切、内外 1 ULP 和 20ms preview seam 用例通过；S06-083 的自适应细分精确位置及 ±1 ULP 用例通过，且 work_units 断言确认实际进入细分。S06-081 动态连续距离差分用例通过。
+
+CI：[Host validation #509](https://github.com/hujunjie-hub/Flight/actions/runs/42745124335)。
+
+该结果仅证明指定 commit 的自动化测试通过；有限采样/数值 oracle 仍不能代替独立数学证明。MR-001..MR-008 的审查状态和 M5-07 门禁按 `M5_06_5_INDEPENDENT_MATH_REVIEW.md` 执行，当前不得宣称 M5-06 整体验收或 H723 实机避障放行。
