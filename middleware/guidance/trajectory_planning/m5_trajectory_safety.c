@@ -749,32 +749,89 @@ static void consumer_power_coefficients(
   c[5] = 6 * d / h5 - 3 * dv / h4 + da / (2 * h3);
 }
 
+/*
+ * Rounding counts for the separate multiply/add form of the consumer
+ * (control_reference.c), counted operation by operation:
+ *
+ *   position     ((((c5*s + c4)*s + c3)*s + c2)*s + c1)*s + c0
+ *                5 multiplies + 5 adds                              = 10
+ *   velocity     (((5c5*s + 4c4)*s + 3c3)*s + 2c2)*s + c1
+ *                4 coefficient multiplies + 4 s multiplies + 4 adds = 12
+ *   acceleration ((20c5*s + 12c4)*s + 6c3)*s + 2c2
+ *                4 coefficient multiplies + 3 s multiplies + 3 adds = 10
+ *
+ * If the production toolchain ever contracts these into fused multiply-add the
+ * count drops (FMA is strictly more accurate), but the computed coefficients
+ * would differ from consumer_power_coefficients(); tests/guidance/
+ * check_consumer_fp_contraction.py fails in that case and forces a review.
+ */
+#define M5_CONSUMER_POSITION_ROUNDINGS 10u
+#define M5_CONSUMER_VELOCITY_ROUNDINGS 12u
+#define M5_CONSUMER_ACCELERATION_ROUNDINGS 10u
+
+/*
+ * Bound |consumer_polynomial(s) - exact_polynomial(s)| for s in [0, s_max].
+ *
+ * `exact` is an outward interval enclosure of the true real coefficients
+ * produced by the validator's interval arithmetic, never a binary64 nominal
+ * value. The bound is
+ *
+ *   sum_i max(|cf_i - c_low_i|, |cf_i - c_high_i|) * s_max^i
+ *     + gamma_n * sum_i |cf_i| * s_max^i
+ *
+ * with gamma_n = n*u / (1 - n*u), u = 2^-24, and a small absolute floor for
+ * subnormal-range final roundings. gamma_n requires normal-range intermediates
+ * and no overflow, so a polynomial whose magnitude term is too small (possible
+ * cancellation into the subnormal range) or too large returns +Inf and the
+ * caller fails closed. Inputs outside the model are rejected, not guessed.
+ */
 static double consumer_eval_error_bound(
     const float consumer[6],
-    const double exact[6],
+    const M5SafetyInterval exact[6],
     unsigned degree,
+    unsigned rounding_count,
     double s_max)
 {
   const double unit = 0x1p-24; /* binary32 unit roundoff, round-to-nearest */
   double coefficient_term = 0.0;
-  double rounding_term = 0.0;
+  double magnitude_term = 0.0;
   double power = 1.0;
+  double gamma, result;
   unsigned i;
 
-  if (!(s_max >= 0.0) || !isfinite(s_max)) return INFINITY;
+  if (!(s_max >= 0.0) || !isfinite(s_max) || rounding_count == 0u)
+    return INFINITY;
   for (i = 0u; i <= degree; ++i) {
     double cf = (double)consumer[i];
-    double ce = exact[i];
-    if (!isfinite(cf) || !isfinite(ce)) return INFINITY;
+    double low_distance, high_distance, difference, magnitude;
+    if (!isfinite(cf) || exact[i].valid == 0u) return INFINITY;
+    low_distance = fabs(cf - exact[i].low);
+    high_distance = fabs(cf - exact[i].high);
+    difference = fmax(low_distance, high_distance);
+    difference = difference > 0.0 ? nextafter(difference, INFINITY) : 0.0;
+    magnitude = fabs(cf);
     coefficient_term = add_upper_nonnegative(coefficient_term,
-        multiply_upper_nonnegative(fabs(cf - ce), power));
-    rounding_term = add_upper_nonnegative(rounding_term,
-        multiply_upper_nonnegative(fabs(cf), power));
+        multiply_upper_nonnegative(difference, power));
+    magnitude_term = add_upper_nonnegative(magnitude_term,
+        multiply_upper_nonnegative(magnitude, power));
     power = multiply_upper_nonnegative(power, s_max);
   }
-  /* Five Horner roundings plus four coefficient-level fused operations. */
-  return add_upper_nonnegative(coefficient_term,
-      multiply_upper_nonnegative(rounding_term, 9.0 * unit));
+  if (!isfinite(coefficient_term) || !isfinite(magnitude_term))
+    return INFINITY;
+  if (magnitude_term > 0.0) {
+    /* Overflow risk in the Horner chain: the gamma model no longer applies. */
+    if (magnitude_term > (double)FLT_MAX * 0.0625) return INFINITY;
+    /* Possible cancellation into the subnormal range: reject conservatively. */
+    if (magnitude_term < (double)FLT_MIN * 1024.0) return INFINITY;
+  }
+  gamma = ((double)rounding_count * unit) /
+          (1.0 - (double)rounding_count * unit);
+  result = add_upper_nonnegative(coefficient_term,
+      multiply_upper_nonnegative(magnitude_term, gamma));
+  /* Absolute floor: each final rounding can lose at most half a subnormal,
+     i.e. FLT_TRUE_MIN, so n of them are covered by n * 2^-149. */
+  return add_upper_nonnegative(
+      result, (double)rounding_count * 0x1p-149);
 }
 
 /* |d^k/dt^k| upper bound of the power-basis polynomial on [0, s_max]. */
@@ -851,46 +908,6 @@ static uint8_t build_curve(
         value += local_power[k] * choose[j][k] / choose[5][k];
       if (!isfinite(value)) return 0u;
       curve->position[axis][j] = value;
-    }
-
-    /* MR-009 envelope: bound the binary32 consumer evaluation of this axis
-       against the binary64 coefficients just computed. */
-    {
-      float cf[6], vf[6], af[6];
-      double vc[6], ac[6];
-      double s_max = h * (double)u1;
-      double time_scale = 2.0 * 0x1p-24 * s_max;
-
-      consumer_power_coefficients(a, b, (float)h, axis, cf);
-      for (k = 0u; k < 6u; ++k) {
-        vf[k] = 0.0f;
-        vc[k] = 0.0;
-        af[k] = 0.0f;
-        ac[k] = 0.0;
-      }
-      for (k = 0u; k < 5u; ++k) {
-        vf[k] = (float)(k + 1u) * cf[k + 1u];
-        vc[k] = (double)(k + 1u) * c[k + 1u];
-      }
-      for (k = 0u; k < 4u; ++k) {
-        af[k] = (float)((k + 1u) * (k + 2u)) * cf[k + 2u];
-        ac[k] = (double)((k + 1u) * (k + 2u)) * c[k + 2u];
-      }
-      curve->eval_position_error[axis] = add_upper_nonnegative(
-          consumer_eval_error_bound(cf, c, 5u, s_max),
-          multiply_upper_nonnegative(time_scale,
-              polynomial_derivative_magnitude(cf, 5u, 1u, s_max)));
-      curve->eval_velocity_error[axis] = add_upper_nonnegative(
-          consumer_eval_error_bound(vf, vc, 4u, s_max),
-          multiply_upper_nonnegative(time_scale,
-              polynomial_derivative_magnitude(cf, 5u, 2u, s_max)));
-      curve->eval_acceleration_error[axis] = add_upper_nonnegative(
-          consumer_eval_error_bound(af, ac, 3u, s_max),
-          multiply_upper_nonnegative(time_scale,
-              polynomial_derivative_magnitude(cf, 5u, 3u, s_max)));
-      if (!isfinite(curve->eval_position_error[axis]) ||
-          !isfinite(curve->eval_velocity_error[axis]) ||
-          !isfinite(curve->eval_acceleration_error[axis])) return 0u;
     }
 
     {
@@ -974,6 +991,51 @@ static uint8_t build_curve(
             fmin(bezier_i[j].low, curve->position[axis][j]);
         curve->position_high[axis][j] =
             fmax(bezier_i[j].high, curve->position[axis][j]);
+      }
+
+      /* MR-009: bound the binary32 consumer evaluation of this axis against
+         the interval coefficients c_i computed above (never the binary64
+         nominal c[]). */
+      {
+        float cf[6], vf[6], af[6];
+        M5SafetyInterval vc[6], ac[6];
+        double s_max = h * (double)u1;
+        double time_scale = 2.0 * 0x1p-24 * s_max;
+
+        consumer_power_coefficients(a, b, (float)h, axis, cf);
+        for (k = 0u; k < 6u; ++k) {
+          vf[k] = 0.0f;
+          af[k] = 0.0f;
+          vc[k] = interval_exact(0.0);
+          ac[k] = interval_exact(0.0);
+        }
+        for (k = 0u; k < 5u; ++k) {
+          vf[k] = (float)(k + 1u) * cf[k + 1u];
+          vc[k] = interval_scale(c_i[k + 1u], (double)(k + 1u));
+        }
+        for (k = 0u; k < 4u; ++k) {
+          af[k] = (float)((k + 1u) * (k + 2u)) * cf[k + 2u];
+          ac[k] = interval_scale(c_i[k + 2u],
+                                 (double)((k + 1u) * (k + 2u)));
+        }
+        curve->eval_position_error[axis] = add_upper_nonnegative(
+            consumer_eval_error_bound(cf, c_i, 5u,
+                M5_CONSUMER_POSITION_ROUNDINGS, s_max),
+            multiply_upper_nonnegative(time_scale,
+                polynomial_derivative_magnitude(cf, 5u, 1u, s_max)));
+        curve->eval_velocity_error[axis] = add_upper_nonnegative(
+            consumer_eval_error_bound(vf, vc, 4u,
+                M5_CONSUMER_VELOCITY_ROUNDINGS, s_max),
+            multiply_upper_nonnegative(time_scale,
+                polynomial_derivative_magnitude(cf, 5u, 2u, s_max)));
+        curve->eval_acceleration_error[axis] = add_upper_nonnegative(
+            consumer_eval_error_bound(af, ac, 3u,
+                M5_CONSUMER_ACCELERATION_ROUNDINGS, s_max),
+            multiply_upper_nonnegative(time_scale,
+                polynomial_derivative_magnitude(cf, 5u, 3u, s_max)));
+        if (!isfinite(curve->eval_position_error[axis]) ||
+            !isfinite(curve->eval_velocity_error[axis]) ||
+            !isfinite(curve->eval_acceleration_error[axis])) return 0u;
       }
     }
   }
@@ -1078,7 +1140,9 @@ static uint8_t curve_bounds(
                                 velocity_mid_interval.low),
           abs_difference_upper(velocity_mid_interval.high,
                                 (double)bounds->velocity[axis]));
-      velocity_mid_abs = interval_abs_max(velocity_mid_interval);
+      velocity_mid_abs = add_upper_nonnegative(
+          interval_abs_max(velocity_mid_interval),
+          curve->eval_velocity_error[axis]);
       position_rounding2 = sum_square_upper(position_rounding2, position_error);
       velocity_rounding2 = sum_square_upper(velocity_rounding2, velocity_error);
       position_rounding2 = sum_square_upper(position_rounding2,

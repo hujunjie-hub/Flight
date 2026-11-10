@@ -4954,6 +4954,274 @@ static void test_m5_safety_consumer_curve_envelope(void)
   }
 }
 
+/*
+ * S06-087..091: end-to-end safety decisions for the consumed curve.
+ *
+ * S06-085/S06-086 prove the numeric envelope; these tests drive the real
+ * m5_trajectory_safety_validate() decision. Obstacles are placed from the
+ * consumer sampler or exactly on a preview knot, so accepting any of them would
+ * mean the controller flies into the obstacle.
+ *
+ * Honest scope note: for a moving reference the DFS band
+ * (speed * h / 2^5) is larger than the MR-009 envelope, so these tests prove
+ * the decision path, not that the envelope alone flips it. Pointwise envelope
+ * coverage is proven by S06-085 and S06-086.
+ */
+static void safety_zero_uncertainty(SafetyFx *fx)
+{
+  unsigned axis;
+  for (axis = 0u; axis < 3u; ++axis) {
+    fx->base.nav.core.position_std_m[axis] = 0.0f;
+    fx->base.nav.core.velocity_std_mps[axis] = 0.0f;
+  }
+  fx->input.response_delay_us = 0u;
+}
+
+static void safety_generous_envelope(SafetyFx *fx, float speed, float accel)
+{
+  unsigned axis;
+  fx->base.env.max_linear_speed_mps = speed;
+  fx->base.env.max_linear_accel_mps2 = accel;
+  for (axis = 0u; axis < 3u; ++axis) {
+    fx->base.env.vehicle_extension.max_velocity_ned_mps[axis] = speed;
+    fx->base.env.vehicle_extension.max_acceleration_ned_mps2[axis] = accel;
+  }
+}
+
+static void safety_mark_occupied(SafetyFx *fx, float x, float y, float z)
+{
+  const float point[3] = {x, y, z};
+  uint16_t voxel = 0u;
+  CHECK(m5_local_map_world_to_voxel(&fx->map, point, &voxel));
+  fx->map.cells[voxel].state = M5_MAP_CELL_OCCUPIED_CONFIRMED;
+  fx->map.cells[voxel].log_odds = 4;
+  fx->map.cells[voxel].source_mask = 1u;
+}
+
+static void safety_linear_reference(SafetyFx *fx,
+                                    float x0, float y0, float z0,
+                                    float vx, float vy, float vz)
+{
+  const float step_s = (float)PRODUCT_PREVIEW_STEP_US * 1e-6f;
+  unsigned i;
+  fx->base.nav.core.position_ned_m[0] = x0;
+  fx->base.nav.core.position_ned_m[1] = y0;
+  fx->base.nav.core.position_ned_m[2] = z0;
+  fx->base.nav.core.velocity_ned_mps[0] = vx;
+  fx->base.nav.core.velocity_ned_mps[1] = vy;
+  fx->base.nav.core.velocity_ned_mps[2] = vz;
+  memset(fx->base.nav.core.acceleration_ned_mps2, 0,
+         sizeof(fx->base.nav.core.acceleration_ned_mps2));
+  safety_point_set(&fx->reference.anchor, x0, y0, z0, vx, vy, vz);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    float t = (float)(i + 1u) * step_s;
+    fx->reference.points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+    safety_point_set(&fx->reference.points[i],
+                     x0 + vx * t, y0 + vy * t, z0 + vz * t, vx, vy, vz);
+  }
+  safety_map_reset(fx);
+}
+
+static void safety_keep_in_box(SafetyFx *fx, float half_width)
+{
+  fill_header(&fx->fence.header, MSG_PRODUCT_GEOFENCE_SNAPSHOT,
+              SOURCE_M4, fx->base.now);
+  fx->fence.fence_id = 91u;
+  fx->fence.frame_id = FRAME_LOCAL_NED;
+  fx->fence.origin_id = T_ORIGIN;
+  fx->fence.state_epoch = T_STATE_EPOCH;
+  fx->fence.validity = PRODUCT_GEOFENCE_VALID;
+  fx->fence.kind = PRODUCT_GEOFENCE_KEEP_IN;
+  fx->fence.vertex_count = 4u;
+  fx->fence.horizontal_margin_m = 0.0f;
+  fx->fence.vertical_margin_m = 0.0f;
+  fx->fence.min_height_above_home_m = 0.0f;
+  fx->fence.max_height_above_home_m = 50.0f;
+  fx->fence.vertices_ne_m[0][0] = -2.0f;
+  fx->fence.vertices_ne_m[0][1] = -half_width;
+  fx->fence.vertices_ne_m[1][0] = 2.0f;
+  fx->fence.vertices_ne_m[1][1] = -half_width;
+  fx->fence.vertices_ne_m[2][0] = 2.0f;
+  fx->fence.vertices_ne_m[2][1] = half_width;
+  fx->fence.vertices_ne_m[3][0] = -2.0f;
+  fx->fence.vertices_ne_m[3][1] = half_width;
+  fx->input.geofences = &fx->fence;
+  fx->input.geofence_count = 1u;
+}
+
+static void test_m5_safety_consumer_static_crossing_rejected(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 50000000u);
+  safety_generous_envelope(&fx, 10.0f, 50.0f);
+  /* v = 2 m/s passes x = 0.75 at t = 0.375 s, i.e. inside interval 18. */
+  safety_linear_reference(&fx, 0.0f, 0.0f, -5.0f, 2.0f, 0.0f, 0.0f);
+  safety_zero_uncertainty(&fx);
+  safety_mark_occupied(&fx, 0.75f, 0.0f, -5.0f);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STATIC_COLLISION);
+  CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_STATIC_COLLISION);
+}
+
+static void test_m5_safety_consumer_static_clear_companion_passes(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 50500000u);
+  safety_generous_envelope(&fx, 10.0f, 50.0f);
+  safety_linear_reference(&fx, 0.0f, 0.0f, -5.0f, 2.0f, 0.0f, 0.0f);
+  safety_zero_uncertainty(&fx);
+  /* Same trajectory, obstacle one cell to the side: 0.25 m AABB clearance. */
+  safety_mark_occupied(&fx, 0.75f, 0.5f, -5.0f);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 1u);
+}
+
+static void test_m5_safety_consumer_preview_seam_rejected(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 51000000u);
+  safety_generous_envelope(&fx, 10.0f, 50.0f);
+  /* v = 2.5 m/s reaches x = 0.75 exactly at the interval-15 preview knot. */
+  safety_linear_reference(&fx, 0.0f, 0.0f, -5.0f, 2.5f, 0.0f, 0.0f);
+  safety_zero_uncertainty(&fx);
+  safety_mark_occupied(&fx, 0.75f, 0.0f, -5.0f);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STATIC_COLLISION);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_consumer_adaptive_subdivision(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 51500000u);
+  safety_generous_envelope(&fx, 10.0f, 50.0f);
+  /* Line at y = -0.16; occupied cell centre y = 0.25 -> AABB distance 0.16,
+     inside the 0.15 + swept(0.02) unresolved band but outside the inflated
+     boundary, so the DFS must subdivide and still prove clearance. */
+  safety_linear_reference(&fx, 0.0f, -0.16f, -5.0f, 2.0f, 0.0f, 0.0f);
+  safety_zero_uncertainty(&fx);
+  safety_mark_occupied(&fx, 0.75f, 0.25f, -5.0f);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 1u);
+  CHECK(fx.result.work_units > PRODUCT_PREVIEW_COUNT);
+
+  /* 0.149 m from the inflated boundary: the same cell must now be rejected
+     without relying on subdivision. */
+  safety_fx_init(&fx, 51600000u);
+  safety_generous_envelope(&fx, 10.0f, 50.0f);
+  safety_linear_reference(&fx, 0.0f, -0.149f, -5.0f, 2.0f, 0.0f, 0.0f);
+  safety_zero_uncertainty(&fx);
+  safety_mark_occupied(&fx, 0.75f, 0.25f, -5.0f);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_STATIC_COLLISION);
+  CHECK(fx.result.passed == 0u);
+}
+
+static void test_m5_safety_consumer_dynamic_track_rejected(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+  safety_fx_init(&fx, 52000000u);
+  safety_generous_envelope(&fx, 10.0f, 50.0f);
+  safety_linear_reference(&fx, 0.0f, 0.0f, -5.0f, 2.0f, 0.0f, 0.0f);
+  safety_zero_uncertainty(&fx);
+  track = &fx.map.tracks[0];
+  track->id = 71u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now;
+  track->expires_us = fx.base.now + 900000u;
+  track->radius_m = 0.05f;
+  track->position_ned_m[0] = 0.5f;
+  track->position_ned_m[1] = 0.0f;
+  track->position_ned_m[2] = -5.0f;
+  memset(track->velocity_ned_mps, 0, sizeof(track->velocity_ned_mps));
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_DYNAMIC_COLLISION);
+  CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_DYNAMIC_COLLISION);
+}
+
+static void test_m5_safety_consumer_geofence_boundary(void)
+{
+  SafetyFx fx;
+  safety_fx_init(&fx, 53000000u);
+  safety_generous_envelope(&fx, 10.0f, 50.0f);
+  safety_linear_reference(&fx, 0.0f, 0.0f, -5.0f, 2.0f, 0.0f, 0.0f);
+  safety_zero_uncertainty(&fx);
+  /* Inflated boundary is 0.15 m (vehicle radius 0.10 + clearance 0.05). */
+  safety_keep_in_box(&fx, 0.149f);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_GEOFENCE_VIOLATION);
+  CHECK(fx.result.passed == 0u);
+  /* Same path with 0.05 m of margin must still pass. */
+  safety_keep_in_box(&fx, 0.20f);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 1u);
+}
+
+static void test_m5_safety_consumer_max_deviation_rejected(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *unused = NULL;
+  ProductMotionPoint sampled;
+  uint32_t seed = 0x6D350091u;
+  uint64_t mid_time;
+  unsigned i, axis;
+  (void)unused;
+
+  safety_fx_init(&fx, 54000000u);
+  safety_generous_envelope(&fx, 200.0f, 20000.0f);
+  /* Independent random p/v/a on every knot: worst case for binary32
+     coefficient cancellation, but bounded so the sampled curve stays in the
+     local map. */
+  for (axis = 0u; axis < 3u; ++axis) {
+    fx.reference.anchor.point.position_ned_m[axis] =
+        safety_fuzz_scaled(&seed, 0.5f);
+    fx.reference.anchor.point.velocity_ned_mps[axis] =
+        safety_fuzz_scaled(&seed, 20.0f);
+    fx.reference.anchor.point.acceleration_ned_mps2[axis] =
+        safety_fuzz_scaled(&seed, 10.0f);
+  }
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    for (axis = 0u; axis < 3u; ++axis) {
+      fx.reference.points[i].point.position_ned_m[axis] =
+          safety_fuzz_scaled(&seed, 0.5f);
+      fx.reference.points[i].point.velocity_ned_mps[axis] =
+          safety_fuzz_scaled(&seed, 20.0f);
+      fx.reference.points[i].point.acceleration_ned_mps2[axis] =
+          safety_fuzz_scaled(&seed, 10.0f);
+    }
+  }
+  fx.base.nav.core.position_ned_m[0] = fx.reference.anchor.point.position_ned_m[0];
+  fx.base.nav.core.position_ned_m[1] = fx.reference.anchor.point.position_ned_m[1];
+  fx.base.nav.core.position_ned_m[2] = fx.reference.anchor.point.position_ned_m[2];
+  fx.base.nav.core.velocity_ned_mps[0] = fx.reference.anchor.point.velocity_ned_mps[0];
+  fx.base.nav.core.velocity_ned_mps[1] = fx.reference.anchor.point.velocity_ned_mps[1];
+  fx.base.nav.core.velocity_ned_mps[2] = fx.reference.anchor.point.velocity_ned_mps[2];
+  fx.base.nav.core.acceleration_ned_mps2[0] =
+      fx.reference.anchor.point.acceleration_ned_mps2[0];
+  fx.base.nav.core.acceleration_ned_mps2[1] =
+      fx.reference.anchor.point.acceleration_ned_mps2[1];
+  fx.base.nav.core.acceleration_ned_mps2[2] =
+      fx.reference.anchor.point.acceleration_ned_mps2[2];
+  safety_map_reset(&fx);
+  safety_zero_uncertainty(&fx);
+
+  /* Put the obstacle exactly on the consumed curve, mid interval 11. */
+  mid_time = fx.reference.header.timestamp_sample_us +
+      11u * PRODUCT_PREVIEW_STEP_US + PRODUCT_PREVIEW_STEP_US / 2u;
+  CHECK(control_sample_reference(&fx.reference, mid_time, &sampled) == STATUS_OK);
+  safety_mark_occupied(&fx, sampled.position_ned_m[0],
+                       sampled.position_ned_m[1], sampled.position_ned_m[2]);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) != M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 0u);
+}
+
 int main(void)
 {
   struct {
@@ -5088,6 +5356,13 @@ int main(void)
     {"m5_safety_dynamic_adaptive_split_ulp", test_m5_safety_dynamic_adaptive_split_ulp},
     {"m5_safety_dynamic_acceleration_envelope_differential", test_m5_safety_dynamic_acceleration_envelope_differential},
     {"m5_safety_consumer_curve_envelope", test_m5_safety_consumer_curve_envelope},
+    {"m5_safety_consumer_static_crossing", test_m5_safety_consumer_static_crossing_rejected},
+    {"m5_safety_consumer_static_clear", test_m5_safety_consumer_static_clear_companion_passes},
+    {"m5_safety_consumer_preview_seam", test_m5_safety_consumer_preview_seam_rejected},
+    {"m5_safety_consumer_adaptive_subdivision", test_m5_safety_consumer_adaptive_subdivision},
+    {"m5_safety_consumer_dynamic_track", test_m5_safety_consumer_dynamic_track_rejected},
+    {"m5_safety_consumer_geofence_boundary", test_m5_safety_consumer_geofence_boundary},
+    {"m5_safety_consumer_max_deviation", test_m5_safety_consumer_max_deviation_rejected},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
