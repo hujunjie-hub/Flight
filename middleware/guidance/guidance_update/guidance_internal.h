@@ -23,6 +23,10 @@
  * detector could never confirm LANDED. Both landing builders descend through
  * the plane by this bounded probe; the ground contact model stops the airframe. */
 #define GUIDANCE_LANDING_PROBE_M 0.25f
+/* Landing descends in small steps from the measured position instead of aiming at
+ * an unreachable plane: a large constant position error saturates the vertical
+ * loop, bounces the airframe off the contact spring and flickers LANDED. */
+#define GUIDANCE_LANDING_STEP_M 0.03f
 #define GUIDANCE_MAX_DURATION_ATTEMPTS 16u
 #define GUIDANCE_VALIDATION_WORK_UNITS 256u
 #define GUIDANCE_VALIDATION_MAX_DEPTH 5u

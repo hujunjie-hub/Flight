@@ -36,8 +36,10 @@ static uint8_t target(const GuidanceInput *in, GuidanceState *s, float p[3], flo
                                                       in->evaluation_time_us) &&
               in->landed_state->state == LANDED_STATE_LANDED)) {
             /* FMAT-0008: keep descending through the Home plane until the land
-             * detector reports LANDED; the contact model stops the airframe. */
-            p[2] += GUIDANCE_LANDING_PROBE_M;
+             * detector reports LANDED. Step from the measured position so the
+             * tracking error stays small; the contact model stops the airframe. */
+            const float step_z = in->navigation->core.position_ned_m[2] + GUIDANCE_LANDING_STEP_M;
+            p[2] = fminf(step_z, d->home.position_ned_m[2] + GUIDANCE_LANDING_PROBE_M);
         }
     }
     return (uint8_t)(finite3(p) && isfinite(*yaw));

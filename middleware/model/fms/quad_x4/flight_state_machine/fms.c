@@ -1190,6 +1190,14 @@ static uint16_t fms_guidance_mode(uint8_t mode)
   case FLIGHT_MODE_MANUAL_RATE: return PRODUCT_GUIDANCE_MODE_RATE;
   case FLIGHT_MODE_MANUAL_ATTITUDE: return PRODUCT_GUIDANCE_MODE_ATTITUDE;
   case FLIGHT_MODE_ALT_HOLD: return PRODUCT_GUIDANCE_MODE_ALT_HOLD;
+  case FLIGHT_MODE_AUTO_LAND:
+  case FLIGHT_MODE_EMERGENCY_LAND:
+    /* The controller only accepts the vertical landing reference for a LAND
+     * directive published as ALT_HOLD (controller.c landing check). Publishing
+     * AUTO_LAND as TRAJECTORY made the MPC reject the below-ground landing
+     * target, drop controllable_dof_mask to 0 and latch TERMINAL during the
+     * descent (FMAT-0008). */
+    return PRODUCT_GUIDANCE_MODE_ALT_HOLD;
   case FLIGHT_MODE_POS_HOLD: return PRODUCT_GUIDANCE_MODE_POS_HOLD;
   default: return PRODUCT_GUIDANCE_MODE_TRAJECTORY;
   }
