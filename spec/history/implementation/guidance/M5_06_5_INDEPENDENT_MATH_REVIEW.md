@@ -230,3 +230,14 @@ This is an independent analytic continuous-distance differential oracle for the 
 CI：[Host validation #509](https://github.com/hujunjie-hub/Flight/actions/runs/42745124335)。
 
 **重要：CI PASS 不等于数学审查 APPROVED。** MR-001 Hermite/Bernstein 推导、MR-002 导数凸包与向量范数界、MR-003 interval outward rounding 假设、MR-004 binary32 sqrt 上下界证明、MR-005 point-to-AABB 下界、MR-006 动态相对 sweep 组合界、MR-007 编译器浮点语义和 MR-008 动态预测位置误差包络仍需逐项独立复核并给出明确结论。当前状态仍为 **BLOCKED / REVIEW_INCOMPLETE**，M5-07 不得开始；H723 目标运行、WCET/RTA、实机 RAM/stack、HIL 和飞行仍 NOT_RUN。
+
+ 
+## 完整 CI #542 结果与数学审查边界（2026-11-10）
+
+commit `dafe47b8b17e7f32f676cb258eaa7a407a1dfb90` / Host validation #542 全部 jobs success。M4 Host 927/0、M5 Host 269,207/0、integration 1,000/0、M5 ASan/UBSan 269,207/0、integration ASan/UBSan 1,000/0；S06-080..084 本轮对应测试均执行并通过，Cortex-M7 M5-06 compile PASS。
+
+S06-081 恒加速度 oracle 已从固定 513 点采样替换为解析候选点（端点、相对速度驻点、相对位置根），64 恒速 + 64 恒加速度 cases。本 oracle 使用 long double，仅对明确的 1D 恒加速度测试模型提供独立解析数值参考；不是任意 3D 相对运动的不确定度区间证明。
+
+CI：[Host validation #542](https://github.com/hujunjie-hub/Flight/actions/runs/42746417706)。
+
+**审查结论不变：BLOCKED / REVIEW_INCOMPLETE。** MR-001..MR-008 仍需逐项独立数学复核并给出 APPROVED；M5-07 不得开始。H723 目标运行、WCET/RTA、实机 RAM/stack、HIL 和飞行仍 NOT_RUN。
