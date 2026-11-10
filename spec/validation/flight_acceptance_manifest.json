@@ -1,0 +1,317 @@
+{
+  "schema_version": "1.0",
+  "project": "Flight",
+  "manifest_id": "FLIGHT-ACCEPTANCE-001",
+  "authoritative_status_file": "spec/09_需求验证实施与发布管理.md",
+  "issue_registry": "GitHub Issues",
+  "issue_workflow": "spec/quality/issue-workflow.json",
+  "local_agent_entrypoint": "AGENTS.md",
+  "local_agent_guide": "spec/AGENT-操作指南.md",
+  "acceptance_guide": "spec/Flight-验收与结果提交.md",
+  "archive_command": "pwsh -NoProfile -File .\\tools\\archive_validation_run.ps1",
+  "default_branch_for_current_milestone": "opt/stage-02-m5-06-safety-validator",
+  "pr_number": 2,
+  "pr_state": "OPEN_DRAFT",
+  "profiles": {
+    "product_h723": {
+      "vehicle": "QUAD_X4",
+      "mcu": "STM32H723ZGT6",
+      "obstacle_source_mode": "NONE",
+      "bench_mode": "BENCH_INHIBIT",
+      "online_obstacle_avoidance_authorized": false
+    },
+    "host_sil": {
+      "vehicle": "QUAD_X4",
+      "scope": "M5-02..M5-06 host-only algorithm and synthetic map validation",
+      "obstacle_data": "synthetic/host fixtures",
+      "target_hardware_claim": false
+    }
+  },
+  "status_enum": [
+    "NOT_RUN",
+    "IN_PROGRESS",
+    "PASS",
+    "FAIL",
+    "WAIVED"
+  ],
+  "pass_rules": {
+    "exit_code": 0,
+    "checks_minimum": 1,
+    "failures": 0,
+    "exact_commit_sha_required": true,
+    "raw_log_required": true,
+    "sha256_required": true,
+    "random_seed_required_for_randomized_tests": true,
+    "previous_commit_pass_inherited": false
+  },
+  "suites": [
+    {
+      "id": "FLIGHT-SRC-001",
+      "name": "Source layout",
+      "context": "Windows PowerShell",
+      "command": "python tools/check_layout.py",
+      "required": true,
+      "pass": "exit_code=0; no layout violations",
+      "evidence": "build/ or console log"
+    },
+    {
+      "id": "FLIGHT-SPEC-001",
+      "name": "Spec audit",
+      "context": "Windows PowerShell",
+      "command": "python spec/tools/audit_spec.py --round 3 --label flight-local",
+      "required": true,
+      "pass": "exit_code=0; report generated",
+      "evidence": "spec/validation/"
+    },
+    {
+      "id": "FLIGHT-TIME-001",
+      "name": "Time service",
+      "context": "CI workflow",
+      "command": "gcc -std=c99 -O2 -Wall -Wextra -Werror -Imiddleware/contracts -Isensor_device/time_base sensor_device/time_base/systime.c tests/time/test_time_service.c -o /tmp/test_time_service && /tmp/test_time_service",
+      "required": true,
+      "pass": "compile and execution success",
+      "evidence": "Host validation workflow log"
+    },
+    {
+      "id": "FLIGHT-ALG-HOST-001",
+      "name": "Navigation/control Host tests",
+      "context": "WSL Ubuntu-26.04",
+      "command": "python3 tests/algorithms/run_tests.py --target host",
+      "required": true,
+      "pass": "exit_code=0; actual test count > 0; failures=0",
+      "evidence": "Host validation workflow log"
+    },
+    {
+      "id": "FLIGHT-M4-HOST-001",
+      "name": "M4 FMS Host regression",
+      "context": "WSL Ubuntu-26.04",
+      "command": "bash tests/flight_management/run_host_tests.sh",
+      "required": true,
+      "pass": "checks > 0; failures=0",
+      "evidence": "build/ci/m4-m5/m4_host.log"
+    },
+    {
+      "id": "FLIGHT-M5-HOST-001",
+      "name": "M5 Guidance and M5-06 Host regression",
+      "context": "WSL Ubuntu-26.04",
+      "command": "bash tests/guidance/run_host_tests.sh",
+      "required": true,
+      "pass": "checks > 0; failures=0; independent Python oracles pass",
+      "evidence": "build/ci/m4-m5/m5_host.log; build/m5_host/"
+    },
+    {
+      "id": "FLIGHT-M4M5-INT-001",
+      "name": "M4/M5 integration",
+      "context": "WSL Ubuntu-26.04",
+      "command": "bash tests/guidance/run_integration_tests.sh",
+      "required": true,
+      "pass": "checks > 0; failures=0",
+      "evidence": "build/ci/m4-m5/m4_m5_integration.log"
+    },
+    {
+      "id": "FLIGHT-M5-ASAN-001",
+      "name": "M5 AddressSanitizer and UndefinedBehaviorSanitizer",
+      "context": "WSL Ubuntu-26.04",
+      "command": "EXTRA_CFLAGS='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' bash tests/guidance/run_host_tests.sh",
+      "required": true,
+      "pass": "checks > 0; failures=0; no sanitizer findings",
+      "evidence": "build/ci/m4-m5/m5_sanitizer.log"
+    },
+    {
+      "id": "FLIGHT-INT-ASAN-001",
+      "name": "M4/M5 integration sanitizers",
+      "context": "WSL Ubuntu-26.04",
+      "command": "EXTRA_CFLAGS='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' bash tests/guidance/run_integration_tests.sh",
+      "required": true,
+      "pass": "checks > 0; failures=0; no sanitizer findings",
+      "evidence": "build/ci/m4-m5/m4_m5_sanitizer.log"
+    },
+    {
+      "id": "FLIGHT-MPC-ARM-001",
+      "name": "Cortex-M7 MPC compile and RAM checks",
+      "context": "WSL Ubuntu-26.04 with GNU Arm Embedded",
+      "command": "python3 tests/algorithms/run_tests.py --target arm",
+      "required": true,
+      "pass": "compile and configured RAM/stack checks pass; report actual values",
+      "evidence": "build/validation/ and workflow artifact"
+    },
+    {
+      "id": "FLIGHT-M5-ARM-001",
+      "name": "Cortex-M7 M5 source compile check",
+      "context": "WSL Ubuntu-26.04 with GNU Arm Embedded",
+      "command": "bash tests/guidance/arm_build_check.sh",
+      "required": true,
+      "pass": "M5_CORTEX_M7_COMPILE_OK; M5 validator object is Host/SIL-only and not product-linked",
+      "evidence": "build/m5_arm/toolchain.txt; object size and .su files"
+    },
+    {
+      "id": "FLIGHT-ABI-001",
+      "name": "Production ABI report",
+      "context": "Windows PowerShell or WSL",
+      "command": "python tests/abi/abi_report.py",
+      "required": true,
+      "pass": "exit_code=0; report matches approved schema",
+      "evidence": "ABI report"
+    },
+    {
+      "id": "FLIGHT-MEM-001",
+      "name": "M5 fixed-memory budget",
+      "context": "Windows PowerShell or WSL",
+      "command": "python tests/guidance/check_memory_budget.py",
+      "required": true,
+      "pass": "exit_code=0; all fixed-memory budgets pass",
+      "evidence": "memory budget report"
+    },
+    {
+      "id": "FLIGHT-LINK-001",
+      "name": "Target build/link contract check",
+      "context": "Windows PowerShell or WSL",
+      "command": "python tests/guidance/check_target_build.py",
+      "required": true,
+      "pass": "exit_code=0; expected production build/link invariants pass",
+      "evidence": "target build report"
+    }
+  ],
+  "m5_06_safety_requirements": [
+    {
+      "id": "M5-06-REQ-001",
+      "name": "Exact consumer input",
+      "acceptance": "validate the exact anchor plus 24 preview intervals consumed downstream; validate offsets, frame, origin, epochs, timestamps, revision and leases"
+    },
+    {
+      "id": "M5-06-REQ-002",
+      "name": "Continuous static collision",
+      "acceptance": "swept-volume checking over every interval; include voxel face/edge/corner and between-knot collisions"
+    },
+    {
+      "id": "M5-06-REQ-003",
+      "name": "Dynamic obstacle relative motion",
+      "acceptance": "relative velocity, acceleration bound, uncertainty, response delay and prediction lease are conservatively enclosed"
+    },
+    {
+      "id": "M5-06-REQ-004",
+      "name": "Prediction numeric error",
+      "acceptance": "outward interval encloses time conversion, multiply/add and float conversion; numeric overflow rejects"
+    },
+    {
+      "id": "M5-06-REQ-005",
+      "name": "Adaptive subdivision",
+      "acceptance": "bounded depth/work/cell checks/stack; unresolved clearance rejects"
+    },
+    {
+      "id": "M5-06-REQ-006",
+      "name": "Geofence and navigation validity",
+      "acceptance": "continuous keep-in/keep-out and valid nav/frame/origin/epoch checks"
+    },
+    {
+      "id": "M5-06-REQ-007",
+      "name": "Fail closed",
+      "acceptance": "UNKNOWN, STALE, INVALID, numeric failure, timeout, capacity or budget exhaustion never PASS"
+    },
+    {
+      "id": "M5-06-REQ-008",
+      "name": "No M6 bypass",
+      "acceptance": "M5-05 remains candidate; M5-06 result cannot grant Permit; M5-07 integration is a separate gate"
+    }
+  ],
+  "adversarial_tests": [
+    {
+      "id": "S06-080",
+      "name": "Exact Fraction norm bounds",
+      "seed": "0x6D350680",
+      "cases_per_path": 10007,
+      "status_at_code_baseline": "PASS",
+      "oracle": "Python Fraction exact squared norm; binary32 upper and binary64 lower"
+    },
+    {
+      "id": "S06-081",
+      "name": "Dynamic relative continuous distance",
+      "seed": [
+        "0x6D350681",
+        "0xD1FF0610"
+      ],
+      "cases": 128,
+      "status_at_code_baseline": "PASS",
+      "oracle": "constant-velocity analytic closest approach and constant-acceleration long-double candidate points; not a formal interval proof"
+    },
+    {
+      "id": "S06-082",
+      "name": "Dynamic tangency, 1-ULP and preview seam",
+      "seed": null,
+      "cases": "deterministic",
+      "status_at_code_baseline": "PASS",
+      "oracle": "exact tangency/inside/outside ULP and 20ms seam cases"
+    },
+    {
+      "id": "S06-083",
+      "name": "Adaptive split collision boundary",
+      "seed": null,
+      "cases": 3,
+      "status_at_code_baseline": "PASS",
+      "oracle": "collision/fail-closed plus actual work-unit subdivision assertion"
+    },
+    {
+      "id": "S06-084",
+      "name": "Dynamic prediction Fraction envelope",
+      "seed": "0x6D350684",
+      "cases": 10007,
+      "status_at_code_baseline": "PASS",
+      "oracle": "exact rational time/position enclosure and large-epoch invariance"
+    }
+  ],
+  "latest_verified_code_baseline": {
+    "date": "2026-11-10",
+    "commit": "0c761964d4bc6cfeec73ba60464657db450743ee",
+    "workflow_run": 509,
+    "workflow_url": "https://github.com/hujunjie-hub/Flight/actions/runs/42745124335",
+    "conclusion": "SUCCESS",
+    "counts": {
+      "m4_host": {
+        "checks": 927,
+        "failures": 0
+      },
+      "m5_host": {
+        "checks": 269207,
+        "failures": 0
+      },
+      "integration": {
+        "checks": 1000,
+        "failures": 0
+      },
+      "m5_asan_ubsan": {
+        "checks": 269207,
+        "failures": 0
+      },
+      "integration_asan_ubsan": {
+        "checks": 1000,
+        "failures": 0
+      },
+      "s06_080": {
+        "binary32_upper_cases": 10007,
+        "binary64_lower_cases": 10007,
+        "seed": "0x6D350680"
+      },
+      "s06_084": {
+        "cases": 10007,
+        "seed": "0x6D350684"
+      },
+      "m5_cortex_m7_compile": "PASS",
+      "mpc_ram_bytes": 29252,
+      "worker_stack_bytes": 8192,
+      "largest_static_frame_bytes": 2024
+    },
+    "scope_limits": [
+      "This evidence applies only to the listed commit.",
+      "It is not H723 target runtime, WCET/RTA, hardware RAM/stack watermark, HIL or flight evidence."
+    ]
+  },
+  "overall_m5_06_status": {
+    "status": "BLOCKED",
+    "reasons": [
+      "Independent mathematical review MR-001..MR-008 is not yet APPROVED.",
+      "M5-07 gate integration is not complete.",
+      "H723 online obstacle avoidance is not authorized; current production profile is OBSTACLE_SOURCE_MODE=NONE and BENCH_INHIBIT."
+    ],
+    "next_milestone": "M5-07 only after M5-06 acceptance and explicit independent mathematical approval."
+  }
+}
