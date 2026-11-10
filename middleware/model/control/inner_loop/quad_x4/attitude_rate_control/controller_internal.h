@@ -14,8 +14,11 @@ typedef struct {
   int32_t last_validation_status;
   uint32_t last_eval_age_us, max_eval_age_us;
   uint64_t last_now_us, last_control_time_us;
+  uint32_t worker_ticks, worker_skips;
+  uint64_t last_worker_us;
 } MpcRunStats;
 void mpc_get_run_stats(MpcRunStats *out);
+void mpc_note_worker(uint64_t now_us, int ready);
 #define CONTROL_GRAVITY_MPS2 9.80665f
 #define MPC_VARIABLE_COUNT 15
 #define MPC_CONSTRAINT_COUNT 190

@@ -21,6 +21,7 @@ static void task_mpc_step(void)
         }
         runtime_data_unlock();
     }
+    mpc_note_worker(runtime_now_us(), ready);
     if (ready)
     {
         ControllerInput input;

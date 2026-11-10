@@ -31,6 +31,11 @@ void mpc_seed(const float a[3], uint32_t sequence) {
     unlock_exchange();
   }
 }
+void mpc_note_worker(uint64_t now_us, int ready) {
+  mpc_run_stats.worker_ticks++;
+  mpc_run_stats.last_worker_us = now_us;
+  if (!ready) mpc_run_stats.worker_skips++;
+}
 void mpc_get_run_stats(MpcRunStats *out) {
   if (out) *out = mpc_run_stats;
 }
