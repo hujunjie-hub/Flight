@@ -2326,6 +2326,92 @@ uint8_t m5_trajectory_safety_test_consumer_time(
   return (uint8_t)isfinite(*seconds);
 }
 
+static void safety_test_fill_reference(MotionReference *reference,
+                                       uint32_t step_us, uint64_t base_us)
+{
+  unsigned i, axis;
+  memset(reference, 0, sizeof(*reference));
+  reference->header.timestamp_sample_us = base_us;
+  reference->point_count = PRODUCT_PREVIEW_COUNT;
+  reference->anchor.offset_us = 0u;
+  reference->anchor.valid_mask = 0x1Fu;
+  reference->anchor.point.valid_mask = 0x1Fu;
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    reference->points[i].offset_us = (i + 1u) * step_us;
+    reference->points[i].valid_mask = 0x1Fu;
+    reference->points[i].point.valid_mask = 0x1Fu;
+  }
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    for (axis = 0u; axis < 3u; ++axis) {
+      reference->points[i].point.position_ned_m[axis] = 0.0f;
+      reference->points[i].point.velocity_ned_mps[axis] = 0.0f;
+      reference->points[i].point.acceleration_ned_mps2[axis] = 0.0f;
+    }
+  }
+}
+
+static void safety_test_set_state(MotionReferencePoint *point,
+                                  const float position[3],
+                                  const float velocity[3],
+                                  const float acceleration[3])
+{
+  unsigned axis;
+  for (axis = 0u; axis < 3u; ++axis) {
+    point->point.position_ned_m[axis] = position[axis];
+    point->point.velocity_ned_mps[axis] = velocity[axis];
+    point->point.acceleration_ned_mps2[axis] = acceleration[axis];
+  }
+}
+
+uint8_t m5_trajectory_safety_test_consumer_interval_sample(
+    uint32_t step_us, uint32_t interval, uint32_t offset_us, uint64_t base_us,
+    const float start_position[3], const float start_velocity[3],
+    const float start_acceleration[3], const float end_position[3],
+    const float end_velocity[3], const float end_acceleration[3],
+    float position[3], float *seconds)
+{
+  MotionReference reference, linear;
+  ProductMotionPoint sampled;
+  MotionReferencePoint *a;
+  MotionReferencePoint *b;
+  uint64_t time;
+  unsigned axis;
+
+  if (position == NULL || seconds == NULL || start_position == NULL ||
+      start_velocity == NULL || start_acceleration == NULL ||
+      end_position == NULL || end_velocity == NULL ||
+      end_acceleration == NULL) return 0u;
+  if (step_us != (uint32_t)PRODUCT_PREVIEW_STEP_US &&
+      step_us != (uint32_t)PRODUCT_ROUTE_PREVIEW_STEP_US) return 0u;
+  if (interval >= PRODUCT_PREVIEW_COUNT || offset_us > step_us) return 0u;
+
+  safety_test_fill_reference(&reference, step_us, base_us);
+  a = interval == 0u ? &reference.anchor : &reference.points[interval - 1u];
+  b = &reference.points[interval];
+  safety_test_set_state(a, start_position, start_velocity, start_acceleration);
+  safety_test_set_state(b, end_position, end_velocity, end_acceleration);
+  time = base_us + (uint64_t)interval * step_us + offset_us;
+  if (control_sample_reference(&reference, time, &sampled) != STATUS_OK) return 0u;
+  for (axis = 0u; axis < 3u; ++axis) position[axis] = sampled.position_ned_m[axis];
+
+  /* Companion unit-velocity reference: its x output is exactly s_c. */
+  {
+    float zero[3] = {0.0f, 0.0f, 0.0f};
+    float unit[3] = {1.0f, 0.0f, 0.0f};
+    float at_h[3] = {(float)step_us * 1e-6f, 0.0f, 0.0f};
+    safety_test_fill_reference(&linear, step_us, base_us);
+    safety_test_set_state(&linear.anchor, zero, unit, zero);
+    for (axis = 0u; axis < PRODUCT_PREVIEW_COUNT; ++axis) {
+      at_h[0] = (float)(axis + 1u) * ((float)step_us * 1e-6f);
+      safety_test_set_state(&linear.points[axis], at_h, unit, zero);
+    }
+    if (control_sample_reference(&linear, time, &sampled) != STATUS_OK) return 0u;
+    *seconds = sampled.position_ned_m[0];
+  }
+  return (uint8_t)(isfinite(*seconds) && isfinite(position[0]) &&
+                   isfinite(position[1]) && isfinite(position[2]));
+}
+
 #endif /* FLIGHT_M5_SAFETY_TEST_API */
 
 #endif /* FLIGHT_M5_HOST_PLANNER */

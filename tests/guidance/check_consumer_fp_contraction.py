@@ -99,17 +99,36 @@ def build_and_scan(gcc, objdump, source, flags, object_name):
 
 
 MODEL_TOKENS = {
-    "gamma_2_derivation": [
-        "gamma2 = nu2 / (1.0 - nu2)",
-        "delta_s = multiply_upper_nonnegative(gamma2, s_max)",
+    "gamma_n": [
+        "double nu = (double)rounding_count * unit;",
+        "nu = nextafter(nu, INFINITY);",
+        "gamma = nu / (1.0 - nu);",
+        "gamma = nextafter(gamma, INFINITY);",
     ],
-    "evaluation_interval": [
-        "s_eval_max = add_upper_nonnegative(s_max, delta_s)",
+    "gamma_2_derivation": [
+        "double nu2 = 2.0 * 0x1p-24;",
+        "nu2 = nextafter(nu2, INFINITY);",
+        "gamma2 = nu2 / (1.0 - nu2);",
+        "gamma2 = nextafter(gamma2, INFINITY);",
+    ],
+    "time_term": [
+        "delta_s = multiply_upper_nonnegative(gamma2, s_max);",
+        "s_eval_max = add_upper_nonnegative(s_max, delta_s);",
+        "multiply_upper_nonnegative(delta_s,",
+    ],
+    "interval_coefficients": [
+        "low_distance = fabs(cf - exact[i].low);",
+        "high_distance = fabs(cf - exact[i].high);",
+        "difference = fmax(low_distance, high_distance);",
     ],
     "rounding_counts": [
         "#define M5_CONSUMER_POSITION_ROUNDINGS 10u",
         "#define M5_CONSUMER_VELOCITY_ROUNDINGS 12u",
         "#define M5_CONSUMER_ACCELERATION_ROUNDINGS 10u",
+    ],
+    "range_guards": [
+        "if (magnitude_term > (double)FLT_MAX * 0.0625) return INFINITY;",
+        "if (magnitude_term < (double)FLT_MIN * 1024.0) return INFINITY;",
     ],
     "subnormal_amplification": [
         "(double)rounding_count * 0x1p-149",
@@ -123,9 +142,10 @@ MODEL_TOKENS = {
 }
 
 
-def check_model_against_source():
+def check_model_against_source(source=None):
     """The report must describe the model that is actually compiled."""
-    source = VALIDATOR.read_text(encoding="utf-8")
+    if source is None:
+        source = VALIDATOR.read_text(encoding="utf-8")
     missing = []
     for section, tokens in MODEL_TOKENS.items():
         for token in tokens:
@@ -140,7 +160,29 @@ def check_model_against_source():
     }
 
 
+def self_test():
+    """Deliberately corrupt one formula: the checker must report MISMATCH."""
+    source = VALIDATOR.read_text(encoding="utf-8")
+    corrupted = source.replace("gamma2 = nu2 / (1.0 - nu2);",
+                               "gamma2 = 0.0;")
+    if corrupted == source:
+        print("FAIL: self-test could not corrupt the gamma_2 formula")
+        return 1
+    good = check_model_against_source(source)
+    bad = check_model_against_source(corrupted)
+    if good["status"] != "MATCH":
+        print(f"FAIL: unmodified source reported {good['status']}")
+        return 1
+    if bad["status"] != "MISMATCH" or not bad["missing_tokens"]:
+        print("FAIL: corrupted gamma_2 formula was not detected")
+        return 1
+    print("M5_FP_MODEL_SELF_TEST_PASS (mutated gamma_2 detected as MISMATCH)")
+    return 0
+
+
 def main():
+    if "--self-test" in sys.argv[1:]:
+        return self_test()
     sys.path.insert(0, str(ROOT))
     import rtconfig  # production compiler flags, not a re-typed copy
 

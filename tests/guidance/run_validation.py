@@ -39,6 +39,7 @@ def main():
         ("m4_arm", ["pwsh", "-NoProfile", "-File", "tests/flight_management/arm_build_check.ps1"], {}),
         ("m5_arm", ["pwsh", "-NoProfile", "-File", "tests/guidance/arm_build_check.ps1"], {}),
         ("consumer_fp", [sys.executable, "tests/guidance/check_consumer_fp_contraction.py"], {}),
+        ("fp_model_selftest", [sys.executable, "tests/guidance/check_consumer_fp_contraction.py", "--self-test"], {}),
         ("spec_layout", [sys.executable, "spec/tools/audit_spec.py", "--round", "3", "--label", "m4-m5-implementation"], {}),
         ("memory_budget", [sys.executable, "tests/guidance/check_memory_budget.py"], {}),
         ("packages_lock", [sys.executable, "tools/check_rt_packages_lock.py"], {}),

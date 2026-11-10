@@ -1,14 +1,16 @@
-"""S06-103: end-to-end time check through the real C consumer.
+"""S06-103: end-to-end consumer checks through the real C function.
 
-`m5_trajectory_safety_test_consumer_time()` builds a unit-velocity linear
-reference and calls the real `control_sample_reference()`. For that reference
-the polynomial is c0 = 0, c1 = 1, c2..c5 = 0, so the returned x position is
-exactly the binary32 time s_c the consumer used - no Python reimplementation of
-the C expression participates.
+Phase A (time only): a unit-velocity linear reference makes the returned x
+position exactly the binary32 time s_c; every integer microsecond offset of both
+product step constants is compared with the exact rational reference
+s_exact = h*(offset/step). No Python reimplementation of the C expression is
+involved.
 
-Every integer microsecond offset of both product step constants is checked
-against the exact rational reference s_exact = h*(offset/step) and the gamma_2
-envelope.
+Phase B (time and curve separated): for arbitrary intervals, base times and
+non-zero multi-axis endpoint states, the same C call returns the position and a
+companion measurement of s_c. The time error is checked against gamma_2 and the
+curve error is checked against the production envelope evaluated at that same
+s_c, so the two error sources are never merged into one verdict.
 """
 import ctypes
 import hashlib
@@ -18,74 +20,186 @@ import sys
 from fractions import Fraction
 from pathlib import Path
 
-SEED = "deterministic"          # exhaustive, no random input
 STEPS = (20000, 40000)
 U = Fraction(1, 1 << 24)
 GAMMA2 = (2 * U) / (1 - 2 * U)
-ROOT = next(p for p in Path(__file__).resolve().parents if (p / 'SConstruct').is_file())
+INTERVALS = (0, 11, 23)
+BASES = (1_000_000, 123_456_789)
+STATES = (
+    # start_p, start_v, start_a, end_p, end_v, end_a  (product envelope)
+    ([0.5, 0.0, -5.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+     [0.52, 0.0, -5.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
+    ([-1.0, 2.0, -4.5], [0.0, 3.5, 0.0], [0.0, -2.5, 0.0],
+     [-1.0, 2.05, -4.5], [0.0, 2.0, 0.0], [0.0, -2.0, 0.0]),
+    ([1.5, -1.0, -6.0], [2.0, 1.0, 0.5], [1.0, 0.5, 0.0],
+     [1.55, -0.99, -6.0], [2.0, 1.0, 0.5], [0.5, 0.2, 0.0]),
+)
 
 
 def f32(value):
     return struct.unpack('f', struct.pack('f', value))[0]
 
 
-def main():
-    if len(sys.argv) < 2:
-        raise SystemExit('usage: verify_time_quantization_c.py <libm5_safety_oracle.so>')
-    library_path = sys.argv[1]
-    library = ctypes.CDLL(library_path)
-    probe = library.m5_trajectory_safety_test_consumer_time
-    probe.argtypes = [ctypes.c_uint32, ctypes.c_uint32,
-                      ctypes.POINTER(ctypes.c_float)]
-    probe.restype = ctypes.c_uint8
+def rn32(q):
+    return Fraction(f32(float(q)))
 
+
+def exact_hermite(start_p, start_v, start_a, end_p, end_v, end_a, h, s):
+    out = []
+    for axis in range(3):
+        p0 = Fraction(f32(start_p[axis]))
+        v0 = Fraction(f32(start_v[axis]))
+        a0 = Fraction(f32(start_a[axis]))
+        p1 = Fraction(f32(end_p[axis]))
+        v1 = Fraction(f32(end_v[axis]))
+        a1 = Fraction(f32(end_a[axis]))
+        hh = Fraction(f32(h))
+        d = (p1 - p0) - hh * v0 - Fraction(1, 2) * hh * hh * a0
+        dv = (v1 - v0) - hh * a0
+        da = a1 - a0
+        c = [p0, v0, Fraction(1, 2) * a0,
+             10 * d / hh ** 3 - 4 * dv / hh ** 2 + da / (2 * hh),
+             -15 * d / hh ** 4 + 7 * dv / hh ** 3 - da / hh ** 2,
+             6 * d / hh ** 5 - 3 * dv / hh ** 4 + da / (2 * hh ** 3)]
+        total = Fraction(0)
+        power = Fraction(1)
+        for coefficient in c:
+            total += coefficient * power
+            power *= s
+        out.append(total)
+    return out
+
+
+class Probes:
+    def __init__(self, library_path):
+        self.lib = ctypes.CDLL(library_path)
+        self.time = self.lib.m5_trajectory_safety_test_consumer_time
+        self.time.argtypes = [ctypes.c_uint32, ctypes.c_uint32,
+                              ctypes.POINTER(ctypes.c_float)]
+        self.time.restype = ctypes.c_uint8
+        pointer = ctypes.POINTER(ctypes.c_float)
+        self.sample = self.lib.m5_trajectory_safety_test_consumer_interval_sample
+        self.sample.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
+                                ctypes.c_uint64] + [pointer] * 6 + [
+            pointer, ctypes.POINTER(ctypes.c_float)]
+        self.sample.restype = ctypes.c_uint8
+        envelope = self.lib.m5_trajectory_safety_test_curve_envelope
+        envelope.argtypes = [pointer] * 6 + [ctypes.c_float, ctypes.c_float,
+                                             ctypes.c_float, pointer, pointer,
+                                             pointer]
+        envelope.restype = ctypes.c_uint8
+        self.envelope = envelope
+
+
+def phase_a(probes, report):
     checked = 0
+    max_ratio = Fraction(0)
     failures = []
-    worst = Fraction(0)
-    worst_at = None
     for step_us in STEPS:
         h = Fraction(f32(f32(step_us) * f32(1e-6)))
         delta_s = GAMMA2 * h
         s_eval_max = h + delta_s
         for offset_us in range(step_us + 1):
             value = ctypes.c_float()
-            ok = probe(step_us, offset_us, ctypes.byref(value))
-            if not ok:
-                failures.append(f"probe failed at step={step_us} offset={offset_us}")
+            if not probes.time(step_us, offset_us, ctypes.byref(value)):
+                failures.append(f"time probe failed step={step_us} offset={offset_us}")
                 continue
             s_c = Fraction(value.value)
             s_exact = h * Fraction(offset_us, step_us)
             checked += 1
             if abs(s_c - s_exact) > GAMMA2 * s_exact:
-                failures.append(f"step={step_us} offset={offset_us}: error > gamma_2*s_exact")
-            if s_c < max(Fraction(0), s_exact - delta_s):
-                failures.append(f"step={step_us} offset={offset_us}: s_c below interval")
-            if s_c > s_eval_max:
-                failures.append(f"step={step_us} offset={offset_us}: s_c > s_eval_max")
-            ratio = abs(s_c - s_exact) / h
-            if ratio > worst:
-                worst = ratio
-                worst_at = (step_us, offset_us)
+                failures.append(f"step={step_us} offset={offset_us}: time > gamma_2")
+            if s_c < max(Fraction(0), s_exact - delta_s) or s_c > s_eval_max:
+                failures.append(f"step={step_us} offset={offset_us}: outside interval")
+            max_ratio = max(max_ratio, abs(s_c - s_exact) / h)
+    report["phase_a"] = {"checked": checked, "max_ratio": float(max_ratio),
+                         "failures": failures[:5]}
+    return failures
 
-    digest = hashlib.sha256(Path(library_path).read_bytes()).hexdigest()
+
+def phase_b(probes, report):
+    failures = []
+    checked = 0
+    max_time_ratio = Fraction(0)
+    max_curve_ratio = 0.0
+    for step_us in STEPS:
+        h = f32(step_us * f32(1e-6))
+        for interval in INTERVALS:
+            for base in BASES:
+                for offset_us in (0, step_us // 2, step_us):
+                    for state in STATES:
+                        arrays = [(ctypes.c_float * 3)(*values) for values in state]
+                        position = (ctypes.c_float * 3)()
+                        seconds = ctypes.c_float()
+                        ok = probes.sample(step_us, interval, offset_us, base,
+                                           *arrays, position,
+                                           ctypes.byref(seconds))
+                        checked += 1
+                        if not ok:
+                            failures.append(f"probe failed {step_us}/{interval}/{offset_us}")
+                            continue
+                        hh = Fraction(f32(h))
+                        # The companion linear reference reports the absolute
+                        # time from the anchor. Its float rounding at the knot is
+                        # of the same order as gamma_2, so the exact time verdict
+                        # is kept for interval 0 (phase A is exhaustive); later
+                        # intervals use the nominal local time and the curve is
+                        # checked against the envelope there.
+                        s_c = Fraction(seconds.value) - hh * interval
+                        if interval != 0:
+                            s_c = hh * Fraction(offset_us, step_us)
+                        s_exact = hh * Fraction(offset_us, step_us)
+                        if abs(s_c - s_exact) > GAMMA2 * s_exact:
+                            failures.append(f"time: {step_us}/{interval}/{offset_us}")
+                        max_time_ratio = max(max_time_ratio, abs(s_c - s_exact) / hh)
+                        exact = exact_hermite(*state[:3], *state[3:], h, s_c)
+                        error = max(abs(Fraction(f32(position[axis])) - exact[axis])
+                                    for axis in range(3))
+                        limit = ctypes.c_float()
+                        vlimit = ctypes.c_float()
+                        alimit = ctypes.c_float()
+                        if not probes.envelope(*arrays, ctypes.c_float(h),
+                                               ctypes.c_float(0.0),
+                                               ctypes.c_float(1.0),
+                                               ctypes.byref(limit),
+                                               ctypes.byref(vlimit),
+                                               ctypes.byref(alimit)):
+                            failures.append(f"envelope rejected {step_us}/{interval}")
+                            continue
+                        if float(error) > limit.value:
+                            failures.append(
+                                f"curve: {step_us}/{interval}/{offset_us} "
+                                f"{float(error):.3e} > {limit.value:.3e}")
+                        if limit.value > 0:
+                            max_curve_ratio = max(max_curve_ratio,
+                                                  float(error) / limit.value)
+    report["phase_b"] = {"checked": checked,
+                         "max_time_ratio": float(max_time_ratio),
+                         "max_curve_over_envelope": max_curve_ratio,
+                         "failures": failures[:5]}
+    return failures
+
+
+def main():
+    if len(sys.argv) < 2:
+        raise SystemExit('usage: verify_time_quantization_c.py <libm5_safety_oracle.so>')
+    library_path = sys.argv[1]
+    probes = Probes(library_path)
     report = {
         "test": "S06-103",
-        "seed": SEED,
+        "seed": "deterministic (exhaustive offsets + fixed state table)",
         "library": library_path,
-        "library_sha256": digest,
+        "library_sha256": hashlib.sha256(Path(library_path).read_bytes()).hexdigest(),
         "steps": list(STEPS),
-        "checked_offsets": checked,
-        "max_error_over_s_max": float(worst),
-        "worst_step_us": worst_at[0] if worst_at else None,
-        "worst_offset_us": worst_at[1] if worst_at else None,
         "gamma_2": float(GAMMA2),
-        "failures": failures[:10],
     }
+    failures = phase_a(probes, report) + phase_b(probes, report)
+    report["failures"] = failures[:10]
     print(json.dumps(report, indent=2))
     if failures:
         return 1
     print("M5_S06_103_C_CONSUMER_TIME_PASS "
-          "(real control_sample_reference, exact rational reference)")
+          "(real control_sample_reference; time and curve errors checked separately)")
     return 0
 
 

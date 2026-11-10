@@ -93,4 +93,14 @@ uint8_t m5_trajectory_safety_test_interval_op(
 uint8_t m5_trajectory_safety_test_consumer_time(
     uint32_t step_us, uint32_t offset_us, float *seconds);
 
+/* S06-103 extension: arbitrary interval, base time and endpoint states.
+   `seconds` is measured separately with a unit-velocity companion reference,
+   so the time error and the curve-evaluation error can be checked separately. */
+uint8_t m5_trajectory_safety_test_consumer_interval_sample(
+    uint32_t step_us, uint32_t interval, uint32_t offset_us, uint64_t base_us,
+    const float start_position[3], const float start_velocity[3],
+    const float start_acceleration[3], const float end_position[3],
+    const float end_velocity[3], const float end_acceleration[3],
+    float position[3], float *seconds);
+
 #endif /* M5_TRAJECTORY_SAFETY_TEST_API_H */
