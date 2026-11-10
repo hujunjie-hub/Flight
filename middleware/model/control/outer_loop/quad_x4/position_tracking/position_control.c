@@ -185,7 +185,25 @@ Status position_control_track(const ControllerInput *in, uint32_t epoch,
                                     (ref.velocity_ned_mps[i] -
                                      in->navigation->core.velocity_ned_mps[i])
                           : cached_mpc.acceleration[i];
-  if (!backup) consumer_stats.used++;
+  if (!backup) {
+    consumer_stats.used++;
+    consumer_stats.diff_samples++;
+    for (i = 0; i < 3; ++i) {
+      float pd = ref.acceleration_ned_mps2[i] +
+                 c->fallback_kp_per_s2[i] *
+                     (ref.position_ned_m[i] -
+                      in->navigation->core.position_ned_m[i]) +
+                 c->fallback_kd_per_s[i] *
+                     (ref.velocity_ned_mps[i] -
+                      in->navigation->core.velocity_ned_mps[i]);
+      float difference = cached_mpc.acceleration[i] - pd;
+      float magnitude = fabsf(difference);
+      if (difference < consumer_stats.diff_lo[i]) consumer_stats.diff_lo[i] = difference;
+      if (difference > consumer_stats.diff_hi[i]) consumer_stats.diff_hi[i] = difference;
+      if (magnitude > consumer_stats.diff_max_abs[i])
+        consumer_stats.diff_max_abs[i] = magnitude;
+    }
+  }
   s = control_limit_acceleration(requested, m6.previous_accel, dt, in->safety_envelope, a);
   if (s) {
     consumer_stats.limit_rejected++;

@@ -91,6 +91,12 @@ typedef struct {
   uint32_t backup_envelope, backup_model, backup_envelope_id;
   uint32_t backup_seed_position, backup_seed_velocity;
   uint32_t limit_rejected, bounds_rejected; /* control_limit_acceleration losses */
+  /* Signed (MPC - PD) difference over the ticks that actually used the snapshot,
+   * so the gate can tell "the solver disagrees slightly" from "the solver is
+   * pulling the loop the wrong way".  Positive means MPC asks for more along
+   * that NED axis than the PD fallback would have. */
+  float diff_lo[3], diff_hi[3], diff_max_abs[3];
+  uint64_t diff_samples;
   uint32_t life_hist[MPC_LIFE_BUCKETS];     /* remaining life at consumption */
   uint32_t life_total;
   int32_t life_min_us, life_max_us;
