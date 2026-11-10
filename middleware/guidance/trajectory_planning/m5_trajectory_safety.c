@@ -2518,6 +2518,104 @@ uint8_t m5_trajectory_safety_test_consumer_full_sample(
                    isfinite(velocity[0]) && isfinite(acceleration[0]));
 }
 
+uint8_t m5_trajectory_safety_test_active_segment(
+    uint32_t step_us, uint32_t interval, uint32_t offset_us, uint64_t base_us,
+    const float start_position[3], const float start_velocity[3],
+    const float start_acceleration[3], const float end_position[3],
+    const float end_velocity[3], const float end_acceleration[3],
+    float endpoints[18], float coefficients[18], float *seconds,
+    uint32_t *active_interval)
+{
+  MotionReference reference;
+  const MotionReferencePoint *a = NULL;
+  const MotionReferencePoint *b = NULL;
+  uint32_t measured_step = 0u;
+  uint64_t time;
+  float c[3][6];
+  float local_seconds = 0.0f;
+  unsigned axis, k;
+
+  if (endpoints == NULL || coefficients == NULL || seconds == NULL ||
+      active_interval == NULL) return 0u;
+  if (interval >= PRODUCT_PREVIEW_COUNT || offset_us > step_us) return 0u;
+  if (step_us != (uint32_t)PRODUCT_PREVIEW_STEP_US &&
+      step_us != (uint32_t)PRODUCT_ROUTE_PREVIEW_STEP_US) return 0u;
+  safety_test_fill_reference(&reference, step_us, base_us);
+  {
+    MotionReferencePoint *start_point = interval == 0u
+        ? &reference.anchor : &reference.points[interval - 1u];
+    safety_test_set_state(start_point, start_position, start_velocity,
+                          start_acceleration);
+  }
+  safety_test_set_state(&reference.points[interval], end_position, end_velocity,
+                        end_acceleration);
+  time = base_us + (uint64_t)interval * step_us + offset_us;
+  if (control_reference_locate_segment(&reference, time, &a, &b, &local_seconds,
+                                       &measured_step) != STATUS_OK) return 0u;
+  for (axis = 0u; axis < 3u; ++axis) {
+    endpoints[axis * 6u + 0u] = a->point.position_ned_m[axis];
+    endpoints[axis * 6u + 1u] = a->point.velocity_ned_mps[axis];
+    endpoints[axis * 6u + 2u] = a->point.acceleration_ned_mps2[axis];
+    endpoints[axis * 6u + 3u] = b->point.position_ned_m[axis];
+    endpoints[axis * 6u + 4u] = b->point.velocity_ned_mps[axis];
+    endpoints[axis * 6u + 5u] = b->point.acceleration_ned_mps2[axis];
+  }
+  control_reference_hermite_coefficients(a->point.position_ned_m,
+                                         a->point.velocity_ned_mps,
+                                         a->point.acceleration_ned_mps2,
+                                         b->point.position_ned_m,
+                                         b->point.velocity_ned_mps,
+                                         b->point.acceleration_ned_mps2,
+                                         (float)measured_step * 1e-6f, c);
+  for (axis = 0u; axis < 3u; ++axis)
+    for (k = 0u; k < 6u; ++k)
+      coefficients[axis * 6u + k] = c[axis][k];
+  *seconds = local_seconds;
+  *active_interval = (uint32_t)((time - base_us) / step_us);
+  if (*active_interval >= PRODUCT_PREVIEW_COUNT)
+    *active_interval = PRODUCT_PREVIEW_COUNT - 1u;
+  return (uint8_t)(isfinite(local_seconds) && isfinite(coefficients[0]));
+}
+
+uint8_t m5_trajectory_safety_test_product_limits(
+    float *max_linear_speed_mps, float *max_linear_accel_mps2,
+    float max_velocity_ned_mps[3], float max_acceleration_ned_mps2[3],
+    float max_jerk_ned_mps3[3])
+{
+  static const SafetyEnvelope envelope = {
+      .safety_envelope_id = 1u,
+      .max_linear_speed_mps = 4.0f,
+      .max_linear_accel_mps2 = 2.5f,
+      .max_angular_rate_radps = 2.0f,
+      .max_yaw_rate_radps = 1.0f,
+      .vehicle_extension = {
+          .valid_mask = 0x7Fu,
+          .max_velocity_ned_mps = {4.0f, 4.0f, 2.0f},
+          .max_acceleration_ned_mps2 = {2.5f, 2.5f, 1.5f},
+          .max_jerk_ned_mps3 = {20.0f, 20.0f, 10.0f},
+          .max_tilt_rad = 0.6f,
+          .min_total_thrust_n = 0.0f,
+          .max_total_thrust_n = 40.0f,
+          .max_body_rate_frd_radps = {3.0f, 3.0f, 1.5f},
+          .min_height_above_home_m = 0.0f,
+          .max_height_above_home_m = 50.0f,
+      },
+  };
+  unsigned axis;
+  if (max_linear_speed_mps == NULL || max_linear_accel_mps2 == NULL ||
+      max_velocity_ned_mps == NULL || max_acceleration_ned_mps2 == NULL ||
+      max_jerk_ned_mps3 == NULL) return 0u;
+  *max_linear_speed_mps = envelope.max_linear_speed_mps;
+  *max_linear_accel_mps2 = envelope.max_linear_accel_mps2;
+  for (axis = 0u; axis < 3u; ++axis) {
+    max_velocity_ned_mps[axis] = envelope.vehicle_extension.max_velocity_ned_mps[axis];
+    max_acceleration_ned_mps2[axis] =
+        envelope.vehicle_extension.max_acceleration_ned_mps2[axis];
+    max_jerk_ned_mps3[axis] = envelope.vehicle_extension.max_jerk_ned_mps3[axis];
+  }
+  return 1u;
+}
+
 #endif /* FLIGHT_M5_SAFETY_TEST_API */
 
 #endif /* FLIGHT_M5_HOST_PLANNER */

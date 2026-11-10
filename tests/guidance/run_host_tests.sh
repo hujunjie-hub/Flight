@@ -57,6 +57,7 @@ python3 tests/guidance/verify_curve_eval_gap.py "${out}/libm5_safety_oracle.so"
 python3 tests/guidance/verify_continuous_envelope.py "${out}/libm5_safety_oracle.so"
 python3 tests/guidance/verify_time_quantization.py
 python3 tests/guidance/verify_time_quantization_c.py "${out}/libm5_safety_oracle.so"
+python3 tests/guidance/verify_time_error_detection.py
 python3 tests/guidance/verify_differential_feasibility.py "${out}/libm5_safety_oracle.so"
 python3 tests/guidance/verify_continuous_error_budget.py "${out}/libm5_safety_oracle.so"
 python3 tests/guidance/verify_consumer_error_budget.py "${out}/libm5_safety_oracle.so"

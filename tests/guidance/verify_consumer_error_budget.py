@@ -125,18 +125,71 @@ class Probes:
                               ctypes.c_uint64] + [pointer] * 6 + [
             pointer, pointer, pointer, ctypes.POINTER(ctypes.c_float)]
         self.full.restype = ctypes.c_uint8
+        self.limits = library.m5_trajectory_safety_test_product_limits
+        self.limits.argtypes = [ctypes.POINTER(ctypes.c_float),
+                                ctypes.POINTER(ctypes.c_float),
+                                ctypes.POINTER(ctypes.c_float),
+                                ctypes.POINTER(ctypes.c_float),
+                                ctypes.POINTER(ctypes.c_float)]
+        self.limits.restype = ctypes.c_uint8
         self.coeff = library.m5_trajectory_safety_test_consumer_coefficients
         self.coeff.argtypes = [ctypes.c_uint32, ctypes.c_uint32] + [pointer] * 6 + [
             pointer]
         self.coeff.restype = ctypes.c_uint8
 
 
+
+def read_limits(probes):
+    speed = ctypes.c_float()
+    accel = ctypes.c_float()
+    velocity = (ctypes.c_float * 3)()
+    acceleration = (ctypes.c_float * 3)()
+    jerk = (ctypes.c_float * 3)()
+    if not probes.limits(ctypes.byref(speed), ctypes.byref(accel), velocity,
+                         acceleration, jerk):
+        raise SystemExit('product limit API failed')
+    return (float(speed.value), float(accel.value),
+            [float(velocity[i]) for i in range(3)],
+            [float(acceleration[i]) for i in range(3)],
+            [float(jerk[i]) for i in range(3)])
+
+
+def envelope_legal(state, h, step_us, v_max, a_max, per_axis_v, per_axis_a,
+                   per_axis_j):
+    """Per-axis, 3-D norm and jerk limits over the whole evaluation interval."""
+    t_max = Fraction(step_us, 1000000)
+    s_eval = max(t_max, Fraction(f32(h))) + GAMMA2 * t_max
+    speed_sq = Fraction(0)
+    accel_sq = Fraction(0)
+    for axis in range(3):
+        exact = exact_coefficients(state[0][axis], state[1][axis], state[2][axis],
+                                   state[3][axis], state[4][axis], state[5][axis], h)
+        velocity = [Fraction(k) * exact[k] for k in range(1, 6)]
+        acceleration = [Fraction(k * (k - 1)) * exact[k] for k in range(2, 6)]
+        jerk = [Fraction(k * (k - 1) * (k - 2)) * exact[k] for k in range(3, 6)]
+        v_bound = bernstein(velocity, s_eval)
+        a_bound = bernstein(acceleration, s_eval)
+        j_bound = bernstein(jerk, s_eval)
+        if v_bound > Fraction(f32(per_axis_v[axis])):
+            return False
+        if a_bound > Fraction(f32(per_axis_a[axis])):
+            return False
+        if j_bound > Fraction(f32(per_axis_j[axis])):
+            return False
+        speed_sq += v_bound * v_bound
+        accel_sq += a_bound * a_bound
+    return (speed_sq <= Fraction(f32(v_max)) ** 2 and
+            accel_sq <= Fraction(f32(a_max)) ** 2)
+
 def main():
     if len(sys.argv) < 2:
         raise SystemExit('usage: verify_consumer_error_budget.py <libm5_safety_oracle.so>')
     probes = Probes(sys.argv[1])
+    v_max, a_max, per_axis_v, per_axis_a, per_axis_j = read_limits(probes)
     rnd = random.Random(SEED)
     checked = 0
+    legal_cases = 0
+    stress_cases = 0
     failures = []
     worst = {"ratio": 0.0}
     component_max = [{"coefficient": 0.0, "horner": 0.0, "time": 0.0} for _ in range(3)]
@@ -153,6 +206,12 @@ def main():
                       + jerk[i] * h ** 3 / 6.0) for i in range(3)]
             v1 = [f32(v0[i] + a0[i] * h + 0.5 * jerk[i] * h * h) for i in range(3)]
             a1 = [f32(a0[i] + jerk[i] * h) for i in range(3)]
+            state = (p0, v0, a0, p1, v1, a1)
+            if not envelope_legal(state, h, step_us, v_max, a_max, per_axis_v,
+                                  per_axis_a, per_axis_j):
+                stress_cases += 1
+                continue
+            legal_cases += 1
             arrays = [(ctypes.c_float * 3)(*values)
                       for values in (p0, v0, a0, p1, v1, a1)]
             raw = (ctypes.c_float * 18)()
@@ -228,6 +287,8 @@ def main():
         "seed": f"0x{SEED:X}",
         "steps": list(STEPS),
         "cases": CASES,
+        "legal_cases": legal_cases,
+        "stress_cases": stress_cases,
         "checked": checked,
         "component_max": component_max,
         "worst": worst,

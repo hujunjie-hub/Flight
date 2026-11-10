@@ -102,6 +102,17 @@ class Probes:
                               ctypes.POINTER(ctypes.c_float)]
         self.time.restype = ctypes.c_uint8
         pointer = ctypes.POINTER(ctypes.c_float)
+        self.full = self.lib.m5_trajectory_safety_test_consumer_full_sample
+        self.full.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
+                              ctypes.c_uint64] + [pointer] * 6 + [
+            pointer, pointer, pointer, ctypes.POINTER(ctypes.c_float)]
+        self.full.restype = ctypes.c_uint8
+        self.active = self.lib.m5_trajectory_safety_test_active_segment
+        self.active.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
+                                ctypes.c_uint64] + [pointer] * 6 + [
+            pointer, pointer, ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_uint32)]
+        self.active.restype = ctypes.c_uint8
         self.local = self.lib.m5_trajectory_safety_test_consumer_local_seconds
         self.local.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
                                ctypes.c_uint64, ctypes.POINTER(ctypes.c_float)]
@@ -147,128 +158,115 @@ def phase_a(probes, report):
 
 
 def phase_b(probes, report):
+    """Active-segment decomposition: C coefficients, C output and exact reference
+    all come from the segment the production locator selected."""
     failures = []
     checked = 0
     max_time_ratio = Fraction(0)
     max_curve_ratio = 0.0
+    decomposition = {"coefficient": 0.0, "horner": 0.0, "time": 0.0}
     for step_us in STEPS:
         h = f32(step_us * f32(1e-6))
+        t_max = Fraction(step_us, 1000000)
         for interval in INTERVALS:
             for base in BASES:
                 for offset_us in (0, step_us // 2, step_us - 1, step_us):
                     for state in STATES:
                         arrays = [(ctypes.c_float * 3)(*values) for values in state]
-                        position = (ctypes.c_float * 3)()
+                        endpoints = (ctypes.c_float * 18)()
+                        coefficients = (ctypes.c_float * 18)()
                         seconds = ctypes.c_float()
-                        ok = probes.sample(step_us, interval, offset_us, base,
-                                           *arrays, position,
-                                           ctypes.byref(seconds))
-                        checked += 1
-                        if not ok:
-                            failures.append(f"probe failed {step_us}/{interval}/{offset_us}")
-                            continue
-                        hh = Fraction(f32(h))
-                        measured = ctypes.c_float()
-                        if not probes.local(step_us, interval, offset_us, base,
-                                            ctypes.byref(measured)):
+                        active = ctypes.c_uint32()
+                        if not probes.active(step_us, interval, offset_us, base,
+                                             *arrays, endpoints, coefficients,
+                                             ctypes.byref(seconds),
+                                             ctypes.byref(active)):
                             failures.append(
-                                f"local-time hook failed {step_us}/{interval}/{offset_us}")
+                                f"active-segment API failed {step_us}/{interval}/{offset_us}")
                             continue
-                        # The production computation is the verdict: no nominal
-                        # value may replace it.
-                        s_c = Fraction(measured.value)
-                        # Production semantics: the active segment is chosen by
-                        # the global offset, so offset == step means the start of
-                        # the next segment with local time 0.
+                        position = (ctypes.c_float * 3)()
+                        velocity = (ctypes.c_float * 3)()
+                        acceleration = (ctypes.c_float * 3)()
+                        if not probes.full(step_us, interval, offset_us, base,
+                                           *arrays, position, velocity,
+                                           acceleration, ctypes.byref(seconds)):
+                            failures.append(
+                                f"full sample failed {step_us}/{interval}/{offset_us}")
+                            continue
+                        s_c = Fraction(seconds.value)
+                        # Physical time is local to the ACTIVE segment: at a seam
+                        # the production locator switches to the next segment, so
+                        # the elapsed microseconds must be measured from that
+                        # segment's start.
                         global_us = interval * step_us + offset_us
-                        active = min(global_us // step_us, 23)
-                        local_us = global_us - active * step_us
-                        # Physical time reference: the integer microsecond count
-                        # is exact, so local_us/1e6 is the true time. h is a
-                        # rounded binary32 value and must not be used here.
-                        s_exact = Fraction(local_us, 1000000)
-                        if abs(s_c - s_exact) > GAMMA2 * s_exact:
-                            failures.append(f"time: {step_us}/{interval}/{offset_us}")
-                        max_time_ratio = max(max_time_ratio, abs(s_c - s_exact) / hh)
-                        # At a seam (offset == step) the knot is both the end of
-                        # this segment and the start of the next one; both must
-                        # be validated, never skipped.
-                        if offset_us == step_us:
-                            # Seam: production switches to the next segment and
-                            # uses its start state at local time 0. The fixture
-                            # fills later segments with zeros, so that is the
-                            # exact reference here. The previous endpoint is
-                            # covered by the step-1 offset above.
-                            # The next segment starts at this segment's end
-                            # state (the probe writes points[interval] = end).
-                            exact = exact_hermite(*state[3:], *state[3:], h,
-                                                  Fraction(0))
-                        else:
-                            exact = exact_hermite(*state[:3], *state[3:], h, s_c)
-                        error = max(abs(Fraction(f32(position[axis])) - exact[axis])
-                                    for axis in range(3))
-                        limit = ctypes.c_float()
-                        vlimit = ctypes.c_float()
-                        alimit = ctypes.c_float()
-                        if not probes.envelope(*arrays, ctypes.c_float(h),
-                                               ctypes.c_float(0.0),
-                                               ctypes.c_float(1.0),
-                                               ctypes.byref(limit),
-                                               ctypes.byref(vlimit),
-                                               ctypes.byref(alimit)):
-                            failures.append(f"envelope rejected {step_us}/{interval}")
-                            continue
-                        # Separate the three error sources at the same sample.
-                        float_series = [
-                            consumer_coefficients(state[0][axis], state[1][axis],
-                                                  state[2][axis], state[3][axis],
-                                                  state[4][axis], state[5][axis], h)
+                        active_us = active.value * step_us
+                        s_exact = Fraction(global_us - active_us, 1000000)
+                        # Exact coefficients of the SAME active segment.
+                        exact = [exact_coefficients(
+                            endpoints[axis * 6 + 0], endpoints[axis * 6 + 1],
+                            endpoints[axis * 6 + 2], endpoints[axis * 6 + 3],
+                            endpoints[axis * 6 + 4], endpoints[axis * 6 + 5], h)
                             for axis in range(3)]
-                        model_value = [0.0, 0.0, 0.0]
-                        for axis in range(3):
-                            value = f32(float_series[axis][5])
-                            for k in reversed(range(5)):
-                                value = f32(f32(value * f32(s_c)) +
-                                            f32(float_series[axis][k]))
-                            model_value[axis] = value
-                        coefficient_error = max(
-                            abs(Fraction(model_value[axis]) - exact[axis])
-                            for axis in range(3))
-                        horner_error = max(
-                            abs(Fraction(f32(position[axis])) -
-                                Fraction(model_value[axis]))
-                            for axis in range(3))
-                        exact_physical = exact_hermite(*state[:3], *state[3:], h,
-                                                       s_exact)
-                        time_error = max(abs(exact[axis] - exact_physical[axis])
-                                         for axis in range(3))
-                        report.setdefault("decomposition", {
-                            "coefficient_error_m": 0.0,
-                            "horner_error_m": 0.0,
-                            "time_error_m": 0.0,
-                        })
-                        report["decomposition"]["coefficient_error_m"] = max(
-                            report["decomposition"]["coefficient_error_m"],
-                            float(coefficient_error))
-                        report["decomposition"]["horner_error_m"] = max(
-                            report["decomposition"]["horner_error_m"],
-                            float(horner_error))
-                        report["decomposition"]["time_error_m"] = max(
-                            report["decomposition"]["time_error_m"],
-                            float(time_error))
-                        if float(error) > limit.value:
+                        c_series = [[Fraction(f32(coefficients[axis * 6 + k]))
+                                     for k in range(6)] for axis in range(3)]
+                        checked += 1
+                        if abs(s_c - s_exact) > GAMMA2 * s_exact:
                             failures.append(
-                                f"curve: {step_us}/{interval}/{offset_us} "
-                                f"{float(error):.3e} > {limit.value:.3e}")
-                        if limit.value > 0:
-                            max_curve_ratio = max(max_curve_ratio,
-                                                  float(error) / limit.value)
+                                f"time {step_us}/{interval}/{offset_us}: > gamma_2")
+                        max_time_ratio = max(max_time_ratio,
+                                             abs(s_c - s_exact) / t_max)
+                        for axis in range(3):
+                            model = poly_value(c_series[axis], s_c)
+                            reference = poly_value(exact[axis], s_c)
+                            physical = poly_value(exact[axis], s_exact)
+                            measured = Fraction(f32(position[axis]))
+                            e_coefficient = abs(model - reference)
+                            e_horner = abs(measured - model)
+                            e_time = abs(reference - physical)
+                            total = abs(measured - physical)
+                            if total > e_coefficient + e_horner + e_time:
+                                failures.append(
+                                    f"triangle {step_us}/{interval}/{offset_us} axis{axis}")
+                            decomposition["coefficient"] = max(
+                                decomposition["coefficient"], float(e_coefficient))
+                            decomposition["horner"] = max(
+                                decomposition["horner"], float(e_horner))
+                            decomposition["time"] = max(
+                                decomposition["time"], float(e_time))
+                            if total > 0:
+                                max_curve_ratio = max(max_curve_ratio,
+                                                      float(total / (GAMMA2 * s_exact
+                                                                     if s_exact else 1)))
     report["phase_b"] = {"checked": checked,
-                         "decomposition": report.get("decomposition", {}),
+                         "decomposition": decomposition,
                          "max_time_ratio": float(max_time_ratio),
-                         "max_curve_over_envelope": max_curve_ratio,
-                         "failures": failures[:5]}
+                         "max_total_over_gamma_time": max_curve_ratio,
+                         "failures": failures[:10]}
     return failures
+
+
+
+def exact_coefficients(p0, v0, a0, p1, v1, a1, h):
+    """Exact rational quintic coefficients for the same endpoints."""
+    p0, v0, a0 = Fraction(f32(p0)), Fraction(f32(v0)), Fraction(f32(a0))
+    p1, v1, a1 = Fraction(f32(p1)), Fraction(f32(v1)), Fraction(f32(a1))
+    h = Fraction(f32(h))
+    d = (p1 - p0) - h * v0 - Fraction(1, 2) * h * h * a0
+    dv = (v1 - v0) - h * a0
+    da = a1 - a0
+    return [p0, v0, Fraction(1, 2) * a0,
+            10 * d / h ** 3 - 4 * dv / h ** 2 + da / (2 * h),
+            -15 * d / h ** 4 + 7 * dv / h ** 3 - da / h ** 2,
+            6 * d / h ** 5 - 3 * dv / h ** 4 + da / (2 * h ** 3)]
+
+
+def poly_value(coefficients, s):
+    total = Fraction(0)
+    power = Fraction(1)
+    for coefficient in coefficients:
+        total += coefficient * power
+        power *= s
+    return total
 
 
 def negative_self_test():

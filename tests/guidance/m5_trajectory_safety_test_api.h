@@ -125,4 +125,20 @@ uint8_t m5_trajectory_safety_test_consumer_full_sample(
     const float end_velocity[3], const float end_acceleration[3],
     float position[3], float velocity[3], float acceleration[3], float *seconds);
 
+/* Active segment for a given time: the real endpoints (18 floats), the
+   actual binary32 coefficients (18 floats) and the local time. */
+uint8_t m5_trajectory_safety_test_active_segment(
+    uint32_t step_us, uint32_t interval, uint32_t offset_us, uint64_t base_us,
+    const float start_position[3], const float start_velocity[3],
+    const float start_acceleration[3], const float end_position[3],
+    const float end_velocity[3], const float end_acceleration[3],
+    float endpoints[18], float coefficients[18], float *seconds,
+    uint32_t *active_interval);
+
+/* Real product envelope limits (SafetyEnvelope + ProductSafetyEnvelopePayload). */
+uint8_t m5_trajectory_safety_test_product_limits(
+    float *max_linear_speed_mps, float *max_linear_accel_mps2,
+    float max_velocity_ned_mps[3], float max_acceleration_ned_mps2[3],
+    float max_jerk_ned_mps3[3]);
+
 #endif /* M5_TRAJECTORY_SAFETY_TEST_API_H */

@@ -108,16 +108,18 @@ def gamma_up(n):
     return nu / (1 - nu) * (1 + Fraction(1, 1 << 52)) ** 2
 
 
-def budget(start_p, start_v, start_a, end_p, end_v, end_a, h, step_us):
+def budget(start_p, start_v, start_a, end_p, end_v, end_a, h, step_us,
+           c_series=None):
     """Return per-component 3-D budgets (E_coeff, E_horner, E_subnormal, E_time)."""
     t_max = Fraction(step_us, 1000000)
     delta_s = GAMMA2 * t_max
     s_eval = max(t_max, Fraction(f32(h))) + delta_s
     components = [Fraction(0), Fraction(0), Fraction(0), Fraction(0)]
     for axis in range(3):
-        consumer = [Fraction(f32(value)) for value in float_coefficients(
-            start_p[axis], start_v[axis], start_a[axis],
-            end_p[axis], end_v[axis], end_a[axis], h)]
+        consumer = (c_series[axis] if c_series is not None else
+                    [Fraction(f32(value)) for value in float_coefficients(
+                        start_p[axis], start_v[axis], start_a[axis],
+                        end_p[axis], end_v[axis], end_a[axis], h)])
         exact = exact_coefficients(start_p[axis], start_v[axis], start_a[axis],
                                    end_p[axis], end_v[axis], end_a[axis], h)
         difference = [consumer[k] - exact[k] for k in range(6)]
@@ -142,10 +144,29 @@ class Probes:
                                 ctypes.c_uint64] + [pointer] * 6 + [
             pointer, ctypes.POINTER(ctypes.c_float)]
         self.sample.restype = ctypes.c_uint8
+        self.active = library.m5_trajectory_safety_test_active_segment
+        self.active.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
+                                ctypes.c_uint64] + [pointer] * 6 + [
+            pointer, pointer, ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_uint32)]
+        self.active.restype = ctypes.c_uint8
         self.local = library.m5_trajectory_safety_test_consumer_local_seconds
         self.local.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
                                ctypes.c_uint64, ctypes.POINTER(ctypes.c_float)]
         self.local.restype = ctypes.c_uint8
+
+    def coefficients(self, step_us, interval, offset_us, state):
+        arrays = [(ctypes.c_float * 3)(*values) for values in state]
+        endpoints = (ctypes.c_float * 18)()
+        coefficients = (ctypes.c_float * 18)()
+        seconds = ctypes.c_float()
+        active = ctypes.c_uint32()
+        if not self.active(step_us, interval, offset_us, 1_000_000, *arrays,
+                           endpoints, coefficients, ctypes.byref(seconds),
+                           ctypes.byref(active)):
+            return None
+        return ([Fraction(f32(coefficients[axis * 6 + k])) for k in range(6)]
+                for axis in range(3))
 
     def measure(self, step_us, offset_us, state):
         arrays = [(ctypes.c_float * 3)(*values) for values in state]
@@ -220,7 +241,12 @@ def main():
             state = (p0, v0, a0, p1, v1, a1)
             if not envelope_legal(state, h, step_us):
                 continue
-            components = budget(*state, h, step_us)
+            c_series = probes.coefficients(step_us, 0, 0, state)
+            if c_series is None:
+                failures.append("coefficient API failed")
+                continue
+            c_series = [list(series) for series in c_series]
+            components = budget(*state, h, step_us, c_series)
             total = sum(components)
             for index, value in enumerate(components):
                 component_max[index] = max(component_max[index], float(value))
