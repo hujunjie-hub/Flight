@@ -267,3 +267,14 @@ The constant-acceleration test no longer uses 513 uniform samples as its minimum
 CI：[Host validation #509](https://github.com/hujunjie-hub/Flight/actions/runs/42745124335)。
 
 **状态修正：** S06-080..084 对该 commit 的自动化执行状态从 CI_PENDING 更新为 CI PASS。此状态仅对该 commit 生效；MR-001..MR-008 独立数学审查仍未全部 APPROVED，M5-06 整体仍 BLOCKED，M5-07 不得开始。H723 目标运行、WCET/RTA、实机 RAM/stack watermark、HIL 和飞行仍 NOT_RUN。
+
+ 
+## 完整 CI #542 更新（2026-11-10）
+
+对 commit `dafe47b8b17e7f32f676cb258eaa7a407a1dfb90` 的 Host validation #542 全部 jobs success：M4 Host 927/0、M5 Host 269,207/0、M4/M5 integration 1,000/0、M5 ASan/UBSan 269,207/0、integration ASan/UBSan 1,000/0。Cortex-M7 M5-06 compile PASS；MPC RAM 29,252 B、worker stack 8,192 B、最大静态栈帧 2,024 B。
+
+S06-081 新增恒加速度解析候选点 oracle 已随该 commit 实际执行并通过（恒速 64 + 恒加速度 64 cases）。该 oracle 的 long-double 计算仅针对当前 1D 测试模型，不构成一般 3D 区间证明。S06-080、082、083、084 也在本轮 Host 与 Sanitizer 回归中通过。
+
+CI：[Host validation #542](https://github.com/hujunjie-hub/Flight/actions/runs/42746417706)。
+
+自动化状态对该 commit 更新为 PASS；独立数学审查 MR-001..MR-008 仍未全部 APPROVED，M5-06 整体仍 BLOCKED。
