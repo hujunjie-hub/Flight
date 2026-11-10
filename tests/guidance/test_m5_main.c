@@ -123,9 +123,11 @@ static void fx_defaults(Fx *fx)
   fx->env.vehicle_extension.max_acceleration_ned_mps2[0] = 2.5f;
   fx->env.vehicle_extension.max_acceleration_ned_mps2[1] = 2.5f;
   fx->env.vehicle_extension.max_acceleration_ned_mps2[2] = 1.0f;
-  fx->env.vehicle_extension.max_jerk_ned_mps3[0] = 10.0f;
-  fx->env.vehicle_extension.max_jerk_ned_mps3[1] = 10.0f;
-  fx->env.vehicle_extension.max_jerk_ned_mps3[2] = 5.0f;
+  /* Geometry fixtures are not jerk tests; the product jerk limit is
+     exercised by m5_safety_jerk_envelope. */
+  fx->env.vehicle_extension.max_jerk_ned_mps3[0] = 3.4028235e38f;
+  fx->env.vehicle_extension.max_jerk_ned_mps3[1] = 3.4028235e38f;
+  fx->env.vehicle_extension.max_jerk_ned_mps3[2] = 3.4028235e38f;
   fx->env.vehicle_extension.max_tilt_rad = 0.5f;
   fx->env.vehicle_extension.max_body_rate_frd_radps[0] = 2.0f;
   fx->env.vehicle_extension.max_body_rate_frd_radps[1] = 2.0f;
@@ -4989,6 +4991,8 @@ static void safety_generous_envelope(SafetyFx *fx, float speed, float accel)
   for (axis = 0u; axis < 3u; ++axis) {
     fx->base.env.vehicle_extension.max_velocity_ned_mps[axis] = speed;
     fx->base.env.vehicle_extension.max_acceleration_ned_mps2[axis] = accel;
+    /* These fixtures intentionally exercise kinematics, not the jerk limit. */
+    fx->base.env.vehicle_extension.max_jerk_ned_mps3[axis] = 3.4028235e38f;
   }
 }
 
@@ -5472,6 +5476,54 @@ static void test_m5_safety_envelope_geofence_participation(void)
 
 
 
+
+/* S06-110: production jerk enforcement (spec/02 JERK bit). */
+static void test_m5_safety_jerk_envelope(void)
+{
+  SafetyFx fx;
+  unsigned axis;
+  static const float zero[3] = {0.0f, 0.0f, 0.0f};
+
+  for (axis = 0u; axis < 3u; ++axis) {
+    float position[3] = {0.0f, 0.0f, -5.0f};
+    float start_acceleration[3] = {0.0f, 0.0f, 0.0f};
+    float end_acceleration[3] = {0.0f, 0.0f, 0.0f};
+    unsigned i;
+
+    safety_fx_init(&fx, 95000000u + axis);
+    safety_generous_envelope(&fx, 1000.0f, 100000.0f);
+    fx.base.env.vehicle_extension.max_jerk_ned_mps3[0] = 10.0f;
+    fx.base.env.vehicle_extension.max_jerk_ned_mps3[1] = 10.0f;
+    fx.base.env.vehicle_extension.max_jerk_ned_mps3[2] = 5.0f;
+    start_acceleration[axis] = 400.0f;
+    end_acceleration[axis] = -400.0f;
+    for (i = 0u; i < 3u; ++i) {
+      fx.base.nav.core.position_ned_m[i] = position[i];
+      fx.base.nav.core.velocity_ned_mps[i] = zero[i];
+      fx.base.nav.core.acceleration_ned_mps2[i] = start_acceleration[i];
+    }
+    safety_point_set_full(&fx.reference.anchor, position, zero,
+                          start_acceleration);
+    for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i)
+      safety_point_set_full(&fx.reference.points[i], position, zero,
+                            end_acceleration);
+    safety_map_reset(&fx);
+    safety_zero_uncertainty(&fx);
+
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+          == M5_SAFETY_DYNAMICS_VIOLATION);
+    CHECK(fx.result.reason_code == M5_SAFETY_REASON_DYNAMICS);
+
+    fx.base.env.vehicle_extension.max_jerk_ned_mps3[axis] = 1.0e9f;
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+          == M5_SAFETY_PASS);
+
+    fx.base.env.vehicle_extension.max_jerk_ned_mps3[axis] = 0.0f / 0.0f;
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+          == M5_SAFETY_INVALID);
+  }
+}
+
 int main(void)
 {
   struct {
@@ -5617,6 +5669,7 @@ int main(void)
     {"m5_safety_envelope_static_participation", test_m5_safety_envelope_static_participation},
     {"m5_safety_envelope_dynamic_participation", test_m5_safety_envelope_dynamic_participation},
     {"m5_safety_envelope_geofence_participation", test_m5_safety_envelope_geofence_participation},
+    {"m5_safety_jerk_envelope", test_m5_safety_jerk_envelope},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {

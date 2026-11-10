@@ -93,6 +93,7 @@ typedef struct {
   float acceleration_bound;
   float velocity_axis_bound[3];
   float acceleration_axis_bound[3];
+  float jerk_axis_bound[3];
   float velocity_mid_norm;
   float position_rounding_error_m;
   float velocity_rounding_error_mps;
@@ -514,6 +515,9 @@ static uint8_t validate_envelope(const SafetyEnvelope *e)
         p->max_velocity_ned_mps[axis] <= 0.0f ||
         !isfinite(p->max_acceleration_ned_mps2[axis]) ||
         p->max_acceleration_ned_mps2[axis] <= 0.0f) return 0u;
+    if ((p->valid_mask & PRODUCT_ENVELOPE_VALID_JERK) != 0u &&
+        (!isfinite(p->max_jerk_ned_mps3[axis]) ||
+         p->max_jerk_ned_mps3[axis] < 0.0f)) return 0u;
   }
   return 1u;
 }
@@ -1212,6 +1216,33 @@ static uint8_t curve_bounds(
       velocity_mid2 = sum_square_upper(velocity_mid2, velocity_mid_abs);
     }
 
+    /* Third derivative: the degree-5 Bernstein control points give a degree-3
+       jerk polynomial; its convex hull bounds |jerk| over [0, h]. The consumer
+       may evaluate slightly beyond h, so add the Bezier derivative bound over
+       the gamma_2 tail. */
+    {
+      const double *c = curve->position[axis];
+      double h3 = (double)duration_s * (double)duration_s * (double)duration_s;
+      double jerk_control[3];
+      double jerk_abs = 0.0;
+      double delta_jerk = 0.0;
+      unsigned k;
+      if (!(h3 > 0.0) || !isfinite(h3)) return 0u;
+      for (k = 0u; k < 3u; ++k)
+        jerk_control[k] = 6.0 * (c[k + 3u] - 3.0 * c[k + 2u] +
+                                 3.0 * c[k + 1u] - c[k]) / h3;
+      for (k = 0u; k < 3u; ++k) {
+        double magnitude = fabs(jerk_control[k]);
+        if (magnitude > jerk_abs) jerk_abs = magnitude;
+        if (k > 0u) {
+          double step = fabs(jerk_control[k] - jerk_control[k - 1u]);
+          if (step > delta_jerk) delta_jerk = step;
+        }
+      }
+      jerk_abs += 3.0 * delta_jerk * 1.1920929e-07; /* gamma_2 tail */
+      bounds->jerk_axis_bound[axis] = round_up_float(jerk_abs);
+      if (!isfinite(bounds->jerk_axis_bound[axis])) return 0u;
+    }
     bounds->position_low[axis] = round_down_float(position_low);
     bounds->position_high[axis] = round_up_float(position_high);
     bounds->velocity_axis_bound[axis] = round_up_float(velocity_abs);
@@ -1891,6 +1922,13 @@ M5TrajectorySafetyStatus m5_trajectory_safety_validate(
                 e->max_velocity_ned_mps[axis] + 1e-4f ||
             curve.acceleration_axis_bound[axis] >
                 e->max_acceleration_ned_mps2[axis] + 1e-4f) {
+          return reject(result, M5_SAFETY_DYNAMICS_VIOLATION,
+                        M5_SAFETY_REASON_DYNAMICS, offset_us);
+        }
+        /* JERK participates whenever the payload declares it (spec/02). */
+        if ((e->valid_mask & PRODUCT_ENVELOPE_VALID_JERK) != 0u &&
+            e->max_jerk_ned_mps3[axis] > 0.0f &&
+            curve.jerk_axis_bound[axis] > e->max_jerk_ned_mps3[axis] + 1e-4f) {
           return reject(result, M5_SAFETY_DYNAMICS_VIOLATION,
                         M5_SAFETY_REASON_DYNAMICS, offset_us);
         }
