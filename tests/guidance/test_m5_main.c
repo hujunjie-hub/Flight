@@ -3061,7 +3061,7 @@ static void test_m5_safety_dynamic_tangency_and_preview_seam_ulp(void)
   safety_fx_init(&fx, 170000000u);
   safety_set_constant_position(&fx, 0.0f, 0.0f, 0.0f);
   fx.input.response_delay_us = 0u;
-  fx.input.max_dynamic_obstacle_accel_mps2 = 0.5f;
+  fx.input.max_dynamic_obstacle_accel_mps2 = 1.0e-6f;
   for (unsigned axis = 0u; axis < 3u; ++axis) {
     fx.base.nav.core.position_std_m[axis] = 0.0f;
     fx.base.nav.core.velocity_std_mps[axis] = 0.0f;
