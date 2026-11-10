@@ -19,6 +19,17 @@ Status actuator_guard_set_driver(const ActuatorDriver *driver);
 /* Call at the 400 Hz frame boundary, independently of incoming demands. */
 Status actuator_guard_frame_boundary(uint64_t now_us);
 uint32_t actuator_guard_state(void);
+/* Ground stop: accept a certificate that authorises a bounded ramp to zero
+ * thrust, then apply it at the following frame boundaries and DISARM once zero
+ * is confirmed. Returns STATUS_OK when the transaction is accepted, not when the
+ * ramp has finished; poll actuator_get_commit_receipt() for
+ * ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED. */
+Status actuator_guard_ground_stop(const GroundStopCertificate *certificate,
+                                  uint64_t now_us);
+/* Evidence for the acceptance gate: when the transaction started and how long
+ * the ramp is allowed to take. Zero when no ground stop has been accepted. */
+uint64_t actuator_guard_ground_stop_start_us(void);
+uint64_t actuator_guard_ground_stop_predicted_us(void);
 /* HIL adapter support: configured per-motor thrust range in newtons. Read-only;
  * it grants no output capability and never stages or commits a demand. */
 Status actuator_guard_get_thrust_limits(float min_n[4], float max_n[4]);

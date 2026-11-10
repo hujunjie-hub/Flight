@@ -70,6 +70,7 @@
 #define MSG_PRODUCT_FMS_INPUT_EXTENSION  53u
 #define MSG_ESTIMATOR_HEALTH             54u
 #define MSG_CONTROL_HEALTH               55u
+#define MSG_GROUND_STOP_CERTIFICATE      56u
 
 /* ModuleHealth C aliases reuse message type 41; component_id distinguishes the
  * publisher.  No separate message ID is allocated. */
