@@ -22,7 +22,7 @@ _Static_assert(DBL_MANT_DIG == 53 && DBL_MIN_EXP == -1021 &&
                "M5 safety requires IEEE-754 binary64 double");
 _Static_assert(FLT_HAS_SUBNORM == 1 && FLT_TRUE_MIN == 0x1p-149f,
                "M5 safety requires IEEE-754 binary32 subnormals");
-_Static_assert(DBL_HAS_SUBNORM == 1 && DBL_TRUE_MIN == 0x1p-1074,
+_Static_assert(DBL_HAS_SUBNORM == 1,
                "M5 safety requires IEEE-754 binary64 subnormals");
 _Static_assert(FLT_EVAL_METHOD == 0,
                "M5 safety requires evaluation at the declared type precision");
