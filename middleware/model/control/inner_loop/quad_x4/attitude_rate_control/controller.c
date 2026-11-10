@@ -212,7 +212,8 @@ Status controller_validate_input(const ControllerInput *in, uint32_t *epoch,
                     NAV_VALID_VERTICAL_POSITION |
                     NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY;
     if ((n->core.valid_mask & need) != need ||
-        !finite_array(n->core.position_ned_m, 6))
+        !finite_array(n->core.position_ned_m, 3) ||
+        !finite_array(n->core.velocity_ned_mps, 3))
       return STATUS_NOT_READY;
     if (!r || !header_valid(&r->header, in->evaluation_time_us) ||
         !same_clock(h, &r->header) ||
