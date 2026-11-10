@@ -223,3 +223,23 @@ Run #499 / `1144ce8`：
 - MPC RAM/stack 静态检查通过；M5 编译失败后 integration 与 sanitizer 被跳过。
 
 修复提交：`b0f40cb`（DBL_HAS_SUBNORM 整数属性断言）、`0349587`（删除可选 IEC 宏依赖，保留 radix/precision/exponent/subnormal/sizeof 检查）。Run #501 正在由新提交触发；**CI_PENDING**。
+
+ 
+## CI #509 验证记录（2026-11-10）
+
+验证提交 `0c761964d4bc6cfeec73ba60464657db450743ee`，GitHub Actions #509：**4/4 jobs SUCCESS**。
+
+- M4 Host：927 / 0 failures
+- M5 Host：269,207 / 0 failures
+- M4/M5 Integration：1,000 / 0 failures
+- M5 ASan/UBSan：269,207 / 0 failures
+- Integration ASan/UBSan：1,000 / 0 failures
+- Source layout / time service：PASS
+- Navigation / control：PASS
+- Cortex-M7 compile / MPC RAM：PASS
+- S06-080 Fraction oracle：binary32 upper 10,007 + binary64 lower 10,007 PASS
+- S06-084 Fraction prediction oracle：10,007 PASS
+
+MPC 静态 RAM 29,252 B，worker stack 8,192 B，最大静态 frame 2,024 B。M5-06 validator 仅作为 Cortex-M7 object 编译，不进入产品链接。
+
+**边界：** 当前 Host/SIL 和 Cortex-M7 编译验证通过，不等于独立数学证明完成、H723 WCET/RTA、HIL 或实机飞行通过。MR-008 和其他独立审查项仍保持 OPEN。
