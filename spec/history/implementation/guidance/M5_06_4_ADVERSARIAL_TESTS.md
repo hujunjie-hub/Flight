@@ -265,3 +265,26 @@ long-double 恒加速度 oracle 仅覆盖其明确的 1D 运动模型；不得�
 | S06-097 | KEEP_IN 边界位于 `inflation + 0.8E` | `GEOFENCE_VIOLATION`，reason 15 |
 
 说明：S06-095..097 使用的速度分裂曲线使 E 远大于几何分辨率，因此证明的是"包络参与判定"；`|consumer − exact|` 级别的穿透由 S06-085/086/094 逐点证明。S06-097 同时验证了 R5 修复的围栏包络缺口。
+
+ 
+## S06-099 时间量化穷举验证（2026-11-10，R6）
+
+`verify_time_quantization.py` 对 `PRODUCT_PREVIEW_STEP_US=20000` 与
+`PRODUCT_ROUTE_PREVIEW_STEP_US=40000` 的**全部** 60,002 个整数微秒偏移，用精确有理数
+计算 `s_exact = h·(offset/step)`、用 binary32 计算 `s_c = RN(offset·RN(1e-6))`，检查
+
+- `|s_c − s_exact| / s_max ≤ γ_2 = 2u/(1−2u)`；
+- `s_c ≤ s_max + γ_2·s_max`。
+
+实测 max ratio `6.61e-08`（γ_2 = `1.19e-07`），`outside_eval_interval = 0`。
+
+S06-094 同步改用 `s_eval_max`，并扩展为两个 step 常量 × 5 个 (u0,u1) 子区间，共 120 组
+检查，`max required/envelope = 0.963`。
+
+## S06-100..102 状态：NOT_IMPLEMENTED / BLOCKED_GEOMETRY_RESOLUTION
+
+要求构造“消费者曲线碰撞、数学曲线不碰撞”的真实差分场景。实测在验证器允许的参考范围内，
+`|consumer − exact|` 与 float 几何分辨率同量级（地图 ±4 m 时约 1e-7 m，voxel 0.5 m），
+无法稳定地把障碍物/边界放在两条曲线之间；强行构造会把结论建立在 1–2 ulp 的摆放误差上。
+按“无法证明即拒绝”的原则，本轮**不提供**该用例，也不以任何弱化断言代替。现状证据为
+S06-087..097（决策路径与包络参与）与 S06-085/086/094（逐点与连续覆盖）。

@@ -164,8 +164,8 @@ jobs:
     # hash of FCU.xml, so round 3 fails on an LF checkout until the owner
     # approves the re-baseline in spec/validation/eol_hash_rebaseline_analysis.md.
     # Round 1 (document, registry, ABI compile) is independent and must not be
-    # skipped because of that. Remove continue-on-error once re-baselined.
-    continue-on-error: true
+    # skipped because of that. The job is blocking: a stale evidence baseline
+    # must make CI red, never disappear behind an overall SUCCESS.
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -187,9 +187,8 @@ jobs:
     name: Production ABI report
     runs-on: ubuntu-latest
     # Separate job so a spec-audit failure can never skip the ABI evidence.
-    # Transitional: abi_lock.h still pins the CRLF-derived message registry
-    # hash; remove continue-on-error after the approved re-baseline.
-    continue-on-error: true
+    # Blocking on purpose: the ABI evidence must be visible in CI status.
+    # The CRLF baseline is still awaiting owner re-baseline approval.
     steps:
       - name: Check out source
         uses: actions/checkout@v4

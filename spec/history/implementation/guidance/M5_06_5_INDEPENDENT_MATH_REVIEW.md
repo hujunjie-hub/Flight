@@ -378,3 +378,17 @@ R5 不再修改误差公式，而是逐项证明 R4 实现是保守的，并把�
 7. **围栏缺口**：`check_geofences()` 之前没有减去 `position_rounding_error_m`，R5 修复并由 S06-097 覆盖。
 
 审查状态：**六项分别有证据，等待独立审查逐项 APPROVED**；MR-009 不因整体 CI 通过而关闭。
+
+ 
+## 16. R6：时间量化与次正规证明修正（2026-11-10）
+
+R5 的时间不等式 `(2u+u²)s ≤ 2u·s_max` 不成立，R6 改为以 `s_exact = h·(offset/step)`
+为统一参考、`γ_2 = 2u/(1−2u)` 为界，并把所有系数/Horner/导数界扩到
+`s_eval_max = s_max + γ_2·s_max`。次正规项改为带幂次放大的
+`n·2^-149·max(1,s_eval_max)^n`，并以 `PRODUCT_PREVIEW_STEP_US < 1e6` 作为产品约束。
+
+新增 S06-099（60,002 个整数偏移穷举）与扩展的 S06-094（120 组子区间）。S06-100..102
+标记 NOT_IMPLEMENTED / BLOCKED_GEOMETRY_RESOLUTION。Host 侧新增 MXCSR RC/FTZ/DAZ
+检查与 5 个负向用例。
+
+审查状态不变：**六项证据齐备但未 APPROVED**，MR-009 不因整体 CI 通过而关闭。

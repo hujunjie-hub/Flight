@@ -54,3 +54,10 @@
 1. 若目标启动代码把 FPSCR 设为非 RN 或开启 FZ，验证器会拒绝（不会误判），但固件其它浮点模块仍按该模式运行——这是固件初始化问题，需要 `packages/` 进入仓库后单独审计。
 2. Host 的 x86 FTZ/DAZ（MXCSR）不在 `fenv.h` 语义内；Host/SIL 默认未开启，目标端由 `FZ/DN` 位检查覆盖。
 3. 该审计不覆盖硬件勘误或调试器在运行时改写 FPSCR 的情况；验证器每次调用都会重新检查，因此这类改写会被拒绝而不是被忽略。
+
+ 
+## 15. R6 更新：Host MXCSR
+
+Host/SIL 现在同时检查 x86 MXCSR：RC=round-to-nearest、FTZ=0、DAZ=0（ARM 侧继续检查
+FPSCR.RMode/FZ/DN）。负向用例覆盖 `FE_DOWNWARD`、`FE_UPWARD`、`FE_TOWARDZERO`、
+`MXCSR.FTZ=1`、`MXCSR.DAZ=1`，每项都要求 `NUMERIC_FAILURE`，测试结束恢复原环境。

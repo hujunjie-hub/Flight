@@ -194,3 +194,65 @@ if (magnitude_term < (double)FLT_MIN * 1024.0) return INFINITY;    /* 抵消入�
 3. **`s_max` 与消费端时间参数**：依赖消费端在子区间内只用 `s ≤ h·u1`；若 M6 未来在区间外插值，本推导不适用。
 4. **NaN/Inf 输入**：由 `finite3` / `finite_motion_point` 在入口拒绝，不在误差模型范围内。
 5. **`velocity_mid_norm` 与 `speed_bound` 的组合**：两个 swept 候选各自包含 `eval_velocity_error` 后才取 `fmin`；这一点由源码结构保证，但需要审查者确认没有第三处使用未修正的 `|v_mid|`。
+
+ 
+## 14. R6 修正（2026-11-10）：时间量化不等式与次正规传播
+
+### 14.1 R5 的不等式错误
+
+R5 使用
+
+```
+(2u + u²) · s ≤ 2u · s_max
+```
+
+该式不成立（2u+u² > 2u）。正确的参考时间与推导为：
+
+```
+h   = RN(step_us   · 1e-6f)
+s_c = RN(offset_us · 1e-6f)
+c   = RN(1e-6) = 1e-6(1+d0)
+h   = step   · c · (1+e1)
+s_c = offset · c · (1+e2)          |e1|,|e2| ≤ u
+s_exact := h · (offset/step) = offset · c · (1+e1)
+⇒ s_c / s_exact = (1+e2)/(1+e1)
+⇒ |s_c − s_exact| ≤ γ_2 · s_exact,  γ_2 = 2u/(1−2u)
+```
+
+`offset` 与 `step` 都是 ≤ 2^24 的整数，binary32 转换精确，所以只有两次乘法舍入。
+取 `s_max = h·u1`，则 `s_exact ≤ s_max`，消费者时间落在
+
+```
+s_eval_max = s_max + γ_2 · s_max
+```
+
+验证器现在用 `s_eval_max` 计算系数项、Horner 幅值项与一/二/三阶导数界，时间项为
+`γ_2·s_max · |d^k p/ds^k|(s_eval_max)`；`γ_2` 与乘积均向外取整。
+
+### 14.2 次正规项的传播
+
+R5 的 `n·2^-149` 隐含假设“早期舍入不被后续 Horner 乘法放大”。正确形式是
+
+```
+Σ_k 2^-150 · s^(n-k) ≤ n · 2^-149 · max(1, s_eval_max)^n
+```
+
+验证器现在使用该放大形式，并在 `build_curve` 中强制 `PRODUCT_PREVIEW_STEP_US < 1e6`
+（20 ms 预览 → `s_eval_max ≈ 0.0200001 ≤ 1`）；更大的步长必须重新评审。`M5_06_6` §7.1
+中“该项不依赖 s_max”的表述已更正为上述放大形式。
+
+### 14.3 新增证据
+
+| ID | 内容 | 结果 |
+|---|---|---|
+| S06-099 | 两个 step 常量（20000/40000 µs）的全部 60,002 个整数微秒偏移，精确有理数参考时间，检查 `|s_c−s_exact|/s_max ≤ γ_2` 与是否越出 `s_eval_max` | max ratio 6.61e-08 ≤ γ_2 1.19e-07，`outside=0` |
+| S06-094（扩展） | 精确有理数 Bernstein 上界改用 `s_eval_max`，覆盖两个 step 与 5 个 (u0,u1) 子区间 | 120 组检查，max required/envelope 0.963，无失败 |
+
+### 14.4 S06-100..102 状态
+
+要求“消费者曲线碰撞、数学曲线不碰撞”的静态/动态/围栏差分用例**未实现**：
+在验证器允许的参考范围内，`|consumer − exact|` 处于几何 float 分辨率量级
+（S06-085 平滑段 1.5e-05 m 对应 500 m 尺度；本仓库地图 ±4 m 时偏差 ~1e-7 m），
+而 voxel 网格与 float 坐标的分辨率同量级，无法稳定地把边界放在两条曲线之间。
+保留 R5 的 S06-087..097 与 S06-085/086/094 作为现状证据，S06-100..102 标记
+**NOT_IMPLEMENTED / BLOCKED_GEOMETRY_RESOLUTION**，不得记 PASS。
