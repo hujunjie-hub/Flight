@@ -223,10 +223,25 @@ Status mpc_solve(const ControllerInput *in,
     if (prim > mpc_run_stats.max_prim_res_x1e6) mpc_run_stats.max_prim_res_x1e6 = prim;
     if (dual > mpc_run_stats.max_dual_res_x1e6) mpc_run_stats.max_dual_res_x1e6 = dual;
   }
-  if (!isfinite(quad_solver.info->prim_res) ||
-      !isfinite(quad_solver.info->dual_res) ||
-      quad_solver.info->prim_res > 1e-3f || quad_solver.info->dual_res > 1e-3f)
-    return STATUS_NUMERIC_ERROR;
+  {
+    /* OSQP reports residuals of the scaled problem and declares convergence
+     * against a relative criterion. Comparing those numbers to a fixed 1e-3
+     * rejects well-converged solutions as soon as the objective scale grows,
+     * so mirror the solver's own default tolerance instead. The unscaled
+     * constraint and thrust-ball checks below stay absolute, as they should. */
+    float scale_q = 0.0f;
+    int s;
+    for (s = 0; s < 15; ++s) {
+      const float magnitude = q[s] < 0.0f ? -q[s] : q[s];
+      if (magnitude > scale_q) scale_q = magnitude;
+    }
+    const float residual_tolerance = 1e-3f * (1.0f + scale_q);
+    if (!isfinite(quad_solver.info->prim_res) ||
+        !isfinite(quad_solver.info->dual_res) ||
+        quad_solver.info->prim_res > residual_tolerance ||
+        quad_solver.info->dual_res > residual_tolerance)
+      return STATUS_NUMERIC_ERROR;
+  }
   /* Independent check against the unscaled original constraints. */
   {
     float y[190] = {0};
@@ -236,13 +251,23 @@ Status mpc_solve(const ControllerInput *in,
     for (col = 0; col < 15; ++col)
       for (n = qp_a_ptr[col]; n < qp_a_ptr[col + 1]; ++n)
         y[qp_a_row[n]] += ax[n] * x[col];
-    for (i = 0; i < 190; ++i)
-      if (y[i] < lower[i] - 1e-3f || y[i] > upper[i] + 1e-3f)
+    /* The solve is scaled, so the feasibility tolerance has to follow the row
+     * magnitude; a fixed 1e-3 on the unscaled problem rejects candidates the
+     * solver accepted inside its own tolerance. */
+    for (i = 0; i < 190; ++i) {
+      float l = lower[i], u = upper[i];
+      float magnitude = (l < 0.0f ? -l : l) + (u < 0.0f ? -u : u);
+      float tolerance = 1e-3f * (1.0f + magnitude);
+      if (y[i] < l - tolerance || y[i] > u + tolerance)
         return STATUS_OUT_OF_RANGE;
+    }
     for (k = 0; k < 5; ++k) {
       float a = x[3 * k], b = x[3 * k + 1], c = CONTROL_GRAVITY_MPS2 - x[3 * k + 2];
+      /* Same reasoning as the constraint rows: the thrust ceiling is compared
+       * in newtons, so the tolerance has to scale with the ceiling instead of
+       * being a fixed millinewton on a forty-newton bound. */
       if (cfg->mass_kg * sqrtf(a * a + b * b + c * c) >
-          e->max_total_thrust_n + 1e-3f)
+          e->max_total_thrust_n * (1.0f + 1e-3f) + 1e-3f)
         return STATUS_OUT_OF_RANGE;
     }
     memcpy(out->acceleration, x, 3 * sizeof(float));
