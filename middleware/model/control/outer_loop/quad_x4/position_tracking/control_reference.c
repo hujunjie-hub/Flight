@@ -1,13 +1,18 @@
 #include "attitude_rate_control/controller_internal.h"
 
-Status control_sample_reference(const MotionReference *ref, uint64_t time,
-                    ProductMotionPoint *out) {
-  const MotionReferencePoint *a, *b;
+/* Segment lookup and local time. Shared by control_sample_reference() and the
+   M5-06 test hooks so the measured local time is the production computation,
+   never a duplicated formula. */
+Status control_reference_locate_segment(const MotionReference *ref, uint64_t time,
+                                        const MotionReferencePoint **a,
+                                        const MotionReferencePoint **b,
+                                        float *local_seconds,
+                                        uint32_t *step_us_out) {
   uint64_t offset;
   uint32_t step_us, horizon_us;
-  unsigned i, j;
-  float s, h, c[6];
-  if (!ref || !out || ref->point_count != PRODUCT_PREVIEW_COUNT ||
+  unsigned i;
+  if (!ref || !a || !b || !local_seconds || !step_us_out ||
+      ref->point_count != PRODUCT_PREVIEW_COUNT ||
       time < ref->header.timestamp_sample_us || ref->anchor.offset_us)
     return STATUS_INVALID_ARGUMENT;
   offset = time - ref->header.timestamp_sample_us;
@@ -21,16 +26,32 @@ Status control_sample_reference(const MotionReference *ref, uint64_t time,
     if (ref->points[i].offset_us != (i + 1) * step_us)
       return STATUS_INVALID_ARGUMENT;
   i = offset == horizon_us ? ref->point_count - 1u : (unsigned)(offset / step_us);
-  a = i ? &ref->points[i - 1] : &ref->anchor;
-  b = &ref->points[i];
-  if ((a->point.valid_mask & 31u) != 31u ||
-      (b->point.valid_mask & 31u) != 31u || (a->valid_mask & 31u) != 31u ||
-      (b->valid_mask & 31u) != 31u)
+  *a = i ? &ref->points[i - 1] : &ref->anchor;
+  *b = &ref->points[i];
+  if (((*a)->point.valid_mask & 31u) != 31u ||
+      ((*b)->point.valid_mask & 31u) != 31u ||
+      ((*a)->valid_mask & 31u) != 31u || ((*b)->valid_mask & 31u) != 31u)
     return STATUS_INVALID_ARGUMENT;
-  if (!finite_array(a->point.position_ned_m, 11) ||
-      !finite_array(b->point.position_ned_m, 11))
+  if (!finite_array((*a)->point.position_ned_m, 11) ||
+      !finite_array((*b)->point.position_ned_m, 11))
     return STATUS_NUMERIC_ERROR;
-  s = (float)(offset - a->offset_us) * 1e-6f;
+  *local_seconds = (float)(offset - (*a)->offset_us) * 1e-6f;
+  *step_us_out = step_us;
+  return STATUS_OK;
+}
+
+Status control_sample_reference(const MotionReference *ref, uint64_t time,
+                    ProductMotionPoint *out) {
+  const MotionReferencePoint *a, *b;
+  uint32_t step_us;
+  unsigned j;
+  float s, h, c[6];
+  Status status;
+  if (!ref || !out)
+    return STATUS_INVALID_ARGUMENT;
+  status = control_reference_locate_segment(ref, time, &a, &b, &s, &step_us);
+  if (status != STATUS_OK)
+    return status;
   h = step_us * 1e-6f;
   memset(out, 0, sizeof(*out));
   out->valid_mask = 31;

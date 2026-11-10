@@ -160,23 +160,38 @@ def check_model_against_source(source=None):
     }
 
 
+MUTATIONS = (
+    ("gamma_2", "gamma2 = nu2 / (1.0 - nu2);", "gamma2 = 0.0;"),
+    ("gamma_n", "gamma = nu / (1.0 - nu);", "gamma = nu;"),
+    ("interval_bound", "difference = fmax(low_distance, high_distance);",
+     "difference = low_distance;"),
+    ("s_eval_max", "s_eval_max = add_upper_nonnegative(s_max, delta_s);",
+     "s_eval_max = s_max;"),
+    ("subnormal", "amplification = multiply_upper_nonnegative(amplification, scale);",
+     "amplification = 1.0;"),
+    ("fp_environment", "vmrs %0, fpscr", "vmrs %0, /* removed */"),
+    ("rounding_count", "#define M5_CONSUMER_POSITION_ROUNDINGS 10u",
+     "#define M5_CONSUMER_POSITION_ROUNDINGS 9u"),
+)
+
+
 def self_test():
-    """Deliberately corrupt one formula: the checker must report MISMATCH."""
+    """Every deliberate mutation of the model must be reported as MISMATCH."""
     source = VALIDATOR.read_text(encoding="utf-8")
-    corrupted = source.replace("gamma2 = nu2 / (1.0 - nu2);",
-                               "gamma2 = 0.0;")
-    if corrupted == source:
-        print("FAIL: self-test could not corrupt the gamma_2 formula")
-        return 1
     good = check_model_against_source(source)
-    bad = check_model_against_source(corrupted)
     if good["status"] != "MATCH":
         print(f"FAIL: unmodified source reported {good['status']}")
         return 1
-    if bad["status"] != "MISMATCH" or not bad["missing_tokens"]:
-        print("FAIL: corrupted gamma_2 formula was not detected")
-        return 1
-    print("M5_FP_MODEL_SELF_TEST_PASS (mutated gamma_2 detected as MISMATCH)")
+    for name, original, replacement in MUTATIONS:
+        if original not in source:
+            print(f"FAIL: mutation target for {name} not found")
+            return 1
+        mutated = source.replace(original, replacement, 1)
+        result = check_model_against_source(mutated)
+        if result["status"] != "MISMATCH":
+            print(f"FAIL: mutation {name} was not detected")
+            return 1
+    print(f"M5_FP_MODEL_SELF_TEST_PASS ({len(MUTATIONS)} mutations detected)")
     return 0
 
 

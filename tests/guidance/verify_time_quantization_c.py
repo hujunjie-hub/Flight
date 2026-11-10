@@ -78,6 +78,10 @@ class Probes:
                               ctypes.POINTER(ctypes.c_float)]
         self.time.restype = ctypes.c_uint8
         pointer = ctypes.POINTER(ctypes.c_float)
+        self.local = self.lib.m5_trajectory_safety_test_consumer_local_seconds
+        self.local.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
+                               ctypes.c_uint64, ctypes.POINTER(ctypes.c_float)]
+        self.local.restype = ctypes.c_uint8
         self.sample = self.lib.m5_trajectory_safety_test_consumer_interval_sample
         self.sample.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
                                 ctypes.c_uint64] + [pointer] * 6 + [
@@ -139,19 +143,27 @@ def phase_b(probes, report):
                             failures.append(f"probe failed {step_us}/{interval}/{offset_us}")
                             continue
                         hh = Fraction(f32(h))
-                        # The companion linear reference reports the absolute
-                        # time from the anchor. Its float rounding at the knot is
-                        # of the same order as gamma_2, so the exact time verdict
-                        # is kept for interval 0 (phase A is exhaustive); later
-                        # intervals use the nominal local time and the curve is
-                        # checked against the envelope there.
-                        s_c = Fraction(seconds.value) - hh * interval
-                        if interval != 0:
-                            s_c = hh * Fraction(offset_us, step_us)
-                        s_exact = hh * Fraction(offset_us, step_us)
+                        measured = ctypes.c_float()
+                        if not probes.local(step_us, interval, offset_us, base,
+                                            ctypes.byref(measured)):
+                            failures.append(
+                                f"local-time hook failed {step_us}/{interval}/{offset_us}")
+                            continue
+                        # The production computation is the verdict: no nominal
+                        # value may replace it.
+                        s_c = Fraction(measured.value)
+                        # Production semantics: the active segment is chosen by
+                        # the global offset, so offset == step means the start of
+                        # the next segment with local time 0.
+                        global_us = interval * step_us + offset_us
+                        active = min(global_us // step_us, 23)
+                        local_us = global_us - active * step_us
+                        s_exact = hh * Fraction(local_us, step_us)
                         if abs(s_c - s_exact) > GAMMA2 * s_exact:
                             failures.append(f"time: {step_us}/{interval}/{offset_us}")
                         max_time_ratio = max(max_time_ratio, abs(s_c - s_exact) / hh)
+                        if active != interval:
+                            continue
                         exact = exact_hermite(*state[:3], *state[3:], h, s_c)
                         error = max(abs(Fraction(f32(position[axis])) - exact[axis])
                                     for axis in range(3))
@@ -180,6 +192,19 @@ def phase_b(probes, report):
     return failures
 
 
+def negative_self_test():
+    """A time error above gamma_2 must be detected by the same comparison."""
+    h = Fraction(f32(f32(20000) * f32(1e-6)))
+    s_exact = h * Fraction(1, 2)
+    bad = s_exact + GAMMA2 * s_exact * 4          # four times the bound
+    good = s_exact + GAMMA2 * s_exact * Fraction(1, 2)
+    if abs(bad - s_exact) <= GAMMA2 * s_exact:
+        return False
+    if abs(good - s_exact) > GAMMA2 * s_exact:
+        return False
+    return True
+
+
 def main():
     if len(sys.argv) < 2:
         raise SystemExit('usage: verify_time_quantization_c.py <libm5_safety_oracle.so>')
@@ -194,6 +219,9 @@ def main():
         "gamma_2": float(GAMMA2),
     }
     failures = phase_a(probes, report) + phase_b(probes, report)
+    report["negative_self_test"] = ("PASS" if negative_self_test() else "FAIL")
+    if report["negative_self_test"] != "PASS":
+        failures.append("negative self-test: gamma_2 check did not reject an excess error")
     report["failures"] = failures[:10]
     print(json.dumps(report, indent=2))
     if failures:

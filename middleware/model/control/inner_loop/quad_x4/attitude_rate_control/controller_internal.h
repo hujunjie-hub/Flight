@@ -55,6 +55,13 @@ Status control_allocate_from_previous(const float inv[4][4], const float eff[4][
                                       const float wrench[4], const float previous[4],
                                       const float lo[4], const float hi[4],
                                       float min_thrust, float max_thrust, ControlAllocation *out);
+/* Shared segment lookup: production and test hooks use this same function. */
+Status control_reference_locate_segment(const MotionReference *ref, uint64_t time,
+                                        const MotionReferencePoint **a,
+                                        const MotionReferencePoint **b,
+                                        float *local_seconds,
+                                        uint32_t *step_us_out);
+
 Status control_sample_reference(const MotionReference *ref, uint64_t time,
                     ProductMotionPoint *out);
 Status controller_validate_input(const ControllerInput *in, uint32_t *ref_epoch,

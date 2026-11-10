@@ -103,4 +103,11 @@ uint8_t m5_trajectory_safety_test_consumer_interval_sample(
     const float end_velocity[3], const float end_acceleration[3],
     float position[3], float *seconds);
 
+/* S06-103: the local time the real consumer uses for a given time, obtained
+   through control_reference_locate_segment() - the same function production
+   code calls, so no formula is duplicated in the test. */
+uint8_t m5_trajectory_safety_test_consumer_local_seconds(
+    uint32_t step_us, uint32_t interval, uint32_t offset_us, uint64_t base_us,
+    float *seconds);
+
 #endif /* M5_TRAJECTORY_SAFETY_TEST_API_H */

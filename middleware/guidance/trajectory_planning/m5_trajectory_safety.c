@@ -2412,6 +2412,36 @@ uint8_t m5_trajectory_safety_test_consumer_interval_sample(
                    isfinite(position[1]) && isfinite(position[2]));
 }
 
+extern Status control_reference_locate_segment(const MotionReference *ref,
+                                               uint64_t time,
+                                               const MotionReferencePoint **a,
+                                               const MotionReferencePoint **b,
+                                               float *local_seconds,
+                                               uint32_t *step_us_out);
+
+uint8_t m5_trajectory_safety_test_consumer_local_seconds(
+    uint32_t step_us, uint32_t interval, uint32_t offset_us, uint64_t base_us,
+    float *seconds)
+{
+  MotionReference reference;
+  const MotionReferencePoint *a = NULL;
+  const MotionReferencePoint *b = NULL;
+  uint32_t measured_step = 0u;
+  float local_seconds = 0.0f;
+  uint64_t time;
+
+  if (seconds == NULL || interval >= PRODUCT_PREVIEW_COUNT || offset_us > step_us)
+    return 0u;
+  safety_test_fill_reference(&reference, step_us, base_us);
+  time = base_us + (uint64_t)interval * step_us + offset_us;
+  if (control_reference_locate_segment(&reference, time, &a, &b,
+                                       &local_seconds, &measured_step) != STATUS_OK)
+    return 0u;
+  if (measured_step != step_us) return 0u;
+  *seconds = local_seconds;
+  return (uint8_t)isfinite(*seconds);
+}
+
 #endif /* FLIGHT_M5_SAFETY_TEST_API */
 
 #endif /* FLIGHT_M5_HOST_PLANNER */
