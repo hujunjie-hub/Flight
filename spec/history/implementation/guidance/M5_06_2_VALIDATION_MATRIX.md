@@ -160,7 +160,7 @@ ARM 静态检查报告：MPC RAM 29,252 bytes、worker stack 8,192 bytes、最�
 |---|---|---|---|
 | S06-080 | norm3 上/下界：float ULP 边界、零、次正规数、极端尺度；Fraction 精确有理数 oracle | upper 不低估、lower 不高估 | IMPLEMENTED / CI_PENDING；7 组边界 + 10,000 组有限 binary32 位模式；seed `0x6D350680` |
 | S06-081 | 动态相对运动端到端连续最小距离，恒速解析最近点 + 恒加速度相对运动解析驻点/零点 oracle | 64 组加速障碍物场景，32 碰撞/32 安全；生产 validator 分类一致 | IMPLEMENTED / CI_PENDING；seed `0x6D350681` |
-| S06-082 | 动态障碍物精确相切、内外 1 ULP、相邻预览接缝 | 相切保守拒绝，分类与独立 oracle 一致 | NOT_RUN；seed `0x6D350682` |
+| S06-082 | 动态障碍物精确相切、内外 1 ULP、20ms 预览接缝前/后 1 ULP | 相切/内侧拒绝；外侧允许保守拒绝但不得错误 PASS；接缝三种位置均拒绝 | IMPLEMENTED / CI_PENDING；确定性边界用例 |
 | S06-083 | 自适应细分点前/恰在/后 1 ULP 的动态碰撞 | 整段/分段 oracle 一致，未证明则 fail-closed | NOT_RUN；seed `0x6D350683` |
 
 **当前阻塞：** MR-004 的新 bit-search 证明及 Fraction oracle 尚待独立审查和本轮 CI；MR-007 的浮点 flags 与工具链记录已实现，但需 CI 证据确认。当前 `arm_build_check.sh` 已将 M5-06 Host-only validator 源交叉编译为 Cortex-M7 object（不进入产品链接）；不得将该对象编译等同于目标运行、WCET 或实机 RAM/stack 验收。MPC RAM 数字仍只代表 MPC 资源。
