@@ -14,12 +14,23 @@
 #include <string.h>
 
 _Static_assert(FLT_RADIX == 2, "M5 safety requires radix-2 floating point");
-_Static_assert(FLT_MANT_DIG == 24 && FLT_MAX_EXP == 128,
+_Static_assert(FLT_MANT_DIG == 24 && FLT_MIN_EXP == -125 &&
+               FLT_MAX_EXP == 128,
                "M5 safety requires IEEE-754 binary32 float");
-_Static_assert(DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024,
+_Static_assert(DBL_MANT_DIG == 53 && DBL_MIN_EXP == -1021 &&
+               DBL_MAX_EXP == 1024,
                "M5 safety requires IEEE-754 binary64 double");
+_Static_assert(FLT_HAS_SUBNORM == 1 && FLT_TRUE_MIN == 0x1p-149f,
+               "M5 safety requires IEEE-754 binary32 subnormals");
+_Static_assert(DBL_HAS_SUBNORM == 1 && DBL_TRUE_MIN == 0x1p-1074,
+               "M5 safety requires IEEE-754 binary64 subnormals");
+_Static_assert(FLT_EVAL_METHOD == 0,
+               "M5 safety requires evaluation at the declared type precision");
 _Static_assert(sizeof(float) == sizeof(uint32_t),
                "M5 safety requires 32-bit float storage");
+#if !defined(__STDC_IEC_559__) || (__STDC_IEC_559__ != 1)
+#error "M5 safety requires IEC 60559 floating-point object representation"
+#endif
 #include "trajectory_planning/m5_trajectory_safety.h"
 #include "messages/message_ids.h"
 #include "geofence_geometry/geofence_geometry.h"
