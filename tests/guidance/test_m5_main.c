@@ -3172,20 +3172,21 @@ static void test_m5_safety_dynamic_adaptive_split_ulp(void)
   unsigned boundary_case;
 
   for (boundary_case = 0u; boundary_case < 3u; ++boundary_case) {
-    float obstacle_start_x = -0.5f;
+    float obstacle_start_x = -5.0f;
     safety_fx_init(&fx, 172000000u + (uint64_t)boundary_case * 1000000u);
     safety_set_constant_position(&fx, 0.0f, 0.0f, 0.0f);
     /* Isolate adaptive subdivision from response-delay inflation: the parent
-       midpoint must be unresolved, not already classified as collision. */
+       midpoint is far outside the collision radius but within the conservative
+       sweep bound; the first child midpoint is the actual collision point. */
     fx.input.response_delay_us = 0u;
     if (boundary_case == 1u)
-      obstacle_start_x = nextafterf(-0.5f, INFINITY);
+      obstacle_start_x = nextafterf(-5.0f, INFINITY);
     else if (boundary_case == 2u)
-      obstacle_start_x = nextafterf(-0.5f, -INFINITY);
+      obstacle_start_x = nextafterf(-5.0f, -INFINITY);
 
     track = &fx.map.tracks[0];
     safety_set_far_dynamic_track(track, 1120u + boundary_case, fx.base.now,
-        obstacle_start_x, 0.0f, 0.0f, 100.0f, 0.0f, 0.0f);
+        obstacle_start_x, 0.0f, 0.0f, 1000.0f, 0.0f, 0.0f);
     track->position_std_m = 0.0f;
     track->velocity_std_mps = 0.0f;
     fx.input.max_dynamic_obstacle_accel_mps2 = 0.5f;
