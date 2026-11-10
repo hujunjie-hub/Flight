@@ -1,0 +1,233 @@
+{
+  "schema_version": "1.0",
+  "project": "Flight",
+  "issue_id_format": "FLIGHT-{github_issue_number}",
+  "authoritative_store": "GitHub Issues",
+  "validation_status_authority": "spec/09_需求验证实施与发布管理.md",
+  "statuses": [
+    {
+      "id": "NEW",
+      "label": "status:new",
+      "github_state": "open",
+      "next": [
+        "TRIAGED"
+      ]
+    },
+    {
+      "id": "TRIAGED",
+      "label": "status:triaged",
+      "github_state": "open",
+      "next": [
+        "NEEDS_INFO",
+        "REPRODUCED",
+        "IN_PROGRESS",
+        "BLOCKED"
+      ]
+    },
+    {
+      "id": "NEEDS_INFO",
+      "label": "status:needs-info",
+      "github_state": "open",
+      "next": [
+        "TRIAGED",
+        "REPRODUCED",
+        "BLOCKED"
+      ]
+    },
+    {
+      "id": "REPRODUCED",
+      "label": "status:reproduced",
+      "github_state": "open",
+      "next": [
+        "IN_PROGRESS",
+        "BLOCKED"
+      ]
+    },
+    {
+      "id": "IN_PROGRESS",
+      "label": "status:in-progress",
+      "github_state": "open",
+      "next": [
+        "FIXED_WAITING_RETEST",
+        "BLOCKED"
+      ]
+    },
+    {
+      "id": "FIXED_WAITING_RETEST",
+      "label": "status:fixed-waiting-retest",
+      "github_state": "open",
+      "next": [
+        "RETESTING",
+        "BLOCKED"
+      ]
+    },
+    {
+      "id": "RETESTING",
+      "label": "status:retesting",
+      "github_state": "open",
+      "next": [
+        "VERIFIED",
+        "IN_PROGRESS",
+        "REOPENED",
+        "BLOCKED"
+      ]
+    },
+    {
+      "id": "VERIFIED",
+      "label": "status:verified",
+      "github_state": "open",
+      "next": [
+        "CLOSED"
+      ]
+    },
+    {
+      "id": "CLOSED",
+      "label": "status:closed",
+      "github_state": "closed",
+      "next": [
+        "REOPENED"
+      ]
+    },
+    {
+      "id": "BLOCKED",
+      "label": "status:blocked",
+      "github_state": "open",
+      "next": [
+        "TRIAGED",
+        "NEEDS_INFO",
+        "REPRODUCED",
+        "IN_PROGRESS",
+        "FIXED_WAITING_RETEST",
+        "RETESTING"
+      ]
+    },
+    {
+      "id": "REOPENED",
+      "label": "status:reopened",
+      "github_state": "open",
+      "next": [
+        "TRIAGED",
+        "REPRODUCED"
+      ]
+    }
+  ],
+  "severities": [
+    {
+      "id": "S0",
+      "label": "severity:S0",
+      "definition": "Safety-critical; immediately blocks affected release or milestone."
+    },
+    {
+      "id": "S1",
+      "label": "severity:S1",
+      "definition": "High; blocks current milestone acceptance."
+    },
+    {
+      "id": "S2",
+      "label": "severity:S2",
+      "definition": "Medium; may proceed only in independent scope with explicit conservative behavior."
+    },
+    {
+      "id": "S3",
+      "label": "severity:S3",
+      "definition": "Low; documentation or non-blocking maintainability."
+    }
+  ],
+  "required_fields": [
+    "title",
+    "severity",
+    "type",
+    "area",
+    "quality_status",
+    "branch",
+    "first_seen_commit",
+    "baseline_commit",
+    "profile",
+    "run_id",
+    "test_ids",
+    "command",
+    "environment",
+    "expected",
+    "actual",
+    "reproduction_steps",
+    "checks",
+    "failures",
+    "log_path",
+    "log_sha256",
+    "safety_impact",
+    "fail_closed",
+    "blocker",
+    "owner",
+    "next_action"
+  ],
+  "randomized_test_fields": [
+    "seed",
+    "generator_version",
+    "case_count",
+    "failing_input",
+    "minimized_counterexample"
+  ],
+  "evidence_requirements": [
+    "exact_commit_sha",
+    "full_command",
+    "exit_code_zero",
+    "checks_greater_than_zero",
+    "failures_zero",
+    "raw_log",
+    "sha256",
+    "independent_reviewer"
+  ],
+  "labels": {
+    "status": [
+      "status:new",
+      "status:triaged",
+      "status:needs-info",
+      "status:reproduced",
+      "status:in-progress",
+      "status:fixed-waiting-retest",
+      "status:retesting",
+      "status:verified",
+      "status:blocked",
+      "status:reopened"
+    ],
+    "severity": [
+      "severity:S0",
+      "severity:S1",
+      "severity:S2",
+      "severity:S3"
+    ],
+    "kind": [
+      "kind:bug",
+      "kind:safety",
+      "kind:test-gap",
+      "kind:build",
+      "kind:docs"
+    ],
+    "area": [
+      "area:M4",
+      "area:M5",
+      "area:M6",
+      "area:M7",
+      "area:INS",
+      "area:platform"
+    ],
+    "verification": [
+      "verification:host",
+      "verification:sanitizer",
+      "verification:arm",
+      "verification:hil"
+    ]
+  },
+  "closure_requires": [
+    "original_failure_reproduced",
+    "root_cause_confirmed",
+    "fix_commit",
+    "regression_test_added",
+    "original_test_retested",
+    "affected_regression_passed",
+    "raw_logs_and_hashes",
+    "independent_review",
+    "spec09_updated_if_applicable",
+    "evidence_archive"
+  ]
+}
