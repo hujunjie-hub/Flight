@@ -277,3 +277,31 @@ python tests/guidance/verify_curve_eval_gap.py
 
 在 MR-009 关闭前，M5-06 动态/静态连续距离的“消费曲线等价性”不得标记 APPROVED，M5-07 不得启动。`tests/guidance/verify_curve_eval_gap.py` 只是回归测量（上限 1e-4 m / 5e-3 m），不是证明。
 
+ 
+### MR-009 修复实现（2026-11-10，本轮）
+
+状态：**FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW**（不再是“无包络”状态）。
+
+实现（方案 2 + 消费端系数逐运算复刻）：
+
+1. `consumer_power_coefficients()` 按 `control_sample_reference()` 的 binary32 运算顺序复刻 c0..c5；验证器不再只假设“同一条代数曲线”。
+2. `consumer_eval_error_bound()` 给出
+   `E = Σ|c_f,i − c_e,i|·s_max^i + 9u·Σ|c_f,i|·s_max^i`，
+   其中 `u = 2^-24`；`9` 覆盖 5 次 Horner 舍入与最多 4 次可能被 FMA 融合的系数运算。
+3. 时间量化项：消费端用 `s = (float)(offset_us) * 1e-6f`，验证器用精确时间；差值按 `2u·s_max·|d^k p/dt^k|` 的导数上界计入位置/速度/加速度。
+4. 三种误差分别进入 `curve_bounds()`：位置加入 `position_low/high` 与 `position_rounding_error_m`；速度加入 `velocity_axis_bound`/`speed_bound`/`velocity_rounding_error_mps`；加速度加入 `acceleration_axis_bound`/`acceleration_bound`。不再依赖 `clearance_margin_m` 吸收。
+5. 新增测试 API `m5_trajectory_safety_test_curve_envelope()`，暴露三条包络范数。
+
+验证（同一提交）：
+
+| 测试 | 内容 | 实测 |
+|---|---|---|
+| S06-086（C，真实消费端） | 链接 `control_sample_reference()`，24 区间 × 33/17 采样 × 9 个分量，平滑 + 8 组对抗参考 | 314,687 checks / 0 failures；位置、速度、加速度全部落在包络内 |
+| S06-085（Python，Fraction 精确） | 同一 float32 端点；真实 `offset_us → s`；精确有理数参考；包络来自生产 C API | 平滑位置 1.52e-05 m、对抗 1.41e-03 m；速度 3.03e-01 m/s、加速度 5.90e+01 m/s²（对抗）；`max gap/envelope = 0.094`，`uncovered=0` |
+| 消费端浮点语义 | 用 `rtconfig.py` 的生产 flags 编译 `control_reference.c`，反汇编统计 | `vfma/vfms/vmla/vmls = 0`；`build/m5_arm/consumer_fp.json` |
+
+包络保守度约 10 倍（`max ratio 0.094`），对平滑参考只增加 ~1e-4 m 量级膨胀，不改变现有 PASS/FAIL 判定；对物理上不合理的对抗参考会显著收紧动力学门限（测试 `m5_safety_keepin_excursion` 的夹具已给出 100 m/s² 余量以继续覆盖围栏路径）。
+
+**仍未关闭的部分：** 独立审查者需要确认 (a) `9u` 系数是否覆盖目标编译器的收缩行为（当前工具链实测无 FMA）、(b) 时间量化项的导数上界推导、(c) `s_max = h·u1` 的单调性论证。在这些确认前，MR-009 保持 OPEN，M5-06 整体保持 BLOCKED，M5-07 不得启动。
+
+

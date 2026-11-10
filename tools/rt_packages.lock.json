@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "status": "UNRESOLVED",
+  "scope": "H723 firmware link: root SConscript includes packages/SConscript and Kconfig oincludes packages/Kconfig",
+  "procedure": "spec/validation/rt_thread_packages_reproducibility.md",
+  "source_of_selection": ".config (CONFIG_PKG_USING_*)",
+  "resolved_by": null,
+  "resolved_at_utc": null,
+  "packages": [
+    {
+      "symbol": "CMSIS_CORE",
+      "config_version_key": "CONFIG_PKG_CMSIS_CORE_VER",
+      "selected_version": "latest",
+      "pinned_version": null,
+      "pinned_commit": null,
+      "required_for": "Cortex-M7 core headers used by the STM32H7 BSP"
+    },
+    {
+      "symbol": "STM32H7_HAL_DRIVER",
+      "config_version_key": "CONFIG_PKG_STM32H7_HAL_DRIVER_VER",
+      "selected_version": "latest",
+      "pinned_version": null,
+      "pinned_commit": null,
+      "required_for": "STM32H723 HAL sources linked into the firmware"
+    },
+    {
+      "symbol": "STM32H7_CMSIS_DRIVER",
+      "config_version_key": "CONFIG_PKG_STM32H7_CMSIS_DRIVER_VER",
+      "selected_version": "latest",
+      "pinned_version": null,
+      "pinned_commit": null,
+      "required_for": "STM32H7 device headers and startup definitions"
+    }
+  ],
+  "note": "All three packages are currently selected with VER=\"latest\", which spec/00 §4 explicitly rejects as non-reproducible. Pinning them changes the firmware dependency baseline, so it needs owner approval before this file can be marked RESOLVED."
+}

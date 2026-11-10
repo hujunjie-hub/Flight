@@ -211,14 +211,28 @@ CI：[Host validation #542](https://github.com/hujunjie-hub/Flight/actions/runs/
 long-double 恒加速度 oracle 仅覆盖其明确的 1D 运动模型；不得将其描述为通用 3D 连续区间证明。M5-06 独立数学审查和 H723 实机放行仍未完成。
 
  
-## S06-085 验证曲线与消费曲线求值差分（2026-11-10）
+## S06-085 验证曲线与消费曲线求值差分（2026-11-10，MR-009 修复后）
 
-`tests/guidance/verify_curve_eval_gap.py` 固定 seed `0x6D350685`，对 256 段五次 Hermite × 33 个采样点比较两条求值路径：
+`tests/guidance/verify_curve_eval_gap.py`（固定 seed `0x6D350685`）比较两条求值路径：
 
-- 消费端 `control_sample_reference()` 的 binary32 Horner；
-- M5-06 验证器的 binary64 精确曲线。
+- 消费端 `control_sample_reference()` 的 binary32 Horner（Python 逐运算复刻，真实 C 路径由 S06-086 覆盖）；
+- 精确有理数参考（`Fraction`），与消费端使用**同一组 binary32 端点**，采样时间使用消费端真实的 `offset_us → s` 换算；
+- 包络来自生产 C API `m5_trajectory_safety_test_curve_envelope()`，不在此脚本内重新实现。
 
-实测最大偏差：平滑段（恒 jerk 积分生成端点）`2.98e-05 m`；对抗段（端点 p/v/a 独立随机）`2.17e-03 m`。脚本以 1e-4 m / 5e-3 m 作为回归上限，并在输出中显式声明该偏差**尚未**被验证器的区间包络覆盖。
+| 场景 | 位置最大偏差 | 速度最大偏差 | 加速度最大偏差 | max gap/envelope |
+|---|---:|---:|---:|---:|
+| 平滑段（恒 jerk 积分端点） | 1.52e-05 m | 1.15e-06 m/s | 1.42e-04 m/s² | 0.092 |
+| 对抗段（端点 p/v/a 独立随机） | 1.41e-03 m | 3.03e-01 m/s | 5.90e+01 m/s² | 0.094 |
 
-该用例不是 PASS 证明，而是 MR-009 的可复现测量；详细说明见 `M5_06_5_INDEPENDENT_MATH_REVIEW.md` 第 11 节。
+`uncovered = 0`：所有采样点的精确偏差都落在生产包络内。脚本输出 `M5_S06_085_EXACT_ENVELOPE_COVERAGE_PASS`，任一采样越界即 FAIL。
+
+## S06-086 真实消费端与验证器曲线的 C 差分（2026-11-10）
+
+`tests/guidance/test_m5_main.c::test_m5_safety_consumer_curve_envelope` 把 M6 的 `control_sample_reference()` 直接链接进 Host 测试二进制，按真实 `offset_us` 采样，与 `m5_trajectory_safety_test_curve_eval()` 的 binary64 曲线逐点比较，并用 `m5_trajectory_safety_test_curve_envelope()` 的包络判定：
+
+- 平滑参考：24 区间 × 33 采样点 × 3 轴 × 3 个分量；
+- 对抗参考：8 组独立随机端点，24 区间 × 17 采样点；
+- 同时断言包络严格大于 0，防止用零裕度“通过”。
+
+实测：`314,687 checks / 0 failures`（Host 与 ASan/UBSan 相同）。该用例证明验证器现在覆盖的是控制器实际执行的曲线，而不只是同一条公式的 binary64 版本。
 

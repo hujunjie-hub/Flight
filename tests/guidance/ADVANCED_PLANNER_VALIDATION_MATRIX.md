@@ -94,7 +94,8 @@ V1.9.1 采用固定时长 minimum-jerk 五次样条，最多 8 段；内部 knot
 
 预测窗口要求：Host 合成源至少提供 1s 预测界；实际参考覆盖 [t0, t0+480ms]，并额外覆盖有效观测年龄/不确定度窗口。ONBOARD_SENSOR 当前不支持，不能把 Host 合成预测当作实物保证。
 
-消费曲线等价性（2026-11-10 增量）：M5-06 用 binary64 重建五次 Hermite，而 M6 `control_sample_reference()` 用 binary32 Horner 求值同一条代数曲线。S06-085（`tests/guidance/verify_curve_eval_gap.py`，seed `0x6D350685`）测量两者偏差：平滑段 `2.98e-05 m`、对抗段 `2.17e-03 m`。该偏差尚未进入验证器区间包络，列为 MR-009（OPEN / S2），详见 `spec/history/implementation/guidance/M5_06_5_INDEPENDENT_MATH_REVIEW.md` 第 11 节；在关闭前不得把 M5-COL-001..008 记作“已证明实际消费曲线净空”。
+消费曲线等价性（MR-009，2026-11-10 修复后）：M5-06 用 binary64 重建五次 Hermite，而 M6 `control_sample_reference()` 用 binary32 Horner 求值同一条代数曲线。验证器现按消费端运算顺序复刻系数，并把 `Σ|Δc|s^i + 9u·Σ|c|s^i` 与时间量化导数项作为位置/速度/加速度包络加入净空与动力学判定，不再由 `clearance_margin_m` 吸收。证据：S06-086（真实 C 消费端，314,687 checks / 0 failures）与 S06-085（Fraction 精确参考，`uncovered=0`，max gap/envelope 0.094）。独立审查确认前 MR-009 仍为 OPEN，M5-COL-001..008 不得记作“已证明实际消费曲线净空”。
+
 
 
 ## 7. 重规划、M5→M6 与 Companion 矩阵
