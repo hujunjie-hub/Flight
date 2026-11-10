@@ -36,6 +36,30 @@ STATES = (
 )
 
 
+
+def consumer_coefficients(p0, v0, a0, p1, v1, a1, h):
+    """binary32 coefficient construction (mirrors control_reference.c)."""
+    p0, v0, a0 = f32(p0), f32(v0), f32(a0)
+    p1, v1, a1 = f32(p1), f32(v1), f32(a1)
+    h = f32(h)
+    h2 = f32(h * h)
+    h3 = f32(h2 * h)
+    h4 = f32(h3 * h)
+    h5 = f32(h4 * h)
+    d = f32(f32(p1 - p0) - f32(h * v0))
+    d = f32(d - f32(f32(f32(0.5 * h) * h) * a0))
+    dv = f32(f32(v1 - v0) - f32(h * a0))
+    da = f32(a1 - a0)
+    return [
+        p0, v0, f32(0.5 * a0),
+        f32(f32(f32(f32(10.0 * d) / h3) - f32(f32(4.0 * dv) / h2))
+            + f32(da / f32(2.0 * h))),
+        f32(f32(f32(f32(-15.0 * d) / h4) + f32(f32(7.0 * dv) / h3)) - f32(da / h2)),
+        f32(f32(f32(f32(6.0 * d) / h5) - f32(f32(3.0 * dv) / h4))
+            + f32(da / f32(2.0 * h3))),
+    ]
+
+
 def f32(value):
     return struct.unpack('f', struct.pack('f', value))[0]
 
@@ -130,7 +154,7 @@ def phase_b(probes, report):
         h = f32(step_us * f32(1e-6))
         for interval in INTERVALS:
             for base in BASES:
-                for offset_us in (0, step_us // 2, step_us):
+                for offset_us in (0, step_us // 2, step_us - 1, step_us):
                     for state in STATES:
                         arrays = [(ctypes.c_float * 3)(*values) for values in state]
                         position = (ctypes.c_float * 3)()
@@ -158,13 +182,28 @@ def phase_b(probes, report):
                         global_us = interval * step_us + offset_us
                         active = min(global_us // step_us, 23)
                         local_us = global_us - active * step_us
-                        s_exact = hh * Fraction(local_us, step_us)
+                        # Physical time reference: the integer microsecond count
+                        # is exact, so local_us/1e6 is the true time. h is a
+                        # rounded binary32 value and must not be used here.
+                        s_exact = Fraction(local_us, 1000000)
                         if abs(s_c - s_exact) > GAMMA2 * s_exact:
                             failures.append(f"time: {step_us}/{interval}/{offset_us}")
                         max_time_ratio = max(max_time_ratio, abs(s_c - s_exact) / hh)
-                        if active != interval:
-                            continue
-                        exact = exact_hermite(*state[:3], *state[3:], h, s_c)
+                        # At a seam (offset == step) the knot is both the end of
+                        # this segment and the start of the next one; both must
+                        # be validated, never skipped.
+                        if offset_us == step_us:
+                            # Seam: production switches to the next segment and
+                            # uses its start state at local time 0. The fixture
+                            # fills later segments with zeros, so that is the
+                            # exact reference here. The previous endpoint is
+                            # covered by the step-1 offset above.
+                            # The next segment starts at this segment's end
+                            # state (the probe writes points[interval] = end).
+                            exact = exact_hermite(*state[3:], *state[3:], h,
+                                                  Fraction(0))
+                        else:
+                            exact = exact_hermite(*state[:3], *state[3:], h, s_c)
                         error = max(abs(Fraction(f32(position[axis])) - exact[axis])
                                     for axis in range(3))
                         limit = ctypes.c_float()
@@ -178,6 +217,44 @@ def phase_b(probes, report):
                                                ctypes.byref(alimit)):
                             failures.append(f"envelope rejected {step_us}/{interval}")
                             continue
+                        # Separate the three error sources at the same sample.
+                        float_series = [
+                            consumer_coefficients(state[0][axis], state[1][axis],
+                                                  state[2][axis], state[3][axis],
+                                                  state[4][axis], state[5][axis], h)
+                            for axis in range(3)]
+                        model_value = [0.0, 0.0, 0.0]
+                        for axis in range(3):
+                            value = f32(float_series[axis][5])
+                            for k in reversed(range(5)):
+                                value = f32(f32(value * f32(s_c)) +
+                                            f32(float_series[axis][k]))
+                            model_value[axis] = value
+                        coefficient_error = max(
+                            abs(Fraction(model_value[axis]) - exact[axis])
+                            for axis in range(3))
+                        horner_error = max(
+                            abs(Fraction(f32(position[axis])) -
+                                Fraction(model_value[axis]))
+                            for axis in range(3))
+                        exact_physical = exact_hermite(*state[:3], *state[3:], h,
+                                                       s_exact)
+                        time_error = max(abs(exact[axis] - exact_physical[axis])
+                                         for axis in range(3))
+                        report.setdefault("decomposition", {
+                            "coefficient_error_m": 0.0,
+                            "horner_error_m": 0.0,
+                            "time_error_m": 0.0,
+                        })
+                        report["decomposition"]["coefficient_error_m"] = max(
+                            report["decomposition"]["coefficient_error_m"],
+                            float(coefficient_error))
+                        report["decomposition"]["horner_error_m"] = max(
+                            report["decomposition"]["horner_error_m"],
+                            float(horner_error))
+                        report["decomposition"]["time_error_m"] = max(
+                            report["decomposition"]["time_error_m"],
+                            float(time_error))
                         if float(error) > limit.value:
                             failures.append(
                                 f"curve: {step_us}/{interval}/{offset_us} "
@@ -186,6 +263,7 @@ def phase_b(probes, report):
                             max_curve_ratio = max(max_curve_ratio,
                                                   float(error) / limit.value)
     report["phase_b"] = {"checked": checked,
+                         "decomposition": report.get("decomposition", {}),
                          "max_time_ratio": float(max_time_ratio),
                          "max_curve_over_envelope": max_curve_ratio,
                          "failures": failures[:5]}

@@ -214,17 +214,32 @@ def main():
     point_ulp = max(ulp(P_MAX), ulp(1.0))
     radius_ulp = max(ulp(0.05), ulp(0.5))
     margin_ulp = ulp(0.15)
+    # Per-channel representable-boundary intervals. Each entry lists the float
+    # operations of the real chain; the interval is the sum of their rounding
+    # steps, not a single fixed ULP value. A fixed "constructible" factor is NOT
+    # applied: proving that no boundary exists needs the whole validator chain
+    # (vehicle radius, swept radius, uncertainty, DFS subdivision), which this
+    # script does not establish.
     channels = {
-        "static": {"resolution_m": point_ulp, "note": "float point + AABB distance"},
-        "dynamic": {"resolution_m": max(radius_ulp, margin_ulp),
-                    "note": "float centre/radius + margin"},
-        "geofence": {"resolution_m": max(ulp(1.0), margin_ulp),
-                     "note": "float polygon vertex + margin"},
+        "static": {
+            "operations": ["float point (curve sample)",
+                           "double AABB distance",
+                           "float clearance margin"],
+            "interval_m": float(point_ulp + margin_ulp),
+        },
+        "dynamic": {
+            "operations": ["float track centre", "float radius",
+                           "float clearance margin", "float prediction bound"],
+            "interval_m": float(radius_ulp + margin_ulp),
+        },
+        "geofence": {
+            "operations": ["float polygon vertices", "float clearance margin",
+                           "float height bounds"],
+            "interval_m": float(ulp(1.0) + margin_ulp),
+        },
     }
     for name, channel in channels.items():
-        ratio = float(worst) / channel["resolution_m"]
-        channel["bound_over_resolution"] = ratio
-        channel["constructible"] = ratio >= FACTOR
+        channel["bound_over_interval"] = float(worst) / channel["interval_m"]
     report = {
         "test": "S06-104",
         "seed": f"0x{SEED:X}",
@@ -234,16 +249,18 @@ def main():
         "model_matches_c_consumer": model_ok,
         "continuous_bound_m": float(worst),
         "worst_case": worst_case,
-        "factor_required": FACTOR,
         "channels": channels,
+        "verdict": "MATHEMATICAL_FEASIBILITY_NOT_ESTABLISHED",
+        "verdict_reason": ("a fixed factor and a single-ULP resolution are not a "
+                           "proof; the per-channel intervals above only bound the "
+                           "placement rounding, not the full validator chain"),
     }
     print(json.dumps(report, indent=2))
     if not model_ok:
         print("FAIL: the C consumer does not match the float-coefficient model")
         return 1
     print("M5_S06_104_CONTINUOUS_BOUND_PASS "
-          f"(bound={float(worst):.3e} m; constructible channels: "
-          f"{[name for name, channel in channels.items() if channel['constructible']]})")
+          f"(bound={float(worst):.3e} m; verdict=MATHEMATICAL_FEASIBILITY_NOT_ESTABLISHED)")
     return 0
 
 
