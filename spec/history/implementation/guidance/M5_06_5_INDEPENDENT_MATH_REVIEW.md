@@ -130,3 +130,19 @@ S06-080 新增 Fraction 精确平方范数 oracle，当前为 IMPLEMENTED / CI_P
 | S06-084 | 动态 track 预测位置的时间换算、double 乘加及 float 转换误差；覆盖大 epoch、正负时间差、非 dyadic 子区间中点、精确相切/近切 | Fraction 精确时间/位置参考 + 端到端 fail-closed 差分 | 0x6D350684 | NOT_RUN |
 
 MR-008 关闭前，S06-081..083 即使 CI 通过，也不能单独证明动态障碍物连续距离路径已完成数学验收。
+
+ 
+### MR-008 修复实现增量（2026-11-10）
+
+生产代码已调整动态 track 预测路径：
+- 以相对 reference timestamp 的有界整数微秒偏移计算时间差，不再将绝对 epoch 加上 float 秒数后截断。
+- 对子区间中点微秒偏移使用 interval 运算；对 (10^{-6}) 秒/微秒比例使用相邻 binary64 值构造包围区间。
+- 对 `position + velocity * dt` 使用 outward interval multiply/add。
+- 以最终 float 预测点到完整预测区间两端的最大距离形成三维位置误差上界。
+- 不确定度传播时域取预测时间区间最大绝对值；非法或溢出区间 fail-closed。
+
+新增测试适配器与 `verify_dynamic_prediction.py`，使用 Fraction 精确计算时间差和位置，固定 seed `0x6D350684`，7 组边界 + 10,000 组随机输入，并包含预测溢出拒绝。已接入 Host runner 和 Python syntax CI。
+
+代码提交序列：`40bb5c7`（生产修复）、`7346235`（测试 API）、`8baba30`（Fraction oracle）、`d906d6e`（runner）、`cd71774`（py_compile CI）、`9f07029`（指数范围扩展）。
+
+当前状态：**FIX IMPLEMENTED / CI_PENDING**。MR-008 仍为阻塞，直到当前 HEAD 的 Host、ASan/UBSan、Cortex-M7 compile 均通过，且独立审查确认区间推导和大 epoch 边界。
