@@ -150,3 +150,19 @@ ARM 静态检查报告：MPC RAM 29,252 bytes、worker stack 8,192 bytes、最�
 - 只有 M5-06 返回 PASS 才能作为后续门禁的输入；本阶段尚未完成 M5-07 接线。
 - UNKNOWN、STALE、INVALID 和任何无法证明安全的情况均不得放行。
 - Host/SIL CI 全通过不等于 H723 已获得实机避障放行。
+
+
+## M5-06.5 独立数学审查增量（2026-11-10）
+
+审查记录：`spec/history/implementation/guidance/M5_06_5_INDEPENDENT_MATH_REVIEW.md`。
+
+| ID | 场景 | 期望 | 当前结果 |
+|---|---|---|---|
+| S06-080 | norm3 上/下界：float ULP 边界、零、次正规数、极端尺度 | 高精度 oracle；upper 不低估、lower 不高估 | NOT_RUN；seed `0x6D350680` |
+| S06-081 | 动态相对运动端到端连续最小距离，恒速解析解/恒加速度/不确定度 | 解析解 + 区间 oracle；记录最小反例 | NOT_RUN；seed `0x6D350681` |
+| S06-082 | 动态障碍物精确相切、内外 1 ULP、相邻预览接缝 | 相切保守拒绝，分类与独立 oracle 一致 | NOT_RUN；seed `0x6D350682` |
+| S06-083 | 自适应细分点前/恰在/后 1 ULP 的动态碰撞 | 整段/分段 oracle 一致，未证明则 fail-closed | NOT_RUN；seed `0x6D350683` |
+
+**当前阻塞：** MR-004（sqrt 上界误差契约）和 MR-007（显式浮点编译约束）未关闭。现有 #438 的 Cortex-M7 证据包含 MPC RAM 检查及 M4/M5 生产源交叉编译；M5-06 验证器本身由 `FLIGHT_M5_HOST_PLANNER` 编译门控，不能把该 ARM 编译结果表述为 M5-06 验证器已在 Cortex-M7 目标上编译或可运行。新的 ARM 证据必须区分编译目标、源文件清单、RAM 统计对象和 Host-only 模块边界。
+
+当前审查状态：**BLOCKED / REVIEW_INCOMPLETE**。S06-080..083 尚未执行；没有新的 CI run 或新的数学审查批准。M5-07 不得开始。
