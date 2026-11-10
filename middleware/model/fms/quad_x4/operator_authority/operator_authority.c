@@ -183,16 +183,41 @@ static uint8_t fms_nav_attitude_invalid(const FmsInputs *in)
   return 0u;
 }
 
+/* ARM starts without any control reference, so the first Control capability
+ * frames legitimately carry a partial controllable DOF mask (or none at all).
+ * The permit path already grants one absolute first-reference window
+ * (first_reference_timeout_us, 06: 100 ms). The failsafe path must use the same
+ * deadline instead of declaring TERMINAL on the ARM frame itself; genuine
+ * failures (health FAILED, actuator faults, fault severity) still latch
+ * immediately and the window never applies once the control link is up. */
+static uint8_t fms_first_reference_pending(const FmsEngine *e, const FmsInputs *in)
+{
+  uint64_t window_us;
+
+  if (e->flight.arm_state != ARM_STATE_ARMED ||
+      e->flight.control_link_established != 0u) {
+    return 0u;
+  }
+  window_us = e->config.payload.first_reference_timeout_us;
+  if (window_us == 0u || window_us > 200000u) {
+    window_us = FMS_ARM_REFERENCE_WINDOW_US;
+  }
+  return (uint8_t)(in->now_us - e->flight.arming_start_us <= window_us);
+}
+
 void fms_failsafe_update(FmsEngine *e, const FmsInputs *in)
 {
   uint8_t level = FAILSAFE_NORMAL;
   uint8_t rc_lost;
+  uint8_t first_reference_pending;
 
   if (e->flight.terminal_latched != 0u) {
     e->flight.failsafe_level = FAILSAFE_TERMINAL;
     fms_permit_revoke(e, 18u);
     return;
   }
+
+  first_reference_pending = fms_first_reference_pending(e, in);
 
   rc_lost = (uint8_t)(in->rc_seen == 0u || in->rc_fresh == 0u);
   const uint8_t guidance_rejected = (uint8_t)(in->guidance_ok && in->feas_ok && in->nav_ok &&
@@ -220,8 +245,10 @@ void fms_failsafe_update(FmsEngine *e, const FmsInputs *in)
     } else if (in->act_ok == 0u || in->act_status->fault_mask != 0u ||
                (in->act_cap->available_mask & 0x0Fu) != 0x0Fu ||
                (in->control_ok != 0u && (in->control->health_state >= 4u ||
-                                         (in->control->controllable_dof_mask & 0x0Fu) != 0x0Fu)) ||
-               (in->control_ok == 0u && in->now_us >= e->permit.reference_rebind_until_us &&
+                                         (first_reference_pending == 0u &&
+                                          (in->control->controllable_dof_mask & 0x0Fu) != 0x0Fu))) ||
+               (in->control_ok == 0u && first_reference_pending == 0u &&
+                                        in->now_us >= e->permit.reference_rebind_until_us &&
                                         (e->flight.control_link_established != 0u ||
                                          e->land.state != LANDED_STATE_LANDED))) {
       level = FAILSAFE_TERMINAL;
