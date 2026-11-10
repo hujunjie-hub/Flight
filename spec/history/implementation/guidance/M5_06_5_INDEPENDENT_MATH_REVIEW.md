@@ -127,7 +127,7 @@ S06-080 新增 Fraction 精确平方范数 oracle，当前为 IMPLEMENTED / CI_P
 
 | ID | 测试内容 | Oracle | Seed | 状态 |
 |---|---|---|---|---|
-| S06-084 | 动态 track 预测位置的时间换算、double 乘加及 float 转换误差；覆盖大 epoch、正负时间差、非 dyadic 子区间中点、精确相切/近切 | Fraction 精确时间/位置参考 + 端到端 fail-closed 差分 | 0x6D350684 | NOT_RUN |
+| S06-084 | 动态 track 预测位置的时间换算、double 乘加及 float 转换误差；覆盖大 epoch、正负时间差、非 dyadic 子区间中点、精确相切/近切 | Fraction 精确时间/位置参考 + 大 epoch 端到端不变性 | 0x6D350684 | IMPLEMENTED / CI_PENDING |
 
 MR-008 关闭前，S06-081..083 即使 CI 通过，也不能单独证明动态障碍物连续距离路径已完成数学验收。
 
@@ -146,3 +146,12 @@ MR-008 关闭前，S06-081..083 即使 CI 通过，也不能单独证明动态�
 代码提交序列：`40bb5c7`（生产修复）、`7346235`（测试 API）、`8baba30`（Fraction oracle）、`d906d6e`（runner）、`cd71774`（py_compile CI）、`9f07029`（指数范围扩展）。
 
 当前状态：**FIX IMPLEMENTED / CI_PENDING**。MR-008 仍为阻塞，直到当前 HEAD 的 Host、ASan/UBSan、Cortex-M7 compile 均通过，且独立审查确认区间推导和大 epoch 边界。
+
+
+### S06-084 实现补充
+
+- 新增 `verify_dynamic_prediction.py`：7 个显式边界 + 10,000 个随机向量，使用 Fraction 精确计算时间差和三轴位置，并断言生产误差半径覆盖精确预测位置；seed `0x6D350684`。
+- 新增大绝对 epoch 端到端不变性测试：低 epoch 与接近 uint64 上限但仍留有 proof/lease 空间的 epoch，使用相同相对 track 时间和运动状态，要求安全结果与 track 检查数一致。
+- Host runner 与 CI `py_compile` 已接入新 oracle。
+
+当前 **FIX IMPLEMENTED / CI_PENDING**；未运行当前 HEAD 的 Host/Sanitizer/ARM 工作流前不得关闭 MR-008。
