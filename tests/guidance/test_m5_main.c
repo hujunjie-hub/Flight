@@ -3123,6 +3123,39 @@ static void test_m5_safety_dynamic_tangency_and_preview_seam_ulp(void)
 }
 
 
+static void test_m5_safety_dynamic_adaptive_split_ulp(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+  unsigned boundary_case;
+
+  for (boundary_case = 0u; boundary_case < 3u; ++boundary_case) {
+    float obstacle_start_x = -0.5f;
+    safety_fx_init(&fx, 172000000u + (uint64_t)boundary_case * 1000000u);
+    safety_set_constant_position(&fx, 0.0f, 0.0f, 0.0f);
+    if (boundary_case == 1u)
+      obstacle_start_x = nextafterf(-0.5f, INFINITY);
+    else if (boundary_case == 2u)
+      obstacle_start_x = nextafterf(-0.5f, -INFINITY);
+
+    track = &fx.map.tracks[0];
+    safety_set_far_dynamic_track(track, 1120u + boundary_case, fx.base.now,
+        obstacle_start_x, 0.0f, 0.0f, 100.0f, 0.0f, 0.0f);
+    track->position_std_m = 0.0f;
+    track->velocity_std_mps = 0.0f;
+    fx.input.max_dynamic_obstacle_accel_mps2 = 0.5f;
+
+    /* Crossing occurs at the first child-interval midpoint (5ms), while the
+       parent midpoint (10ms) is only an unresolved near approach. The exact
+       and +/-1 ULP starts must all be found after adaptive subdivision. */
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+        &fx.result) == M5_SAFETY_DYNAMIC_COLLISION);
+    CHECK(fx.result.passed == 0u);
+    CHECK(fx.result.work_units > PRODUCT_PREVIEW_COUNT);
+  }
+}
+
+
 static void test_m5_safety_multi_track_all_slots_and_fail_closed(void)
 {
   SafetyFx fx;
@@ -4801,6 +4834,7 @@ int main(void)
     {"m5_safety_dynamic_continuous_distance_differential", test_m5_safety_dynamic_continuous_distance_differential},
     {"m5_safety_dynamic_constant_acceleration_continuous_oracle", test_m5_safety_dynamic_constant_acceleration_continuous_oracle},
     {"m5_safety_dynamic_tangency_preview_seam_ulp", test_m5_safety_dynamic_tangency_and_preview_seam_ulp},
+    {"m5_safety_dynamic_adaptive_split_ulp", test_m5_safety_dynamic_adaptive_split_ulp},
     {"m5_safety_dynamic_acceleration_envelope_differential", test_m5_safety_dynamic_acceleration_envelope_differential},
   };
   size_t i;
