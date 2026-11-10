@@ -2878,7 +2878,7 @@ static void test_m5_safety_dynamic_continuous_distance_differential(void)
 
     CHECK(closest_time > 0.0 && closest_time < horizon_s);
     if (collision_case) {
-      CHECK(oracle_min_distance < physical_contact_radius);
+      CHECK(oracle_min_distance < (long double)physical_contact_radius);
     } else {
       CHECK(oracle_min_distance > 0.70);
     }
@@ -3002,7 +3002,7 @@ static void test_m5_safety_dynamic_constant_acceleration_continuous_oracle(void)
     if (collision_case) {
       CHECK(oracle_min_distance < contact_radius);
     } else {
-      CHECK(oracle_min_distance > 1.0);
+      CHECK(oracle_min_distance > 1.0L);
     }
 
     status = m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result);
@@ -3017,6 +3017,64 @@ static void test_m5_safety_dynamic_constant_acceleration_continuous_oracle(void)
 }
 
 
+static long double safety_constant_accel_min_distance_1d(
+    long double x0,
+    long double relative_velocity,
+    long double relative_acceleration,
+    long double lateral_offset,
+    long double horizon_s)
+{
+  long double candidates[5] = {0.0L, horizon_s, 0.0L, 0.0L, 0.0L};
+  long double minimum = INFINITY;
+  unsigned count = 2u, i;
+
+  /* d/dt (x(t)^2 + lateral_offset^2) = 2*x(t)*x'(t).
+     The exact candidate set is both endpoints, x'(t)=0, and every
+     in-horizon root of x(t)=0. */
+  if (relative_acceleration != 0.0L) {
+    long double stationary =
+        -relative_velocity / relative_acceleration;
+    if (stationary >= 0.0L && stationary <= horizon_s)
+      candidates[count++] = stationary;
+  }
+
+  {
+    long double quadratic = 0.5L * relative_acceleration;
+    if (quadratic == 0.0L) {
+      if (relative_velocity != 0.0L) {
+        long double root = -x0 / relative_velocity;
+        if (root >= 0.0L && root <= horizon_s)
+          candidates[count++] = root;
+      }
+    } else {
+      long double discriminant =
+          relative_velocity * relative_velocity -
+          4.0L * quadratic * x0;
+      if (discriminant >= 0.0L) {
+        long double root_term = sqrtl(discriminant);
+        long double root_a =
+            (-relative_velocity - root_term) / (2.0L * quadratic);
+        long double root_b =
+            (-relative_velocity + root_term) / (2.0L * quadratic);
+        if (root_a >= 0.0L && root_a <= horizon_s)
+          candidates[count++] = root_a;
+        if (root_b >= 0.0L && root_b <= horizon_s)
+          candidates[count++] = root_b;
+      }
+    }
+  }
+
+  for (i = 0u; i < count; ++i) {
+    long double time_s = candidates[i];
+    long double x = x0 + relative_velocity * time_s +
+        0.5L * relative_acceleration * time_s * time_s;
+    long double distance = sqrtl(x * x +
+        lateral_offset * lateral_offset);
+    if (distance < minimum) minimum = distance;
+  }
+  return minimum;
+}
+
 static void test_m5_safety_dynamic_acceleration_envelope_differential(void)
 {
   uint32_t seed = 0xACCE5076u;
@@ -3030,8 +3088,8 @@ static void test_m5_safety_dynamic_acceleration_envelope_differential(void)
     SafetyFx fx;
     M5DynamicTrack *track;
     double obstacle_vx, obstacle_ax, crossing_time, offset, obstacle_x;
-    double oracle_min_distance = INFINITY, physical_contact_radius;
-    unsigned sample;
+    long double oracle_min_distance;
+    double physical_contact_radius;
     M5TrajectorySafetyStatus status;
     int collision_case = (trial < 32u);
 
@@ -3055,15 +3113,12 @@ static void test_m5_safety_dynamic_acceleration_envelope_differential(void)
     track->velocity_std_mps = 0.0f;
     fx.input.max_dynamic_obstacle_accel_mps2 = 0.5f;
 
-    for (sample = 0u; sample <= 512u; ++sample) {
-      double time_s = horizon_s * (double)sample / 512.0;
-      double vehicle_x = start_x + vehicle_vx * time_s;
-      double obstacle_position_x = obstacle_x + obstacle_vx * time_s +
-          0.5 * obstacle_ax * time_s * time_s;
-      double dx = vehicle_x - obstacle_position_x;
-      double distance = sqrt(dx * dx + offset * offset);
-      oracle_min_distance = fmin(oracle_min_distance, distance);
-    }
+    oracle_min_distance = safety_constant_accel_min_distance_1d(
+        (long double)start_x - (long double)obstacle_x,
+        (long double)vehicle_vx - (long double)obstacle_vx,
+        -(long double)obstacle_ax,
+        (long double)offset,
+        (long double)horizon_s);
 
     physical_contact_radius = (double)fx.map.vehicle_radius_m +
         (double)fx.map.clearance_margin_m + (double)track->radius_m;
