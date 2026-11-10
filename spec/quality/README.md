@@ -51,7 +51,8 @@ GitHub 自动生成的 Issue number 是唯一编号。项目内引用统一写�
 
 ## 入口
 
-1. 新问题：使用 [Flight Validation Issue 模板](../../.github/ISSUE_TEMPLATE/flight-validation-issue.md)。
+1. 问题登记入口与实时开放列表：[ISSUE_REGISTER.md](ISSUE_REGISTER.md)。
+2. 新问题：使用 [Flight Validation Issue 模板](../../.github/ISSUE_TEMPLATE/flight-validation-issue.md)。
 2. 状态流转：按 [Issue 工作流](ISSUE_WORKFLOW.md)。
 3. 关闭前：逐项完成 [关闭检查清单](ISSUE_CLOSURE_CHECKLIST.md)。
 4. 本地 Agent 操作：见 [spec/AGENT-操作指南.md](../AGENT-操作指南.md)。
