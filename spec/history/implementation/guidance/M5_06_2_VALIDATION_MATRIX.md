@@ -248,3 +248,22 @@ MPC 静态 RAM 29,252 B，worker stack 8,192 B，最大静态 frame 2,024 B。M5
 ### S06-081 oracle improvement
 
 The constant-acceleration test no longer uses 513 uniform samples as its minimum-distance oracle. It now evaluates the analytic continuous-time candidate set: both endpoints, the root of relative velocity, and all in-horizon roots of relative position, using long double. This removes the fixed-grid miss risk for the tested 1D constant-acceleration model. It remains a test-model oracle, not a formal general 3D interval proof. Commit `a14b9f1`; CI_PENDING.
+
+ 
+## CI #509 验证结果更新（2026-11-10）
+
+本节更新此前 S06-080..084 的 CI_PENDING 状态。代码基线 `0c761964d4bc6cfeec73ba60464657db450743ee` 对应 Host validation #509 全部 jobs success：
+
+- M4 Host：927 checks / 0 failures。
+- M5 Host：269,207 checks / 0 failures。
+- M4/M5 Integration：1,000 checks / 0 failures。
+- M5 ASan/UBSan：269,207 checks / 0 failures。
+- Integration ASan/UBSan：1,000 checks / 0 failures。
+- S06-080：binary32 upper 10,007 cases + binary64 lower 10,007 cases，Fraction oracle，seed `0x6D350680`。
+- S06-084：Fraction prediction oracle 10,007 cases，seed `0x6D350684`。
+- S06-081/082/083：对应连续距离、切触/接缝/ULP、自适应细分断言均实际执行并通过。
+- Cortex-M7 M5-06 compile：`M5_CORTEX_M7_COMPILE_OK`；MPC RAM 29,252 bytes、worker stack 8,192 bytes、最大静态栈帧 2,024 bytes。
+
+CI：[Host validation #509](https://github.com/hujunjie-hub/Flight/actions/runs/42745124335)。
+
+**状态修正：** S06-080..084 对该 commit 的自动化执行状态从 CI_PENDING 更新为 CI PASS。此状态仅对该 commit 生效；MR-001..MR-008 独立数学审查仍未全部 APPROVED，M5-06 整体仍 BLOCKED，M5-07 不得开始。H723 目标运行、WCET/RTA、实机 RAM/stack watermark、HIL 和飞行仍 NOT_RUN。
