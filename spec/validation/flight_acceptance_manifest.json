@@ -397,28 +397,37 @@
       "id": "S06-100",
       "name": "Differential static collision (consumer hits, exact clears)",
       "seed": "deterministic",
-      "cases": 0,
-      "status_at_code_baseline": "NOT_RUN",
-      "oracle": "BLOCKED_GEOMETRY_RESOLUTION: |consumer-exact| is at the float geometry resolution for validator-legal references, so a boundary cannot be placed between the two curves",
-      "local_run": "M5-06-R6-20261110"
+      "cases": 4,
+      "status_at_code_baseline": "PASS",
+      "oracle": "deterministic search over legal references; obstacle at inflation + d/2; exact clearance > inflation, consumer distance < inflation, STATIC_COLLISION, empty-map control PASS",
+      "local_run": "M5-06-R7-20261110"
     },
     {
       "id": "S06-101",
       "name": "Differential dynamic collision",
       "seed": "deterministic",
-      "cases": 0,
-      "status_at_code_baseline": "NOT_RUN",
-      "oracle": "BLOCKED_GEOMETRY_RESOLUTION (same reason as S06-100)",
-      "local_run": "M5-06-R6-20261110"
+      "cases": 4,
+      "status_at_code_baseline": "PASS",
+      "oracle": "track at radius + inflation + d/2; exact distance > combined radius, DYNAMIC_COLLISION, track-removed control PASS",
+      "local_run": "M5-06-R7-20261110"
     },
     {
       "id": "S06-102",
       "name": "Differential geofence violation",
       "seed": "deterministic",
-      "cases": 0,
-      "status_at_code_baseline": "NOT_RUN",
-      "oracle": "BLOCKED_GEOMETRY_RESOLUTION (same reason as S06-100)",
-      "local_run": "M5-06-R6-20261110"
+      "cases": 4,
+      "status_at_code_baseline": "PASS",
+      "oracle": "KEEP_OUT edge at inflation + d/2; GEOFENCE_VIOLATION, 2.5 m KEEP_IN control PASS",
+      "local_run": "M5-06-R7-20261110"
+    },
+    {
+      "id": "S06-103",
+      "name": "Real C consumer time end-to-end",
+      "seed": "deterministic",
+      "cases": 60002,
+      "status_at_code_baseline": "PASS",
+      "oracle": "m5_trajectory_safety_test_consumer_time drives the real control_sample_reference with a unit-velocity linear reference; max error/s_max 6.61e-08 <= gamma_2, library SHA256 recorded",
+      "local_run": "M5-06-R7-20261110"
     }
   ],
   "latest_verified_code_baseline": {
@@ -478,6 +487,7 @@
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
+      "R7 implemented the true differential collision tests S06-100..102 and the real-C time check S06-103; MR-009 still awaits independent approval.",
       "R6 re-derived the time-quantisation bound (gamma_2), enlarged every evaluation interval to s_eval_max, generalised the subnormal term and added exhaustive timing evidence; S06-100..102 remain NOT_IMPLEMENTED.",
       "R5 fixed a geofence clearance gap: check_geofences() did not subtract position_rounding_error_m.",
       "MR-009 is FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW: six sub-items (coefficient, Horner, time, FP environment, continuous coverage, end-to-end decision) each need an independent APPROVED.",
@@ -513,6 +523,8 @@
     "subnormal_term": "n * 2^-149 * max(1, s_eval_max)^n",
     "preview_step_contract_checked": true,
     "host_mxcsr_checked": true,
-    "differential_collision_status": "NOT_IMPLEMENTED / BLOCKED_GEOMETRY_RESOLUTION"
+    "differential_collision_status": "IMPLEMENTED (S06-100..102 PASS)",
+    "fp_report_model_check": "MATCH (tokens verified against the compiled source)",
+    "time_evidence": "S06-099 (exact Fraction) + S06-103 (real C consumer)"
   }
 }

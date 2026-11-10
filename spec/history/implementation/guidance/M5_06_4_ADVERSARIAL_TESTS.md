@@ -288,3 +288,15 @@ S06-094 同步改用 `s_eval_max`，并扩展为两个 step 常量 × 5 个 (u0,
 无法稳定地把障碍物/边界放在两条曲线之间；强行构造会把结论建立在 1–2 ulp 的摆放误差上。
 按“无法证明即拒绝”的原则，本轮**不提供**该用例，也不以任何弱化断言代替。现状证据为
 S06-087..097（决策路径与包络参与）与 S06-085/086/094（逐点与连续覆盖）。
+
+ 
+## S06-100..103 差分碰撞与真实 C 时间验证（2026-11-10，R7）
+
+| ID | 方法 | 断言 |
+|---|---|---|
+| S06-100 | 确定性搜索（drop×端点速度），真实 `control_sample_reference()` 对比 binary64 精确曲线，障碍放在 `inflation + d/2` | 数学净空 > inflation；消费距离 < inflation；`STATIC_COLLISION`；空地图对照 PASS |
+| S06-101 | 同上，track 放在 `radius + inflation + d/2` | 数学距离 > combined；`DYNAMIC_COLLISION`；移除 track 对照 PASS |
+| S06-102 | KEEP_OUT 边界放在 `inflation + d/2` | `GEOFENCE_VIOLATION`；2.5 m KEEP_IN 对照 PASS |
+| S06-103 | 测试 API 调真实 `control_sample_reference()`，单位速度线性参考使输出即 `s_c`；遍历两个 step 全部 60,002 个偏移 | max error/s_max 6.61e-08 ≤ γ_2；库 SHA256 记录 |
+
+R6 的“几何分辨率阻断”结论被推翻：偏差可通过病态但合法的参考放大到 ~1e-6 m，而几何可分辨到 ~1e-7 m；关键是把边界放在两条曲线之间并用 clearance margin 连续调节，而不是依赖 voxel 网格。

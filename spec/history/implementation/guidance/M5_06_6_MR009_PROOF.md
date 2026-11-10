@@ -256,3 +256,9 @@ R5 的 `n·2^-149` 隐含假设“早期舍入不被后续 Horner 乘法放大�
 而 voxel 网格与 float 坐标的分辨率同量级，无法稳定地把边界放在两条曲线之间。
 保留 R5 的 S06-087..097 与 S06-085/086/094 作为现状证据，S06-100..102 标记
 **NOT_IMPLEMENTED / BLOCKED_GEOMETRY_RESOLUTION**，不得记 PASS。
+
+ 
+## 16. R7 更新：差分碰撞与真实 C 时间证据
+
+R6 §14.4 的“几何分辨率阻断”结论不成立。R7 用确定性搜索（端点位移 0.5–2.5 m、端点速度 0–200 m/s）找到合法参考，使 `|consumer − exact|` 达 ~1e-6 m（几何分辨率 ~1e-7 m），并把障碍/轨道/围栏边界放在 `inflation + d/2`，由真实 Validator 返回 `STATIC_COLLISION` / `DYNAMIC_COLLISION` / `GEOFENCE_VIOLATION`，同时提供安全对照。
+S06-103 用真实 `control_sample_reference()` 验证时间参数，60,002 个偏移与 S06-099 的精确有理数结果一致。
