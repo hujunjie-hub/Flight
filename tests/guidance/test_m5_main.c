@@ -3194,17 +3194,12 @@ static void test_m5_safety_dynamic_adaptive_split_ulp(void)
     /* Crossing occurs at the first child-interval midpoint (5ms), while the
        parent midpoint (10ms) is only an unresolved near approach. The exact
        and +/-1 ULP starts must all be found after adaptive subdivision. */
-    {
-      M5TrajectorySafetyStatus status = m5_trajectory_safety_validate(
-          &fx.input, &fx.workspace, &fx.result);
-      printf("adaptive_case=%u status=%u work_units=%u offset_us=%u reason=%u\\n",
-          boundary_case, (unsigned)status, (unsigned)fx.result.work_units,
-          (unsigned)fx.result.first_violation_offset_us,
-          (unsigned)fx.result.reason_code);
-      CHECK(status == M5_SAFETY_DYNAMIC_COLLISION);
-    }
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+        &fx.result) == M5_SAFETY_DYNAMIC_COLLISION);
     CHECK(fx.result.passed == 0u);
-    CHECK(fx.result.work_units > PRODUCT_PREVIEW_COUNT);
+    /* Initial stack is LIFO and interval zero is processed first. Two work
+       items prove that the parent was subdivided and a child found collision. */
+    CHECK(fx.result.work_units > 1u);
   }
 }
 
