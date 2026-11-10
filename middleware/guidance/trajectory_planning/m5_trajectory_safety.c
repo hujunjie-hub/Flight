@@ -1822,6 +1822,27 @@ float m5_trajectory_safety_test_norm_upper_bound(
   return norm3_upper(v);
 }
 
+uint8_t m5_trajectory_safety_test_predict_dynamic_position(
+    const float position_ned_m[3],
+    const float velocity_ned_mps[3],
+    double local_mid_offset_us,
+    int64_t sample_offset_us,
+    float predicted_position[3],
+    float *position_error_m)
+{
+  M5SafetyInterval local_mid_interval;
+  double time_from_sample_upper_s;
+  if (!isfinite(local_mid_offset_us) ||
+      sample_offset_us > INT64_C(9007199254740991) ||
+      sample_offset_us < -INT64_C(9007199254740991)) return 0u;
+  local_mid_interval = interval_bounds(
+      nextafter(local_mid_offset_us, -INFINITY),
+      nextafter(local_mid_offset_us, INFINITY));
+  return predict_dynamic_track_position(position_ned_m, velocity_ned_mps,
+      local_mid_interval, local_mid_offset_us, (double)sample_offset_us,
+      predicted_position, position_error_m, &time_from_sample_upper_s);
+}
+
 uint8_t m5_trajectory_safety_test_point_aabb_distance_lower(
     const float point[3],
     const float center[3],
