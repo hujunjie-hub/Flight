@@ -25,3 +25,13 @@ python tests/abi/abi_report.py
 ```
 
 实际任务与降落验证见 [FMT-SIM 验证矩阵](../doc/simulation/FLIGHT_LOGIC_MATRIX.md)。
+
+
+## 本地 Agent 与验收交付
+
+- 仓库根目录 `AGENTS.md` 是本地 Agent 强制入口。
+- [本地 Agent 操作指南](AGENT-操作指南.md)：拉取分支、环境、命令、修改流程和交接模板。
+- [验收与结果提交指南](Flight-验收与结果提交.md)：测试矩阵、M5-06 验收、PASS 证据和归档步骤。
+- [问题登记与闭环](quality/README.md)：GitHub Issues 状态机、严重度、关闭条件。
+- [机器可读验收清单](validation/flight_acceptance_manifest.json)：测试入口、验收条件、随机种子和最近代码基线。
+- 证据归档脚本：`tools/archive_validation_run.ps1`，归档目录 `work/validation/archives/`（已加入 .gitignore）。
