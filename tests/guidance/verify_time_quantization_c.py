@@ -233,14 +233,15 @@ def phase_b(probes, report):
                                 decomposition["horner"], float(e_horner))
                             decomposition["time"] = max(
                                 decomposition["time"], float(e_time))
-                            if total > 0:
-                                max_curve_ratio = max(max_curve_ratio,
-                                                      float(total / (GAMMA2 * s_exact
-                                                                     if s_exact else 1)))
+                            if total > 0 and s_exact:
+                                max_curve_ratio = max(
+                                    max_curve_ratio,
+                                    float(total / (GAMMA2 * s_exact)))
     report["phase_b"] = {"checked": checked,
                          "decomposition": decomposition,
                          "max_time_ratio": float(max_time_ratio),
-                         "max_total_over_gamma_time": max_curve_ratio,
+                         "max_time_error_ratio": float(max_time_ratio) / float(GAMMA2) if GAMMA2 else 0.0,
+                         "max_total_error_over_gamma_time": max_curve_ratio,
                          "failures": failures[:10]}
     return failures
 

@@ -54,28 +54,6 @@ def sqrt_up(value):
     return Fraction(candidate)
 
 
-def float_coefficients(p0, v0, a0, p1, v1, a1, h):
-    p0, v0, a0 = f32(p0), f32(v0), f32(a0)
-    p1, v1, a1 = f32(p1), f32(v1), f32(a1)
-    h = f32(h)
-    h2 = f32(h * h)
-    h3 = f32(h2 * h)
-    h4 = f32(h3 * h)
-    h5 = f32(h4 * h)
-    d = f32(f32(p1 - p0) - f32(h * v0))
-    d = f32(d - f32(f32(f32(0.5 * h) * h) * a0))
-    dv = f32(f32(v1 - v0) - f32(h * a0))
-    da = f32(a1 - a0)
-    return [
-        p0, v0, f32(0.5 * a0),
-        f32(f32(f32(f32(10.0 * d) / h3) - f32(f32(4.0 * dv) / h2))
-            + f32(da / f32(2.0 * h))),
-        f32(f32(f32(f32(-15.0 * d) / h4) + f32(f32(7.0 * dv) / h3)) - f32(da / h2)),
-        f32(f32(f32(f32(6.0 * d) / h5) - f32(f32(3.0 * dv) / h4))
-            + f32(da / f32(2.0 * h3))),
-    ]
-
-
 def exact_coefficients(p0, v0, a0, p1, v1, a1, h):
     p0, v0, a0 = Fraction(f32(p0)), Fraction(f32(v0)), Fraction(f32(a0))
     p1, v1, a1 = Fraction(f32(p1)), Fraction(f32(v1)), Fraction(f32(a1))
@@ -109,17 +87,14 @@ def gamma_up(n):
 
 
 def budget(start_p, start_v, start_a, end_p, end_v, end_a, h, step_us,
-           c_series=None):
+           c_series):
     """Return per-component 3-D budgets (E_coeff, E_horner, E_subnormal, E_time)."""
     t_max = Fraction(step_us, 1000000)
     delta_s = GAMMA2 * t_max
     s_eval = max(t_max, Fraction(f32(h))) + delta_s
     components = [Fraction(0), Fraction(0), Fraction(0), Fraction(0)]
     for axis in range(3):
-        consumer = (c_series[axis] if c_series is not None else
-                    [Fraction(f32(value)) for value in float_coefficients(
-                        start_p[axis], start_v[axis], start_a[axis],
-                        end_p[axis], end_v[axis], end_a[axis], h)])
+        consumer = c_series[axis]
         exact = exact_coefficients(start_p[axis], start_v[axis], start_a[axis],
                                    end_p[axis], end_v[axis], end_a[axis], h)
         difference = [consumer[k] - exact[k] for k in range(6)]
