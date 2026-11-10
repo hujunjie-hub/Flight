@@ -113,7 +113,7 @@ Get-ChildItem -LiteralPath $runDir -Recurse -File | ForEach-Object {
     $relative = $_.FullName.Substring($runDir.Length).TrimStart([IO.Path]::DirectorySeparatorChar)
     $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256
     $evidenceFiles += [ordered]@{
-        path = $relative.Replace("\\", "/")
+        path = $relative.Replace([string][char]92, "/")
         size_bytes = $_.Length
         sha256 = $hash.Hash.ToLowerInvariant()
     }
@@ -146,7 +146,7 @@ $archiveManifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $manifest
 $sumLines = @()
 Get-ChildItem -LiteralPath $runDir -Recurse -File | Where-Object { $_.Name -ne "SHA256SUMS.txt" } | Sort-Object FullName | ForEach-Object {
     $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256
-    $relative = $_.FullName.Substring($runDir.Length).TrimStart([IO.Path]::DirectorySeparatorChar).Replace("\\", "/")
+    $relative = $_.FullName.Substring($runDir.Length).TrimStart([IO.Path]::DirectorySeparatorChar).Replace([string][char]92, "/")
     $sumLines += ($hash.Hash.ToLowerInvariant() + "  " + $relative)
 }
 [System.IO.File]::WriteAllLines(
