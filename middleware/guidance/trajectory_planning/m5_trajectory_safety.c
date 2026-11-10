@@ -1243,11 +1243,82 @@ static M5TrajectorySafetyStatus validate_tracks(
   return M5_SAFETY_PASS;
 }
 
+static uint8_t predict_dynamic_track_position(
+    const float position_ned_m[3],
+    const float velocity_ned_mps[3],
+    M5SafetyInterval local_mid_offset_us,
+    double local_mid_offset_us_nominal,
+    double sample_offset_us,
+    float predicted_position[3],
+    float *position_error_m,
+    double *time_from_sample_upper_s)
+{
+  const M5SafetyInterval seconds_per_microsecond = interval_bounds(
+      nextafter(1.0e-6, -INFINITY),
+      nextafter(1.0e-6, INFINITY));
+  M5SafetyInterval delta_us, delta_s;
+  double nominal_dt_s, position_error2 = 0.0;
+  unsigned axis;
+
+  if (position_ned_m == NULL || velocity_ned_mps == NULL ||
+      predicted_position == NULL || position_error_m == NULL ||
+      time_from_sample_upper_s == NULL ||
+      local_mid_offset_us.valid == 0u ||
+      !isfinite(local_mid_offset_us_nominal) ||
+      !isfinite(sample_offset_us) ||
+      !finite3(position_ned_m) || !finite3(velocity_ned_mps)) return 0u;
+
+  delta_us = interval_sub(local_mid_offset_us,
+                          interval_exact(sample_offset_us));
+  delta_s = interval_mul(delta_us, seconds_per_microsecond);
+  if (delta_us.valid == 0u || delta_s.valid == 0u) return 0u;
+
+  nominal_dt_s =
+      (local_mid_offset_us_nominal - sample_offset_us) * 1.0e-6;
+  if (!isfinite(nominal_dt_s)) return 0u;
+
+  *time_from_sample_upper_s = nextafter(
+      fmax(fabs(delta_s.low), fabs(delta_s.high)), INFINITY);
+  if (!isfinite(*time_from_sample_upper_s)) return 0u;
+
+  for (axis = 0u; axis < 3u; ++axis) {
+    M5SafetyInterval exact_position = interval_exact(
+        (double)position_ned_m[axis]);
+    M5SafetyInterval exact_velocity = interval_exact(
+        (double)velocity_ned_mps[axis]);
+    M5SafetyInterval displacement = interval_mul(
+        exact_velocity, delta_s);
+    M5SafetyInterval exact_prediction = interval_add(
+        exact_position, displacement);
+    double nominal_prediction =
+        (double)position_ned_m[axis] +
+        (double)velocity_ned_mps[axis] * nominal_dt_s;
+    double error_low, error_high, error_bound;
+
+    if (displacement.valid == 0u || exact_prediction.valid == 0u ||
+        !isfinite(nominal_prediction)) return 0u;
+
+    predicted_position[axis] = (float)nominal_prediction;
+    if (!isfinite(predicted_position[axis])) return 0u;
+
+    error_low = abs_difference_upper(
+        (double)predicted_position[axis], exact_prediction.low);
+    error_high = abs_difference_upper(
+        (double)predicted_position[axis], exact_prediction.high);
+    error_bound = fmax(error_low, error_high);
+    position_error2 = sum_square_upper(position_error2, error_bound);
+  }
+
+  *position_error_m = sqrt_upper_float(position_error2);
+  return (uint8_t)isfinite(*position_error_m);
+}
+
 static M5TrajectorySafetyStatus check_dynamic_tracks(
     const M5TrajectorySafetyInput *in,
     const M5SafetyCurveBounds *curve,
     float inflation,
-    float horizon_mid_s,
+    double local_mid_offset_us,
+    M5SafetyInterval local_mid_offset_us_interval,
     M5TrajectorySafetyResult *result,
     M5SafetyCheck *check)
 {
@@ -1262,39 +1333,40 @@ static M5TrajectorySafetyStatus check_dynamic_tracks(
   for (i = 0u; i < M5_MAP_MAX_TRACKS; ++i) {
     const M5DynamicTrack *t = &map->tracks[i];
     float obstacle[3];
-    double relative_velocity[3], dt_exact;
+    double relative_velocity[3], sample_offset_us;
+    double time_from_sample_upper_s, uncertainty_horizon, uncertainty;
     float obstacle_speed, relative_speed, relative_accel;
-    double uncertainty_horizon, uncertainty;
     float combined_radius, obstacle_rounding_error;
     float relative_sweep, distance;
-    double obstacle_rounding2 = 0.0;
+    uint64_t sample_delta_us;
     if (t->id == 0u) continue;
     if (++result->track_checks > M5_SAFETY_MAX_WORK_UNITS * M5_MAP_MAX_TRACKS)
       return M5_SAFETY_BUDGET_EXCEEDED;
 
-    {
-      uint64_t interval_mid_us = r->header.timestamp_sample_us +
-          (uint64_t)(horizon_mid_s * 1000000.0f);
-      if (interval_mid_us >= t->sample_us)
-        dt_exact = (double)(interval_mid_us - t->sample_us) * 1e-6;
-      else
-        dt_exact = -(double)(t->sample_us - interval_mid_us) * 1e-6;
-      for (axis = 0u; axis < 3u; ++axis) {
-        double predicted = (double)t->position_ned_m[axis] +
-                           (double)t->velocity_ned_mps[axis] * dt_exact;
-        obstacle[axis] = (float)predicted;
-        obstacle_rounding2 = sum_square_upper(
-            obstacle_rounding2,
-            abs_difference_upper((double)obstacle[axis], predicted));
-        relative_velocity[axis] =
-            (double)curve->velocity[axis] - (double)t->velocity_ned_mps[axis];
-      }
+    if (t->sample_us >= r->header.timestamp_sample_us) {
+      sample_delta_us = t->sample_us - r->header.timestamp_sample_us;
+      sample_offset_us = (double)sample_delta_us;
+    } else {
+      sample_delta_us = r->header.timestamp_sample_us - t->sample_us;
+      sample_offset_us = -(double)sample_delta_us;
+    }
+    /* validate_tracks() constrains this relative epoch delta to less than
+       one second, so uint64 -> binary64 is exact and safely signed. */
+    if (sample_delta_us > UINT64_C(9007199254740991) ||
+        !predict_dynamic_track_position(t->position_ned_m,
+            t->velocity_ned_mps, local_mid_offset_us_interval,
+            local_mid_offset_us, sample_offset_us, obstacle,
+            &obstacle_rounding_error, &time_from_sample_upper_s)) {
+      return M5_SAFETY_NUMERIC_FAILURE;
+    }
+    for (axis = 0u; axis < 3u; ++axis) {
+      relative_velocity[axis] =
+          (double)curve->velocity[axis] - (double)t->velocity_ned_mps[axis];
     }
     if (!finite3(obstacle) ||
         !isfinite(relative_velocity[0]) ||
         !isfinite(relative_velocity[1]) ||
-        !isfinite(relative_velocity[2]) || !isfinite(dt_exact))
-      return M5_SAFETY_NUMERIC_FAILURE;
+        !isfinite(relative_velocity[2])) return M5_SAFETY_NUMERIC_FAILURE;
 
     obstacle_speed = norm3_upper(t->velocity_ned_mps);
     relative_speed = round_up_float(add_upper_nonnegative(
@@ -1305,7 +1377,7 @@ static M5TrajectorySafetyStatus check_dynamic_tracks(
     relative_accel = round_up_float(add_upper_nonnegative(
         curve->acceleration_bound, dynamic_accel));
     uncertainty_horizon = add_upper_nonnegative(
-        add_upper_nonnegative(fabs(dt_exact), half_dt), delay_s);
+        add_upper_nonnegative(time_from_sample_upper_s, half_dt), delay_s);
     uncertainty = multiply_upper_nonnegative(
         (double)map->uncertainty_inflation_factor,
         add_upper_nonnegative(
@@ -1317,10 +1389,10 @@ static M5TrajectorySafetyStatus check_dynamic_tracks(
                     multiply_upper_nonnegative(0.5, dynamic_accel),
                     uncertainty_horizon),
                 uncertainty_horizon)));
-    obstacle_rounding_error = sqrt_upper_float(obstacle_rounding2);
-    /* During response delay the obstacle's known nominal velocity also moves
-       it. Inflate by that bounded displacement; acceleration and velocity
-       uncertainty are already included above. */
+    /* The prediction helper encloses time conversion and position
+       multiply/add; its radius covers the chosen float point to both interval
+       endpoints. During response delay the obstacle's nominal velocity also
+       moves it. */
     combined_radius = round_up_float(add_upper_nonnegative(
         add_upper_nonnegative(
             add_upper_nonnegative((double)t->radius_m, inflation),
@@ -1529,8 +1601,19 @@ M5TrajectorySafetyStatus m5_trajectory_safety_validate(
     if (status != M5_SAFETY_PASS)
       return reject(result, status, state_reason(status), offset_us);
 
-    status = check_dynamic_tracks(input, &curve, inflation, local_mid,
-                                  result, &check);
+    {
+      const double local_mid_fraction =
+          0.5 * ((double)item.u0 + (double)item.u1);
+      const double local_mid_offset_us =
+          ((double)item.interval + local_mid_fraction) * (double)step_us;
+      M5SafetyInterval local_mid_offset_us_interval = interval_mul(
+          interval_add(interval_exact((double)item.interval),
+                       interval_exact(local_mid_fraction)),
+          interval_exact((double)step_us));
+      status = check_dynamic_tracks(input, &curve, inflation,
+          local_mid_offset_us, local_mid_offset_us_interval,
+          result, &check);
+    }
     if (status == M5_SAFETY_BUDGET_EXCEEDED)
       return reject(result, status, M5_SAFETY_REASON_BUDGET, offset_us);
     if (status != M5_SAFETY_PASS) {
