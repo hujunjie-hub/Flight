@@ -40,6 +40,9 @@ jobs:
       - name: Check shell script line endings
         run: python tools/check_line_endings.py
 
+      - name: Test python -O audit guard
+        run: python tests/guidance/test_audit_optimized.py
+
       - name: Check generated Kinodynamic primitive table
         run: python tools/guidance/generate_kinodynamic_primitives.py --check
 
@@ -74,6 +77,9 @@ jobs:
 
       - name: Compile M4/M5 production sources for Cortex-M7
         run: bash tests/guidance/arm_build_check.sh
+
+      - name: Check consumer floating-point contraction
+        run: python tests/guidance/check_consumer_fp_contraction.py
 
       - name: Upload M5 ARM compile evidence
         uses: actions/upload-artifact@v4

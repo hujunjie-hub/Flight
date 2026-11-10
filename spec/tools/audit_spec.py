@@ -28,6 +28,17 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def require(condition, message):
+    """Explicit audit check.
+
+    `assert` is compiled away by `python -O`, which would turn a failed safety
+    acceptance check into a silent pass. This helper always raises, and the
+    regression test tests/guidance/test_audit_optimized.py runs it under -O.
+    """
+    if not condition:
+        raise SystemExit('SPEC_AUDIT_FAILED: ' + message)
+
+
 def write_json(path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
@@ -251,15 +262,24 @@ def main():
         checks.append(run_reference_checks())
         if args.outside_baseline:
             proof = json.loads(Path(args.outside_baseline).read_text(encoding='utf-8'))
-            assert proof['status'] == 'PASS'
+            require(proof['status'] == 'PASS',
+                    'protected-sources baseline report is not PASS')
             current, tree_hash = outside_snapshot()
-            assert tree_hash == proof['tree_sha256'] and len(current) == proof['current_files'], 'outside-spec tree changed'
+            require(tree_hash == proof['tree_sha256'] and
+                    len(current) == proof['current_files'],
+                    'protected outside-spec tree changed since the frozen baseline')
             checks.append({'name': 'protected_sources_report', 'status': 'PASS', 'sha256': sha(Path(args.outside_baseline))})
         else:
             checks.append({'name': 'protected_sources_report', 'status': 'NOT_ENFORCED',
                            'reason': 'pass --outside-baseline <report> to assert a frozen tree; implementation work necessarily changes it'})
         proof = json.loads((VALIDATION/'dialect_report.json').read_text(encoding='utf-8'))
-        assert proof['status'] == 'PASS' and proof['spec_xml_sha256'] == sha(SPEC/'contracts/FCU.xml')
+        require(proof['status'] == 'PASS',
+                'spec/validation/dialect_report.json is not PASS')
+        require(proof['spec_xml_sha256'] == sha(SPEC/'contracts/FCU.xml'),
+                'spec/validation/dialect_report.json spec_xml_sha256 does not match '
+                'spec/contracts/FCU.xml; the committed evidence is stale or was '
+                'generated from a different line-ending checkout (see '
+                'spec/validation/eol_hash_rebaseline_analysis.md)')
         checks.append({'name': 'dialect_report', 'status': 'PASS', 'sha256': sha(VALIDATION/'dialect_report.json')})
     label = args.label or f'round{args.round}'
     inputs = [p for p in SPEC.rglob('*') if p.is_file() and 'validation' not in p.relative_to(SPEC).parts and '__pycache__' not in p.parts]

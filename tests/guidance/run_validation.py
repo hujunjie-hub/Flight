@@ -11,13 +11,15 @@ ROOT = next(p for p in Path(__file__).resolve().parents if (p/'SConstruct').is_f
 OUT = ROOT / "build/m4_m5_implementation/evidence"
 
 
-def status_for(exit_code):
-    # 2 is reserved for checks that cannot run in this repository state
-    # (for example the firmware link needs the gitignored RT-Thread packages
-    # tree). A blocked check is never reported as a pass.
+def status_for(name, exit_code):
+    # Only the firmware link check has a defined blocked state (exit 2): it
+    # needs the gitignored RT-Thread packages tree. Any other exit code 2 is a
+    # normal failure, not an excuse to skip the check.
     if exit_code == 0:
         return "PASS"
-    return "BLOCKED" if exit_code == 2 else "FAIL"
+    if exit_code == 2 and name == "scons_link":
+        return "BLOCKED"
+    return "FAIL"
 
 
 def main():
@@ -26,6 +28,7 @@ def main():
     sanitizer = "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
     commands = [
         ("line_endings", [sys.executable, "tools/check_line_endings.py"], {}),
+        ("python_o_negative", [sys.executable, "tests/guidance/test_audit_optimized.py"], {}),
         ("m4_host", wsl+["bash", "tests/flight_management/run_host_tests.sh"], {}),
         ("m5_host", wsl+["bash", "tests/guidance/run_host_tests.sh"], {}),
         ("integration", wsl+["bash", "tests/guidance/run_integration_tests.sh"], {}),
@@ -35,8 +38,10 @@ def main():
             "bash", "tests/guidance/run_integration_tests.sh"], {}),
         ("m4_arm", ["pwsh", "-NoProfile", "-File", "tests/flight_management/arm_build_check.ps1"], {}),
         ("m5_arm", ["pwsh", "-NoProfile", "-File", "tests/guidance/arm_build_check.ps1"], {}),
+        ("consumer_fp", [sys.executable, "tests/guidance/check_consumer_fp_contraction.py"], {}),
         ("spec_layout", [sys.executable, "spec/tools/audit_spec.py", "--round", "3", "--label", "m4-m5-implementation"], {}),
         ("memory_budget", [sys.executable, "tests/guidance/check_memory_budget.py"], {}),
+        ("packages_lock", [sys.executable, "tools/check_rt_packages_lock.py"], {}),
         ("production_abi", [sys.executable, "tests/abi/abi_report.py"], {}),
         ("scons_link", [sys.executable, "tests/guidance/check_target_build.py"], {}),
     ]
@@ -46,7 +51,7 @@ def main():
         result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True)
         log = OUT / (name+".log")
         log.write_text(result.stdout+result.stderr, encoding="utf-8")
-        status = status_for(result.returncode)
+        status = status_for(name, result.returncode)
         results.append({"name": name, "command": command, "exit_code": result.returncode,
             "status": status, "log": log.relative_to(ROOT).as_posix()})
         print(f"{name}: {status} (exit {result.returncode})", flush=True)

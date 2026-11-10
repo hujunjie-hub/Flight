@@ -74,16 +74,16 @@ tests/guidance/run_host_tests.sh: line 3: set: pipefail
 : invalid option name
 ```
 
-这不是 Host 测试失败，也不是算法失败。仓库已用 `.gitattributes` 固定 `eol=lf`；旧检出按以下步骤修复，不要用 `git clean` 或 `git reset --hard`：
+这不是 Host 测试失败，也不是算法失败。仓库已用 `.gitattributes` 固定 `eol=lf`；旧检出用下面这一条命令就地修复，它只把这些 `*.sh` 的 CRLF 改成 LF，不执行 `git checkout/reset/clean/stash`，不会覆盖其他未提交改动：
 
 ```powershell
-git config core.autocrlf false
-git update-index --refresh
-git checkout -- .
+python tools/check_line_endings.py --fix
 python tools/check_line_endings.py
 ```
 
 `python tools/check_line_endings.py` 必须输出 `PASS`；CI 的 `Source layout and time-service tests` job 执行同一检查。若该检查失败，先修复换行，再运行任何 Host/Sanitizer/ARM 命令，否则得到的失败没有诊断价值。
+
+不要用 `git checkout -- .` 修复换行：它会覆盖本地未提交的修改。旧的 `core.autocrlf=true` 全局设置可以保留，`.gitattributes` 的 `eol=lf` 优先。
 
 
 ## 4. Windows 本地环境
