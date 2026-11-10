@@ -848,6 +848,29 @@ static void test_pilot_yaw_integrates_and_altitude_centre_holds(void)
   CHECK(guidance_stop() == STATUS_OK);
 }
 
+static void test_landing_reference_probes_below_home_plane(void)
+{
+  Fx fx;
+  float lowest = 0.0f;
+
+  CHECK(fx_init(&fx));
+  fx.dir.operation_code = PRODUCT_OP_LAND;
+  fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_ALT_HOLD;
+  fx.nav.core.position_ned_m[2] = -2.0f;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  for (unsigned i = 0; i < 1500; ++i) {
+    CHECK(fx_step(&fx) == STATUS_OK);
+    const float above = fx.out.pilot_control_reference.vehicle_extension.altitude_above_origin_m;
+    if (above < lowest) lowest = above;
+  }
+  /* FMAT-0008: a landing that stops exactly at Home hovers above the landing
+   * surface whenever the vertical estimate drifted, so the detector can never
+   * confirm LANDED. The reference must therefore descend through the Home plane
+   * (home=0 here) and let the ground contact model stop the airframe. */
+  CHECK(lowest < -0.5f);
+  CHECK(guidance_stop() == STATUS_OK);
+}
+
 int main(void)
 {
   struct {
@@ -879,6 +902,7 @@ int main(void)
     {"consumed_speed_spike_thrust", test_consumed_curve_speed_spike_and_thrust},
     {"bernstein_analytic_bounds", test_bernstein_bounds_cover_analytic_extrema},
     {"pilot_yaw_altitude_hold", test_pilot_yaw_integrates_and_altitude_centre_holds},
+    {"landing_reference_probes_below_home", test_landing_reference_probes_below_home_plane},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {

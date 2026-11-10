@@ -2,6 +2,14 @@
 #include <string.h>
 #include "guidance_update/guidance_internal.h"
 
+/* Landing must reach ground contact, not the Home plane as an estimate: the
+ * vertical estimate can drift relative to the airframe, so a reference that
+ * stops exactly at Home would hover above the landing surface and the land
+ * detector could never confirm LANDED (FMAT-0008). The landing reference
+ * therefore keeps descending through the Home plane until the detector reports
+ * LANDED; the airframe itself is stopped by the ground contact model. */
+#define GUIDANCE_LANDING_PROBE_M 1.0f
+
 Status guidance_build_pilot(GuidanceState *s, const GuidanceInput *in, GuidanceOutput *out)
 {
     PilotControlReference *r = &out->pilot_control_reference;
@@ -80,7 +88,13 @@ Status guidance_build_vertical_land(GuidanceState *s, const GuidanceInput *in, G
         }
         if (!isfinite(a)) return STATUS_NUMERIC_ERROR;
         goal = d+1.0f;
-        if (guidance_home_ok(in)) goal = fmaxf(d, fminf(goal, in->directive->payload.home.position_ned_m[2]));
+        if (guidance_home_ok(in)) {
+            const float plane = in->directive->payload.home.position_ned_m[2];
+            const float floor_m = in->directive->operation_code == PRODUCT_OP_LAND
+                                      ? plane + GUIDANCE_LANDING_PROBE_M
+                                      : plane;
+            goal = fmaxf(d, fminf(goal, floor_m));
+        }
         if (in->landed_state && guidance_header_ok(&in->landed_state->header, &in->navigation->header,
             MSG_LANDED_STATE_SNAPSHOT, in->evaluation_time_us) &&
             in->landed_state->state == LANDED_STATE_LANDED) goal = d;
