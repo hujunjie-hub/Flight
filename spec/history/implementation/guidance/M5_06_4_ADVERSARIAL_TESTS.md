@@ -121,3 +121,12 @@ S06-074..079 静态/动态端到端扫掠差分、加速度包络、预览接缝
 - M5-05 仍只输出 candidate。
 - M5-07 尚未把 M5-06 PASS 绑定为 FMS/Permit/M6 的不可绕过发布门禁。
 - 不得将 Host/SIL 结果解释为 H723 实机避障放行；真实传感器标定、WCET/RTA、RAM/栈、HIL 和场地验证仍未完成。
+
+
+## M5-06.5 独立数学审查与后续边界用例（2026-11-10）
+
+详见 `M5_06_5_INDEPENDENT_MATH_REVIEW.md`。初审识别出 `norm3_upper()` 的 sqrt 结果没有在 float 转换前建立明确的向上误差界；单纯对 sqrt 返回值调用 `round_up_float()` 不足以证明相对精确范数保守。另需将 IEEE-754 binary64、正确舍入、禁止 fast-math/不受控重结合及 `nextafter` 语义写入并锁定编译契约。
+
+预留测试 S06-080..083，固定 seed 分别为 `0x6D350680`.. `0x6D350683`，覆盖 sqrt/float ULP、动态端到端连续距离、精确相切与接缝、自适应分裂点 1 ULP 边界。以上全部 **NOT_RUN**，不得将编号或 seed 当作已执行证据。
+
+本次检查没有执行新的 ARM 构建或 CI。已有 ARM 工作流中的 M4/M5 production-source compile 不包含 Host-only 的 M5-06 validator translation unit；MPC RAM 数字也不是 M5-06 validator RAM。不得混淆。
