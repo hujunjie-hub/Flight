@@ -80,3 +80,9 @@ static float norm3_upper(const float v[3])
 - M5-06 未获独立数学审查批准前，不进入 M5-07。
 - 不得合并 PR #2 或修改 main 以绕过验收。
 - H723/NONE 不具备在线避障放行；Host/SIL 结果不构成实机避障许可。
+
+### S06-080 实现增量（2026-11-10）
+
+已在 Host 测试中加入 `tests/guidance/verify_norm_bounds.py`：通过 ctypes 调用生产 C helper，以 Python `Fraction` 精确还原 binary32 输入并比较平方范数，不依赖 `sqrt` / `sqrtl` 作为唯一 oracle。固定 seed `0x6D350680`，覆盖 7 组显式边界向量及 10,000 组任意有限 binary32 位模式；测试脚本已接入 `tests/guidance/run_host_tests.sh`。生产代码增加 binary32/binary64 exponent、subnormal、evaluation precision 和 IEC 60559 编译期约束。
+
+当前状态：**IMPLEMENTED / CI_PENDING**。本次提交触发的 GitHub Actions 尚未取得可核验结果；不得标记 PASS。Host/Sanitizer 与 Cortex-M7 编译仍需本次提交的真实 CI 证据。
