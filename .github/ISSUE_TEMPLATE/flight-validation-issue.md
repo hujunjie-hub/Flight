@@ -2,7 +2,7 @@
 name: Flight Validation / Defect
 about: Register a reproducible Flight code, test, safety, build or evidence issue
 title: "[S1][M5] "
-labels: ["status:new"]
+labels: []
 assignees: []
 ---
 
