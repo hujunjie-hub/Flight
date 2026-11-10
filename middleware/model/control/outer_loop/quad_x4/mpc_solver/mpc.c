@@ -245,6 +245,13 @@ Status control_backend_outer_update(const ControllerInput *in) {
     mpc_run_stats.blocked_uninitialized++;
     return STATUS_NOT_READY;
   }
+  {
+    uint32_t age = in->evaluation_time_us > in->control_time_us
+                       ? (uint32_t)(in->evaluation_time_us - in->control_time_us)
+                       : 0u;
+    mpc_run_stats.last_eval_age_us = age;
+    if (age > mpc_run_stats.max_eval_age_us) mpc_run_stats.max_eval_age_us = age;
+  }
   s = controller_validate_input(in, &epoch, &mode);
   if (s) {
     mpc_run_stats.blocked_validation++;
