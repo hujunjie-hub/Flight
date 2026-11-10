@@ -156,3 +156,32 @@ jobs:
             build/m4_host/
             build/m5_host/
             build/m4_m5_host/
+
+  spec-and-abi:
+    name: Spec audit and production ABI
+    runs-on: ubuntu-latest
+    # Transitional: the committed spec/validation/dialect_report.json and
+    # middleware/contracts/product_contract/abi_lock.h still pin CRLF-derived
+    # hashes, so these checks fail on an LF checkout until the owner approves
+    # the re-baseline in spec/validation/eol_hash_rebaseline_analysis.md.
+    # Remove continue-on-error once that change lands.
+    continue-on-error: true
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ARM embedded toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi
+
+      - name: Run spec audit
+        run: python spec/tools/audit_spec.py --round 1 --label ci
+
+      - name: Run production ABI report
+        run: python tests/abi/abi_report.py

@@ -89,6 +89,20 @@ def main():
         "m5_static_and_validator_bytes": m5, "m5_limit_bytes": 16*1024,
         "scope": "STATIC_ARM_OBJECTS_PLUS_SPEC_SLOT_RESERVATIONS",
         "stack_wcet_and_full_system_arena_placement": "NOT_RUN"}
+    # Headroom warnings do not change PASS/FAIL; they make a near-saturated
+    # budget visible in the evidence instead of only failing on the next byte.
+    icd_headroom = 48*1024 - (slots+m4)
+    m5_headroom = 16*1024 - m5
+    result["icd_and_m4_headroom_bytes"] = icd_headroom
+    result["m5_headroom_bytes"] = m5_headroom
+    warnings = []
+    if 0 <= icd_headroom < 1024:
+        warnings.append(
+            f"ICD+M4 headroom is {icd_headroom} B (<1 KiB); any M4 static growth "
+            "needs a spec/07 budget review")
+    if 0 <= m5_headroom < 1024:
+        warnings.append(f"M5 headroom is {m5_headroom} B (<1 KiB)")
+    result["warnings"] = warnings
     result["status"] = "PASS" if slots+m4 <= 48*1024 and m5 <= 16*1024 else "FAIL"
     out = ROOT/"build/m4_m5_implementation/evidence/memory_budget.json"
     out.parent.mkdir(parents=True, exist_ok=True)

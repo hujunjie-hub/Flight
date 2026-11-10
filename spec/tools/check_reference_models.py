@@ -5,6 +5,39 @@ import json
 import math
 import random
 
+
+def _record_failure(message, filename, line):
+    """Best-effort structured failure artifact for the acceptance ledger."""
+    try:
+        import json as _json
+        import time as _time
+        target = Path(__file__).resolve().parent.parent / 'validation' / 'audit_failure.json'
+        target.write_text(_json.dumps({
+            'status': 'FAIL',
+            'message': str(message),
+            'file': filename,
+            'line': line,
+            'utc': _time.strftime('%Y-%m-%dT%H:%M:%SZ', _time.gmtime()),
+        }, indent=2) + '\n', encoding='utf-8')
+    except Exception:
+        pass
+
+
+def require(condition, message="acceptance check failed"):
+    """Acceptance check that survives `python -O`.
+
+    `assert` statements are removed when Python runs with -O, which would turn a
+    failed safety acceptance check into a silent pass. This helper always raises
+    SystemExit with a structured message, the failing source location and a JSON
+    failure artifact.
+    """
+    if not condition:
+        import sys as _sys
+        frame = _sys._getframe(1)
+        _record_failure(message, frame.f_code.co_filename, frame.f_lineno)
+        raise SystemExit('SPEC_AUDIT_FAILED: %s (%s:%d)' % (
+            message, frame.f_code.co_filename, frame.f_lineno))
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -106,7 +139,7 @@ def run_reference_checks():
             for sample in range(101):
                 value = evaluate(derivative, sample/100)
                 worst_bernstein = max(worst_bernstein, min(bernstein)-value, value-max(bernstein))
-    assert worst_endpoint < 1e-9 and worst_bernstein < 1e-9
+    require(worst_endpoint < 1e-9 and worst_bernstein < 1e-9)
     results.append({'case':'100 arbitrary quintic endpoint and Bernstein derivative-bound fixtures', 'max_endpoint_error':worst_endpoint, 'max_bound_violation':worst_bernstein, 'status':'PASS'})
 
     worst_so3 = 0.0
@@ -117,7 +150,7 @@ def run_reference_checks():
             original = rotation(scale(axis, math.radians(degrees)))
             rebuilt = rotation(rotation_log(original))
             worst_so3 = max(worst_so3, max(abs(original[i][j]-rebuilt[i][j]) for i in range(3) for j in range(3)))
-    assert worst_so3 < 5e-8
+    require(worst_so3 < 5e-8)
     results.append({'case':'24 SO3 near-zero and near-pi reconstruction fixtures', 'max_matrix_error':worst_so3, 'status':'PASS'})
 
     r = rotation([.1, -.2, .3])
@@ -135,7 +168,7 @@ def run_reference_checks():
         # Innovation nominal minus retracted truth, not ordinary h derivative.
         finite.append(((phi0-math.atan2(mplus[1],mplus[0]))-(phi0-math.atan2(mminus[1],mminus[0])))/2e-6)
     mag_error = max(abs(x-y) for x,y in zip(analytic,finite))
-    assert mag_error < 1e-7
+    require(mag_error < 1e-7)
     results.append({'case':'magnetic Phi-angle H central difference', 'max_error':mag_error, 'status':'PASS'})
 
     lever, velocity, gyro, sg = [1.2,-.3,.7], [3,-1,.5], [.2,-.1,.3], [.01,.02,-.01]
@@ -166,7 +199,7 @@ def run_reference_checks():
         for row in range(3):
             value = -(a[row]-b[row])/2e-5
             worst_velocity = max(worst_velocity,abs(value-analytic[row][column]))
-    assert worst_velocity < 1e-7
+    require(worst_velocity < 1e-7)
     results.append({'case':'GNSS lever velocity 3x22 error-retraction H central difference (affine Earth-rate fixture)', 'max_error':worst_velocity, 'status':'PASS'})
 
     # Nonzero IMU->CG lever arm: public position error must include attitude P.
@@ -181,14 +214,14 @@ def run_reference_checks():
         aa,bb = cg(plus),cg(scale(plus,-1))
         for row in range(3):
             worst_cg = max(worst_cg,abs(-(aa[row]-bb[row])/2e-6-jp[row][column]))
-    assert worst_cg < 1e-7
+    require(worst_cg < 1e-7)
     results.append({'case':'public CG position 3x6 error-retraction Jacobian with nonzero lever', 'max_error':worst_cg, 'status':'PASS'})
 
     quantiles = {1:6.6348966, 3:11.3448667, 6:16.8118938}
     for dof,x in quantiles.items():
         t=x/2
         cdf = math.erf(math.sqrt(t)) if dof==1 else (math.erf(math.sqrt(t))-2*math.sqrt(t)*math.exp(-t)/math.sqrt(math.pi) if dof==3 else 1-math.exp(-t)*(1+t+t*t/2))
-        assert abs(cdf-.99) < 1e-8
+        require(abs(cdf-.99) < 1e-8)
     results.append({'case':'chi-square 99% quantiles checked with independent closed-form CDFs', 'status':'PASS'})
 
     active,preload,buffer = 'LOW','BIT0',[f'BIT{i}' for i in range(1,16)]+['ZERO1','ZERO2']
@@ -198,9 +231,9 @@ def run_reference_checks():
         periods.append(active)
         if event<len(buffer):
             preload=buffer[event]
-    assert periods==[f'BIT{i}' for i in range(16)]+['ZERO1','ZERO2']
-    assert len(buffer)*4==68
-    assert 248+253*8==2272 and 2272+32==2304
+    require(periods==[f'BIT{i}' for i in range(16)]+['ZERO1','ZERO2'])
+    require(len(buffer)*4==68)
+    require(248+253*8==2272 and 2272+32==2304)
     results.append({'case':'DShot 18 complete periods/68 words symbolic event model and 2304B checkpoint layout', 'status':'PASS', 'target_waveform':'NOT_RUN'})
 
     inputs = [ROOT/'spec'/name for name in ['02_接口契约与公共数据规范.md','04_飞控核心模块与控制系统设计.md','05_传感器采集时间基准与GNSS独立运行.md','07_实时调度与板级硬件资源设计.md','08_产品配置插件与参数管理.md']]

@@ -42,6 +42,8 @@ def main():
         ("spec_layout", [sys.executable, "spec/tools/audit_spec.py", "--round", "3", "--label", "m4-m5-implementation"], {}),
         ("memory_budget", [sys.executable, "tests/guidance/check_memory_budget.py"], {}),
         ("packages_lock", [sys.executable, "tools/check_rt_packages_lock.py"], {}),
+        ("packages_lock_unit", [sys.executable, "tests/guidance/test_rt_packages_lock.py"], {}),
+        ("rebaseline_proposal", [sys.executable, "tools/analyze_eol_rebaseline.py"], {}),
         ("production_abi", [sys.executable, "tests/abi/abi_report.py"], {}),
         ("scons_link", [sys.executable, "tests/guidance/check_target_build.py"], {}),
     ]

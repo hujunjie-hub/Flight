@@ -16,6 +16,39 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
+
+def _record_failure(message, filename, line):
+    """Best-effort structured failure artifact for the acceptance ledger."""
+    try:
+        import json as _json
+        import time as _time
+        target = Path(__file__).resolve().parent.parent / 'validation' / 'audit_failure.json'
+        target.write_text(_json.dumps({
+            'status': 'FAIL',
+            'message': str(message),
+            'file': filename,
+            'line': line,
+            'utc': _time.strftime('%Y-%m-%dT%H:%M:%SZ', _time.gmtime()),
+        }, indent=2) + '\n', encoding='utf-8')
+    except Exception:
+        pass
+
+
+def require(condition, message="acceptance check failed"):
+    """Acceptance check that survives `python -O`.
+
+    `assert` statements are removed when Python runs with -O, which would turn a
+    failed safety acceptance check into a silent pass. This helper always raises
+    SystemExit with a structured message, the failing source location and a JSON
+    failure artifact.
+    """
+    if not condition:
+        import sys as _sys
+        frame = _sys._getframe(1)
+        _record_failure(message, frame.f_code.co_filename, frame.f_lineno)
+        raise SystemExit('SPEC_AUDIT_FAILED: %s (%s:%d)' % (
+            message, frame.f_code.co_filename, frame.f_lineno))
+
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -42,7 +75,7 @@ def main():
         shutil.copy2(source, stage/'FCU.xml')
         with contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
             for language, output in [('C',stage/'generated'),('Python3',stage/'reference.py')]:
-                assert mavgen.mavgen(mavgen.Opts(str(output),wire_protocol='2.0',language=language,validate=True,strict_units=True),[str(stage/'FCU.xml')])
+                require(mavgen.mavgen(mavgen.Opts(str(output),wire_protocol='2.0',language=language,validate=True,strict_units=True),[str(stage/'FCU.xml')]))
         spec = importlib.util.spec_from_file_location('fcu_reference',stage/'reference.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -63,16 +96,16 @@ def main():
                     values[name] = value
                 packet = cls(**values).pack(module.MAVLink(None,srcSystem=1,srcComponent=1))
                 got = module.MAVLink(None).parse_char(packet)
-                assert got is not None and got.get_type() == message.attrib['name']
+                require(got is not None and got.get_type() == message.attrib['name'])
                 for name,value in values.items():
                     actual = getattr(got,name)
-                    assert (list(actual) if isinstance(value,list) else actual) == value
+                    require((list(actual) if isinstance(value,list) else actual) == value)
                 cases.append({'message':message.attrib['name'],'boundary':'MAX_INT_NEGATIVE_SIGNED_EXACT_FLOAT' if boundary else 'ZERO_TRUNCATION','frame_bytes_unsigned':len(packet),'status':'PASS'})
         fixture = stage/'compile.c'
         fixture.write_text('#include "FCU/mavlink.h"\n_Static_assert(MAVLINK_MSG_ID_FCU_OPERATION_STATUS==43000,"id");\n_Static_assert(MAVLINK_MSG_ID_FCU_BUILD_INFO==43012,"id");\nvoid spec_encode(mavlink_message_t*m,mavlink_fcu_prearm_status_t*p){mavlink_msg_fcu_prearm_status_encode(1,1,m,p);}\n',encoding='utf-8')
         flags = ['-std=c11','-mcpu=cortex-m7','-mthumb','-mfpu=fpv5-d16','-mfloat-abi=hard','-Werror=implicit-function-declaration']
         proc = subprocess.run([args.cc,*flags,'-I',str(stage/'generated'),'-c',str(fixture),'-o',str(stage/'compile.o')],capture_output=True,text=True)
-        assert proc.returncode == 0, proc.stderr
+        require(proc.returncode == 0, proc.stderr)
         report = {'scope':'SPEC_DIALECT_CODEGEN','status':'PASS','pymavlink_version':pymavlink.__version__,'spec_xml_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),'inputs_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in stage.glob('*.xml')},'wire_protocol':'2.0','language':['C','Python3'],'strict_units':True,'roundtrip_cases':cases,'arm_generated_header_compile':'PASS','compile_flags':flags,'compiler_diagnostics':proc.stderr,'log':log.getvalue(),'production_integration':'NOT_RUN','tool_scope':'temporary spec generation outside project'}
     (ROOT/'spec/validation/dialect_report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     print('PASS: 13 private messages, 26 roundtrips, ARM generated-header compile')

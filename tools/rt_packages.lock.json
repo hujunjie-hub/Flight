@@ -3,6 +3,7 @@
   "status": "UNRESOLVED",
   "scope": "H723 firmware link: root SConscript includes packages/SConscript and Kconfig oincludes packages/Kconfig",
   "procedure": "spec/validation/rt_thread_packages_reproducibility.md",
+  "candidates_document": "spec/validation/rt_thread_packages_candidates.md",
   "source_of_selection": ".config (CONFIG_PKG_USING_*)",
   "resolved_by": null,
   "resolved_at_utc": null,
@@ -13,7 +14,13 @@
       "selected_version": "latest",
       "pinned_version": null,
       "pinned_commit": null,
-      "required_for": "Cortex-M7 core headers used by the STM32H7 BSP"
+      "required_for": "Cortex-M7 core headers used by the STM32H7 BSP",
+      "candidate": {
+        "version": "5.9.0",
+        "commit": "61e36449f53c25ef7825c40f7dd93685736f457f",
+        "source": "https://github.com/ARM-software/CMSIS_5.git",
+        "evidence": "CMSIS/Core/Include/core_cm7.h present at that tag"
+      }
     },
     {
       "symbol": "STM32H7_HAL_DRIVER",
@@ -21,7 +28,13 @@
       "selected_version": "latest",
       "pinned_version": null,
       "pinned_commit": null,
-      "required_for": "STM32H723 HAL sources linked into the firmware"
+      "required_for": "STM32H723 HAL sources linked into the firmware",
+      "candidate": {
+        "version": "v1.11.6",
+        "commit": "33ca46547d40b281a98b5ca497efc89dc628a4a7",
+        "source": "https://github.com/STMicroelectronics/stm32h7xx_hal_driver.git",
+        "evidence": "Inc/stm32h7xx_hal.h present at that tag; STM32H723 supported by the H7 HAL"
+      }
     },
     {
       "symbol": "STM32H7_CMSIS_DRIVER",
@@ -29,8 +42,14 @@
       "selected_version": "latest",
       "pinned_version": null,
       "pinned_commit": null,
-      "required_for": "STM32H7 device headers and startup definitions"
+      "required_for": "STM32H7 device headers and startup definitions",
+      "candidate": {
+        "version": "v1.10.7",
+        "commit": "05ea8164ca19102bb5c9eebf0c45f7ac2cd1e35c",
+        "source": "https://github.com/STMicroelectronics/cmsis_device_h7.git",
+        "evidence": "Include/stm32h723xx.h present at that tag"
+      }
     }
   ],
-  "note": "All three packages are currently selected with VER=\"latest\", which spec/00 §4 explicitly rejects as non-reproducible. Pinning them changes the firmware dependency baseline, so it needs owner approval before this file can be marked RESOLVED."
+  "note": "All three packages are still selected with VER=\"latest\", which spec/00 §4 rejects as non-reproducible. The candidates above are the upstream tags verified against the STM32H723 device header and the Cortex-M7 core header. Pinning them changes the firmware dependency baseline and requires owner approval plus an actual `pkgs --update` install before this file may become RESOLVED."
 }
