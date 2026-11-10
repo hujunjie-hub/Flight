@@ -131,6 +131,10 @@ S06-074..079 静态/动态端到端扫掠差分、加速度包络、预览接缝
 
 当前 ARM 脚本已将 M5-06 Host-only validator translation unit 交叉编译为 Cortex-M7 object，但不链接进产品；完整目标 CI 结果仍待本轮提交确认。MPC RAM 数字不是 M5-06 validator RAM，object 编译也不构成 H723 运行期资源或飞行放行证据。
 
+## S06-082 动态切触、ULP 与预览接缝边界（2026-11-10）
+
+新增 `test_m5_safety_dynamic_tangency_and_preview_seam_ulp`：构造静止车辆与动态障碍物的精确膨胀半径切触、内侧 1 ULP、外侧 1 ULP 和有明确净空的安全对照；外侧 1 ULP 允许保守拒绝，但禁止 PASS/碰撞边界漏放。另构造障碍物在 20ms preview seam 精确穿越，以及起始位置向两侧各偏移 1 ULP 的穿越场景，均要求 DYNAMIC_COLLISION。确定性边界用例，无随机 seed。状态 **IMPLEMENTED / CI_PENDING**。
+
 ## S06-081 动态障碍物恒加速度连续距离 oracle（2026-11-10）
 
 新增 `test_m5_safety_dynamic_constant_acceleration_continuous_oracle`：64 组恒加速度动态障碍物场景，32 组碰撞、32 组安全近失。独立参考将车辆与障碍物的相对位置表示为二次多项式，检查区间端点、相对位置驻点及二次方程零点，计算整个预测时域的连续最小距离；不是固定时间采样 oracle。实际加速度绝对值限制在 0.45m/s²，validator 输入上界为 0.5m/s²。固定 seed `0x6D350681`。当前 **IMPLEMENTED / CI_PENDING**，等待 Host、ASan/UBSan 和 Cortex-M7 编译回归。
