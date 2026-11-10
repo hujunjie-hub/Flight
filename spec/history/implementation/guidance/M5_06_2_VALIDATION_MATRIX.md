@@ -197,3 +197,10 @@ ARM 静态检查报告：MPC RAM 29,252 bytes、worker stack 8,192 bytes、最�
 | S06-084 | 动态 track 预测时间和位置数值误差 | Fraction 精确时间/位置参考；大 epoch、正负时间差、非 dyadic 中点及相切/近切；误差上界必须覆盖精确预测 | NOT_RUN；seed `0x6D350684` |
 
 修复方向：相对参考时间整数差、微秒换秒 outward interval、位置乘加 outward interval、float 预测点到完整区间的最大距离作为误差界；失败时 NUMERIC_FAILURE。MR-008 未关闭前，不得宣称动态障碍物连续距离数学证明完成。
+
+ 
+## S06-084 动态 track 预测位置误差 oracle（2026-11-10）
+
+生产路径已改为相对 reference epoch 的时间差、微秒到秒比例 outward interval、位置乘加 outward interval，并以 float 预测点到完整预测区间两端的最大距离形成误差上界。新增 `verify_dynamic_prediction.py`，Fraction 精确时间/位置 oracle，7 个显式边界 + 10,000 个固定种子随机输入，seed `0x6D350684`；覆盖预测溢出拒绝。Host runner 与 CI Python syntax 检查已接入。
+
+状态：**FIX IMPLEMENTED / CI_PENDING**。未取得当前 HEAD 的真实 CI 结果前不得标记 PASS；独立数学审查仍需复核区间构造及大 epoch 边界。
