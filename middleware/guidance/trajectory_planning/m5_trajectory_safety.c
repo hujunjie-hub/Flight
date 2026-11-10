@@ -43,6 +43,9 @@ _Static_assert(sizeof(double) == sizeof(uint64_t),
 #include "messages/message_ids.h"
 #include "geofence_geometry/geofence_geometry.h"
 
+_Static_assert(PRODUCT_PREVIEW_STEP_US <= 1000000u,
+               "M5 safety preview step must stay within one second");
+
 #define M5_SAFETY_POINT_MASK 0x1Fu
 #define M5_SAFETY_NAV_MASK (NAV_VALID_HORIZONTAL_POSITION | \
                             NAV_VALID_VERTICAL_POSITION | \
@@ -1049,12 +1052,15 @@ static uint8_t build_curve(
         delta_s = multiply_upper_nonnegative(gamma2, s_max);
         s_eval_max = add_upper_nonnegative(s_max, delta_s);
         if (!isfinite(s_eval_max) || !(s_eval_max > 0.0)) return 0u;
-        /* Contract limit: the production validator only accepts the 20 ms
-           preview step, so s_eval_max ~ 0.0200001. consumer_eval_error_bound()
-           also carries the general max(1,s)^n amplification term, but the
-           product contract is still enforced: a future step constant larger
-           than 1 s must be reviewed before it can be validated. */
-        if (!(PRODUCT_PREVIEW_STEP_US < 1000000u)) return 0u;
+        /* consumer_eval_error_bound() carries the general max(1,s)^n
+           amplification term, so the subnormal floor is valid for any finite
+           s_eval_max produced here (the test API may pass durations above one
+           second). The product contract still bounds the preview step: the
+           static assertion below keeps PRODUCT_PREVIEW_STEP_US <= 1 s, and
+           validate_reference_shape requires every preview offset to be an
+           exact multiple of that step, so the validated curve always has
+           h = 0.02 s and s_eval_max ~ 0.0200001. */
+        if (!isfinite(s_eval_max)) return 0u;
 
         consumer_power_coefficients(a, b, (float)h, axis, cf);
         for (k = 0u; k < 6u; ++k) {
@@ -2267,6 +2273,57 @@ uint8_t m5_trajectory_safety_test_interval_op(
   *result_low = result.low;
   *result_high = result.high;
   return 1u;
+}
+
+/* Declared in control_reference.c / controller_internal.h; this unit never
+   includes the controller-private header, so the prototype is repeated here.
+   Both translation units are linked into the same Host test binary. */
+extern Status control_sample_reference(const MotionReference *ref,
+                                       uint64_t time,
+                                       ProductMotionPoint *out);
+
+uint8_t m5_trajectory_safety_test_consumer_time(
+    uint32_t step_us, uint32_t offset_us, float *seconds)
+{
+  MotionReference reference;
+  ProductMotionPoint sampled;
+  unsigned i, axis;
+  const uint64_t base_us = 1000000u;
+
+  if (seconds == NULL) return 0u;
+  if (step_us != (uint32_t)PRODUCT_PREVIEW_STEP_US &&
+      step_us != (uint32_t)PRODUCT_ROUTE_PREVIEW_STEP_US) return 0u;
+  if (offset_us > step_us) return 0u;
+
+  memset(&reference, 0, sizeof(reference));
+  reference.header.timestamp_sample_us = base_us;
+  reference.point_count = PRODUCT_PREVIEW_COUNT;
+  reference.anchor.offset_us = 0u;
+  reference.anchor.valid_mask = 0x1Fu;
+  reference.anchor.point.valid_mask = 0x1Fu;
+  for (axis = 0u; axis < 3u; ++axis) {
+    reference.anchor.point.position_ned_m[axis] = 0.0f;
+    reference.anchor.point.velocity_ned_mps[axis] = axis == 0u ? 1.0f : 0.0f;
+    reference.anchor.point.acceleration_ned_mps2[axis] = 0.0f;
+  }
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    MotionReferencePoint *point = &reference.points[i];
+    point->offset_us = (i + 1u) * step_us;
+    point->valid_mask = 0x1Fu;
+    point->point.valid_mask = 0x1Fu;
+    for (axis = 0u; axis < 3u; ++axis) {
+      /* Consistent linear motion: p_i = i*h with v = 1 makes d = dv = da = 0,
+         so the consumer polynomial is exactly p(s) = s. */
+      point->point.position_ned_m[axis] =
+          axis == 0u ? (float)(i + 1u) * ((float)step_us * 1e-6f) : 0.0f;
+      point->point.velocity_ned_mps[axis] = axis == 0u ? 1.0f : 0.0f;
+      point->point.acceleration_ned_mps2[axis] = 0.0f;
+    }
+  }
+  if (control_sample_reference(&reference, base_us + offset_us, &sampled) !=
+      STATUS_OK) return 0u;
+  *seconds = sampled.position_ned_m[0];
+  return (uint8_t)isfinite(*seconds);
 }
 
 #endif /* FLIGHT_M5_SAFETY_TEST_API */

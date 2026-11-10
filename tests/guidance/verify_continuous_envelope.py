@@ -166,8 +166,8 @@ def check_segment(segment, h, u0, u1, envelope):
     ok, limits = envelope(segment, h, u0, u1)
     if not ok:
         return ['production envelope rejected a valid sub-interval'], 0.0, None
-    s_max = Fraction(f32(h)) * Fraction(u0 if False else 0)  # placeholder replaced below
-    s_max = Fraction(f32(h)) * Fraction(u1).limit_denominator(10 ** 9)
+    # Fraction(float) is exact: no approximation of the hovered sub-interval.
+    s_max = Fraction(f32(h)) * Fraction(u1)
     delta_s = GAMMA2 * s_max
     s_eval_max = s_max + delta_s
     failures = []

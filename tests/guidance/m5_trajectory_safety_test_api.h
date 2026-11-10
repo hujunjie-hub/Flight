@@ -88,4 +88,9 @@ uint8_t m5_trajectory_safety_test_interval_op(
     double b_low, double b_high,
     double *result_low, double *result_high);
 
+/* S06-103: drive the real M6 control_sample_reference() with a unit-velocity
+   linear reference so its x output is exactly the binary32 time s_c. */
+uint8_t m5_trajectory_safety_test_consumer_time(
+    uint32_t step_us, uint32_t offset_us, float *seconds);
+
 #endif /* M5_TRAJECTORY_SAFETY_TEST_API_H */

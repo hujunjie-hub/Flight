@@ -97,6 +97,49 @@ def build_and_scan(gcc, objdump, source, flags, object_name):
     }
 
 
+
+MODEL_TOKENS = {
+    "gamma_2_derivation": [
+        "gamma2 = nu2 / (1.0 - nu2)",
+        "delta_s = multiply_upper_nonnegative(gamma2, s_max)",
+    ],
+    "evaluation_interval": [
+        "s_eval_max = add_upper_nonnegative(s_max, delta_s)",
+    ],
+    "rounding_counts": [
+        "#define M5_CONSUMER_POSITION_ROUNDINGS 10u",
+        "#define M5_CONSUMER_VELOCITY_ROUNDINGS 12u",
+        "#define M5_CONSUMER_ACCELERATION_ROUNDINGS 10u",
+    ],
+    "subnormal_amplification": [
+        "(double)rounding_count * 0x1p-149",
+        "amplification = multiply_upper_nonnegative(amplification, scale)",
+    ],
+    "runtime_fp_environment": [
+        "vmrs %0, fpscr",
+        "_mm_getcsr()",
+        "fegetround() == FE_TONEAREST",
+    ],
+}
+
+
+def check_model_against_source():
+    """The report must describe the model that is actually compiled."""
+    source = VALIDATOR.read_text(encoding="utf-8")
+    missing = []
+    for section, tokens in MODEL_TOKENS.items():
+        for token in tokens:
+            if token not in source:
+                missing.append(f"{section}: {token}")
+    return {
+        "status": "MATCH" if not missing else "MISMATCH",
+        "source": str(VALIDATOR.relative_to(ROOT)).replace("\\", "/"),
+        "missing_tokens": missing,
+        "note": ("Report fields are derived from tokens that must exist in the "
+                 "compiled validator source; a mismatch fails the check."),
+    }
+
+
 def main():
     sys.path.insert(0, str(ROOT))
     import rtconfig  # production compiler flags, not a re-typed copy
@@ -118,12 +161,23 @@ def main():
                                validator_flags() + ["-DFLIGHT_M5_HOST_PLANNER"],
                                "m5_trajectory_safety_fp_check.o")
     fused_total = consumer["fused_operations"] + validator["fused_operations"]
+    model = check_model_against_source()
     report = {
-        "status": "PASS" if fused_total == 0 else "REVIEW_REQUIRED",
+        "status": ("PASS" if fused_total == 0 and model["status"] == "MATCH"
+                   else "REVIEW_REQUIRED"),
         "compiler": compiler,
-        "error_model": ("gamma_n = n*u/(1-n*u), u = 2^-24, n = 10/12/10 for "
-                        "position/velocity/acceleration, plus the outward "
-                        "interval-coefficient term and the 2u*s_max time term"),
+        "error_model": {
+            "coefficient_term": "outward interval coefficients [low, high], "
+                                "max(|cf - low|, |cf - high|) * s^i",
+            "horner_term": "gamma_n * sum |cf_i| * s^i with gamma_n = n*u/(1-n*u)",
+            "horner_roundings": {"position": 10, "velocity": 12,
+                                 "acceleration": 10},
+            "time_term": "gamma_2 * s_max * |d^k p/ds^k|(s_eval_max) with "
+                         "gamma_2 = 2u/(1-2u), s_exact = h*(offset/step)",
+            "evaluation_interval": "s_eval_max = s_max + gamma_2*s_max",
+            "subnormal_term": "n * 2^-149 * max(1, s_eval_max)^n",
+        },
+        "model_check": model,
         "objects": [consumer, validator],
         "fused_operations": fused_total,
         "note": ("No fused multiply-add observed in either object; the replicated "
@@ -132,9 +186,21 @@ def main():
                  "Fused multiply-add observed; MR-009 must be re-reviewed because "
                  "the consumer rounding sequence changed."),
     }
-    (OUT / "consumer_fp.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(json.dumps(report, indent=2))
-    return 0 if fused_total == 0 else 1
+    payload = json.dumps(report, indent=2)
+    (OUT / "consumer_fp.json").write_text(payload, encoding="utf-8")
+    log_lines = [
+        f"compiler={compiler}",
+        f"fused_operations={fused_total}",
+        f"model_check={model['status']}",
+        f"model_missing={model['missing_tokens']}",
+    ]
+    for entry in report["objects"]:
+        log_lines.append(
+            f"object={entry['object']} sha256={entry['object_sha256']} "
+            f"fused={entry['fused_operations']} flags={entry['flags']}")
+    (OUT / "consumer_fp.log").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
+    print(payload)
+    return 0 if report["status"] == "PASS" else 1
 
 
 if __name__ == "__main__":

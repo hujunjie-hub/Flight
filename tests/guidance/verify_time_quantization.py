@@ -1,23 +1,15 @@
-"""S06-099: exhaustive time-quantisation check for both preview step constants.
+"""S06-099: exhaustive time-quantisation check, exact rational comparisons only.
 
-The consumer computes
-
+Consumer:
     h   = RN(step_us   * 1e-6f)
     s_c = RN(offset_us * 1e-6f)
-
-with integer microsecond counts that are exact in binary32. The validator uses
-
+Validator reference:
     s_exact = h * (offset_us / step_us)
-
-as the mathematical reference time and claims |s_c - s_exact| <= gamma_2*s_max
-with gamma_2 = 2u/(1-2u), s_max = h*u1 (u1 = 1 for a whole segment).
-
-This script checks the claim exhaustively for every integer offset of both
-product step constants, using exact rational arithmetic for the reference and
-binary32 rounding for the consumer, and also checks that s_c never leaves the
-enlarged evaluation interval [0, s_max + gamma_2*s_max]. It does not reuse the
-production 2u approximation: the only shared input is the definition of the
-consumer conversion, which is re-implemented from the C source.
+Claim:
+    |s_c - s_exact| <= gamma_2 * s_exact,   gamma_2 = 2u/(1-2u)
+    max(0, s_exact - gamma_2*s_max) <= s_c <= s_max + gamma_2*s_max
+with s_max = h (u1 = 1). Every comparison is done on exact Fractions; no Python
+float participates in the verdict.
 """
 import struct
 from fractions import Fraction
@@ -32,58 +24,57 @@ def f32(value):
 
 
 def rn32(q):
-    """Round a rational to binary32, round-to-nearest even."""
     return Fraction(f32(float(q)))
 
 
 def consumer_seconds(microseconds):
-    """s = RN(microseconds * RN(1e-6)) in binary32."""
-    micro = Fraction(microseconds)          # exact: microseconds < 2^24
-    c = Fraction(f32(1e-6))
-    return rn32(micro * c)
+    return rn32(Fraction(microseconds) * Fraction(f32(1e-6)))
 
 
 def main():
-    worst_ratio = 0.0
-    worst_step = None
-    worst_offset = None
-    outside = 0
     checked = 0
+    failures = []
+    worst = Fraction(0)
+    worst_at = None
+    outside = 0
 
     for step_us in STEPS:
-        h = consumer_seconds(step_us)       # same construction as the consumer
-        s_max = h                            # u1 = 1
+        h = consumer_seconds(step_us)
+        s_max = h
         delta_s = GAMMA2 * s_max
         s_eval_max = s_max + delta_s
         for offset_us in range(step_us + 1):
             s_c = consumer_seconds(offset_us)
             s_exact = h * Fraction(offset_us, step_us)
             error = abs(s_c - s_exact)
-            ratio = float(error / s_max)
             checked += 1
-            if ratio > worst_ratio:
-                worst_ratio = ratio
-                worst_step = step_us
-                worst_offset = offset_us
+            if error > GAMMA2 * s_exact:
+                failures.append(f"step={step_us} offset={offset_us}: "
+                                f"|s_c-s_exact| > gamma_2*s_exact")
+            if s_c < max(Fraction(0), s_exact - delta_s):
+                failures.append(f"step={step_us} offset={offset_us}: s_c below the interval")
             if s_c > s_eval_max:
                 outside += 1
+                failures.append(f"step={step_us} offset={offset_us}: s_c > s_eval_max")
+            ratio = error / s_max if s_max else Fraction(0)
+            if ratio > worst:
+                worst = ratio
+                worst_at = (step_us, offset_us)
 
-    gamma2_float = float(GAMMA2)
     print(f"M5_S06_099_TIME_QUANTIZATION_REPORT steps={STEPS} checked_offsets={checked} "
-          f"gamma2={gamma2_float:.6e} max_ratio={worst_ratio:.6e} "
-          f"worst_step={worst_step} worst_offset={worst_offset} "
-          f"outside_eval_interval={outside}")
-    failures = []
-    if worst_ratio > gamma2_float:
-        failures.append(f"max |s_c-s_exact|/s_max = {worst_ratio:.6e} > gamma_2")
-    if outside:
-        failures.append(f"{outside} consumer times exceed s_max + gamma_2*s_max")
+          f"gamma2={float(GAMMA2):.6e} max_ratio={float(worst):.6e} "
+          f"worst_step={worst_at[0] if worst_at else -1} "
+          f"worst_offset={worst_at[1] if worst_at else -1} outside={outside} "
+          f"failures={len(failures)}")
     if failures:
-        for failure in failures:
+        for failure in failures[:5]:
             print("FAIL:", failure)
         return 1
+    if worst > GAMMA2:
+        print(f"FAIL: max ratio {float(worst):.6e} exceeds gamma_2")
+        return 1
     print("M5_S06_099_TIME_QUANTIZATION_PASS "
-          "(exhaustive integer microseconds, exact rational reference)")
+          "(exact Fraction comparisons, 60,002 integer offsets)")
     return 0
 
 
