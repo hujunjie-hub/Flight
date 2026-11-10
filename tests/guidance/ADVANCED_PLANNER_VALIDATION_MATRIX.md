@@ -94,6 +94,9 @@ V1.9.1 采用固定时长 minimum-jerk 五次样条，最多 8 段；内部 knot
 
 预测窗口要求：Host 合成源至少提供 1s 预测界；实际参考覆盖 [t0, t0+480ms]，并额外覆盖有效观测年龄/不确定度窗口。ONBOARD_SENSOR 当前不支持，不能把 Host 合成预测当作实物保证。
 
+消费曲线等价性（2026-11-10 增量）：M5-06 用 binary64 重建五次 Hermite，而 M6 `control_sample_reference()` 用 binary32 Horner 求值同一条代数曲线。S06-085（`tests/guidance/verify_curve_eval_gap.py`，seed `0x6D350685`）测量两者偏差：平滑段 `2.98e-05 m`、对抗段 `2.17e-03 m`。该偏差尚未进入验证器区间包络，列为 MR-009（OPEN / S2），详见 `spec/history/implementation/guidance/M5_06_5_INDEPENDENT_MATH_REVIEW.md` 第 11 节；在关闭前不得把 M5-COL-001..008 记作“已证明实际消费曲线净空”。
+
+
 ## 7. 重规划、M5→M6 与 Companion 矩阵
 
 | ID | 输入/场景 | 预期结果 | 失败判据 | 自动化与证据 | 当前状态 |

@@ -241,3 +241,39 @@ S06-081 恒加速度 oracle 已从固定 513 点采样替换为解析候选点�
 CI：[Host validation #542](https://github.com/hujunjie-hub/Flight/actions/runs/42746417706)。
 
 **审查结论不变：BLOCKED / REVIEW_INCOMPLETE。** MR-001..MR-008 仍需逐项独立数学复核并给出 APPROVED；M5-07 不得开始。H723 目标运行、WCET/RTA、实机 RAM/stack、HIL 和飞行仍 NOT_RUN。
+
+ 
+## 11. MR-009：验证曲线与消费曲线数值路径不一致（2026-11-10 本地复现）
+
+状态：**OPEN / S2 / 证明范围缺口**（不是已证实的碰撞漏检）。
+
+spec/02 要求“M5-06 验证的对象是这套实际发布/消费的分段曲线”。当前实现存在两条不同的数值路径：
+
+- 消费端 `control_sample_reference()`（`middleware/model/control/outer_loop/quad_x4/position_tracking/control_reference.c`）用 **binary32** 系数和 Horner 求值五次 Hermite；
+- M5-06 `build_curve()` / `curve_bounds()` 用 **binary64** 区间重建同一条代数曲线，`position_rounding_error_m` 只覆盖“中点值转 float”的误差，不覆盖两侧求值路径之差。
+
+因此验证器证明的是 binary64 曲线，而实际被 M6 消费的是 binary32 曲线；两者的差没有进入任何保守包络。
+
+**复现命令：**
+
+```bash
+python tests/guidance/verify_curve_eval_gap.py
+```
+
+固定 seed `0x6D350685`，256 段 × 每段 33 个采样点，两个寄存器：
+
+| 场景 | 构造 | 实测最大偏差 |
+|---|---|---:|
+| 平滑段 | 端点由单个 20 ms 区间内的有界 jerk 积分生成（真实参考数据形态） | 2.98e-05 m |
+| 对抗段 | 端点 p/v/a 相互独立随机，最大化 binary32 Horner 的抵消误差 | 2.17e-03 m |
+
+偏差远小于当前 `clearance_margin_m` + 机体半径（≥0.15 m），没有发现因此漏检的碰撞；但它意味着验证结论与“实际消费曲线”之间存在一个未量化的 30 µm～2 mm 量级缺口，且随位置尺度和系数抵消程度增长。
+
+**可选修复方向（需独立审查决定）：**
+
+1. 在验证器内复刻消费端的 binary32 运算，并对每一步舍入做向外区间包络（严格，改动最大）；
+2. 由 Horner 前向误差给出可证明的求值误差上界，作为 `position_rounding_error_m` 的附加项（需要非平凡推导，且对抗系数下界可能很松）；
+3. 明确把该偏差划入 `clearance_margin_m` 的用途并由审查批准（当前文档没有这样声明，不能默认成立）。
+
+在 MR-009 关闭前，M5-06 动态/静态连续距离的“消费曲线等价性”不得标记 APPROVED，M5-07 不得启动。`tests/guidance/verify_curve_eval_gap.py` 只是回归测量（上限 1e-4 m / 5e-3 m），不是证明。
+

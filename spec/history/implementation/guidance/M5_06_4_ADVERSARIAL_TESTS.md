@@ -209,3 +209,16 @@ commit `dafe47b8b17e7f32f676cb258eaa7a407a1dfb90` 对应 Host validation #542 �
 CI：[Host validation #542](https://github.com/hujunjie-hub/Flight/actions/runs/42746417706)。
 
 long-double 恒加速度 oracle 仅覆盖其明确的 1D 运动模型；不得将其描述为通用 3D 连续区间证明。M5-06 独立数学审查和 H723 实机放行仍未完成。
+
+ 
+## S06-085 验证曲线与消费曲线求值差分（2026-11-10）
+
+`tests/guidance/verify_curve_eval_gap.py` 固定 seed `0x6D350685`，对 256 段五次 Hermite × 33 个采样点比较两条求值路径：
+
+- 消费端 `control_sample_reference()` 的 binary32 Horner；
+- M5-06 验证器的 binary64 精确曲线。
+
+实测最大偏差：平滑段（恒 jerk 积分生成端点）`2.98e-05 m`；对抗段（端点 p/v/a 独立随机）`2.17e-03 m`。脚本以 1e-4 m / 5e-3 m 作为回归上限，并在输出中显式声明该偏差**尚未**被验证器的区间包络覆盖。
+
+该用例不是 PASS 证明，而是 MR-009 的可复现测量；详细说明见 `M5_06_5_INDEPENDENT_MATH_REVIEW.md` 第 11 节。
+
