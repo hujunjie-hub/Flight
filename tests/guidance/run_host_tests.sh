@@ -43,3 +43,4 @@ gcc "${cflags[@]}" -fPIC -shared -Wl,--no-undefined \
 "${out}/m5_host_tests"
 
 python3 tests/guidance/verify_norm_bounds.py "${out}/libm5_safety_oracle.so"
+python3 tests/guidance/verify_dynamic_prediction.py "${out}/libm5_safety_oracle.so"
