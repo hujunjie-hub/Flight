@@ -200,3 +200,12 @@ The constant-acceleration differential now computes the continuous minimum analy
 CI：[Host validation #509](https://github.com/hujunjie-hub/Flight/actions/runs/42745124335)。
 
 该结果仅证明指定 commit 的自动化测试通过；有限采样/数值 oracle 仍不能代替独立数学证明。MR-001..MR-008 的审查状态和 M5-07 门禁按 `M5_06_5_INDEPENDENT_MATH_REVIEW.md` 执行，当前不得宣称 M5-06 整体验收或 H723 实机避障放行。
+
+ 
+## 完整 CI #542 复测更新（2026-11-10）
+
+commit `dafe47b8b17e7f32f676cb258eaa7a407a1dfb90` 对应 Host validation #542 全部 jobs success。M5 Host 269,207 checks / 0 failures；M5 ASan/UBSan 269,207 / 0；M4/M5 integration 与其 Sanitizer 均 1,000 / 0。S06-081 恒速/恒加速度连续距离 oracle、S06-082 相切/ULP/seam、S06-083 自适应细分边界均实际执行并通过。
+
+CI：[Host validation #542](https://github.com/hujunjie-hub/Flight/actions/runs/42746417706)。
+
+long-double 恒加速度 oracle 仅覆盖其明确的 1D 运动模型；不得将其描述为通用 3D 连续区间证明。M5-06 独立数学审查和 H723 实机放行仍未完成。
