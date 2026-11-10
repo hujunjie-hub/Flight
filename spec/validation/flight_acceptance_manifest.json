@@ -231,7 +231,7 @@
         "0xD1FF0610"
       ],
       "cases": 128,
-      "status_at_code_baseline": "PASS",
+      "status_at_code_baseline": "PASS at full CI run #542",
       "oracle": "constant-velocity analytic closest approach and constant-acceleration long-double candidate points; not a formal interval proof"
     },
     {
@@ -261,9 +261,9 @@
   ],
   "latest_verified_code_baseline": {
     "date": "2026-11-10",
-    "commit": "0c761964d4bc6cfeec73ba60464657db450743ee",
-    "workflow_run": 509,
-    "workflow_url": "https://github.com/hujunjie-hub/Flight/actions/runs/42745124335",
+    "commit": "dafe47b8b17e7f32f676cb258eaa7a407a1dfb90",
+    "workflow_run": 542,
+    "workflow_url": "https://github.com/hujunjie-hub/Flight/actions/runs/42746417706",
     "conclusion": "SUCCESS",
     "counts": {
       "m4_host": {
@@ -291,6 +291,13 @@
         "binary64_lower_cases": 10007,
         "seed": "0x6D350680"
       },
+      "s06_081": {
+        "constant_velocity_cases": 64,
+        "constant_acceleration_cases": 64,
+        "oracle": "analytic long-double candidate set for the specified 1D constant-acceleration test model"
+      },
+      "s06_082": "PASS",
+      "s06_083": "PASS",
       "s06_084": {
         "cases": 10007,
         "seed": "0x6D350684"
@@ -302,6 +309,7 @@
     },
     "scope_limits": [
       "This evidence applies only to the listed commit.",
+      "The S06-081 long-double analytic oracle is not a general 3D interval proof.",
       "It is not H723 target runtime, WCET/RTA, hardware RAM/stack watermark, HIL or flight evidence."
     ]
   },
