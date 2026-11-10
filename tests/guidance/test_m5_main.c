@@ -3042,6 +3042,87 @@ static void test_m5_safety_dynamic_acceleration_envelope_differential(void)
   }
 }
 
+static float safety_test_round_up_float(double value)
+{
+  float rounded = (float)value;
+  if ((double)rounded < value) rounded = nextafterf(rounded, INFINITY);
+  return rounded;
+}
+
+
+static void test_m5_safety_dynamic_tangency_and_preview_seam_ulp(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+  float inflation, tangent_radius;
+  double inflation_exact, combined_exact;
+  unsigned seam_case;
+
+  safety_fx_init(&fx, 170000000u);
+  safety_set_constant_position(&fx, 0.0f, 0.0f, 0.0f);
+  fx.input.response_delay_us = 0u;
+  fx.input.max_dynamic_obstacle_accel_mps2 = 0.5f;
+  for (unsigned axis = 0u; axis < 3u; ++axis) {
+    fx.base.nav.core.position_std_m[axis] = 0.0f;
+    fx.base.nav.core.velocity_std_mps[axis] = 0.0f;
+  }
+  track = &fx.map.tracks[0];
+  safety_set_far_dynamic_track(track, 1100u, fx.base.now,
+      2.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+  track->position_std_m = 0.0f;
+  track->velocity_std_mps = 0.0f;
+
+  /* Reproduce the documented outward additions for the static hold fixture:
+     no navigation uncertainty, no response delay, and zero obstacle speed. */
+  inflation_exact = nextafter(
+      (double)fx.map.vehicle_radius_m + (double)fx.map.clearance_margin_m,
+      INFINITY);
+  inflation = safety_test_round_up_float(inflation_exact);
+  combined_exact = nextafter((double)track->radius_m + (double)inflation,
+                             INFINITY);
+  tangent_radius = safety_test_round_up_float(combined_exact);
+
+  track->position_ned_m[0] = tangent_radius;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_DYNAMIC_COLLISION);
+
+  track->position_ned_m[0] = nextafterf(tangent_radius, 0.0f);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_DYNAMIC_COLLISION);
+
+  /* One ULP outside may be conservatively rejected because the lower-distance
+     proof and bounded acceleration sweep overlap; it must never PASS. */
+  track->position_ned_m[0] = nextafterf(tangent_radius, INFINITY);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) != M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 0u);
+
+  track->position_ned_m[0] = tangent_radius + 0.01f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 1u);
+
+  /* A dynamic obstacle crosses the stationary vehicle exactly at the 20ms
+     preview seam, and one position ULP on either side. All three must reject. */
+  for (seam_case = 0u; seam_case < 3u; ++seam_case) {
+    float start_x = -2.0f;
+    safety_fx_init(&fx, 171000000u + (uint64_t)seam_case * 1000000u);
+    safety_set_constant_position(&fx, 0.0f, 0.0f, 0.0f);
+    track = &fx.map.tracks[0];
+    if (seam_case == 1u) start_x = nextafterf(-2.0f, INFINITY);
+    if (seam_case == 2u) start_x = nextafterf(-2.0f, -INFINITY);
+    safety_set_far_dynamic_track(track, 1110u + seam_case, fx.base.now,
+        start_x, 0.0f, 0.0f, 100.0f, 0.0f, 0.0f);
+    track->position_std_m = 0.0f;
+    track->velocity_std_mps = 0.0f;
+    fx.input.max_dynamic_obstacle_accel_mps2 = 0.5f;
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+        &fx.result) == M5_SAFETY_DYNAMIC_COLLISION);
+    CHECK(fx.result.passed == 0u);
+  }
+}
+
+
 static void test_m5_safety_multi_track_all_slots_and_fail_closed(void)
 {
   SafetyFx fx;
@@ -4719,6 +4800,7 @@ int main(void)
     {"m5_safety_dynamic_adaptive_preview_boundaries", test_m5_safety_dynamic_collision_at_adaptive_and_preview_boundaries},
     {"m5_safety_dynamic_continuous_distance_differential", test_m5_safety_dynamic_continuous_distance_differential},
     {"m5_safety_dynamic_constant_acceleration_continuous_oracle", test_m5_safety_dynamic_constant_acceleration_continuous_oracle},
+    {"m5_safety_dynamic_tangency_preview_seam_ulp", test_m5_safety_dynamic_tangency_and_preview_seam_ulp},
     {"m5_safety_dynamic_acceleration_envelope_differential", test_m5_safety_dynamic_acceleration_envelope_differential},
   };
   size_t i;
