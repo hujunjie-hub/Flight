@@ -12,6 +12,10 @@ static float seed_accel[3];
 static uint32_t seed_sequence;
 static uint32_t solve_sequence;
 static uint64_t last_solve_time;
+/* Acceptance accounting for the real solver: a job is counted only when the
+ * outer loop actually reaches mpc_solve(), so a scenario that never enters the
+ * trajectory path reports zero jobs instead of a fake success rate. */
+static MpcRunStats mpc_run_stats;
 static MpcSnapshot last_context;
 static OSQPFloat px[45], ax[702], q[15], lower[190], upper[190];
 static int lock_exchange(void) {
@@ -26,6 +30,9 @@ void mpc_seed(const float a[3], uint32_t sequence) {
     seed_sequence = sequence;
     unlock_exchange();
   }
+}
+void mpc_get_run_stats(MpcRunStats *out) {
+  if (out) *out = mpc_run_stats;
 }
 void mpc_reset(void) {
   /* Lifecycle only; both update tasks must have stopped. */
@@ -272,6 +279,13 @@ Status control_backend_outer_update(const ControllerInput *in) {
     osqp_cold_start(&quad_solver);
   last_context = result;
   s = mpc_solve(in, &m6.config.payload, previous, &result);
+  mpc_run_stats.jobs++;
+  if (s == STATUS_OK) {
+    mpc_run_stats.solved++;
+    mpc_run_stats.covered_us += 20000u;
+  } else {
+    mpc_run_stats.rejected++;
+  }
   if (clock_read(&end) || end.boot_id != start.boot_id ||
       end.time_epoch != start.time_epoch ||
       end.monotonic_us < start.monotonic_us ||

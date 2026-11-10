@@ -3,6 +3,12 @@
 #include "contract_checks/algorithm_checks.h"
 #include "control_backend.h"
 EXTERN_C_BEGIN
+/* Acceptance accounting for the MPC solver; diagnostics only. */
+typedef struct {
+  uint32_t jobs, solved, rejected;
+  uint64_t covered_us;
+} MpcRunStats;
+void mpc_get_run_stats(MpcRunStats *out);
 #define CONTROL_GRAVITY_MPS2 9.80665f
 #define MPC_VARIABLE_COUNT 15
 #define MPC_CONSTRAINT_COUNT 190
