@@ -49,7 +49,7 @@ python tests/guidance/run_validation.py
 
 `build/m4_m5_implementation/evidence/`
 
-此入口覆盖 M4 Host、M5 Host、M4/M5 integration、M5 ASan/UBSan、integration ASan/UBSan、ARM 检查、spec audit、内存预算、ABI 和目标构建检查。
+此入口覆盖 M4 Host、M5 Host、M4/M5 integration、M5 ASan/UBSan、integration ASan/UBSan、PowerShell ARM 检查、spec audit、内存预算、ABI 和目标构建检查。当前 `tests/guidance/arm_build_check.ps1` 主要编译生产源；M5-06 Host-only 验证器的 Cortex-M7 object 编译证据必须额外执行 §3.2 的 `bash tests/guidance/arm_build_check.sh`，不能只凭一键脚本的 PowerShell ARM 步骤认定完成。
 
 ### 3.2 CI 对齐的关键回归
 
