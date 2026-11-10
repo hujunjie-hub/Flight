@@ -16,30 +16,25 @@
 | MR-001 | 五次 Hermite 系数与 Bernstein 控制点转换 | 公式结构与五次 Hermite 边界条件相符；需独立高精度 oracle 覆盖非 dyadic 子区间及极端时长 | OPEN |
 | MR-002 | Bernstein convex-hull 位置/导数上界 | 控制点凸包可给出分量范围；向量范数上界需逐轴绝对值上界平方和并向外舍入 | OPEN |
 | MR-003 | double outward interval 运算 | add/sub/mul/div 结果以 nextafter 扩张；其可靠性依赖 IEEE-754 binary64、正确舍入、非 fast-math、无重结合/收缩改变运算语义 | OPEN |
-| MR-004 | sqrt 与浮点上下界转换 | `norm3_upper()` 未在 sqrt 结果转 float 前显式向 +∞ 扩张；当精确根值极接近 float 边界时，sqrt 的向下舍入可能使 round_up_float 仍返回低于精确值的 float。C 数学库精度契约及 Cortex-M7 实际实现尚未被本仓库验证 | BLOCKER |
+| MR-004 | sqrt 与浮点上下界转换 | 当前分支已改为 `sqrt_upper_float()` / `sqrt_lower_float()` 的 binary32 位模式有界二分搜索，不再依赖 libm sqrt；平方和向外舍入及 IEEE 60559 表示假设已加入代码约束。需独立复核证明并等待精确 Fraction oracle 的 CI 证据 | REVIEW_PENDING / CI_PENDING |
 | MR-005 | point-to-AABB 下界 | 输入为 float，差值/平方在 binary64 下有较强精确性基础；但应把完整误差论证写成可检查的不变量，并覆盖零距离、次正规数和极端尺度 | OPEN |
 | MR-006 | 动态相对运动扫掠界 | 取 speed-based 与 acceleration-based 两个上界的较小值，只有在两者分别对整个子区间成立时才保守；需独立解析/区间 oracle 对速度不确定度、加速度界、时间端点和舍入共同验证 | OPEN |
-| MR-007 | 编译器/目标约束 | 当前 ARM 编译脚本未显式声明 `-fno-fast-math`、舍入模型及浮点收缩策略；默认选项虽未启用 fast-math，但应把安全假设显式锁定并检查宏/编译命令 | BLOCKER |
+| MR-007 | 编译器/目标约束 | 当前 ARM/Host runner 已显式声明 `-fno-fast-math`、`-fno-unsafe-math-optimizations`、`-ffp-contract=off`、`-frounding-math`、`-fexcess-precision=standard`；ARM 脚本交叉编译 Host-only validator object 并记录工具链。需以本轮 CI 验证目标工具链支持与实际命令 | IMPLEMENTED / CI_PENDING |
 
 ## 2. 具体数学说明
 
-### MR-004：sqrt 上界
+### MR-004：binary32 平方根上下界（当前实现复核）
 
-当前实现：
+当前分支已不再通过 libm `sqrt()` 构造范数边界，而是使用 `sqrt_upper_float()` 与 `sqrt_lower_float()`：
 
-```c
-static float norm3_upper(const float v[3])
-{
-  const double x = v[0], y = v[1], z = v[2];
-  return round_up_float(sqrt(x * x + y * y + z * z));
-}
-```
+- binary32 正有限数的 IEEE 754 编码按无符号位模式单调递增；从 `0x00000000` 到 `0x7f7fffff` 可用固定最多 32 轮二分搜索。
+- 任意 binary32 数转为 binary64 精确；其平方最多需要 48 个有效二进制位，且平方指数范围仍处于 binary64 可表示范围内，因此候选 binary32 的平方可精确比较。
+- 上界路径先形成平方和上界，再找满足 `f*f >= sum_upper` 的最小 binary32 候选；下界路径先将各分量绝对值、平方及求和逐步向下扩张，再找满足 `f*f <= sum_lower` 的最大 binary32 候选。
+- 若上界超出最大有限 binary32，则返回 +Inf（安全拒绝）；下界在超范围时返回 FLT_MAX，仍是保守下界。
 
-`round_up_float` 只能保证结果不小于传入的 double 值，不能修复此前 sqrt 已向下舍入造成的误差。若精确范数略高于某个 float 可表示值，而 sqrt 的 double 结果略低于该边界，向上转 float 仍可能落在精确范数之下。
+该论证依赖 IEEE 754 binary32/binary64 表示、次正规数支持、binary64 正确舍入及禁止 fast-math/重结合。代码现已通过静态断言约束 radix、mantissa、指数范围、subnormal、`FLT_EVAL_METHOD` 和 IEC 60559 宏；仍需独立数学复核这些前提是否足以覆盖目标编译器 ABI。
 
-建议修复方向：将平方和累积作为明确的上界，并在 sqrt 结果向 float 转换前，按已声明且可验证的 sqrt 误差契约向 +∞ 扩张；若目标数学库不能提供所需误差保证，则采用可证明的保守替代实现。不得只凭随机采样通过来关闭此项。
-
-`curve_bounds()` 中部分 sqrt 调用已有 `nextafter(..., INFINITY)`，但仍需将统一的平方和、sqrt、float 转换规则抽成单一审计过的 helper，避免不同路径的舍入策略不一致。
+S06-080 新增 Fraction 精确平方范数 oracle，当前为 IMPLEMENTED / CI_PENDING。未取得 Host、ASan/UBSan 和 Cortex-M7 compile job 对本轮 commit 的证据前，不关闭 MR-004。
 
 ### MR-003 / MR-007：区间运算前提
 
@@ -50,7 +45,7 @@ static float norm3_upper(const float v[3])
 - `nextafter`、`INFINITY`、`isfinite` 在 Host 与目标工具链上具有预期语义；
 - 编译器和数学库版本纳入构建证据。
 
-当前 `tests/guidance/arm_build_check.sh` 使用 `-std=c11 -Wall -Wextra -Werror`，但没有把上述安全浮点选项显式写入命令。应锁定选项并将完整命令/编译器版本保存到 CI artifact。
+当前 `tests/guidance/arm_build_check.sh` 已显式加入 `-fno-fast-math -fno-unsafe-math-optimizations -ffp-contract=off -frounding-math -fexcess-precision=standard`，并将编译器版本、size 工具版本、完整 flags 和 M5-06 Host-only 编译范围写入 `build/m5_arm/toolchain.txt`。脚本还将 `m5_trajectory_safety.c` 以 `FLIGHT_M5_HOST_PLANNER` 宏交叉编译为 Cortex-M7 object，但不链接进产品。仍需 CI artifact 确认本轮实际使用的编译器及参数。
 
 ## 3. 必须新增的测试（尚未执行）
 
@@ -67,7 +62,7 @@ static float norm3_upper(const float v[3])
 
 ## 4. 进入 M5-07 的前置条件
 
-1. 修复并关闭 MR-004、MR-007。
+1. 完成 MR-004 的独立数学复核，并取得 S06-080 的 Host/ASan/UBSan 及 Cortex-M7 compile CI 证据；确认 MR-007 的 flags、编译器版本和目标对象范围均符合约束。
 2. 独立复核 Hermite→power→Bernstein 转换、导数控制点及 convex-hull 推导，提交可复算的公式和边界条件。
 3. 完成 S06-080..083，Host 与 ASan/UBSan 全通过；ARM 重新编译并保存明确的浮点编译参数。
 4. 动态障碍物连续距离 oracle 采用解析/区间方法，采样仅作补充。
