@@ -338,6 +338,51 @@
       "status_at_code_baseline": "PASS",
       "oracle": "independent random p/v/a knots; obstacle placed on the consumer curve at interval 11 midpoint -> not PASS",
       "local_run": "M5-06-R4-20261110"
+    },
+    {
+      "id": "S06-094",
+      "name": "Continuous-time envelope coverage (exact rational Bernstein bound)",
+      "seed": "0x6D350694",
+      "cases": 144,
+      "status_at_code_baseline": "PASS",
+      "oracle": "exact rational recomputation of coefficient/Horner/time/subnormal terms over the whole [0,s_max] with Bernstein control points; max required/envelope 0.970",
+      "local_run": "M5-06-R5-20261110"
+    },
+    {
+      "id": "S06-095",
+      "name": "Envelope participates in the static decision",
+      "seed": "deterministic",
+      "cases": 3,
+      "status_at_code_baseline": "PASS",
+      "oracle": "obstacle at inflation + 0.8E: exact curve clears, validator subtracts E -> STATIC_COLLISION",
+      "local_run": "M5-06-R5-20261110"
+    },
+    {
+      "id": "S06-096",
+      "name": "Envelope participates in the dynamic decision",
+      "seed": "deterministic",
+      "cases": 3,
+      "status_at_code_baseline": "PASS",
+      "oracle": "track at radius + inflation + 0.8E; consumer measured closer than the combined radius -> DYNAMIC_COLLISION",
+      "local_run": "M5-06-R5-20261110"
+    },
+    {
+      "id": "S06-097",
+      "name": "Envelope participates in the geofence decision",
+      "seed": "deterministic",
+      "cases": 2,
+      "status_at_code_baseline": "PASS",
+      "oracle": "KEEP_IN edge at inflation + 0.8E; clearance minus E -> GEOFENCE_VIOLATION; covers the R5 clearance fix",
+      "local_run": "M5-06-R5-20261110"
+    },
+    {
+      "id": "S06-098",
+      "name": "Floating-point environment is enforced at runtime",
+      "seed": "deterministic",
+      "cases": 4,
+      "status_at_code_baseline": "PASS",
+      "oracle": "FE_DOWNWARD -> NUMERIC_FAILURE; restored FE_TONEAREST -> PASS; target reads FPSCR RMode/FZ/DN",
+      "local_run": "M5-06-R5-20261110"
     }
   ],
   "latest_verified_code_baseline": {
@@ -397,6 +442,8 @@
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
+      "R5 fixed a geofence clearance gap: check_geofences() did not subtract position_rounding_error_m.",
+      "MR-009 is FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW: six sub-items (coefficient, Horner, time, FP environment, continuous coverage, end-to-end decision) each need an independent APPROVED.",
       "MR-009 is FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW (S06-085..093); spec/ABI evidence re-baseline and RT-Thread package pinning need owner approval.",
       "Independent mathematical review MR-001..MR-008 is not yet APPROVED.",
       "M5-07 gate integration is not complete.",
@@ -414,6 +461,14 @@
     "coefficient_error_source": "outward interval coefficients, not binary64 nominal",
     "velocity_mid_norm_includes_eval_error": true,
     "fma_guard": "tests/guidance/check_consumer_fp_contraction.py",
-    "evidence": "build/m4_m5_implementation/evidence/m5_host.log"
+    "evidence": "build/m4_m5_implementation/evidence/m5_host.log",
+    "gamma_upward_rounded": true,
+    "runtime_rounding_mode_enforced": true,
+    "geofence_clearance_includes_envelope": true,
+    "continuous_time_evidence": "S06-094",
+    "decision_participation_evidence": "S06-095..097",
+    "runtime_environment_test": "S06-098",
+    "proof_record": "spec/history/implementation/guidance/M5_06_6_MR009_PROOF.md",
+    "fp_environment_audit": "spec/validation/fp_environment_audit.md"
   }
 }

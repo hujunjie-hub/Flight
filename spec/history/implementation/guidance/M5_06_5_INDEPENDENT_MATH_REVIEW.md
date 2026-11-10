@@ -363,3 +363,18 @@ R3 只把 `eval_velocity_error` 加进 `speed_bound` 与 `velocity_rounding_erro
 | FMA 检查 | `vfma/vfms/vmla/vmls = 0`（生产 flags） |
 
 **状态：FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW。** 独立审查仍需确认：`γ_n` 前提（正规数、无溢出、RN）、区间系数与 binary32 复刻的一致性、时间量化导数上界、`s_max = h·u1` 单调性。MR-009 未 APPROVED 前 M5-06 保持 BLOCKED，M5-07 不得启动。
+
+ 
+## 13. R5 证明闭环（2026-11-10）
+
+R5 不再修改误差公式，而是逐项证明 R4 实现是保守的，并把假设变成运行时检查：
+
+1. **γ_n 推导**：`M5_06_6_MR009_PROOF.md` 给出 Higham 引理、Horner 的 2n 计数（10/12/10）、系数区间项、时间量化 2u·s_max、次正规 n·2^-149（不依赖 s_max≤1）与溢出/次正规拒绝条件。
+2. **γ 向上取整**：`nu` 与商各补一次 `nextafter`，时间缩放改 outward。
+3. **运行时圆整模式**：入口读 FPSCR/`fegetround()`，不满足即 `NUMERIC_FAILURE`；负向用例 `m5_safety_floating_environment`。
+4. **浮点环境审计**：`spec/validation/fp_environment_audit.md` 记录 3,362 文件扫描、无 FPSCR 写、Cortex-M7 只保存 s16–s31、启动代码不在仓库（`packages/` 缺失）→ 以运行时检查取代假设。
+5. **FMA**：消费端与验证器两个对象都检查，记录对象 SHA256 与完整 flags。
+6. **连续覆盖**：S06-094 用精确有理数 + Bernstein 覆盖整个区间，`0.970` 的上界比仍有余量。
+7. **围栏缺口**：`check_geofences()` 之前没有减去 `position_rounding_error_m`，R5 修复并由 S06-097 覆盖。
+
+审查状态：**六项分别有证据，等待独立审查逐项 APPROVED**；MR-009 不因整体 CI 通过而关闭。

@@ -157,14 +157,14 @@ jobs:
             build/m5_host/
             build/m4_m5_host/
 
-  spec-and-abi:
-    name: Spec audit and production ABI
+  src-spec-audit:
+    name: Spec audit
     runs-on: ubuntu-latest
-    # Transitional: the committed spec/validation/dialect_report.json and
-    # middleware/contracts/product_contract/abi_lock.h still pin CRLF-derived
-    # hashes, so these checks fail on an LF checkout until the owner approves
-    # the re-baseline in spec/validation/eol_hash_rebaseline_analysis.md.
-    # Remove continue-on-error once that change lands.
+    # Transitional: spec/validation/dialect_report.json still pins the CRLF
+    # hash of FCU.xml, so round 3 fails on an LF checkout until the owner
+    # approves the re-baseline in spec/validation/eol_hash_rebaseline_analysis.md.
+    # Round 1 (document, registry, ABI compile) is independent and must not be
+    # skipped because of that. Remove continue-on-error once re-baselined.
     continue-on-error: true
     steps:
       - name: Check out source
@@ -180,8 +180,37 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi
 
-      - name: Run spec audit
+      - name: Run spec audit (round 1)
         run: python spec/tools/audit_spec.py --round 1 --label ci
+
+  src-abi-report:
+    name: Production ABI report
+    runs-on: ubuntu-latest
+    # Separate job so a spec-audit failure can never skip the ABI evidence.
+    # Transitional: abi_lock.h still pins the CRLF-derived message registry
+    # hash; remove continue-on-error after the approved re-baseline.
+    continue-on-error: true
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ARM embedded toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi
 
       - name: Run production ABI report
         run: python tests/abi/abi_report.py
+
+      - name: Upload ABI evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: abi-evidence
+          path: tests/abi/evidence/
+

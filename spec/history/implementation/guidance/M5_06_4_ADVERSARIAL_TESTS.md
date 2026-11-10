@@ -253,3 +253,15 @@ long-double 恒加速度 oracle 仅覆盖其明确的 1D 运动模型；不得�
 | S06-093 | 最大偏差参考 | 24 个 knot 的 p/v/a 独立随机（seed `0x6D350091`），障碍物放在 interval 11 中点的**消费**位置 | 不得 PASS |
 
 诚实边界：对运动参考，DFS 未决带（`speed·h/2⁵`）通常大于 MR-009 包络，因此这些用例证明的是**决策路径**（碰撞必须拒绝、安全必须通过），而不是“包络单独翻转判定”。包络本身的逐点覆盖由 S06-085（精确有理数）与 S06-086（真实 C 消费端）证明。
+
+ 
+## S06-094..097 连续时间覆盖与包络参与（2026-11-10，R5）
+
+| ID | 内容 | 结果 |
+|---|---|---|
+| S06-094 | `verify_continuous_envelope.py`：用精确有理数重算每一项包络（Bernstein 控制点覆盖整个 `[0,s_max]`、γ_n 向上取整、时间项 2u·s_max、n·2^-149），seed `0x6D350694`，16 段 × 3 轴 × 3 个量 | `max_required/envelope = 0.970`，`failures=0`；无采样 oracle |
+| S06-095 | 静态障碍位于 `inflation + 0.8E`：数学曲线净空 > 0，验证器减去 E 后拒绝 | `STATIC_COLLISION`，reason 10 |
+| S06-096 | 动态 track 位于 `radius + inflation + 0.8E` | `DYNAMIC_COLLISION`，reason 13；同时断言消费曲线更近 |
+| S06-097 | KEEP_IN 边界位于 `inflation + 0.8E` | `GEOFENCE_VIOLATION`，reason 15 |
+
+说明：S06-095..097 使用的速度分裂曲线使 E 远大于几何分辨率，因此证明的是"包络参与判定"；`|consumer − exact|` 级别的穿透由 S06-085/086/094 逐点证明。S06-097 同时验证了 R5 修复的围栏包络缺口。
