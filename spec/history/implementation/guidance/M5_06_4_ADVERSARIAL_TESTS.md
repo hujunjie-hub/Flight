@@ -142,3 +142,11 @@ S06-074..079 静态/动态端到端扫掠差分、加速度包络、预览接缝
 ## S06-080 精确有理数范数 oracle（2026-11-10）
 
 新增 `tests/guidance/verify_norm_bounds.py`，通过生产 C test API 获取 upper/lower binary32 结果，Python `Fraction` 对输入 binary32 值精确还原并比较平方范数，避免使用浮点 sqrt 作为唯一判据。固定 seed `0x6D350680`；覆盖零向量、单位向量、`sqrt(1 + 2^-160)`、最小次正规数、最大有限数及 10,000 组任意有限 binary32 位模式。已接入 Host runner；当前状态 **CI_PENDING**，尚无本次提交的 PASS 记录。
+ 
+## S06-080..083 源码复核补充（2026-11-10）
+
+- S06-080 已使用 Python `Fraction` 精确平方范数 oracle，覆盖 binary32 上界和 binary64 下界各 10,007 组，固定 seed `0x6D350680`；binary64 扩展由 commit `61dbc4c` 加入。
+- S06-081 已加入恒速解析最近点和恒加速度解析候选点两组端到端差分，每组 64 cases。恒加速度参考使用 long double 计算端点、驻点与相对位置根；它不是形式化区间 oracle，且随机不确定度传播组合仍待扩展。
+- S06-082 已加入精确相切、内侧/外侧 1 ULP、明确安全净空，以及 20ms seam 精确位置和 ±1 float ULP 的动态碰撞测试。
+- S06-083 已加入自适应细分点碰撞测试，覆盖精确起点和 ±1 float ULP，断言结果为 DYNAMIC_COLLISION、passed=0 且 work_units 确实超过预览区间数。
+- 上述新增用例当前均为 **IMPLEMENTED / CI_PENDING**。在对应新 commit 的 CI 运行完成前，不得把源码存在误报为测试通过。
