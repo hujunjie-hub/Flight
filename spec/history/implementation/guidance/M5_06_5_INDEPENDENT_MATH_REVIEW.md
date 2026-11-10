@@ -97,3 +97,36 @@ S06-080 新增 Fraction 精确平方范数 oracle，当前为 IMPLEMENTED / CI_P
 `verify_norm_bounds.py` 已进一步扩展：binary32 上界 10,007 组（7 个显式边界 + 10,000 个固定种子随机向量），以及 binary64 下界 10,007 组（7 个显式边界 + 10,000 个固定种子随机向量）。binary64 下界测试覆盖次正规数、最小正规数、极大有限值、指数跨度及混合尺度；所有断言仍使用 Fraction 精确平方范数，不调用 sqrt 作为 oracle。
 
 新增代码提交：`61dbc4c56240a54aa2a8a3bc54e8392093a1b029`。该提交触发的 CI 结果尚未核验，S06-080 仍为 CI_PENDING。
+
+ 
+## 7. 新发现阻塞：动态 track 预测位置的数值误差包络（MR-008）
+
+状态：**OPEN / SAFETY BLOCKER**。
+
+在复核 `check_dynamic_tracks()` 时发现，动态障碍物中点预测目前按以下路径计算：
+
+1. 将 `horizon_mid_s` 乘以 `1e6f` 并转换为 `uint64_t`，形成整数微秒中点；
+2. 通过两个 uint64 时间戳相减，再乘 double 常量 `1e-6` 得到 `dt_exact`；
+3. 使用 double 计算 `position + velocity * dt_exact`；
+4. 将预测位置转换成 float；
+5. `obstacle_rounding_error` 仅统计 float 结果与已舍入 double `predicted` 的差。
+
+第 5 步没有覆盖第 1～3 步的时间量化、秒单位换算和 double 乘加误差。特别是当 double 预测结果恰好落在 float 可表示值上时，float 转换误差可能为零，但这并不证明精确实数预测位置也恰好落在该 float 上。当前代码没有为该路径建立完整的向外误差区间。
+
+这构成动态障碍物距离下界证明的缺口；目前没有证明它一定产生错误 PASS，但在补齐之前不能认定动态距离下界严格保守。
+
+**修复要求：**
+- 避免用绝对 epoch 的浮点秒数做差；使用相对参考时间的有界整数微秒差，避免大 epoch 精度损失。
+- 对子区间中点时间偏移建立 outward interval，显式包住微秒到秒的精确比例（(10^{-6})）。
+- 使用 interval multiply/add 包住 `track.position + track.velocity * dt` 的精确实数结果。
+- 将最终 float obstacle 点到完整预测区间两端的最大距离作为位置误差上界，再向上扩张。
+- 用预测时间区间端点的最大绝对值计算不确定度传播时域。
+- 任何 interval 溢出或非法值必须返回 NUMERIC_FAILURE，禁止退化成点估计。
+
+**新增测试预留：**
+
+| ID | 测试内容 | Oracle | Seed | 状态 |
+|---|---|---|---|---|
+| S06-084 | 动态 track 预测位置的时间换算、double 乘加及 float 转换误差；覆盖大 epoch、正负时间差、非 dyadic 子区间中点、精确相切/近切 | Fraction 精确时间/位置参考 + 端到端 fail-closed 差分 | 0x6D350684 | NOT_RUN |
+
+MR-008 关闭前，S06-081..083 即使 CI 通过，也不能单独证明动态障碍物连续距离路径已完成数学验收。
