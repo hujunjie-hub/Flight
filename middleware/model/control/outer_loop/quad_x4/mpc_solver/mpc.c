@@ -241,26 +241,41 @@ Status control_backend_outer_update(const ControllerInput *in) {
   uint32_t epoch;
   float previous[3];
   Status s;
-  if (!m6.initialized)
+  if (!m6.initialized) {
+    mpc_run_stats.blocked_uninitialized++;
     return STATUS_NOT_READY;
+  }
   s = controller_validate_input(in, &epoch, &mode);
-  if (s)
+  if (s) {
+    mpc_run_stats.blocked_validation++;
+    mpc_run_stats.last_validation_status = (int32_t)s;
     return s;
-  if (mode != GUIDANCE_REFERENCE_TRAJECTORY)
+  }
+  if (mode != GUIDANCE_REFERENCE_TRAJECTORY) {
+    mpc_run_stats.blocked_mode++;
     return STATUS_UNSUPPORTED;
+  }
   if (clock_read(&start) || start.monotonic_us < in->evaluation_time_us ||
       start.boot_id != in->navigation->header.boot_id ||
-      start.time_epoch != in->navigation->header.time_epoch)
+      start.time_epoch != in->navigation->header.time_epoch) {
+    mpc_run_stats.blocked_clock++;
     return STATUS_STALE_DATA;
+  }
   if (start.monotonic_us - in->control_time_us +
           in->navigation->header.event_time_uncertainty_us >
-      5000)
+      5000) {
+    mpc_run_stats.blocked_stale++;
     return STATUS_STALE_DATA;
-  if (last_solve_time && start.monotonic_us - last_solve_time < 20000)
+  }
+  if (last_solve_time && start.monotonic_us - last_solve_time < 20000) {
+    mpc_run_stats.blocked_throttle++;
     return STATUS_NOT_READY;
+  }
   last_solve_time = start.monotonic_us;
-  if (!lock_exchange())
+  if (!lock_exchange()) {
+    mpc_run_stats.blocked_lock++;
     return STATUS_NOT_READY;
+  }
   memcpy(previous, seed_accel, sizeof(previous));
   memset(&result, 0, sizeof(result));
   result.seed_control_sequence = seed_sequence;

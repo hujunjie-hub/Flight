@@ -7,6 +7,11 @@ EXTERN_C_BEGIN
 typedef struct {
   uint32_t jobs, solved, rejected;
   uint64_t covered_us;
+  /* Why the outer loop never reached mpc_solve(): one counter per early return
+   * in control_backend_outer_update(), so a zero-job run explains itself. */
+  uint32_t blocked_uninitialized, blocked_validation, blocked_mode;
+  uint32_t blocked_clock, blocked_stale, blocked_throttle, blocked_lock;
+  int32_t last_validation_status;
 } MpcRunStats;
 void mpc_get_run_stats(MpcRunStats *out);
 #define CONTROL_GRAVITY_MPS2 9.80665f
