@@ -131,6 +131,10 @@ S06-074..079 静态/动态端到端扫掠差分、加速度包络、预览接缝
 
 当前 ARM 脚本已将 M5-06 Host-only validator translation unit 交叉编译为 Cortex-M7 object，但不链接进产品；完整目标 CI 结果仍待本轮提交确认。MPC RAM 数字不是 M5-06 validator RAM，object 编译也不构成 H723 运行期资源或飞行放行证据。
 
+## S06-081 动态障碍物恒加速度连续距离 oracle（2026-11-10）
+
+新增 `test_m5_safety_dynamic_constant_acceleration_continuous_oracle`：64 组恒加速度动态障碍物场景，32 组碰撞、32 组安全近失。独立参考将车辆与障碍物的相对位置表示为二次多项式，检查区间端点、相对位置驻点及二次方程零点，计算整个预测时域的连续最小距离；不是固定时间采样 oracle。实际加速度绝对值限制在 0.45m/s²，validator 输入上界为 0.5m/s²。固定 seed `0x6D350681`。当前 **IMPLEMENTED / CI_PENDING**，等待 Host、ASan/UBSan 和 Cortex-M7 编译回归。
+
 ## S06-080 精确有理数范数 oracle（2026-11-10）
 
 新增 `tests/guidance/verify_norm_bounds.py`，通过生产 C test API 获取 upper/lower binary32 结果，Python `Fraction` 对输入 binary32 值精确还原并比较平方范数，避免使用浮点 sqrt 作为唯一判据。固定 seed `0x6D350680`；覆盖零向量、单位向量、`sqrt(1 + 2^-160)`、最小次正规数、最大有限数及 10,000 组任意有限 binary32 位模式。已接入 Host runner；当前状态 **CI_PENDING**，尚无本次提交的 PASS 记录。
