@@ -41,6 +41,13 @@ float m5_trajectory_safety_test_norm_lower_bound(
 float m5_trajectory_safety_test_norm_upper_bound(
     float x, float y, float z);
 
+uint8_t m5_trajectory_safety_test_predict_dynamic_position(
+    const float position_ned_m[3],
+    const float velocity_ned_mps[3],
+    double local_mid_offset_us,
+    int64_t sample_offset_us,
+    float predicted_position[3],
+    float *position_error_m);
 
 uint8_t m5_trajectory_safety_test_point_aabb_distance_lower(
     const float point[3],
