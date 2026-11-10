@@ -221,3 +221,12 @@ Replaced it with the analytic candidate set for one-dimensional constant relativ
 Because (d^2(t)=x(t)^2+y^2), every interior minimum must satisfy either (x(t)=0) or (x'(t)=0). The oracle evaluates all valid candidates in long double and uses `sqrtl`; no fixed time grid is used.
 
 This is an independent analytic continuous-distance differential oracle for the 1D constant-acceleration test model, not a general 3D interval proof for arbitrary acceleration and uncertainty. Code commit: `a14b9f1`. CI pending.
+
+ 
+## CI #509 状态更新（2026-11-10）
+
+此前记录的 S06-080..084 CI_PENDING 已有对应代码基线结果：commit `0c761964d4bc6cfeec73ba60464657db450743ee` / Host validation #509 全部 jobs success。M5 Host 和 M5 ASan/UBSan 均为 269,207 checks / 0 failures；S06-080 两条 Fraction oracle 各 10,007 cases（seed `0x6D350680`）；S06-084 Fraction prediction oracle 10,007 cases（seed `0x6D350684`）；S06-081..083 对应测试通过；Cortex-M7 M5-06 compile 通过。
+
+CI：[Host validation #509](https://github.com/hujunjie-hub/Flight/actions/runs/42745124335)。
+
+**重要：CI PASS 不等于数学审查 APPROVED。** MR-001 Hermite/Bernstein 推导、MR-002 导数凸包与向量范数界、MR-003 interval outward rounding 假设、MR-004 binary32 sqrt 上下界证明、MR-005 point-to-AABB 下界、MR-006 动态相对 sweep 组合界、MR-007 编译器浮点语义和 MR-008 动态预测位置误差包络仍需逐项独立复核并给出明确结论。当前状态仍为 **BLOCKED / REVIEW_INCOMPLETE**，M5-07 不得开始；H723 目标运行、WCET/RTA、实机 RAM/stack、HIL 和飞行仍 NOT_RUN。
