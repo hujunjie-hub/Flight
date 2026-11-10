@@ -212,3 +212,14 @@ ARM 静态检查报告：MPC RAM 29,252 bytes、worker stack 8,192 bytes、最�
 - 三轴预测误差平方和必须不超过生产返回的误差半径平方；预测溢出必须 fail-closed。
 - C 端到端新增低 epoch/近 uint64 上限 epoch 不变性用例，检查相同相对 track 时间下结果和 track_checks 一致。
 - 当前状态：**FIX IMPLEMENTED / CI_PENDING**，尚无本轮 CI 通过证据。
+
+ 
+## CI #499 失败定位与修复（2026-11-10）
+
+Run #499 / `1144ce8`：
+- M4 Host 927/0 PASS；source/time 和 navigation/control PASS。
+- M5 Host 在编译阶段因 `DBL_TRUE_MIN` 浮点比较不属于 C static assertion integer constant expression 而失败；M5 用例未执行。
+- Cortex-M7 M4/M5 编译因 GNU Arm GCC 未定义可选宏 `__STDC_IEC_559__` 而失败。
+- MPC RAM/stack 静态检查通过；M5 编译失败后 integration 与 sanitizer 被跳过。
+
+修复提交：`b0f40cb`（DBL_HAS_SUBNORM 整数属性断言）、`0349587`（删除可选 IEC 宏依赖，保留 radix/precision/exponent/subnormal/sizeof 检查）。Run #501 正在由新提交触发；**CI_PENDING**。
