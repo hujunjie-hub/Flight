@@ -8,8 +8,18 @@
  */
 #if defined(FLIGHT_M5_HOST_PLANNER)
 
+#include <float.h>
 #include <math.h>
+#include <stdint.h>
 #include <string.h>
+
+_Static_assert(FLT_RADIX == 2, "M5 safety requires radix-2 floating point");
+_Static_assert(FLT_MANT_DIG == 24 && FLT_MAX_EXP == 128,
+               "M5 safety requires IEEE-754 binary32 float");
+_Static_assert(DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024,
+               "M5 safety requires IEEE-754 binary64 double");
+_Static_assert(sizeof(float) == sizeof(uint32_t),
+               "M5 safety requires 32-bit float storage");
 #include "trajectory_planning/m5_trajectory_safety.h"
 #include "messages/message_ids.h"
 #include "geofence_geometry/geofence_geometry.h"
@@ -193,17 +203,74 @@ static double interval_abs_max(M5SafetyInterval value)
   return fmax(fabs(value.low), fabs(value.high));
 }
 
+/*
+ * All safety bounds use outward arithmetic. The float-root helpers avoid
+ * libm sqrt accuracy assumptions: positive binary32 bit patterns are ordered,
+ * and the square of any binary32 value is exact in binary64 (48 significand
+ * bits <= the binary64 53-bit significand).
+ */
+static double add_upper_nonnegative(double a, double b)
+{
+  if (!(a >= 0.0) || !(b >= 0.0) || !isfinite(a) || !isfinite(b))
+    return INFINITY;
+  if (a == 0.0) return b;
+  if (b == 0.0) return a;
+  return nextafter(a + b, INFINITY);
+}
+
+static double multiply_upper_nonnegative(double a, double b)
+{
+  double product;
+  if (!(a >= 0.0) || !(b >= 0.0) || !isfinite(a) || !isfinite(b))
+    return INFINITY;
+  if (a == 0.0 || b == 0.0) return 0.0;
+  product = a * b;
+  return nextafter(product, INFINITY);
+}
+
 static double sum_square_upper(double sum, double value)
 {
-  double square;
+  return add_upper_nonnegative(
+      sum, multiply_upper_nonnegative(value, value));
+}
+
+static double sum_square_lower(double sum, double value)
+{
+  double square, total;
+  if (!(sum >= 0.0) || !(value >= 0.0) || isnan(sum) || isnan(value))
+    return 0.0;
   if (value == 0.0) return sum;
-  square = nextafter(value * value, INFINITY);
-  return nextafter(sum + square, INFINITY);
+  square = nextafter(value * value, -INFINITY);
+  if (!(square > 0.0)) square = 0.0;
+  if (sum == 0.0) return square;
+  total = nextafter(sum + square, -INFINITY);
+  return total > 0.0 ? total : 0.0;
+}
+
+static double abs_difference_upper(double a, double b)
+{
+  double difference = fabs(a - b);
+  return difference > 0.0 ? nextafter(difference, INFINITY) : 0.0;
+}
+
+static double microseconds_to_seconds_upper(uint64_t microseconds)
+{
+  double integer_upper;
+  if (microseconds == 0u) return 0.0;
+  /* One ULP covers uint64_t -> binary64 conversion before scaling. The
+     multiplier is the next binary64 value above the exact 1e-6 rational. */
+  integer_upper = nextafter((double)microseconds, INFINITY);
+  return multiply_upper_nonnegative(
+      integer_upper, 1.0000000000000002e-6);
 }
 
 static float round_up_float(double value)
 {
-  float rounded = (float)value;
+  float rounded;
+  if (isnan(value)) return (float)value;
+  if (value > (double)FLT_MAX) return INFINITY;
+  if (value < -(double)FLT_MAX) return -FLT_MAX;
+  rounded = (float)value;
   if (!isfinite(rounded)) return rounded;
   if ((double)rounded < value) rounded = nextafterf(rounded, INFINITY);
   return rounded;
@@ -211,23 +278,115 @@ static float round_up_float(double value)
 
 static float round_down_float(double value)
 {
-  float rounded = (float)value;
+  float rounded;
+  if (isnan(value)) return (float)value;
+  if (value > (double)FLT_MAX) return FLT_MAX;
+  if (value < -(double)FLT_MAX) return -INFINITY;
+  rounded = (float)value;
   if (!isfinite(rounded)) return rounded;
   if ((double)rounded > value) rounded = nextafterf(rounded, -INFINITY);
   return rounded;
 }
 
+static float positive_float_from_bits(uint32_t bits)
+{
+  float value;
+  memcpy(&value, &bits, sizeof(value));
+  return value;
+}
+
+static float sqrt_upper_float(double value)
+{
+  const uint32_t max_bits = UINT32_C(0x7f7fffff);
+  const double max_square = (double)FLT_MAX * (double)FLT_MAX;
+  uint32_t low = 0u, high = max_bits;
+
+  if (!(value >= 0.0) || !isfinite(value)) return INFINITY;
+  if (value == 0.0) return 0.0f;
+  if (value > max_square) return INFINITY;
+
+  /* Find the least binary32 f for which the exact binary64 product f*f
+     encloses value. No rounded sqrt result participates in the proof. */
+  while (low < high) {
+    uint32_t middle = low + (high - low) / 2u;
+    float candidate = positive_float_from_bits(middle);
+    double square = (double)candidate * (double)candidate;
+    if (square >= value) high = middle;
+    else low = middle + 1u;
+  }
+  return positive_float_from_bits(low);
+}
+
+static float sqrt_lower_float(double value)
+{
+  const uint32_t max_bits = UINT32_C(0x7f7fffff);
+  const double max_square = (double)FLT_MAX * (double)FLT_MAX;
+  uint32_t low = 0u, high = max_bits;
+
+  if (!(value >= 0.0)) return 0.0f;
+  if (!isfinite(value) || value >= max_square) return FLT_MAX;
+
+  /* Find the greatest binary32 f for which the exact product f*f is no
+     greater than value. This is a conservative lower square-root bound. */
+  while (low < high) {
+    uint32_t middle = low + (high - low + 1u) / 2u;
+    float candidate = positive_float_from_bits(middle);
+    double square = (double)candidate * (double)candidate;
+    if (square <= value) low = middle;
+    else high = middle - 1u;
+  }
+  return positive_float_from_bits(low);
+}
+
 static float norm3_upper(const float v[3])
 {
-  const double x = v[0], y = v[1], z = v[2];
-  return round_up_float(sqrt(x * x + y * y + z * z));
+  double sum = 0.0;
+  unsigned axis;
+  if (v == NULL) return INFINITY;
+  for (axis = 0u; axis < 3u; ++axis) {
+    double component, square;
+    if (!isfinite(v[axis])) return INFINITY;
+    component = (double)v[axis];
+    /* A binary32 x converted to binary64 has an exact x*x product. */
+    square = component * component;
+    if (!isfinite(square)) return INFINITY;
+    if (square != 0.0)
+      sum = sum == 0.0 ? square : add_upper_nonnegative(sum, square);
+  }
+  return sqrt_upper_float(sum);
+}
+
+static float norm3_upper_double(double x, double y, double z)
+{
+  const double components[3] = {x, y, z};
+  double sum = 0.0;
+  unsigned axis;
+  for (axis = 0u; axis < 3u; ++axis) {
+    double magnitude;
+    if (!isfinite(components[axis])) return INFINITY;
+    magnitude = fabs(components[axis]);
+    if (magnitude > 0.0) magnitude = nextafter(magnitude, INFINITY);
+    sum = sum_square_upper(sum, magnitude);
+  }
+  return sqrt_upper_float(sum);
 }
 
 static float norm3_lower(const double x, const double y, const double z)
 {
-  double value = sqrt(x * x + y * y + z * z);
-  float rounded = round_down_float(value);
-  return rounded > 0.0f ? nextafterf(rounded, -INFINITY) : 0.0f;
+  const double components[3] = {x, y, z};
+  double sum = 0.0;
+  unsigned axis;
+  for (axis = 0u; axis < 3u; ++axis) {
+    double magnitude;
+    if (!isfinite(components[axis])) return 0.0f;
+    magnitude = fabs(components[axis]);
+    if (magnitude > 0.0) {
+      magnitude = nextafter(magnitude, -INFINITY);
+      if (!(magnitude > 0.0)) magnitude = 0.0;
+    }
+    sum = sum_square_lower(sum, magnitude);
+  }
+  return sqrt_lower_float(sum);
 }
 
 static uint64_t earlier_u64(uint64_t a, uint64_t b)
@@ -745,11 +904,15 @@ static uint8_t curve_bounds(
 
     {
       double position_error = fmax(
-          fabs((double)bounds->position[axis] - position_mid_interval.low),
-          fabs(position_mid_interval.high - (double)bounds->position[axis]));
+          abs_difference_upper((double)bounds->position[axis],
+                                position_mid_interval.low),
+          abs_difference_upper(position_mid_interval.high,
+                                (double)bounds->position[axis]));
       double velocity_error = fmax(
-          fabs((double)bounds->velocity[axis] - velocity_mid_interval.low),
-          fabs(velocity_mid_interval.high - (double)bounds->velocity[axis]));
+          abs_difference_upper((double)bounds->velocity[axis],
+                                velocity_mid_interval.low),
+          abs_difference_upper(velocity_mid_interval.high,
+                                (double)bounds->velocity[axis]));
       velocity_mid_abs = interval_abs_max(velocity_mid_interval);
       position_rounding2 = sum_square_upper(position_rounding2, position_error);
       velocity_rounding2 = sum_square_upper(velocity_rounding2, velocity_error);
@@ -769,15 +932,11 @@ static uint8_t curve_bounds(
     acceleration2 = sum_square_upper(acceleration2, acceleration_abs);
   }
 
-  bounds->speed_bound = round_up_float(nextafter(sqrt(speed2), INFINITY));
-  bounds->acceleration_bound =
-      round_up_float(nextafter(sqrt(acceleration2), INFINITY));
-  bounds->velocity_mid_norm =
-      round_up_float(nextafter(sqrt(velocity_mid2), INFINITY));
-  bounds->position_rounding_error_m =
-      round_up_float(nextafter(sqrt(position_rounding2), INFINITY));
-  bounds->velocity_rounding_error_mps =
-      round_up_float(nextafter(sqrt(velocity_rounding2), INFINITY));
+  bounds->speed_bound = sqrt_upper_float(speed2);
+  bounds->acceleration_bound = sqrt_upper_float(acceleration2);
+  bounds->velocity_mid_norm = sqrt_upper_float(velocity_mid2);
+  bounds->position_rounding_error_m = sqrt_upper_float(position_rounding2);
+  bounds->velocity_rounding_error_mps = sqrt_upper_float(velocity_rounding2);
   bounds->half_duration_s = round_up_float(0.5 * duration_s);
   return (uint8_t)(isfinite(bounds->speed_bound) &&
       isfinite(bounds->acceleration_bound) &&
@@ -851,6 +1010,7 @@ static uint8_t point_aabb_distance_lower(
   double distance2 = 0.0;
   unsigned axis;
   float geometric_lower;
+  double corrected_lower;
 
   if (point == NULL || center == NULL || distance_lower == NULL ||
       !finite3(point) || !finite3(center) ||
@@ -860,13 +1020,16 @@ static uint8_t point_aabb_distance_lower(
   }
 
   for (axis = 0u; axis < 3u; ++axis) {
-    double delta = fabs((double)point[axis] - center[axis]) -
-                   (double)half_extent;
-    if (delta > 0.0) distance2 += delta * delta;
+    double separation = fabs((double)point[axis] - (double)center[axis]);
+    double delta;
+    if (separation > 0.0) separation = nextafter(separation, -INFINITY);
+    delta = nextafter(separation - (double)half_extent, -INFINITY);
+    if (delta > 0.0) distance2 = sum_square_lower(distance2, delta);
   }
-  geometric_lower = norm3_lower(sqrt(distance2), 0.0, 0.0);
-  *distance_lower = fmaxf(0.0f, round_down_float(
-      (double)geometric_lower - point_rounding_error));
+  geometric_lower = sqrt_lower_float(distance2);
+  corrected_lower = nextafter(
+      (double)geometric_lower - (double)point_rounding_error, -INFINITY);
+  *distance_lower = fmaxf(0.0f, round_down_float(corrected_lower));
   return (uint8_t)isfinite(*distance_lower);
 }
 
@@ -880,6 +1043,8 @@ static uint8_t dynamic_relative_sweep_bound(
     float *sweep_bound)
 {
   float speed_sweep, acceleration_sweep;
+  double speed_sum, speed_sweep_upper, acceleration_sweep_upper;
+  double acceleration_term, velocity_term;
 
   if (sweep_bound == NULL ||
       !isfinite(curve_speed_bound) || curve_speed_bound < 0.0f ||
@@ -892,14 +1057,25 @@ static uint8_t dynamic_relative_sweep_bound(
     return 0u;
   }
 
-  speed_sweep = round_up_float(
-      ((double)curve_speed_bound + obstacle_speed_bound +
-       velocity_std_mps) * half_duration_s);
-  acceleration_sweep = round_up_float(
-      (double)relative_speed_bound * half_duration_s +
-      0.5 * relative_acceleration_bound * half_duration_s *
-          half_duration_s +
-      (double)velocity_std_mps * half_duration_s);
+  speed_sum = add_upper_nonnegative(
+      add_upper_nonnegative(curve_speed_bound, obstacle_speed_bound),
+      velocity_std_mps);
+  speed_sweep_upper = multiply_upper_nonnegative(
+      speed_sum, half_duration_s);
+  acceleration_term = multiply_upper_nonnegative(
+      multiply_upper_nonnegative(
+          multiply_upper_nonnegative(0.5, relative_acceleration_bound),
+          half_duration_s),
+      half_duration_s);
+  velocity_term = multiply_upper_nonnegative(
+      velocity_std_mps, half_duration_s);
+  acceleration_sweep_upper = add_upper_nonnegative(
+      add_upper_nonnegative(
+          multiply_upper_nonnegative(relative_speed_bound, half_duration_s),
+          acceleration_term),
+      velocity_term);
+  speed_sweep = round_up_float(speed_sweep_upper);
+  acceleration_sweep = round_up_float(acceleration_sweep_upper);
   if (!isfinite(speed_sweep) || !isfinite(acceleration_sweep)) return 0u;
 
   *sweep_bound = fminf(speed_sweep, acceleration_sweep);
@@ -1066,16 +1242,19 @@ static M5TrajectorySafetyStatus check_dynamic_tracks(
 {
   const M5LocalMap *map = in->map;
   const MotionReference *r = in->candidate_reference;
-  const float delay_s = (float)in->response_delay_us * 1e-6f;
+  const double delay_s =
+      microseconds_to_seconds_upper(in->response_delay_us);
   const float dynamic_accel = in->max_dynamic_obstacle_accel_mps2;
   unsigned i, axis;
   float half_dt = curve->half_duration_s;
 
   for (i = 0u; i < M5_MAP_MAX_TRACKS; ++i) {
     const M5DynamicTrack *t = &map->tracks[i];
-    float dt, obstacle[3], relative_velocity[3];
+    float obstacle[3];
+    double relative_velocity[3], dt_exact;
     float obstacle_speed, relative_speed, relative_accel;
-    float uncertainty_horizon, uncertainty, combined_radius;
+    double uncertainty_horizon, uncertainty;
+    float combined_radius, obstacle_rounding_error;
     float relative_sweep, distance;
     double obstacle_rounding2 = 0.0;
     if (t->id == 0u) continue;
@@ -1085,38 +1264,58 @@ static M5TrajectorySafetyStatus check_dynamic_tracks(
     {
       uint64_t interval_mid_us = r->header.timestamp_sample_us +
           (uint64_t)(horizon_mid_s * 1000000.0f);
-      double dt_exact;
       if (interval_mid_us >= t->sample_us)
         dt_exact = (double)(interval_mid_us - t->sample_us) * 1e-6;
       else
         dt_exact = -(double)(t->sample_us - interval_mid_us) * 1e-6;
-      dt = (float)dt_exact;
       for (axis = 0u; axis < 3u; ++axis) {
         double predicted = (double)t->position_ned_m[axis] +
                            (double)t->velocity_ned_mps[axis] * dt_exact;
         obstacle[axis] = (float)predicted;
-        obstacle_rounding2 += ((double)obstacle[axis] - predicted) *
-                              ((double)obstacle[axis] - predicted);
-        relative_velocity[axis] = curve->velocity[axis] - t->velocity_ned_mps[axis];
+        obstacle_rounding2 = sum_square_upper(
+            obstacle_rounding2,
+            abs_difference_upper((double)obstacle[axis], predicted));
+        relative_velocity[axis] =
+            (double)curve->velocity[axis] - (double)t->velocity_ned_mps[axis];
       }
     }
-    if (!finite3(obstacle) || !finite3(relative_velocity) || !isfinite(dt))
+    if (!finite3(obstacle) ||
+        !isfinite(relative_velocity[0]) ||
+        !isfinite(relative_velocity[1]) ||
+        !isfinite(relative_velocity[2]) || !isfinite(dt_exact))
       return M5_SAFETY_NUMERIC_FAILURE;
 
     obstacle_speed = norm3_upper(t->velocity_ned_mps);
-    relative_speed = round_up_float((double)norm3_upper(relative_velocity) +
-        curve->velocity_rounding_error_mps + t->velocity_std_mps);
-    relative_accel = round_up_float((double)curve->acceleration_bound + dynamic_accel);
-    uncertainty_horizon = round_up_float(fabs((double)dt) + half_dt + delay_s);
-    uncertainty = round_up_float((double)map->uncertainty_inflation_factor *
-        ((double)t->position_std_m +
-         (double)uncertainty_horizon * t->velocity_std_mps +
-         0.5 * dynamic_accel * uncertainty_horizon * uncertainty_horizon));
+    relative_speed = round_up_float(add_upper_nonnegative(
+        (double)norm3_upper_double(relative_velocity[0],
+            relative_velocity[1], relative_velocity[2]),
+        add_upper_nonnegative(curve->velocity_rounding_error_mps,
+                              t->velocity_std_mps)));
+    relative_accel = round_up_float(add_upper_nonnegative(
+        curve->acceleration_bound, dynamic_accel));
+    uncertainty_horizon = add_upper_nonnegative(
+        add_upper_nonnegative(fabs(dt_exact), half_dt), delay_s);
+    uncertainty = multiply_upper_nonnegative(
+        (double)map->uncertainty_inflation_factor,
+        add_upper_nonnegative(
+            add_upper_nonnegative((double)t->position_std_m,
+                multiply_upper_nonnegative(uncertainty_horizon,
+                                           t->velocity_std_mps)),
+            multiply_upper_nonnegative(
+                multiply_upper_nonnegative(
+                    multiply_upper_nonnegative(0.5, dynamic_accel),
+                    uncertainty_horizon),
+                uncertainty_horizon)));
+    obstacle_rounding_error = sqrt_upper_float(obstacle_rounding2);
     /* During response delay the obstacle's known nominal velocity also moves
        it. Inflate by that bounded displacement; acceleration and velocity
        uncertainty are already included above. */
-    combined_radius = round_up_float((double)t->radius_m + inflation + uncertainty +
-        (double)obstacle_speed * delay_s + sqrt(obstacle_rounding2));
+    combined_radius = round_up_float(add_upper_nonnegative(
+        add_upper_nonnegative(
+            add_upper_nonnegative((double)t->radius_m, inflation),
+            add_upper_nonnegative(uncertainty,
+                multiply_upper_nonnegative(obstacle_speed, delay_s))),
+        obstacle_rounding_error));
     if (!dynamic_relative_sweep_bound(curve->speed_bound, obstacle_speed,
             t->velocity_std_mps, relative_speed, relative_accel, half_dt,
             &relative_sweep)) return M5_SAFETY_NUMERIC_FAILURE;
@@ -1125,8 +1324,14 @@ static M5TrajectorySafetyStatus check_dynamic_tracks(
       double dy = (double)curve->position[1] - obstacle[1];
       double dz = (double)curve->position[2] - obstacle[2];
       distance = norm3_lower(dx, dy, dz);
-      distance = fmaxf(0.0f, round_down_float((double)distance -
-          curve->position_rounding_error_m - round_up_float(sqrt(obstacle_rounding2))));
+      {
+        double distance_lower = nextafter(
+            (double)distance - (double)curve->position_rounding_error_m,
+            -INFINITY);
+        distance_lower = nextafter(
+            distance_lower - (double)obstacle_rounding_error, -INFINITY);
+        distance = fmaxf(0.0f, round_down_float(distance_lower));
+      }
     }
     if (!isfinite(combined_radius) || !isfinite(relative_sweep) ||
         !isfinite(distance)) return M5_SAFETY_NUMERIC_FAILURE;
@@ -1150,10 +1355,11 @@ static uint8_t compute_inflation(
   float home_std[3] = {0.0f, 0.0f, 0.0f};
   /* Bound uncertainty at the far edge of this sub-interval and through
      the response delay, not only at the interval midpoint. */
-  double uncertainty_horizon = (double)horizon_mid_s +
-      (double)curve->half_duration_s +
-      (double)in->response_delay_us * 1e-6;
-  double delay_s = (double)in->response_delay_us * 1e-6;
+  double delay_s = microseconds_to_seconds_upper(in->response_delay_us);
+  double uncertainty_horizon = add_upper_nonnegative(
+      add_upper_nonnegative((double)horizon_mid_s,
+                            (double)curve->half_duration_s),
+      delay_s);
   unsigned axis;
   for (axis = 0u; axis < 3u; ++axis) {
     position_std[axis] = nav->core.position_std_m[axis];
@@ -1164,21 +1370,27 @@ static uint8_t compute_inflation(
       home_std[axis] = in->directive->payload.home.position_std_m[axis];
   }
   {
-    double position_norm = sqrt((double)position_std[0] * position_std[0] +
-        (double)position_std[1] * position_std[1] +
-        (double)position_std[2] * position_std[2]);
-    double velocity_norm = sqrt((double)velocity_std[0] * velocity_std[0] +
-        (double)velocity_std[1] * velocity_std[1] +
-        (double)velocity_std[2] * velocity_std[2]);
-    double home_norm = sqrt((double)home_std[0] * home_std[0] +
-        (double)home_std[1] * home_std[1] +
-        (double)home_std[2] * home_std[2]);
-    double uncertainty = position_norm + uncertainty_horizon * velocity_norm + home_norm;
-    double delay_motion = curve->speed_bound * delay_s +
-        0.5 * curve->acceleration_bound * delay_s * delay_s;
-    *inflation = round_up_float((double)map->vehicle_radius_m +
-        map->clearance_margin_m +
-        (double)map->uncertainty_inflation_factor * uncertainty + delay_motion);
+    double position_norm = (double)norm3_upper(position_std);
+    double velocity_norm = (double)norm3_upper(velocity_std);
+    double home_norm = (double)norm3_upper(home_std);
+    double uncertainty = add_upper_nonnegative(
+        add_upper_nonnegative(position_norm,
+            multiply_upper_nonnegative(uncertainty_horizon, velocity_norm)),
+        home_norm);
+    double delay_motion = add_upper_nonnegative(
+        multiply_upper_nonnegative(curve->speed_bound, delay_s),
+        multiply_upper_nonnegative(
+            multiply_upper_nonnegative(
+                multiply_upper_nonnegative(0.5, curve->acceleration_bound),
+                delay_s),
+            delay_s));
+    *inflation = round_up_float(add_upper_nonnegative(
+        add_upper_nonnegative((double)map->vehicle_radius_m,
+                              (double)map->clearance_margin_m),
+        add_upper_nonnegative(
+            multiply_upper_nonnegative(
+                (double)map->uncertainty_inflation_factor, uncertainty),
+            delay_motion)));
   }
   return (uint8_t)(isfinite(*inflation) && *inflation > 0.0f);
 }
@@ -1507,6 +1719,13 @@ float m5_trajectory_safety_test_norm_lower_bound(
     double x, double y, double z)
 {
   return norm3_lower(x, y, z);
+}
+
+float m5_trajectory_safety_test_norm_upper_bound(
+    float x, float y, float z)
+{
+  const float v[3] = {x, y, z};
+  return norm3_upper(v);
 }
 
 uint8_t m5_trajectory_safety_test_point_aabb_distance_lower(

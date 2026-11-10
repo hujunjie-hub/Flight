@@ -14,7 +14,10 @@ out="build/m5_host"
 mkdir -p "${out}"
 
 cflags=(
-  -std=c11 -Wall -Wextra -Werror -DFLIGHT_M5_HOST_PLANNER -DFLIGHT_M5_SAFETY_TEST_API
+  -std=c11 -Wall -Wextra -Werror
+  -fno-fast-math -fno-unsafe-math-optimizations
+  -ffp-contract=off -frounding-math -fexcess-precision=standard
+  -DFLIGHT_M5_HOST_PLANNER -DFLIGHT_M5_SAFETY_TEST_API
   -Imiddleware/model/fms
   -Imiddleware/contracts
   -Imiddleware/guidance

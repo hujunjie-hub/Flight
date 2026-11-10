@@ -38,6 +38,8 @@ uint8_t m5_trajectory_safety_test_rounding_bounds(
     double value, float *lower, float *upper);
 float m5_trajectory_safety_test_norm_lower_bound(
     double x, double y, double z);
+float m5_trajectory_safety_test_norm_upper_bound(
+    float x, float y, float z);
 
 
 uint8_t m5_trajectory_safety_test_point_aabb_distance_lower(

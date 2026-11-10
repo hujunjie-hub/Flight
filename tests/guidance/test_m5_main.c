@@ -3090,7 +3090,7 @@ static void test_m5_safety_outward_rounding_and_norm_lower(void)
 
   for (i = 0u; i < 512u; ++i) {
     double component[3];
-    double exact;
+    long double exact;
     float lower;
     unsigned axis;
     for (axis = 0u; axis < 3u; ++axis) {
@@ -3099,14 +3099,14 @@ static void test_m5_safety_outward_rounding_and_norm_lower(void)
       double sign = ((safety_fuzz_next(&seed) & 1u) != 0u) ? -1.0 : 1.0;
       component[axis] = sign * ldexp(mantissa, exponent);
     }
-    exact = sqrt(component[0] * component[0] +
-                 component[1] * component[1] +
-                 component[2] * component[2]);
+    exact = sqrtl((long double)component[0] * component[0] +
+                  (long double)component[1] * component[1] +
+                  (long double)component[2] * component[2]);
     lower = m5_trajectory_safety_test_norm_lower_bound(
         component[0], component[1], component[2]);
     CHECK(isfinite(lower));
     CHECK(lower >= 0.0f);
-    CHECK((double)lower <= exact);
+    CHECK((long double)lower <= exact);
   }
 
   {
@@ -3116,6 +3116,60 @@ static void test_m5_safety_outward_rounding_and_norm_lower(void)
     CHECK(!m5_trajectory_safety_test_rounding_bounds(1.0e300, &lower, &upper));
     CHECK(isfinite(m5_trajectory_safety_test_norm_lower_bound(
         1.0e300, -1.0e300, 1.0e300)));
+  }
+}
+
+
+static void test_m5_safety_norm_ulp_boundaries(void)
+{
+  uint32_t seed = 0x6D350680u;
+  const float tiny = ldexpf(1.0f, -80);
+  const float min_subnormal = nextafterf(0.0f, 1.0f);
+  float upper, lower;
+  unsigned trial;
+
+  /* Exact adversarial case: sqrt(1 + 2^-160) is strictly greater than 1,
+     although binary64 addition rounds 1 + 2^-160 back to 1. */
+  upper = m5_trajectory_safety_test_norm_upper_bound(1.0f, tiny, 0.0f);
+  CHECK(upper == nextafterf(1.0f, INFINITY));
+  lower = m5_trajectory_safety_test_norm_lower_bound(1.0, (double)tiny, 0.0);
+  CHECK(lower <= 1.0f);
+
+  upper = m5_trajectory_safety_test_norm_upper_bound(
+      min_subnormal, min_subnormal, 0.0f);
+  CHECK(upper == 2.0f * min_subnormal);
+  lower = m5_trajectory_safety_test_norm_lower_bound(
+      (double)min_subnormal, (double)min_subnormal, 0.0);
+  CHECK(lower <= min_subnormal);
+
+  CHECK(m5_trajectory_safety_test_norm_upper_bound(FLT_MAX, 0.0f, 0.0f) ==
+        FLT_MAX);
+  CHECK(isinf(m5_trajectory_safety_test_norm_upper_bound(
+      FLT_MAX, FLT_MAX, 0.0f)));
+  CHECK(m5_trajectory_safety_test_norm_lower_bound(
+      (double)FLT_MAX, 0.0, 0.0) <= FLT_MAX);
+
+  for (trial = 0u; trial < 512u; ++trial) {
+    float component[3];
+    long double exact_norm;
+    float upper_bound, lower_bound;
+    unsigned axis;
+    for (axis = 0u; axis < 3u; ++axis) {
+      int exponent = -120 + (int)(safety_fuzz_next(&seed) % 225u);
+      float magnitude = (float)ldexp(
+          0.5 + 0.5 * (double)safety_fuzz_unit(&seed), exponent);
+      component[axis] = (safety_fuzz_next(&seed) & 1u) != 0u
+          ? -magnitude : magnitude;
+    }
+    exact_norm = sqrtl((long double)component[0] * component[0] +
+        (long double)component[1] * component[1] +
+        (long double)component[2] * component[2]);
+    upper_bound = m5_trajectory_safety_test_norm_upper_bound(
+        component[0], component[1], component[2]);
+    lower_bound = m5_trajectory_safety_test_norm_lower_bound(
+        (double)component[0], (double)component[1], (double)component[2]);
+    CHECK((long double)upper_bound >= exact_norm);
+    CHECK((long double)lower_bound <= exact_norm);
   }
 }
 
@@ -4537,6 +4591,7 @@ int main(void)
     {"m5_safety_multi_track_all_slots", test_m5_safety_multi_track_all_slots_and_fail_closed},
     {"m5_safety_interval_arithmetic_oracle", test_m5_safety_interval_arithmetic_oracle},
     {"m5_safety_outward_rounding_norm_lower", test_m5_safety_outward_rounding_and_norm_lower},
+    {"m5_safety_norm_ulp_boundaries", test_m5_safety_norm_ulp_boundaries},
     {"m5_safety_point_aabb_distance_oracle", test_m5_safety_point_aabb_distance_lower_oracle},
     {"m5_safety_dynamic_relative_sweep_oracle", test_m5_safety_dynamic_relative_sweep_oracle},
     {"m5_safety_dynamic_adaptive_preview_boundaries", test_m5_safety_dynamic_collision_at_adaptive_and_preview_boundaries},

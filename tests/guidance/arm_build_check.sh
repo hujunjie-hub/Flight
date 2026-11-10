@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Portable Cortex-M7 compile check for production M4/M5 sources.
-# Compile/stack-usage evidence only; not a target link, WCET, runtime stack
-# watermark, RTA, HIL, or flight result.
+# Cortex-M7 compile checks for production M4/M5 sources and the Host/SIL-only
+# M5-06 validator translation unit. The validator object is NOT linked into
+# the product; this is architecture/compiler compatibility evidence only.
+# Not a target link, WCET, runtime stack watermark, RTA, HIL, or flight result.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -24,6 +25,8 @@ mkdir -p "$out"
 flags=(
   -mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard
   -std=c11 -Wall -Wextra -Werror -fno-short-enums -fstack-usage
+  -fno-fast-math -fno-unsafe-math-optimizations
+  -ffp-contract=off -frounding-math -fexcess-precision=standard
   -Imiddleware/contracts
   -Imiddleware/model/fms
   -Imiddleware/guidance
@@ -48,6 +51,23 @@ for src in "${sources[@]}"; do
   objects+=("$obj")
 done
 
+m5_safety_src="middleware/guidance/trajectory_planning/m5_trajectory_safety.c"
+m5_safety_obj="$out/m5_trajectory_safety_host_only.o"
+echo "CC $m5_safety_src (Host/SIL-only source, Cortex-M7 compile check only)"
+"$cc" "${flags[@]}" -DFLIGHT_M5_HOST_PLANNER -c "$m5_safety_src" -o "$m5_safety_obj"
+objects+=("$m5_safety_obj")
+
+{
+  echo "commit=$(git rev-parse HEAD)"
+  echo "compiler=$("$cc" --version | head -n 1)"
+  echo "size_tool=$("$size" --version | head -n 1)"
+  printf 'flags='
+  printf '%s ' "${flags[@]}"
+  echo
+  echo "M5-06 scope=Host/SIL-only validator object cross-compiled for Cortex-M7; not linked into product"
+} > "$out/toolchain.txt"
+
 "$size" "${objects[@]}"
 echo "M5_CORTEX_M7_COMPILE_OK"
 echo "Static .su files: $out/*.su"
+echo "Toolchain record: $out/toolchain.txt"
