@@ -250,6 +250,8 @@ Status control_backend_outer_update(const ControllerInput *in) {
                        ? (uint32_t)(in->evaluation_time_us - in->control_time_us)
                        : 0u;
     mpc_run_stats.last_eval_age_us = age;
+    mpc_run_stats.last_now_us = in->evaluation_time_us;
+    mpc_run_stats.last_control_time_us = in->control_time_us;
     if (age > mpc_run_stats.max_eval_age_us) mpc_run_stats.max_eval_age_us = age;
   }
   s = controller_validate_input(in, &epoch, &mode);

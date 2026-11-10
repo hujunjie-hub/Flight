@@ -13,6 +13,7 @@ typedef struct {
   uint32_t blocked_clock, blocked_stale, blocked_throttle, blocked_lock;
   int32_t last_validation_status;
   uint32_t last_eval_age_us, max_eval_age_us;
+  uint64_t last_now_us, last_control_time_us;
 } MpcRunStats;
 void mpc_get_run_stats(MpcRunStats *out);
 #define CONTROL_GRAVITY_MPS2 9.80665f
