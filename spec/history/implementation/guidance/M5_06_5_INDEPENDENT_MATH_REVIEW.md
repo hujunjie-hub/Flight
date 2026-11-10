@@ -155,3 +155,26 @@ MR-008 关闭前，S06-081..083 即使 CI 通过，也不能单独证明动态�
 - Host runner 与 CI `py_compile` 已接入新 oracle。
 
 当前 **FIX IMPLEMENTED / CI_PENDING**；未运行当前 HEAD 的 Host/Sanitizer/ARM 工作流前不得关闭 MR-008。
+
+ 
+## 8. CI run #499 compile blockers and fixes (2026-11-10)
+
+Run #499 / commit `1144ce8d792ab4f5a4d2b229f3ab6461c9722649` exposed two portability failures before M5 test execution:
+
+1. Host GCC rejected `DBL_TRUE_MIN == 0x1p-1074` inside `_Static_assert` because the floating comparison is not an integer constant expression.
+2. GNU Arm GCC did not define `__STDC_IEC_559__`, so the preprocessor guard rejected the target compile despite the binary radix/precision/exponent assertions being available.
+
+Fixes committed:
+- `b0f40cb`: binary64 subnormal static assertion now checks the integer-valued `DBL_HAS_SUBNORM == 1` property.
+- `0349587`: removed reliance on the optional `__STDC_IEC_559__` macro and explicitly asserts 64-bit double storage; binary32/binary64 radix, precision, exponent and subnormal properties remain checked.
+
+Run #499 evidence:
+- M4 Host: 927 checks / 0 failures.
+- Source layout/time service: PASS.
+- Navigation/control Host: PASS.
+- M5 Host: compile failed at the non-ICE DBL_TRUE_MIN assertion; no M5 test cases executed.
+- Cortex-M7 MPC compile/RAM stage: PASS (MPC RAM 29,252 B, worker stack 8,192 B, largest static frame 2,024 B).
+- Cortex-M7 M4/M5 production-source compile: failed at optional IEC macro guard.
+- Integration and sanitizers skipped because the M5 Host step failed.
+
+Run #501 is triggered by commit `0349587`; status must be rechecked before declaring the fixes validated. M5-06 remains BLOCKED.
