@@ -111,9 +111,9 @@ typedef struct {
  * snapshot was used, not when, and the ground-phase question ("did the MPC
  * acceleration lift the vehicle before TAKEOFF?") needs the ordering.  Only the
  * takeoff window is recorded, so the buffer stays small. */
-#define MPC_TRACE_CAPACITY 3000
+#define MPC_TRACE_CAPACITY 7000
 #define MPC_TRACE_FIRST_US 4000000u
-#define MPC_TRACE_LAST_US  6300000u
+#define MPC_TRACE_LAST_US  10500000u
 typedef struct {
   uint32_t time_us;
   uint32_t backup;   /* 1 = PD fallback was used, 0 = the snapshot was used */
