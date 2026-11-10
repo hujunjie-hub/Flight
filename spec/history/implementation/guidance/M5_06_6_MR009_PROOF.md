@@ -279,3 +279,16 @@ S06-103 Phase B 此前用名义局部时间覆盖实测值，R9 改为共享 `co
 - 时间参考改为物理微秒时间 `local_us/1e6`，不再使用舍入后的 h；接缝两侧分别验证。
 - 新增 E_total 分量预算（系数/Horner/次正规/时间），三维范数向外取整，995 个真实 C 采样验证。
 - 撤回 R9 的“三通道均不可构造”结论：该结论依赖固定 4× 系数与单一 ULP，未覆盖完整验证器链；现标记 **MATHEMATICAL_FEASIBILITY_NOT_ESTABLISHED**。
+
+## 20. R15：Jerk 扩展区间与独立 Fraction 验证
+
+R15 修正 R14b 扩展尾段：Bernstein 二次控制点必须先转幂基
+`p0=b0, p1=2(b1-b0), p2=b0-2b1+b2`，尾坐标统一为
+`1 + gamma_2*(end/duration)`。生产仍保留 `60/d^3` 与区间位置控制点，并同时
+取 Bernstein 原区间、幂基尾段、consumer binary32 多项式三者最大值。
+
+S06-112 用真实 C binary32 系数和 Fraction 连续最大值（端点 + 驻点
+`s*=-c4/(5c5)`）逐例验证，无容差；旧 Bernstein-as-power 公式在 248/300 个尾部
+案例中欠界，作为负向对照。S06-113 把时间转换与 C gamma_2 谓词提取为共享函数，
+正常输入 PASS，错误局部时间、4*gamma_2、错误段时长 FAIL。
+MR-009 仍为 WAITING_INDEPENDENT_REVIEW，未 APPROVED。

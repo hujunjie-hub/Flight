@@ -329,3 +329,21 @@ S06-104 在产品包线（|v| ≤ 4 m/s、|a| ≤ 2.5 m/s²、20 ms）下，用�
 - S06-103 Phase B：`s_exact = Fraction(local_us, 1000000)`；接缝两侧分别验证；144 例；时间误差 3.44e-08、曲线误差 2.98% 包络；系数/Horner/时间分量分别报告。
 - S06-105：E_total = E_coefficient + E_horner + E_subnormal + E_time，三维范数向外取整，995 个真实 C 采样，最坏 measured/budget = 0.080。
 - S06-104：撤回 `FACTOR=4` 的不可行结论；按通道列出放置区间并声明其不覆盖完整验证器链；结论 **MATHEMATICAL_FEASIBILITY_NOT_ESTABLISHED**；S06-100..102 保持 NOT_RUN。
+
+## R15：连续 jerk 区间与时间错误 C 路径（2026-11-10）
+
+- 生产 `curve_bounds()` 保留 `60/d^3` 三阶导系数和 `position_low/high` 区间控制点。
+- 扩展尾段先把二次 Bernstein 控制点转换为幂基：
+  `p0=b0, p1=2*(b1-b0), p2=b0-2*b1+b2`，再用区间 Horner 求值。
+- 归一化尾坐标改为 `u_tail = 1 + gamma_2 * (end_time/duration)`；不再使用
+  `ratio*(1+gamma_2)`。
+- 同时保留 consumer binary32 幂基上界 `j(s)=6c3+24c4*s+60c5*s^2`；三者取最大值，
+  任一区间失效返回 NUMERIC_FAILURE。
+- 新增 S06-112：真实 C 系数、Fraction 精确端点与驻点 `s*=-c4/(5c5)`、
+  gamma_2 尾段、X/Y/Z、R14b 反例、零/极小/极大/次正规边界。旧
+  Bernstein-as-power 转换在 248/300 个尾部案例中欠界，作为负向对照。
+- 新增 S06-113：生产 `control_reference_convert_local_time()` 与 C 侧
+  `control_reference_time_within_gamma2()` 被 `control_sample_reference()` 和
+  测试 API 共用；正常 PASS，错误局部时间/4*gamma_2/错误段时长 FAIL。
+- 这不构成 MR-009 的 APPROVED；独立审查仍需确认扩展尾段、驻点和 consumer
+  多项式覆盖关系。

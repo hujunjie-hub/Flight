@@ -433,22 +433,37 @@
       "id": "S06-104",
       "name": "Product-envelope differential feasibility analysis",
       "seed": "0x6D350104",
-      "cases": 169,
+      "cases": 80,
       "status_at_code_baseline": "TEST_EXECUTION_PASS",
-      "oracle": "coefficient_error_bound_m 2.96e-08 over 169 legal cases out of 808 candidates (per-axis and 3-D envelope); coefficient-only",
-      "local_run": "M5-06-R14b-20261110",
-      "mathematical_feasibility": "MATHEMATICAL_FEASIBILITY_NOT_ESTABLISHED"
+      "oracle": "coefficient_error_bound_m 1.982e-08 over 80 legal cases out of 808 candidates; per-axis + 3-D speed/accel + extended-interval jerk; coefficient-only",
+      "local_run": "M5-06-R15-20261110",
+      "mathematical_feasibility": "MATHEMATICAL_FEASIBILITY_NOT_ESTABLISHED",
+      "candidate_cases": 808,
+      "legal_cases": 80,
+      "stress_cases": 728,
+      "checked_samples": 80,
+      "jerk_rejected_cases": 8,
+      "speed_rejected_cases": 468,
+      "acceleration_rejected_cases": 252,
+      "coefficient_error_bound_only": true
     },
     {
       "id": "S06-105",
       "name": "Position component budget (continuous, real C)",
       "seed": "0x6D350105",
-      "cases": 250,
+      "cases": 565,
       "status_at_code_baseline": "TEST_EXECUTION_PASS",
       "mathematical_scope": "SINGLE_STATE_CONTINUOUS_BOUND_PLUS_FINITE_REGRESSION",
       "global_proof": "NOT_ESTABLISHED",
       "oracle": "position budget from real C coefficients only (no Python fallback)",
-      "local_run": "M5-06-R14b-20261110"
+      "local_run": "M5-06-R15-20261110",
+      "candidate_cases": 240,
+      "legal_cases": 113,
+      "stress_cases": 127,
+      "checked_samples": 565,
+      "jerk_rejected_cases": 5,
+      "speed_rejected_cases": 60,
+      "acceleration_rejected_cases": 62
     },
     {
       "id": "S06-106",
@@ -463,10 +478,17 @@
       "id": "S06-107",
       "name": "Position/velocity/acceleration budgets from real C coefficients",
       "seed": "0x6D350107",
-      "cases": 765,
+      "cases": 2370,
       "status_at_code_baseline": "PASS",
-      "oracle": "p/v/a budgets; legal 51 / stress 249 samples; worst measured/budget 0.234",
-      "local_run": "M5-06-R14b-20261110"
+      "oracle": "p/v/a budgets; legal 158 / stress 142; checked sampled 2370; real product envelope",
+      "local_run": "M5-06-R15-20261110",
+      "candidate_cases": 300,
+      "legal_cases": 158,
+      "stress_cases": 142,
+      "checked_samples": 2370,
+      "jerk_rejected_cases": 3,
+      "speed_rejected_cases": 60,
+      "acceleration_rejected_cases": 79
     },
     {
       "id": "S06-108",
@@ -475,8 +497,9 @@
       "cases": 96,
       "coeff_mix_checked": 32,
       "status_at_code_baseline": "PASS",
-      "oracle": "previous and next segment coefficient mixes detected by exact reverse-triangle; 4x gamma_2, wrong local time and C-path time injection rejected; in-bound value accepted",
-      "local_run": "M5-06-R14b-20261110"
+      "oracle": "previous and next segment coefficient mixes detected by exact reverse-triangle; global-vs-local time mismatch detected whenever they differ (72 cases); 4x gamma_2 and C-path injection rejected",
+      "local_run": "M5-06-R15-20261110",
+      "wrong_local_checked": 72
     },
     {
       "id": "S06-109",
@@ -502,23 +525,43 @@
       "seed": "deterministic",
       "cases": 1,
       "status_at_code_baseline": "PASS",
-      "oracle": "test API and validator consume fms_quad_x4_policy via fms_product_build_safety_envelope; no static test copy",
-      "local_run": "M5-06-R14b-20261110"
+      "oracle": "test API and validator consume fms_quad_x4_policy via fms_product_build_safety_envelope; config validation (version/hash/policy/mask/NaN) shared with FMS init; no static test copy",
+      "local_run": "M5-06-R15-20261110"
+    },
+    {
+      "id": "S06-112",
+      "name": "Continuous jerk exact Fraction bound",
+      "seed": "deterministic",
+      "cases": 360,
+      "fail_closed_cases": 20,
+      "wrong_tail_checked": 300,
+      "wrong_tail_underbound": 248,
+      "status_at_code_baseline": "PASS",
+      "oracle": "real C binary32 c3/c4/c5; endpoints + stationary s*=-c4/(5c5); gamma_2 tail; production bound >= exact with no tolerance; old Bernstein-as-power tail under-bounds",
+      "local_run": "M5-06-R15-20261110"
+    },
+    {
+      "id": "S06-113",
+      "name": "C-side time conversion injection",
+      "seed": "deterministic",
+      "cases": 82,
+      "status_at_code_baseline": "PASS",
+      "oracle": "production control_reference_convert_local_time + C gamma_2 predicate; normal PASS, wrong local/4x gamma_2/wrong duration FAIL",
+      "local_run": "M5-06-R15-20261110"
     }
   ],
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
-      "R14b corrected the R14 jerk implementation (6/d^3 -> 60/d^3, interval controls, gamma_2 tail, consumer polynomial, zero-limit fail-closed) and added S06-110b..d.",
-      "R14b moved the product policy/envelope builder to quad_x4_product_config.c; the test API and validator fixtures now consume fms_quad_x4_policy instead of a static 4/2.5/20/10 copy (S06-111).",
+      "R15 corrected the R14b jerk tail: Bernstein-to-power conversion and u_tail=1+gamma_2*ratio; S06-112 verifies the production bound against exact Fraction maxima without tolerance.",
+      "R15 added S06-113, a shared production C local-time conversion and gamma_2 predicate with wrong-local/4x-gamma_2/wrong-duration injection.",
+      "R15 removed Python V_MAX/A_MAX/per-axis duplicates and classifies legal/stress cases with the real product envelope including extended-interval jerk (S06-104/105/107).",
       "REVOKED: the R7 differential tests are not valid evidence; S06-100..102 remain NOT_RUN and feasibility is NOT ESTABLISHED.",
       "SUPERSEDED: the R9/R10 fixed-factor infeasibility conclusions are revoked and must not be cited.",
-      "R5 fixed a geofence clearance gap: check_geofences() did not subtract position_rounding_error_m.",
-      "MR-009 is FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW: six sub-items (coefficient, Horner, time, FP environment, continuous coverage, end-to-end decision) each need an independent APPROVED.",
-      "spec/ABI evidence re-baseline and RT-Thread package pinning need owner approval.",
+      "MR-009 is FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW; it is not APPROVED.",
       "Independent mathematical review MR-001..MR-008 is not yet APPROVED.",
       "M5-07 gate integration is not complete.",
-      "H723 online obstacle avoidance is not authorized; current production profile is OBSTACLE_SOURCE_MODE=NONE and BENCH_INHIBIT."
+      "H723 online obstacle avoidance is not authorized; production profile is OBSTACLE_SOURCE_MODE=NONE and BENCH_INHIBIT."
     ],
     "next_milestone": "M5-07 only after M5-06 acceptance and explicit independent mathematical approval."
   },
@@ -553,7 +596,9 @@
     "fp_model_self_test": "PASS (mutated gamma_2 detected)",
     "c_consumer_time_evidence": "S06-103 phase A (60,002 offsets) + phase B (108 cases, measured production local time)",
     "feasibility_threshold": "derived per channel from the float geometry chain (point/vertex ulp + margin ulp), not a fixed ulp count",
-    "error_budget_evidence": "S06-105"
+    "error_budget_evidence": "S06-105",
+    "jerk_evidence": "S06-112 (360 exact Fraction cases, 20 fail-closed, 0 failures) + S06-110d analytic C coverage",
+    "jerk_proof_record": "spec/history/implementation/guidance/M5_06_7_JERK_INTERVAL_PROOF.md"
   },
   "historical_ci_baseline": {
     "date": "2026-11-10",
@@ -612,10 +657,11 @@
   },
   "previous_commit_pass_inherited": false,
   "latest_local_validation": {
-    "run_id": "M5-06-R14b-20261110",
-    "validated_code_commit": "595b1b702b3f80a1d79233761cf9efa76dc64961",
-    "head": "595b1b702b3f80a1d79233761cf9efa76dc64961",
-    "archive_head_sha": "see work/validation/archives/M5-06-R14b-20261110/archive_manifest.json",
+    "run_id": "M5-06-R15-20261110",
+    "validated_code_commit": "a2fd81a44a9f2c6e4ac36917beea1f6a645f3f4f",
+    "head": "a2fd81a44a9f2c6e4ac36917beea1f6a645f3f4f",
+    "archive_head_sha": "PENDING_ARCHIVE_ZIP_SHA256",
+    "archive_zip_sha256": "PENDING_ZIP_SHA256",
     "branch": "opt/stage-02-m5-06-safety-validator",
     "scope": "LOCAL_EXECUTION_ONLY",
     "github_ci": "NOT_RUN_FOR_THIS_HEAD",
@@ -631,8 +677,9 @@
     "blocked_items": [
       "scons_link"
     ],
-    "note": "validated_code_commit and archive_head_sha are different commits: the archive commit contains documentation/manifest updates only. They are not claimed to be identical. Local results are never reported as GitHub CI success."
+    "note": "validated_code_commit and archive_head_sha are different commits; archive_zip_sha256 is recorded outside the ZIP because a ZIP cannot contain its own hash. Local results are never reported as GitHub CI success.",
+    "archive_commit_sha": "PENDING_ARCHIVE_COMMIT"
   },
-  "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope)",
-  "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d)"
+  "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
+  "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112)"
 }
