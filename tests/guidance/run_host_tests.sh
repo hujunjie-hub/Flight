@@ -39,6 +39,6 @@ gcc "${cflags[@]}" -fPIC -shared \
   middleware/guidance/*/*.c \
   -lm -o "${out}/libm5_safety_oracle.so"
 
-python3 tests/guidance/verify_norm_bounds.py "${out}/libm5_safety_oracle.so"
-
 "${out}/m5_host_tests"
+
+python3 tests/guidance/verify_norm_bounds.py "${out}/libm5_safety_oracle.so"
