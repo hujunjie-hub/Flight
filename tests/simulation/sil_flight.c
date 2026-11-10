@@ -116,8 +116,14 @@ rt_err_t rt_device_control(rt_device_t d,int c,void *p) {
 rt_err_t rt_device_set_rx_indicate(rt_device_t d,rt_err_t (*cb)(rt_device_t,rt_size_t)) {
   (void)d;(void)cb;return RT_EOK;
 }
+/* Flight's own SIL scenario keeps these deterministic stubs. The Simulink
+ * adapter defines FLIGHT_HOST_REAL_TIME_SERVICE and links the firmware time
+ * service instead, so the MIL exercises systime.c rather than a stub. */
+#ifndef FLIGHT_HOST_REAL_TIME_SERVICE
 Status clock_read(ClockInstant *c) { if(!c)return STATUS_INVALID_ARGUMENT;*c=test_clock;return 0; }
+#endif
 uint64_t board_boot_id(void) { return test_clock.boot_id; }
+#ifndef FLIGHT_HOST_REAL_TIME_SERVICE
 Status clock_now_us(uint64_t *now) { *now=test_clock.monotonic_us;return 0; }
 Status time_get_mapping_status(uint32_t id,ClockDomainMappingStatus *s) { (void)id;memset(s,0,sizeof(*s));return STATUS_NOT_READY; }
 Status time_get_latest_pps(PpsCaptureEvent *out) { (void)out;return STATUS_NOT_READY; }
@@ -132,6 +138,7 @@ Status time_get_status(TimeServiceStatus *out) {
 Status time_get_local_discipline_status(LocalTimebaseDisciplineStatus *out) {
   memset(out,0,sizeof(*out));return STATUS_OK;
 }
+#endif
 rt_err_t rt_device_set_tx_complete(rt_device_t d,rt_err_t (*callback)(rt_device_t,void *)) {
   (void)d;test_tx_complete=callback;return RT_EOK;
 }
