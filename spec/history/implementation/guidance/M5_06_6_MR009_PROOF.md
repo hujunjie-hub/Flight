@@ -262,3 +262,8 @@ R5 的 `n·2^-149` 隐含假设“早期舍入不被后续 Horner 乘法放大�
 
 R6 §14.4 的“几何分辨率阻断”结论不成立。R7 用确定性搜索（端点位移 0.5–2.5 m、端点速度 0–200 m/s）找到合法参考，使 `|consumer − exact|` 达 ~1e-6 m（几何分辨率 ~1e-7 m），并把障碍/轨道/围栏边界放在 `inflation + d/2`，由真实 Validator 返回 `STATIC_COLLISION` / `DYNAMIC_COLLISION` / `GEOFENCE_VIOLATION`，同时提供安全对照。
 S06-103 用真实 `control_sample_reference()` 验证时间参数，60,002 个偏移与 S06-099 的精确有理数结果一致。
+
+ 
+## 17. R8：撤回差分碰撞结论
+
+R7 的“差分碰撞”用例不满足产品包线（使用 200 m/s、5000 m/s²）且只以中点为据，R8 撤回。S06-104 给出产品包线内定量不可行性（最大偏差 1.26e-07 m，为放置分辨率的 2.1 倍，低于 8 倍阈值），S06-100..102 标记 NOT_IMPLEMENTED_PRODUCT_ENVELOPE。R8 不改变 §14 的时间与次正规推导。

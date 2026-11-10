@@ -398,27 +398,27 @@
       "name": "Differential static collision (consumer hits, exact clears)",
       "seed": "deterministic",
       "cases": 4,
-      "status_at_code_baseline": "PASS",
-      "oracle": "deterministic search over legal references; obstacle at inflation + d/2; exact clearance > inflation, consumer distance < inflation, STATIC_COLLISION, empty-map control PASS",
-      "local_run": "M5-06-R7-20261110"
+      "status_at_code_baseline": "NOT_RUN",
+      "oracle": "NOT_IMPLEMENTED_PRODUCT_ENVELOPE: R7 used 200 m/s and 5000 m/s2 (outside the product envelope) and only midpoint clearance; R8 S06-104 shows the product-limit deviation (1.26e-07 m) is only 2.1 placement ulps, below the 8-ulp robustness threshold",
+      "local_run": "M5-06-R8-20261110"
     },
     {
       "id": "S06-101",
       "name": "Differential dynamic collision",
       "seed": "deterministic",
       "cases": 4,
-      "status_at_code_baseline": "PASS",
-      "oracle": "track at radius + inflation + d/2; exact distance > combined radius, DYNAMIC_COLLISION, track-removed control PASS",
-      "local_run": "M5-06-R7-20261110"
+      "status_at_code_baseline": "NOT_RUN",
+      "oracle": "NOT_IMPLEMENTED_PRODUCT_ENVELOPE: R7 used 200 m/s and 5000 m/s2 (outside the product envelope) and only midpoint clearance; R8 S06-104 shows the product-limit deviation (1.26e-07 m) is only 2.1 placement ulps, below the 8-ulp robustness threshold",
+      "local_run": "M5-06-R8-20261110"
     },
     {
       "id": "S06-102",
       "name": "Differential geofence violation",
       "seed": "deterministic",
       "cases": 4,
-      "status_at_code_baseline": "PASS",
-      "oracle": "KEEP_OUT edge at inflation + d/2; GEOFENCE_VIOLATION, 2.5 m KEEP_IN control PASS",
-      "local_run": "M5-06-R7-20261110"
+      "status_at_code_baseline": "NOT_RUN",
+      "oracle": "NOT_IMPLEMENTED_PRODUCT_ENVELOPE: R7 used 200 m/s and 5000 m/s2 (outside the product envelope) and only midpoint clearance; R8 S06-104 shows the product-limit deviation (1.26e-07 m) is only 2.1 placement ulps, below the 8-ulp robustness threshold",
+      "local_run": "M5-06-R8-20261110"
     },
     {
       "id": "S06-103",
@@ -428,9 +428,64 @@
       "status_at_code_baseline": "PASS",
       "oracle": "m5_trajectory_safety_test_consumer_time drives the real control_sample_reference with a unit-velocity linear reference; max error/s_max 6.61e-08 <= gamma_2, library SHA256 recorded",
       "local_run": "M5-06-R7-20261110"
+    },
+    {
+      "id": "S06-104",
+      "name": "Product-envelope differential feasibility analysis",
+      "seed": "0x6D350104",
+      "cases": 2000,
+      "status_at_code_baseline": "PASS",
+      "oracle": "exact rational consumer/reference comparison over product limits (|v|<=4, |a|<=2.5): max deviation 1.26e-07 m = 2.1 placement ulp < 8 required -> INFEASIBLE",
+      "local_run": "M5-06-R8-20261110"
     }
   ],
-  "latest_verified_code_baseline": {
+  "overall_m5_06_status": {
+    "status": "BLOCKED",
+    "reasons": [
+      "R8 revoked the R7 differential PASS: it used non-product envelopes and midpoint-only safety. S06-104 quantifies why a product-envelope differential case is not robustly constructible.",
+      "R7 implemented the true differential collision tests S06-100..102 and the real-C time check S06-103; MR-009 still awaits independent approval.",
+      "R6 re-derived the time-quantisation bound (gamma_2), enlarged every evaluation interval to s_eval_max, generalised the subnormal term and added exhaustive timing evidence; S06-100..102 remain NOT_IMPLEMENTED.",
+      "R5 fixed a geofence clearance gap: check_geofences() did not subtract position_rounding_error_m.",
+      "MR-009 is FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW: six sub-items (coefficient, Horner, time, FP environment, continuous coverage, end-to-end decision) each need an independent APPROVED.",
+      "MR-009 is FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW (S06-085..093); spec/ABI evidence re-baseline and RT-Thread package pinning need owner approval.",
+      "Independent mathematical review MR-001..MR-008 is not yet APPROVED.",
+      "M5-07 gate integration is not complete.",
+      "H723 online obstacle avoidance is not authorized; current production profile is OBSTACLE_SOURCE_MODE=NONE and BENCH_INHIBIT."
+    ],
+    "next_milestone": "M5-07 only after M5-06 acceptance and explicit independent mathematical approval."
+  },
+  "m5_06_consumer_curve_bound": {
+    "mr_id": "MR-009",
+    "status": "FIX_IMPLEMENTED_WAITING_INDEPENDENT_REVIEW",
+    "position_roundings": 10,
+    "velocity_roundings": 12,
+    "acceleration_roundings": 10,
+    "gamma_model": "gamma_n = n*u/(1-n*u), u = 2^-24",
+    "coefficient_error_source": "outward interval coefficients, not binary64 nominal",
+    "velocity_mid_norm_includes_eval_error": true,
+    "fma_guard": "tests/guidance/check_consumer_fp_contraction.py",
+    "evidence": "build/m4_m5_implementation/evidence/m5_host.log",
+    "gamma_upward_rounded": true,
+    "runtime_rounding_mode_enforced": true,
+    "geofence_clearance_includes_envelope": true,
+    "continuous_time_evidence": "S06-094 (120 checks, 0.963) + S06-099 (60002 offsets)",
+    "decision_participation_evidence": "S06-095..097",
+    "runtime_environment_test": "S06-098",
+    "proof_record": "spec/history/implementation/guidance/M5_06_6_MR009_PROOF.md",
+    "fp_environment_audit": "spec/validation/fp_environment_audit.md",
+    "time_reference": "s_exact = h * (offset_us / step_us)",
+    "time_error_bound": "gamma_2 * s_exact, gamma_2 = 2u/(1-2u)",
+    "evaluation_interval": "s_eval_max = s_max + gamma_2*s_max",
+    "subnormal_term": "n * 2^-149 * max(1, s_eval_max)^n",
+    "preview_step_contract_checked": true,
+    "host_mxcsr_checked": true,
+    "differential_collision_status": "NOT_IMPLEMENTED_PRODUCT_ENVELOPE (S06-104)",
+    "fp_report_model_check": "MATCH (tokens verified against the compiled source)",
+    "time_evidence": "S06-099 (exact Fraction) + S06-103 (real C consumer)",
+    "fp_model_self_test": "PASS (mutated gamma_2 detected)",
+    "c_consumer_time_evidence": "S06-103 phase A + B (60,002 + 108 cases)"
+  },
+  "historical_ci_baseline": {
     "date": "2026-11-10",
     "commit": "dafe47b8b17e7f32f676cb258eaa7a407a1dfb90",
     "workflow_run": 542,
@@ -482,49 +537,25 @@
       "This evidence applies only to the listed commit.",
       "The S06-081 long-double analytic oracle is not a general 3D interval proof.",
       "It is not H723 target runtime, WCET/RTA, hardware RAM/stack watermark, HIL or flight evidence."
-    ]
-  },
-  "overall_m5_06_status": {
-    "status": "BLOCKED",
-    "reasons": [
-      "R7 implemented the true differential collision tests S06-100..102 and the real-C time check S06-103; MR-009 still awaits independent approval.",
-      "R6 re-derived the time-quantisation bound (gamma_2), enlarged every evaluation interval to s_eval_max, generalised the subnormal term and added exhaustive timing evidence; S06-100..102 remain NOT_IMPLEMENTED.",
-      "R5 fixed a geofence clearance gap: check_geofences() did not subtract position_rounding_error_m.",
-      "MR-009 is FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW: six sub-items (coefficient, Horner, time, FP environment, continuous coverage, end-to-end decision) each need an independent APPROVED.",
-      "MR-009 is FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW (S06-085..093); spec/ABI evidence re-baseline and RT-Thread package pinning need owner approval.",
-      "Independent mathematical review MR-001..MR-008 is not yet APPROVED.",
-      "M5-07 gate integration is not complete.",
-      "H723 online obstacle avoidance is not authorized; current production profile is OBSTACLE_SOURCE_MODE=NONE and BENCH_INHIBIT."
     ],
-    "next_milestone": "M5-07 only after M5-06 acceptance and explicit independent mathematical approval."
+    "scope": "HISTORICAL GitHub Actions run; it does not apply to the current HEAD and must not be inherited."
   },
-  "m5_06_consumer_curve_bound": {
-    "mr_id": "MR-009",
-    "status": "FIX_IMPLEMENTED_WAITING_INDEPENDENT_REVIEW",
-    "position_roundings": 10,
-    "velocity_roundings": 12,
-    "acceleration_roundings": 10,
-    "gamma_model": "gamma_n = n*u/(1-n*u), u = 2^-24",
-    "coefficient_error_source": "outward interval coefficients, not binary64 nominal",
-    "velocity_mid_norm_includes_eval_error": true,
-    "fma_guard": "tests/guidance/check_consumer_fp_contraction.py",
-    "evidence": "build/m4_m5_implementation/evidence/m5_host.log",
-    "gamma_upward_rounded": true,
-    "runtime_rounding_mode_enforced": true,
-    "geofence_clearance_includes_envelope": true,
-    "continuous_time_evidence": "S06-094 (120 checks, 0.963) + S06-099 (60002 offsets)",
-    "decision_participation_evidence": "S06-095..097",
-    "runtime_environment_test": "S06-098",
-    "proof_record": "spec/history/implementation/guidance/M5_06_6_MR009_PROOF.md",
-    "fp_environment_audit": "spec/validation/fp_environment_audit.md",
-    "time_reference": "s_exact = h * (offset_us / step_us)",
-    "time_error_bound": "gamma_2 * s_exact, gamma_2 = 2u/(1-2u)",
-    "evaluation_interval": "s_eval_max = s_max + gamma_2*s_max",
-    "subnormal_term": "n * 2^-149 * max(1, s_eval_max)^n",
-    "preview_step_contract_checked": true,
-    "host_mxcsr_checked": true,
-    "differential_collision_status": "IMPLEMENTED (S06-100..102 PASS)",
-    "fp_report_model_check": "MATCH (tokens verified against the compiled source)",
-    "time_evidence": "S06-099 (exact Fraction) + S06-103 (real C consumer)"
+  "previous_commit_pass_inherited": false,
+  "latest_local_validation": {
+    "run_id": "M5-06-R8-20261110",
+    "head": "see archive_manifest.json (RUN_ID M5-06-R8-20261110)",
+    "branch": "opt/stage-02-m5-06-safety-validator",
+    "scope": "LOCAL_EXECUTION_ONLY",
+    "github_ci": "NOT_RUN_FOR_THIS_HEAD",
+    "status": "FAIL",
+    "note": "Overall FAIL because spec_layout, packages_lock and production_abi are pre-existing failures and scons_link is BLOCKED; the host, sanitizer, Cortex-M7 and evidence checks pass. Local results are never reported as GitHub CI success.",
+    "counts": {
+      "m4_host": 927,
+      "m5_host": 314785,
+      "integration": 1000,
+      "m5_sanitizer": 314785,
+      "integration_sanitizer": 1000
+    },
+    "failures": 0
   }
 }
