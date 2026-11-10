@@ -84,6 +84,7 @@ Status control_backend_init(const ProductControllerConfig *c) {
   next.health.common.health_state = MODULE_HEALTH_INITIALIZING;
   m6 = next;
   position_control_reset();
+  mpc_consumer_reset();
   mpc_reset();
   return STATUS_OK;
 }

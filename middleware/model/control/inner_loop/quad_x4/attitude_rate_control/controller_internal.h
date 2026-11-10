@@ -2,26 +2,11 @@
 #define CONTROLLER_INTERNAL_H
 #include "contract_checks/algorithm_checks.h"
 #include "control_backend.h"
+#include "mpc_diagnostics.h"
 EXTERN_C_BEGIN
-/* Acceptance accounting for the MPC solver; diagnostics only. */
-typedef struct {
-  uint32_t jobs, solved, rejected;
-  uint64_t covered_us;
-  /* Why the outer loop never reached mpc_solve(): one counter per early return
-   * in control_backend_outer_update(), so a zero-job run explains itself. */
-  uint32_t blocked_uninitialized, blocked_validation, blocked_mode;
-  uint32_t blocked_clock, blocked_stale, blocked_throttle, blocked_lock;
-  int32_t last_validation_status;
-  uint32_t last_eval_age_us, max_eval_age_us;
-  uint64_t last_now_us, last_control_time_us;
-  uint32_t worker_ticks, worker_skips, entry_calls;
-  uint32_t rejected_numeric, rejected_range, rejected_stale, rejected_domain;
-  uint32_t solver_inaccurate, solver_max_iter, solver_infeasible, solver_deadline;
-  int32_t last_solver_status;
-  uint32_t max_prim_res_x1e6, max_dual_res_x1e6;
-  uint64_t last_worker_us;
-} MpcRunStats;
-void mpc_get_run_stats(MpcRunStats *out);
+/* MpcRunStats and its getter are declared in mpc_diagnostics.h: the Host SIL
+ * adapter that serializes the counters must include the producer's definition,
+ * not a copy. */
 void mpc_note_worker(uint64_t now_us, int ready);
 #define CONTROL_GRAVITY_MPS2 9.80665f
 #define MPC_VARIABLE_COUNT 15
