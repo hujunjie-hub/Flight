@@ -186,3 +186,14 @@ ARM 静态检查报告：MPC RAM 29,252 bytes、worker stack 8,192 bytes、最�
 | S06-083 | 自适应细分中点碰撞，起点精确/±1 ULP 三组；断言 work_units 确认细分被执行 | IMPLEMENTED / CI_PENDING；尚未形成整段/分段独立 oracle 等价证明 |
 
 以上为源码存在性和测试断言静态检查，不是测试执行证据。必须等待新 commit 的 Host、ASan/UBSan、Cortex-M7 compile workflow 全部实际结果；任何失败需记录完整输入与最小反例。
+
+ 
+## MR-008 动态障碍物预测位置误差包络阻塞（2026-11-10）
+
+`check_dynamic_tracks()` 当前通过 float 中点时间转整数微秒、double 秒换算和 double 位置乘加得到障碍物预测点；现有 `obstacle_rounding_error` 只覆盖 float 与已舍入 double 点的差，没有显式覆盖时间量化、秒换算和 double 乘加的完整误差区间。该路径的连续距离下界保守性尚未证明，列为 **SAFETY BLOCKER**。
+
+| ID | 场景 | Oracle / 通过条件 | 状态 |
+|---|---|---|---|
+| S06-084 | 动态 track 预测时间和位置数值误差 | Fraction 精确时间/位置参考；大 epoch、正负时间差、非 dyadic 中点及相切/近切；误差上界必须覆盖精确预测 | NOT_RUN；seed `0x6D350684` |
+
+修复方向：相对参考时间整数差、微秒换秒 outward interval、位置乘加 outward interval、float 预测点到完整区间的最大距离作为误差界；失败时 NUMERIC_FAILURE。MR-008 未关闭前，不得宣称动态障碍物连续距离数学证明完成。
