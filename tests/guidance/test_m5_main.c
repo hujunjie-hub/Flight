@@ -11,6 +11,9 @@
 #include <math.h>
 #include <float.h>
 #include <fenv.h>
+#if (defined(__x86_64__) || defined(__i386__)) && defined(__SSE__)
+#include <xmmintrin.h>
+#endif
 #include "ports/port_api.h"
 #include "guidance_update/guidance.h"
 #include "guidance_update/guidance_internal.h"
@@ -5227,16 +5230,31 @@ static void test_m5_safety_floating_environment_rejected(void)
 {
   SafetyFx fx;
   int previous = fegetround();
+  static const int modes[] = {FE_DOWNWARD, FE_UPWARD, FE_TOWARDZERO};
+  unsigned i;
+
   safety_fx_init(&fx, 55000000u);
-  /* MR-009 bounds assume round-to-nearest; a different runtime mode must be
-     rejected, not silently evaluated with the wrong error model. */
-  CHECK(fesetround(FE_DOWNWARD) == 0);
+  for (i = 0u; i < sizeof(modes) / sizeof(modes[0]); ++i) {
+    CHECK(fesetround(modes[i]) == 0);
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+          == M5_SAFETY_NUMERIC_FAILURE);
+    CHECK(fx.result.passed == 0u);
+    CHECK(fesetround(previous) == 0);
+  }
+#if (defined(__x86_64__) || defined(__i386__)) && defined(__SSE__)
+  {
+    unsigned original = (unsigned)_mm_getcsr();
+    _mm_setcsr(original | (1u << 15)); /* FTZ */
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+          == M5_SAFETY_NUMERIC_FAILURE);
+    _mm_setcsr((original & ~(1u << 15)) | (1u << 6)); /* DAZ */
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+          == M5_SAFETY_NUMERIC_FAILURE);
+    _mm_setcsr(original);
+  }
+#endif
   CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
-      == M5_SAFETY_NUMERIC_FAILURE);
-  CHECK(fx.result.passed == 0u);
-  CHECK(fesetround(previous) == 0);
-  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
-      == M5_SAFETY_PASS);
+        == M5_SAFETY_PASS);
 }
 
 /*
@@ -5450,6 +5468,7 @@ static void test_m5_safety_envelope_geofence_participation(void)
   CHECK(fx.result.passed == 0u);
   CHECK(fx.result.reason_code == M5_SAFETY_REASON_GEOFENCE_VIOLATION);
 }
+
 
 int main(void)
 {

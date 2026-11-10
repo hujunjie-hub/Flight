@@ -10,6 +10,9 @@
 
 #include <float.h>
 #include <fenv.h>
+#if (defined(__x86_64__) || defined(__i386__)) && defined(__SSE__)
+#include <xmmintrin.h>
+#endif
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
@@ -836,10 +839,22 @@ static double consumer_eval_error_bound(
   }
   result = add_upper_nonnegative(coefficient_term,
       multiply_upper_nonnegative(magnitude_term, gamma));
-  /* Absolute floor: each final rounding can lose at most half a subnormal,
-     i.e. FLT_TRUE_MIN, so n of them are covered by n * 2^-149. */
-  return add_upper_nonnegative(
-      result, (double)rounding_count * 0x1p-149);
+  /* Absolute floor. A rounding at Horner step k is multiplied by s for every
+     later step, so its contribution is at most 2^-149 * s^(n-k); the worst
+     case is bounded by n * 2^-149 * max(1, s_max)^n. For s_max <= 1 this is
+     exactly the R5 term n * 2^-149 (no amplification), which is why the
+     production validator additionally requires s_eval_max <= 1. */
+  {
+    double scale = s_max > 1.0 ? s_max : 1.0; /* max(1, s_max) */
+    double amplification = 1.0;
+    unsigned step;
+    for (step = 0u; step < rounding_count; ++step)
+      amplification = multiply_upper_nonnegative(amplification, scale);
+    result = add_upper_nonnegative(result,
+        multiply_upper_nonnegative((double)rounding_count * 0x1p-149,
+                                   amplification));
+  }
+  return result;
 }
 
 /* |d^k/dt^k| upper bound of the power-basis polynomial on [0, s_max]. */
@@ -1003,17 +1018,43 @@ static uint8_t build_curve(
 
       /* MR-009: bound the binary32 consumer evaluation of this axis against
          the interval coefficients c_i computed above (never the binary64
-         nominal c[]). */
+         nominal c[]).
+
+         Timing model. The consumer computes
+             h   = RN(step_us   * 1e-6f)
+             s_c = RN(offset_us * 1e-6f)
+         with both integers exactly representable in binary32. With
+         c = RN(1e-6) = 1e-6(1+d0), |d0| <= u, this is
+             h   = step   * c * (1+e1),  |e1| <= u
+             s_c = offset * c * (1+e2),  |e2| <= u.
+         Using s_exact = h * (offset/step) = offset * c * (1+e1) absorbs the
+         first error, so s_c/s_exact = (1+e2)/(1+e1) and therefore
+             |s_c - s_exact| <= gamma_2 * s_exact,  gamma_2 = 2u/(1-2u).
+         With s_exact <= s_max = h*u1 every consumer time lies in
+             [0, s_eval_max],  s_eval_max = s_max + gamma_2*s_max.
+         All value and derivative bounds are evaluated on that enlarged
+         interval; the residual shift contributes delta_s = gamma_2*s_max times
+         the derivative bound. The old R5 form (2u+u^2)*s <= 2u*s_max was wrong
+         because 2u+u^2 > 2u. */
       {
         float cf[6], vf[6], af[6];
         M5SafetyInterval vc[6], ac[6];
         double s_max = h * (double)u1;
-        /* |s_consumer - s_exact| <= 2u*s_max: the consumer rounds the integer
-           microsecond count to binary32 and the 1e-6 multiplier, so two unit
-           roundoffs per unit of time are the worst case. Compute the product
-           outward so the scale itself cannot under-state the error. */
-        double time_scale = multiply_upper_nonnegative(
-            2.0 * 0x1p-24, s_max);
+        double nu2 = 2.0 * 0x1p-24;
+        double gamma2, delta_s, s_eval_max;
+
+        nu2 = nextafter(nu2, INFINITY);
+        gamma2 = nu2 / (1.0 - nu2);
+        gamma2 = nextafter(gamma2, INFINITY);
+        delta_s = multiply_upper_nonnegative(gamma2, s_max);
+        s_eval_max = add_upper_nonnegative(s_max, delta_s);
+        if (!isfinite(s_eval_max) || !(s_eval_max > 0.0)) return 0u;
+        /* Contract limit: the production validator only accepts the 20 ms
+           preview step, so s_eval_max ~ 0.0200001. consumer_eval_error_bound()
+           also carries the general max(1,s)^n amplification term, but the
+           product contract is still enforced: a future step constant larger
+           than 1 s must be reviewed before it can be validated. */
+        if (!(PRODUCT_PREVIEW_STEP_US < 1000000u)) return 0u;
 
         consumer_power_coefficients(a, b, (float)h, axis, cf);
         for (k = 0u; k < 6u; ++k) {
@@ -1033,19 +1074,19 @@ static uint8_t build_curve(
         }
         curve->eval_position_error[axis] = add_upper_nonnegative(
             consumer_eval_error_bound(cf, c_i, 5u,
-                M5_CONSUMER_POSITION_ROUNDINGS, s_max),
-            multiply_upper_nonnegative(time_scale,
-                polynomial_derivative_magnitude(cf, 5u, 1u, s_max)));
+                M5_CONSUMER_POSITION_ROUNDINGS, s_eval_max),
+            multiply_upper_nonnegative(delta_s,
+                polynomial_derivative_magnitude(cf, 5u, 1u, s_eval_max)));
         curve->eval_velocity_error[axis] = add_upper_nonnegative(
             consumer_eval_error_bound(vf, vc, 4u,
-                M5_CONSUMER_VELOCITY_ROUNDINGS, s_max),
-            multiply_upper_nonnegative(time_scale,
-                polynomial_derivative_magnitude(cf, 5u, 2u, s_max)));
+                M5_CONSUMER_VELOCITY_ROUNDINGS, s_eval_max),
+            multiply_upper_nonnegative(delta_s,
+                polynomial_derivative_magnitude(cf, 5u, 2u, s_eval_max)));
         curve->eval_acceleration_error[axis] = add_upper_nonnegative(
             consumer_eval_error_bound(af, ac, 3u,
-                M5_CONSUMER_ACCELERATION_ROUNDINGS, s_max),
-            multiply_upper_nonnegative(time_scale,
-                polynomial_derivative_magnitude(cf, 5u, 3u, s_max)));
+                M5_CONSUMER_ACCELERATION_ROUNDINGS, s_eval_max),
+            multiply_upper_nonnegative(delta_s,
+                polynomial_derivative_magnitude(cf, 5u, 3u, s_eval_max)));
         if (!isfinite(curve->eval_position_error[axis]) ||
             !isfinite(curve->eval_velocity_error[axis]) ||
             !isfinite(curve->eval_acceleration_error[axis])) return 0u;
@@ -1735,6 +1776,16 @@ static uint8_t floating_environment_is_supported(void)
   return (uint8_t)(((fpscr >> 22) & 3u) == 0u &&  /* RMode = round to nearest */
                    ((fpscr >> 24) & 1u) == 0u &&  /* FZ: flush-to-zero off */
                    ((fpscr >> 25) & 1u) == 0u);   /* DN: default NaN off */
+#elif (defined(__x86_64__) || defined(__i386__)) && defined(__SSE__)
+  {
+    /* Host/SIL x86: the MXCSR rounding control, flush-to-zero and
+       denormals-are-zero bits must all match the error model. */
+    unsigned csr = (unsigned)_mm_getcsr();
+    return (uint8_t)(fegetround() == FE_TONEAREST &&
+                     (csr & (3u << 13)) == 0u &&  /* RC = round to nearest */
+                     (csr & (1u << 15)) == 0u &&  /* FTZ = 0 */
+                     (csr & (1u << 6)) == 0u);    /* DAZ = 0 */
+  }
 #else
   return (uint8_t)(fegetround() == FE_TONEAREST);
 #endif
