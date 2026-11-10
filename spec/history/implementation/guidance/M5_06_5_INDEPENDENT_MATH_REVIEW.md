@@ -207,3 +207,17 @@ Cortex-M7 compile evidence:
 S06-083 test correction: the initial LIFO work stack processes interval zero first. A successful adaptive collision therefore correctly needs only two work units (parent + child), not more than the 24 preview intervals. The test now asserts `work_units > 1` and all three exact/±1 ULP cases pass.
 
 Status: **HOST/SIL AND CORTEX-M7 COMPILE VALIDATION PASS at #509**. This does not close MR-008's independent mathematical proof review, does not authorize M5-07, and does not authorize H723 obstacle avoidance. Remaining open items are listed below.
+
+ 
+## 10. S06-081 constant-acceleration oracle strengthened (2026-11-10)
+
+The previous 64-case constant-acceleration differential used 513 uniform time samples to estimate minimum distance. That was not an independent continuous-time oracle and could miss a narrow minimum between samples.
+
+Replaced it with the analytic candidate set for one-dimensional constant relative acceleration plus fixed lateral offset:
+- interval endpoints (t=0,T);
+- stationary relative x-velocity root (x'(t)=0);
+- every in-horizon quadratic root (x(t)=0).
+
+Because (d^2(t)=x(t)^2+y^2), every interior minimum must satisfy either (x(t)=0) or (x'(t)=0). The oracle evaluates all valid candidates in long double and uses `sqrtl`; no fixed time grid is used.
+
+This is an independent analytic continuous-distance differential oracle for the 1D constant-acceleration test model, not a general 3D interval proof for arbitrary acceleration and uncertainty. Code commit: `a14b9f1`. CI pending.
