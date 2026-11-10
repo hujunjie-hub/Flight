@@ -19,6 +19,10 @@ def float_from_bits(bits: int) -> float:
     return struct.unpack("!f", struct.pack("!I", bits))[0]
 
 
+def double_from_bits(bits: int) -> float:
+    return struct.unpack("!d", struct.pack("!Q", bits))[0]
+
+
 def exact_square(values: tuple[float, float, float]) -> Fraction:
     terms = (Fraction.from_float(float(v)) for v in values)
     return sum((v * v for v in terms), Fraction(0))
@@ -77,9 +81,45 @@ def verify(lib_path: str) -> None:
                 f"lower={lower!r}"
             )
 
+    # The lower-bound helper accepts binary64 components in production.
+    # Exercise its full finite input domain as well; binary32-only vectors
+    # above do not cover values created by the validator's interval math.
+    double_cases = [
+        (0.0, 0.0, 0.0),
+        (1.0, 2.0**-80, 0.0),
+        (double_from_bits(0x0000000000000001), 0.0, 0.0),
+        (double_from_bits(0x0010000000000000), 0.0, 0.0),
+        (sys.float_info.max, 0.0, 0.0),
+        (sys.float_info.max, sys.float_info.max, 0.0),
+        (1.0, double_from_bits(0x0000000000000001), 0.0),
+    ]
+    double_rng = random.Random(0x6D350680)
+    for _ in range(10000):
+        vector = []
+        for _axis in range(3):
+            bits = double_rng.getrandbits(64)
+            if ((bits >> 52) & 0x7FF) == 0x7FF:
+                bits &= ~(0x7FF << 52)
+            vector.append(double_from_bits(bits))
+        double_cases.append(tuple(vector))
+
+    for index, vector in enumerate(double_cases):
+        exact = exact_square(vector)
+        lower = float(lower_fn(*vector))
+        if lower < 0.0:
+            raise AssertionError(
+                f"binary64 case {index}: negative lower bound {lower!r}"
+            )
+        if lower == float("inf") or Fraction.from_float(lower) ** 2 > exact:
+            raise AssertionError(
+                f"binary64 case {index}: lower bound overestimates; "
+                f"vector={vector!r}, lower={lower!r}"
+            )
+
     print(
         f"M5_S06_080_EXACT_FRACTION_ORACLE_PASS "
-        f"cases={len(cases)} seed=0x6D350680"
+        f"binary32_upper_cases={len(cases)} "
+        f"binary64_lower_cases={len(double_cases)} seed=0x6D350680"
     )
 
 
