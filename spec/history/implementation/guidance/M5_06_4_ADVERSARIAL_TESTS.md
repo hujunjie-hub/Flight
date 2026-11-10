@@ -164,3 +164,6 @@ S06-074..079 静态/动态端到端扫掠差分、加速度包络、预览接缝
 动态 track 预测不再使用 float 中点时间转整数微秒后直接点估计。生产实现现以相对 reference epoch 的时间差构造 outward interval，包住 (10^{-6}) 换算和 position/velocity 乘加，并以 float 预测点到区间两端的最大距离作为误差上界。预测区间无效/溢出时返回数值失败，保持 fail-closed。
 
 新增 Fraction oracle：7 个显式边界 + 10,000 个固定 seed `0x6D350684` 的随机输入；检查三轴精确位置误差范数不超过生产误差上界，并验证超范围预测拒绝。当前 **FIX IMPLEMENTED / CI_PENDING**，不是测试 PASS。
+
+
+S06-084 另增加大绝对 epoch 端到端不变性测试，使用接近 uint64 上限但保留完整预测租约和 proof horizon 的时间戳；相同相对时间下必须与低 epoch fixture 得到相同安全结果。Fraction oracle 覆盖 10,007 组输入。当前仅 IMPLEMENTED / CI_PENDING。
