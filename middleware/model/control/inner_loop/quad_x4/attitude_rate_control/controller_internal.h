@@ -15,6 +15,10 @@ typedef struct {
   uint32_t last_eval_age_us, max_eval_age_us;
   uint64_t last_now_us, last_control_time_us;
   uint32_t worker_ticks, worker_skips, entry_calls;
+  uint32_t rejected_numeric, rejected_range, rejected_stale, rejected_domain;
+  uint32_t solver_inaccurate, solver_max_iter, solver_infeasible, solver_deadline;
+  int32_t last_solver_status;
+  uint32_t max_prim_res_x1e6, max_dual_res_x1e6;
   uint64_t last_worker_us;
 } MpcRunStats;
 void mpc_get_run_stats(MpcRunStats *out);

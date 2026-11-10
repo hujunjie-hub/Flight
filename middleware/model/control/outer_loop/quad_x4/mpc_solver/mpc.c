@@ -217,6 +217,12 @@ Status mpc_solve(const ControllerInput *in,
     out->solver_status = CONTROL_SOLVER_NUMERICAL_FAILURE;
     return STATUS_NUMERIC_ERROR;
   }
+  {
+    uint32_t prim = (uint32_t)(quad_solver.info->prim_res * 1e6f);
+    uint32_t dual = (uint32_t)(quad_solver.info->dual_res * 1e6f);
+    if (prim > mpc_run_stats.max_prim_res_x1e6) mpc_run_stats.max_prim_res_x1e6 = prim;
+    if (dual > mpc_run_stats.max_dual_res_x1e6) mpc_run_stats.max_dual_res_x1e6 = dual;
+  }
   if (!isfinite(quad_solver.info->prim_res) ||
       !isfinite(quad_solver.info->dual_res) ||
       quad_solver.info->prim_res > 1e-3f || quad_solver.info->dual_res > 1e-3f)
@@ -313,11 +319,27 @@ Status control_backend_outer_update(const ControllerInput *in) {
   last_context = result;
   s = mpc_solve(in, &m6.config.payload, previous, &result);
   mpc_run_stats.jobs++;
+  mpc_run_stats.last_solver_status = (int32_t)result.solver_status;
   if (s == STATUS_OK) {
     mpc_run_stats.solved++;
     mpc_run_stats.covered_us += 20000u;
   } else {
     mpc_run_stats.rejected++;
+    switch (s) {
+    case STATUS_NUMERIC_ERROR: mpc_run_stats.rejected_numeric++; break;
+    case STATUS_OUT_OF_RANGE: mpc_run_stats.rejected_range++; break;
+    case STATUS_STALE_DATA: mpc_run_stats.rejected_stale++; break;
+    case STATUS_MODEL_OUT_OF_DOMAIN: mpc_run_stats.rejected_domain++; break;
+    default: break;
+    }
+  }
+  switch (result.solver_status) {
+  case CONTROL_SOLVER_SOLVED_INACCURATE: mpc_run_stats.solver_inaccurate++; break;
+  case CONTROL_SOLVER_MAX_ITER: mpc_run_stats.solver_max_iter++; break;
+  case CONTROL_SOLVER_PRIMAL_INFEASIBLE:
+  case CONTROL_SOLVER_DUAL_INFEASIBLE: mpc_run_stats.solver_infeasible++; break;
+  case CONTROL_SOLVER_DEADLINE_EXCEEDED: mpc_run_stats.solver_deadline++; break;
+  default: break;
   }
   if (clock_read(&end) || end.boot_id != start.boot_id ||
       end.time_epoch != start.time_epoch ||
