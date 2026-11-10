@@ -197,9 +197,9 @@ pwsh -NoProfile -File .\tools\archive_validation_run.ps1 -CiRunUrl "https://gith
 
 不要只发“测试通过”或几张截图。
 
-## 8. 最近一次代码 CI 基线（历史证据）
+## 8. 最近一次完整 CI 基线（2026-11-10）
 
-截至 2026-11-10，代码 commit `0c761964d4bc6cfeec73ba60464657db450743ee` 的 Host validation #509 全部 jobs success：
+Host validation #542 对 commit `dafe47b8b17e7f32f676cb258eaa7a407a1dfb90` 的全部 jobs success：
 
 | 项目 | 实际结果 |
 |---|---:|
@@ -209,10 +209,12 @@ pwsh -NoProfile -File .\tools\archive_validation_run.ps1 -CiRunUrl "https://gith
 | M5 ASan/UBSan | 269,207 checks / 0 failures |
 | Integration ASan/UBSan | 1,000 checks / 0 failures |
 | S06-080 Fraction oracle | binary32 upper 10,007 + binary64 lower 10,007 cases，seed `0x6D350680` |
+| S06-081 动态连续距离 oracle | 恒速 64 + 恒加速度 64 cases；analytic long-double candidate set |
+| S06-082 / S06-083 | 精确相切、1 ULP、preview seam、自适应细分边界全部 PASS |
 | S06-084 Fraction prediction oracle | 10,007 cases，seed `0x6D350684` |
 | Cortex-M7 compile | `M5_CORTEX_M7_COMPILE_OK` |
 | MPC 静态资源报告 | RAM 29,252 bytes；worker stack 8,192 bytes；最大静态栈帧 2,024 bytes |
 
-CI：[Host validation #509](https://github.com/hujunjie-hub/Flight/actions/runs/42745124335)。
+CI：[Host validation #542](https://github.com/hujunjie-hub/Flight/actions/runs/42746417706)。
 
-注意：这是该 commit 的 Host/CI 证据，不是文档更新后新 HEAD 的 CI 结果；也不代表 H723 目标运行、WCET/RTA、实机 RAM/stack watermark、HIL 或飞行通过。M5-06 整体仍受独立数学审查和后续 M5-07 门禁约束。
+注意：该证据对列出的 commit 有效。S06-081 的 long-double 解析候选 oracle 只针对当前 1D 恒加速度测试模型，不是一般 3D 区间证明。该结果也不代表 H723 目标运行、WCET/RTA、实机 RAM/stack watermark、HIL 或飞行通过。M5-06 整体仍受独立数学审查和后续 M5-07 门禁约束；后续任何新 commit 均须重新核对 CI。
