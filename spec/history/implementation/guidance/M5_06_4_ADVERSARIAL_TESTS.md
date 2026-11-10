@@ -125,11 +125,11 @@ S06-074..079 静态/动态端到端扫掠差分、加速度包络、预览接缝
 
 ## M5-06.5 独立数学审查与后续边界用例（2026-11-10）
 
-详见 `M5_06_5_INDEPENDENT_MATH_REVIEW.md`。初审识别出 `norm3_upper()` 的 sqrt 结果没有在 float 转换前建立明确的向上误差界；单纯对 sqrt 返回值调用 `round_up_float()` 不足以证明相对精确范数保守。另需将 IEEE-754 binary64、正确舍入、禁止 fast-math/不受控重结合及 `nextafter` 语义写入并锁定编译契约。
+详见 `M5_06_5_INDEPENDENT_MATH_REVIEW.md`。初审提出的 libm sqrt 舍入风险已在后续代码中通过 binary32 位模式有界二分搜索替代；并新增 IEEE 754 binary32/binary64 静态约束、显式浮点编译 flags、Cortex-M7 Host-only validator object 交叉编译，以及 Fraction 精确平方范数 oracle。上述实现当前等待新 commit 的 CI 证据和独立数学复核，不应沿用旧版 sqrt 风险描述作为当前代码事实。
 
 预留测试 S06-080..083，固定 seed 分别为 `0x6D350680`.. `0x6D350683`，覆盖 sqrt/float ULP、动态端到端连续距离、精确相切与接缝、自适应分裂点 1 ULP 边界。以上全部 **NOT_RUN**，不得将编号或 seed 当作已执行证据。
 
-本次检查没有执行新的 ARM 构建或 CI。已有 ARM 工作流中的 M4/M5 production-source compile 不包含 Host-only 的 M5-06 validator translation unit；MPC RAM 数字也不是 M5-06 validator RAM。不得混淆。
+当前 ARM 脚本已将 M5-06 Host-only validator translation unit 交叉编译为 Cortex-M7 object，但不链接进产品；完整目标 CI 结果仍待本轮提交确认。MPC RAM 数字不是 M5-06 validator RAM，object 编译也不构成 H723 运行期资源或飞行放行证据。
 
 ## S06-080 精确有理数范数 oracle（2026-11-10）
 
