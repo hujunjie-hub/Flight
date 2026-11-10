@@ -660,7 +660,7 @@
     "run_id": "M5-06-R15-20261110",
     "validated_code_commit": "a2fd81a44a9f2c6e4ac36917beea1f6a645f3f4f",
     "head": "a2fd81a44a9f2c6e4ac36917beea1f6a645f3f4f",
-    "archive_head_sha": "PENDING_ARCHIVE_ZIP_SHA256",
+    "archive_head_sha": "3415bf1508e3a3415c66f27696a2d10f3ec1b5c0b855f5a21da7e306ecd8f33e",
     "archive_zip_sha256": "PENDING_ZIP_SHA256",
     "branch": "opt/stage-02-m5-06-safety-validator",
     "scope": "LOCAL_EXECUTION_ONLY",
@@ -677,8 +677,8 @@
     "blocked_items": [
       "scons_link"
     ],
-    "note": "validated_code_commit and archive_head_sha are different commits; archive_zip_sha256 is recorded outside the ZIP because a ZIP cannot contain its own hash. Local results are never reported as GitHub CI success.",
-    "archive_commit_sha": "PENDING_ARCHIVE_COMMIT"
+    "note": "validated_code_commit and archive_commit_sha are different commits; archive_head_sha is the SHA256 of the delivered ZIP (recorded after archive creation; a ZIP cannot contain its own hash). The archive contains SHA256SUMS.txt for its files. Local results are never reported as GitHub CI success.",
+    "archive_commit_sha": "bf1118cd3653cfec1ef63281b835b503a78fa8d2"
   },
   "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
   "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112)"
