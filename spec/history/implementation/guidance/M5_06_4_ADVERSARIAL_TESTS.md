@@ -186,3 +186,8 @@ Commit `0c761964d4bc6cfeec73ba60464657db450743ee`:
 - S06-083 adaptive split exact/±1 ULP now verifies actual parent→child processing with `work_units > 1`; all cases PASS.
 
 This closes the CI execution gap for these test suites at the verified commit. It does not close the independent proof review, H723 target runtime, HIL, or flight release gates.
+
+ 
+### S06-081 constant-acceleration reference correction
+
+The constant-acceleration differential now computes the continuous minimum analytically from endpoint, relative-velocity stationary, and relative-position zero candidates. The prior 513-point grid oracle has been removed. The analytic test covers its defined 1D constant-acceleration + fixed lateral-offset model; broader uncertainty and 3D acceleration interval proof remain open. Commit `a14b9f1`; CI_PENDING.
