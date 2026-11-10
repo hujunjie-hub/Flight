@@ -62,8 +62,8 @@ def verify(lib_path: str) -> None:
         for _axis in range(3):
             sign_p = rng.getrandbits(1)
             sign_v = rng.getrandbits(1)
-            exp_p = rng.randrange(0, 201)
-            exp_v = rng.randrange(0, 201)
+            exp_p = rng.randrange(0, 255)
+            exp_v = rng.randrange(0, 255)
             mant_p = rng.getrandbits(23)
             mant_v = rng.getrandbits(23)
             position.append(float_from_bits(
@@ -79,16 +79,20 @@ def verify(lib_path: str) -> None:
         p_in, v_in = float3(*position), float3(*velocity)
         p_out = float3()
         error = ctypes.c_float()
+        exact = exact_position(position, velocity, local_mid, sample_offset)
         ok = fn(p_in, v_in, local_mid, sample_offset,
                 p_out, ctypes.byref(error))
+        finite_float_max = Fraction.from_float(max_finite)
+        exact_fits_float = all(abs(value) <= finite_float_max for value in exact)
         if not ok:
-            raise AssertionError(f"case {index}: valid finite case rejected")
+            if exact_fits_float:
+                raise AssertionError(f"case {index}: representable finite case rejected")
+            continue
         if not (error.value >= 0.0 and error.value != float("inf")):
             raise AssertionError(
                 f"case {index}: invalid position error {error.value!r}"
             )
 
-        exact = exact_position(position, velocity, local_mid, sample_offset)
         error2 = sum(
             ((Fraction.from_float(float(actual)) - expected) ** 2
              for actual, expected in zip(p_out, exact)),
