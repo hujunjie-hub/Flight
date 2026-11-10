@@ -130,3 +130,7 @@ S06-074..079 静态/动态端到端扫掠差分、加速度包络、预览接缝
 预留测试 S06-080..083，固定 seed 分别为 `0x6D350680`.. `0x6D350683`，覆盖 sqrt/float ULP、动态端到端连续距离、精确相切与接缝、自适应分裂点 1 ULP 边界。以上全部 **NOT_RUN**，不得将编号或 seed 当作已执行证据。
 
 本次检查没有执行新的 ARM 构建或 CI。已有 ARM 工作流中的 M4/M5 production-source compile 不包含 Host-only 的 M5-06 validator translation unit；MPC RAM 数字也不是 M5-06 validator RAM。不得混淆。
+
+## S06-080 精确有理数范数 oracle（2026-11-10）
+
+新增 `tests/guidance/verify_norm_bounds.py`，通过生产 C test API 获取 upper/lower binary32 结果，Python `Fraction` 对输入 binary32 值精确还原并比较平方范数，避免使用浮点 sqrt 作为唯一判据。固定 seed `0x6D350680`；覆盖零向量、单位向量、`sqrt(1 + 2^-160)`、最小次正规数、最大有限数及 10,000 组任意有限 binary32 位模式。已接入 Host runner；当前状态 **CI_PENDING**，尚无本次提交的 PASS 记录。
