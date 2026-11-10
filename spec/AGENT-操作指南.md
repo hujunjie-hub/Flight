@@ -65,6 +65,27 @@ git rev-parse HEAD
 
 本轮基线分支为 `opt/stage-02-m5-06-safety-validator`，PR #2 保持 Open / Draft，目标分支为 `opt/stage-01-host-validation`。若后续 PR/分支变化，以 GitHub 当前状态为准，不得硬编码旧 SHA。
 
+### 3.3 Windows 换行修复（每次新检出必须确认）
+
+Windows Git 默认 `core.autocrlf=true`，会把跟踪的 `.sh` 检出为 CRLF。bash 把 CR 当作选项词的一部分，所有测试脚本会在第一行 `set -euo pipefail` 处立即失败，看起来像测试框架损坏：
+
+```text
+tests/guidance/run_host_tests.sh: line 3: set: pipefail
+: invalid option name
+```
+
+这不是 Host 测试失败，也不是算法失败。仓库已用 `.gitattributes` 固定 `eol=lf`；旧检出按以下步骤修复，不要用 `git clean` 或 `git reset --hard`：
+
+```powershell
+git config core.autocrlf false
+git update-index --refresh
+git checkout -- .
+python tools/check_line_endings.py
+```
+
+`python tools/check_line_endings.py` 必须输出 `PASS`；CI 的 `Source layout and time-service tests` job 执行同一检查。若该检查失败，先修复换行，再运行任何 Host/Sanitizer/ARM 命令，否则得到的失败没有诊断价值。
+
+
 ## 4. Windows 本地环境
 
 推荐从 Windows PowerShell 7 启动 Agent，使用 WSL2 Ubuntu-26.04 执行与 GitHub Actions 一致的 GCC Host/Sanitizer/ARM Shell 测试。

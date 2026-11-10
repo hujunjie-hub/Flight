@@ -1,0 +1,9 @@
+# Repository line-ending policy.
+#
+# Every platform checks out text files with LF. Windows Git defaults to
+# core.autocrlf=true, which rewrites *.sh to CRLF; the bash test runners then
+# fail immediately with "set: pipefail: invalid option name" because the CR is
+# parsed as part of the option word. Keeping the worktree LF (and normalising
+# to LF in the object database) makes the documented WSL/Linux commands in
+# spec/AGENT-操作指南.md reproducible from a Windows clone.
+* text=auto eol=lf

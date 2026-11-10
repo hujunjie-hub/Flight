@@ -77,11 +77,14 @@ wsl.exe -d Ubuntu-26.04 -- bash -lc 'EXTRA_CFLAGS="-O1 -g -fsanitize=address,und
 
 ```powershell
 python tools/check_layout.py
+python tools/check_line_endings.py
 python spec/tools/audit_spec.py --round 3 --label flight-local
 python tests/abi/abi_report.py
 python tests/guidance/check_memory_budget.py
 python tests/guidance/check_target_build.py
 ```
+
+`python tools/check_line_endings.py` 必须在所有 Host/Sanitizer 命令之前通过；CRLF 版的 `*.sh` 会让 bash 在 `set -euo pipefail` 处失败，并把环境问题伪装成测试失败。`check_target_build.py` 在缺少 RT-Thread `packages/` 树时返回退出码 2（BLOCKED），不得记为 PASS 或 FAIL。
 
 执行顺序建议：源码/文档检查 → 单元测试 → M4/M5 集成 → Sanitizer → ARM 编译/资源静态检查 → 目标链接/ABI → 证据归档。
 
