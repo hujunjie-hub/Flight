@@ -82,6 +82,22 @@ void mpc_note_worker(uint64_t now_us, int ready) {
 void mpc_get_run_stats(MpcRunStats *out) {
   if (out) *out = mpc_run_stats;
 }
+/* The generated workspace terminates OSQP on
+ *   eps_abs + eps_rel * max(||Px||, ||A'y||, ||q||)
+ * which for this QP is about 2e-3, while mpc_solve() rejects a dual residual
+ * above an absolute 1e-3.  The solver was therefore free to stop inside its own
+ * contract and still be rejected downstream: 468 of 488 jobs in the 26 s MIL
+ * failed exactly there (median dual residual 1.75e-3).  Terminating on the
+ * absolute tolerance alone (eps_abs unchanged) makes the solver honour the gate
+ * that the application already applies; it does not relax that gate. */
+static void mpc_use_absolute_termination(void) {
+  OSQPSettings settings;
+  if (!quad_solver.settings) return;
+  settings = *quad_solver.settings;
+  settings.eps_rel = 0;
+  (void)osqp_update_settings(&quad_solver, &settings);
+}
+
 void mpc_reset(void) {
   /* Lifecycle only; both update tasks must have stopped. */
   memset(snapshots, 0, sizeof(snapshots));
@@ -97,6 +113,7 @@ void mpc_reset(void) {
   mpc_job_record_written = 0;
 #endif
   mpc_job_total = 0;
+  mpc_use_absolute_termination();
   osqp_cold_start(&quad_solver);
 }
 int mpc_read(MpcSnapshot *out) {
@@ -485,10 +502,14 @@ Status control_backend_outer_update(const ControllerInput *in) {
       result.expires_at_us, in->guidance_status->header.valid_until_us);
   result.expires_at_us = min_time(
       result.expires_at_us, in->authority_status->header.valid_until_us);
-  result.expires_at_us = min_time(
-      result.expires_at_us, in->actuator_capability->header.valid_until_us);
-  result.expires_at_us = min_time(
-      result.expires_at_us, in->actuator_status->header.valid_until_us);
+  /* The plan expires with the inputs it was built from plus its own horizon.
+   * Actuator capability/status used to be in this chain through their 5 ms
+   * header TTL, but neither message enters the QP: the allocation limits are
+   * enforced downstream by the controller and the guard, and the plan is not a
+   * function of actuator telemetry.  A 5 ms telemetry TTL therefore capped every
+   * plan at one quarter of the 20 ms period in which the worker can refresh it,
+   * so a solved plan expired before the next solve and the 1 kHz consumer fell
+   * back to PD for 19 of every 20 ms (FMAT-0012). */
   if (s && result.solver_status == CONTROL_SOLVER_NOT_RUN)
     result.solver_status = CONTROL_SOLVER_NUMERICAL_FAILURE;
   if (s)
