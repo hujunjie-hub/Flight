@@ -2,14 +2,6 @@
 #include <string.h>
 #include "guidance_update/guidance_internal.h"
 
-/* Landing must reach ground contact, not the Home plane as an estimate: the
- * vertical estimate can drift relative to the airframe, so a reference that
- * stops exactly at Home would hover above the landing surface and the land
- * detector could never confirm LANDED (FMAT-0008). The landing reference
- * therefore keeps descending through the Home plane until the detector reports
- * LANDED; the airframe itself is stopped by the ground contact model. */
-#define GUIDANCE_LANDING_PROBE_M 1.0f
-
 Status guidance_build_pilot(GuidanceState *s, const GuidanceInput *in, GuidanceOutput *out)
 {
     PilotControlReference *r = &out->pilot_control_reference;

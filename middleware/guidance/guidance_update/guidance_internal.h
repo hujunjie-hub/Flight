@@ -18,6 +18,11 @@
 #define GUIDANCE_REF_TTL_US 200000u
 #define GUIDANCE_VALIDATE_SUBSAMPLES 8u
 #define GUIDANCE_MAX_DURATION_S 6.2f
+/* FMAT-0008: a landing reference that stops exactly on the Home plane hovers
+ * above the landing surface whenever the vertical estimate drifted, so the land
+ * detector could never confirm LANDED. Both landing builders descend through
+ * the plane by this bounded probe; the ground contact model stops the airframe. */
+#define GUIDANCE_LANDING_PROBE_M 0.25f
 #define GUIDANCE_MAX_DURATION_ATTEMPTS 16u
 #define GUIDANCE_VALIDATION_WORK_UNITS 256u
 #define GUIDANCE_VALIDATION_MAX_DEPTH 5u

@@ -29,6 +29,16 @@ static uint8_t target(const GuidanceInput *in, GuidanceState *s, float p[3], flo
                in->directive->operation_code == PRODUCT_OP_SAFE_ACTION) {
         if (!guidance_home_ok(in)) return 0; /* origin zero is not ground */
         p[2] = d->home.position_ned_m[2];
+        if (in->directive->operation_code == PRODUCT_OP_LAND &&
+            !(in->landed_state && guidance_header_ok(&in->landed_state->header,
+                                                      &in->navigation->header,
+                                                      MSG_LANDED_STATE_SNAPSHOT,
+                                                      in->evaluation_time_us) &&
+              in->landed_state->state == LANDED_STATE_LANDED)) {
+            /* FMAT-0008: keep descending through the Home plane until the land
+             * detector reports LANDED; the contact model stops the airframe. */
+            p[2] += GUIDANCE_LANDING_PROBE_M;
+        }
     }
     return (uint8_t)(finite3(p) && isfinite(*yaw));
 }

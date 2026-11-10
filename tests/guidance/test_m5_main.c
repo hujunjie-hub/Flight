@@ -867,7 +867,7 @@ static void test_landing_reference_probes_below_home_plane(void)
    * surface whenever the vertical estimate drifted, so the detector can never
    * confirm LANDED. The reference must therefore descend through the Home plane
    * (home=0 here) and let the ground contact model stop the airframe. */
-  CHECK(lowest < -0.5f);
+  CHECK(lowest < -0.2f);
   CHECK(guidance_stop() == STATUS_OK);
 }
 
