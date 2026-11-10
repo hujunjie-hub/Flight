@@ -204,3 +204,11 @@ ARM 静态检查报告：MPC RAM 29,252 bytes、worker stack 8,192 bytes、最�
 生产路径已改为相对 reference epoch 的时间差、微秒到秒比例 outward interval、位置乘加 outward interval，并以 float 预测点到完整预测区间两端的最大距离形成误差上界。新增 `verify_dynamic_prediction.py`，Fraction 精确时间/位置 oracle，7 个显式边界 + 10,000 个固定种子随机输入，seed `0x6D350684`；覆盖预测溢出拒绝。Host runner 与 CI Python syntax 检查已接入。
 
 状态：**FIX IMPLEMENTED / CI_PENDING**。未取得当前 HEAD 的真实 CI 结果前不得标记 PASS；独立数学审查仍需复核区间构造及大 epoch 边界。
+
+
+## S06-084 当前实现状态补充
+
+- Fraction 精确预测位置 oracle：7 个显式边界 + 10,000 个固定 seed `0x6D350684` 的随机向量。
+- 三轴预测误差平方和必须不超过生产返回的误差半径平方；预测溢出必须 fail-closed。
+- C 端到端新增低 epoch/近 uint64 上限 epoch 不变性用例，检查相同相对 track 时间下结果和 track_checks 一致。
+- 当前状态：**FIX IMPLEMENTED / CI_PENDING**，尚无本轮 CI 通过证据。
