@@ -322,3 +322,10 @@ S06-104 在产品包线（|v| ≤ 4 m/s、|a| ≤ 2.5 m/s²、20 ms）下，用�
 - S06-103 Phase B 使用生产共享的 `control_reference_locate_segment()` 返回的实测局部时间，不再用名义值覆盖；108 例覆盖 interval {0,11,23}、base {1e6,123456789}、接缝与多轴非零 v/a；负向自测注入 4×γ₂ 误差必须被拒绝。
 - S06-104 改为连续 Bernstein 上界：679 例自洽且满足 |v| ≤ 4、|a| ≤ 2.5 的轨迹，上界 1.22e-08 m；static/dynamic/geofence 放置分辨率 2.4e-07 / 6.0e-08 / 1.2e-07 m，均低于 4× 阈值，三个通道均不可构造。
 - 因此 S06-100..102 维持 NOT_RUN，不以降低几何容差或扩大包线制造 PASS。
+
+ 
+## S06-103/104/105 物理时间与误差预算（2026-11-10，R10）
+
+- S06-103 Phase B：`s_exact = Fraction(local_us, 1000000)`；接缝两侧分别验证；144 例；时间误差 3.44e-08、曲线误差 2.98% 包络；系数/Horner/时间分量分别报告。
+- S06-105：E_total = E_coefficient + E_horner + E_subnormal + E_time，三维范数向外取整，995 个真实 C 采样，最坏 measured/budget = 0.080。
+- S06-104：撤回 `FACTOR=4` 的不可行结论；按通道列出放置区间并声明其不覆盖完整验证器链；结论 **MATHEMATICAL_FEASIBILITY_NOT_ESTABLISHED**；S06-100..102 保持 NOT_RUN。
