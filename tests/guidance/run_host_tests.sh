@@ -54,3 +54,6 @@ gcc "${cflags[@]}" -fPIC -shared -Wl,--no-undefined \
 python3 tests/guidance/verify_norm_bounds.py "${out}/libm5_safety_oracle.so"
 python3 tests/guidance/verify_dynamic_prediction.py "${out}/libm5_safety_oracle.so"
 python3 tests/guidance/verify_curve_eval_gap.py "${out}/libm5_safety_oracle.so"
+python3 tests/guidance/verify_continuous_envelope.py "${out}/libm5_safety_oracle.so"
+
+

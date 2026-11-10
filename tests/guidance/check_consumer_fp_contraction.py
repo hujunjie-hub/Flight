@@ -1,26 +1,40 @@
-"""MR-009 item 5: pin the floating-point semantics of the consumed curve.
+"""MR-009 item 5: pin the floating-point semantics of the proved curve.
 
-M5-06 replicates control_sample_reference()'s binary32 Horner chain. That
-replication is only meaningful if the production translation unit does not
-contract `a*b + c` into a fused multiply-add with different rounding. The
+The validator replicates `control_sample_reference()`'s binary32 Horner chain.
+That replication is only meaningful if neither translation unit contracts
+`a*b + c` into a fused multiply-add with a different rounding sequence. The
 production build takes its flags from rtconfig.py (no -ffp-contract pin), so
-this check compiles the consumer with those exact flags and inspects the
-Cortex-M7 disassembly for fused operations.
+this check compiles:
 
-Exit codes: 0 = no fused multiply-add found, 1 = fused operation found (the
-MR-009 envelope must be re-reviewed), 2 = BLOCKED because the ARM toolchain is
-not available on this machine.
+* the M6 consumer with the production flags;
+* the M5-06 validator with the Cortex-M7 check flags from
+  tests/guidance/arm_build_check.sh,
+
+then inspects both Cortex-M7 objects for fused operations and records the object
+SHA256, compiler version and the complete flag list. A fused operation in either
+object means MR-009 must be re-reviewed, because the coefficient chain would no
+longer match the replicated one.
+
+The error model itself is `gamma_n = n*u/(1-n*u)` with n = 10/12/10 roundings
+(position/velocity/acceleration) plus the interval-coefficient term; this script
+only proves that the compiler did not change the operation sequence.
+
+Exit codes: 0 = no fused multiply-add in either object, 1 = found or build
+failed, 2 = BLOCKED because the ARM toolchain is unavailable.
 """
 from pathlib import Path
+import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 
 ROOT = next(p for p in Path(__file__).resolve().parents if (p/'SConstruct').is_file())
 OUT = ROOT / "build/m5_arm"
-SOURCE = ROOT / "middleware/model/control/outer_loop/quad_x4/position_tracking/control_reference.c"
+CONSUMER = ROOT / "middleware/model/control/outer_loop/quad_x4/position_tracking/control_reference.c"
+VALIDATOR = ROOT / "middleware/guidance/trajectory_planning/m5_trajectory_safety.c"
 INCLUDES = [
     "-Imiddleware/model/control",
     "-Imiddleware/model/control/inner_loop",
@@ -46,6 +60,43 @@ def find_tool(name):
     return Path(found) if found else None
 
 
+def validator_flags():
+    """Read the Cortex-M7 flag list from arm_build_check.sh, not a re-typed copy."""
+    script = (ROOT / "tests/guidance/arm_build_check.sh").read_text(encoding="utf-8")
+    match = re.search(r"flags=\(\n(.*?)\n\)", script, re.S)
+    if not match:
+        raise SystemExit("cannot parse the flag list from arm_build_check.sh")
+    flags = []
+    for line in match.group(1).splitlines():
+        flags += line.split()
+    return flags
+
+
+def build_and_scan(gcc, objdump, source, flags, object_name):
+    obj = OUT / object_name
+    command = [str(gcc)] + flags + INCLUDES + [
+        "-c", str(source.relative_to(ROOT)), "-o", str(obj)]
+    build = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+    if build.returncode != 0:
+        print(build.stdout + build.stderr)
+        raise SystemExit(f"compile failed for {source.name}")
+    disassembly = subprocess.run([str(objdump), "-d", str(obj)], cwd=ROOT,
+                                 capture_output=True, text=True, check=True).stdout
+    counts = {mnemonic: 0 for mnemonic in FUSED}
+    for line in disassembly.splitlines():
+        for mnemonic in FUSED:
+            if ("\t" + mnemonic) in line or (" " + mnemonic + ".") in line:
+                counts[mnemonic] += 1
+    return {
+        "source": str(source.relative_to(ROOT)).replace("\\", "/"),
+        "object": str(obj.relative_to(ROOT)).replace("\\", "/"),
+        "object_sha256": hashlib.sha256(obj.read_bytes()).hexdigest(),
+        "flags": " ".join(flags),
+        "fused_operations": sum(counts.values()),
+        "mnemonics": counts,
+    }
+
+
 def main():
     sys.path.insert(0, str(ROOT))
     import rtconfig  # production compiler flags, not a re-typed copy
@@ -59,36 +110,27 @@ def main():
         return 2
 
     OUT.mkdir(parents=True, exist_ok=True)
-    obj = OUT / "control_reference_prod.o"
-    command = [str(gcc)] + rtconfig.CFLAGS.split() + INCLUDES + [
-        "-c", str(SOURCE.relative_to(ROOT)), "-o", str(obj)]
-    build = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
-    if build.returncode != 0:
-        print(build.stdout + build.stderr)
-        return 1
-
-    disassembly = subprocess.run([str(objdump), "-d", str(obj)], cwd=ROOT,
-                                 capture_output=True, text=True, check=True).stdout
-    counts = {mnemonic: 0 for mnemonic in FUSED}
-    for line in disassembly.splitlines():
-        for mnemonic in FUSED:
-            if ("\t" + mnemonic) in line or (" " + mnemonic + ".") in line:
-                counts[mnemonic] += 1
-    fused_total = sum(counts.values())
     compiler = subprocess.run([str(gcc), "--version"], capture_output=True,
                               text=True, check=True).stdout.splitlines()[0]
+    consumer = build_and_scan(gcc, objdump, CONSUMER, rtconfig.CFLAGS.split(),
+                              "control_reference_prod.o")
+    validator = build_and_scan(gcc, objdump, VALIDATOR,
+                               validator_flags() + ["-DFLIGHT_M5_HOST_PLANNER"],
+                               "m5_trajectory_safety_fp_check.o")
+    fused_total = consumer["fused_operations"] + validator["fused_operations"]
     report = {
         "status": "PASS" if fused_total == 0 else "REVIEW_REQUIRED",
-        "source": str(SOURCE.relative_to(ROOT)).replace("\\", "/"),
-        "cflags": rtconfig.CFLAGS.strip(),
         "compiler": compiler,
+        "error_model": ("gamma_n = n*u/(1-n*u), u = 2^-24, n = 10/12/10 for "
+                        "position/velocity/acceleration, plus the outward "
+                        "interval-coefficient term and the 2u*s_max time term"),
+        "objects": [consumer, validator],
         "fused_operations": fused_total,
-        "mnemonics": counts,
-        "note": ("No fused multiply-add observed; the validator's binary32 "
-                 "replication and the MR-009 9u allowance cover this build."
+        "note": ("No fused multiply-add observed in either object; the replicated "
+                 "binary32 coefficient chain matches the consumer operation order."
                  if fused_total == 0 else
-                 "Fused multiply-add observed; MR-009 envelope review required "
-                 "because contraction changes the consumer rounding sequence."),
+                 "Fused multiply-add observed; MR-009 must be re-reviewed because "
+                 "the consumer rounding sequence changed."),
     }
     (OUT / "consumer_fp.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))

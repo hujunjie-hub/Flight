@@ -9,6 +9,7 @@
 #if defined(FLIGHT_M5_HOST_PLANNER)
 
 #include <float.h>
+#include <fenv.h>
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
@@ -824,8 +825,15 @@ static double consumer_eval_error_bound(
     /* Possible cancellation into the subnormal range: reject conservatively. */
     if (magnitude_term < (double)FLT_MIN * 1024.0) return INFINITY;
   }
-  gamma = ((double)rounding_count * unit) /
-          (1.0 - (double)rounding_count * unit);
+  {
+    /* nu, 1 - nu and the quotient must all round upward: a downward-rounded
+       gamma would under-state the bound. n is exact in binary64 (n <= 12), and
+       the extra nextafter calls make the whole expression outward. */
+    double nu = (double)rounding_count * unit;
+    nu = nextafter(nu, INFINITY);
+    gamma = nu / (1.0 - nu);
+    gamma = nextafter(gamma, INFINITY);
+  }
   result = add_upper_nonnegative(coefficient_term,
       multiply_upper_nonnegative(magnitude_term, gamma));
   /* Absolute floor: each final rounding can lose at most half a subnormal,
@@ -1000,7 +1008,12 @@ static uint8_t build_curve(
         float cf[6], vf[6], af[6];
         M5SafetyInterval vc[6], ac[6];
         double s_max = h * (double)u1;
-        double time_scale = 2.0 * 0x1p-24 * s_max;
+        /* |s_consumer - s_exact| <= 2u*s_max: the consumer rounds the integer
+           microsecond count to binary32 and the 1e-6 multiplier, so two unit
+           roundoffs per unit of time are the worst case. Compute the product
+           outward so the scale itself cannot under-state the error. */
+        double time_scale = multiply_upper_nonnegative(
+            2.0 * 0x1p-24, s_max);
 
         consumer_power_coefficients(a, b, (float)h, axis, cf);
         for (k = 0u; k < 6u; ++k) {
@@ -1394,29 +1407,32 @@ static M5TrajectorySafetyStatus check_geofences(
   unsigned i;
   for (i = 0u; i < in->geofence_count; ++i) {
     const ProductGeofenceSnapshot *f = &in->geofences[i];
-    float clearance, height_mid, height_low, height_high;
+    float clearance, height_low, height_high;
     float min_height, max_height;
     result->geofence_checks++;
+    /* MR-009: the consumed binary32 curve can sit up to
+       position_rounding_error_m closer to the fence than this binary64 point,
+       so the clearance is shrunk by that bound before any comparison. The
+       vertical bounds already use position_low/high, which include the same
+       envelope (and the axis-aligned norm is a conservative radial slack). */
     clearance = round_down_float((double)fence_clearance(
         f, curve->position[0], curve->position[1]) -
-        M5_SAFETY_GEOMETRY_EPSILON_M);
-    height_mid = home_down - curve->position[2];
+        M5_SAFETY_GEOMETRY_EPSILON_M -
+        (double)curve->position_rounding_error_m);
     height_low = round_down_float((double)home_down - curve->position_high[2]);
     height_high = round_up_float((double)home_down - curve->position_low[2]);
     min_height = round_up_float((double)f->min_height_above_home_m +
         f->vertical_margin_m + inflation);
     max_height = round_down_float((double)f->max_height_above_home_m -
         f->vertical_margin_m - inflation);
-    if (!isfinite(clearance) || !isfinite(height_mid) ||
-        !isfinite(height_low) || !isfinite(height_high) ||
+    if (!isfinite(clearance) || !isfinite(height_low) || !isfinite(height_high) ||
         !isfinite(min_height) || !isfinite(max_height) ||
         min_height >= max_height) return M5_SAFETY_NUMERIC_FAILURE;
 
-    if (clearance <= inflation || height_mid < min_height ||
-        height_mid > max_height) return M5_SAFETY_GEOFENCE_VIOLATION;
+    if (clearance <= inflation || height_low < min_height ||
+        height_high > max_height) return M5_SAFETY_GEOFENCE_VIOLATION;
 
-    if (clearance <= round_up_float((double)inflation + swept_radius) ||
-        height_low < min_height || height_high > max_height) {
+    if (clearance <= round_up_float((double)inflation + swept_radius)) {
       mark_unresolved(check, M5_SAFETY_GEOFENCE_VIOLATION);
     }
   }
@@ -1700,6 +1716,30 @@ static uint8_t compute_inflation(
   return (uint8_t)(isfinite(*inflation) && *inflation > 0.0f);
 }
 
+/*
+ * MR-009 runtime assumption: every error bound assumes round-to-nearest with
+ * IEEE subnormals enabled (no flush-to-zero). Compile flags alone do not prove
+ * the runtime state, so the validator reads the actual control register.
+ *
+ * Cortex-M7: FPSCR.RMode[23:22] must be 00b, FZ[24] and DN[25] must be 0.
+ * Host/SIL: the C99 rounding mode must be FE_TONEAREST.
+ *
+ * A different mode returns NUMERIC_FAILURE instead of silently using a bound
+ * that no longer applies.
+ */
+static uint8_t floating_environment_is_supported(void)
+{
+#if defined(__arm__) && defined(__ARM_FP) && (__ARM_FP != 0)
+  uint32_t fpscr = 0u;
+  __asm__ volatile ("vmrs %0, fpscr" : "=r" (fpscr));
+  return (uint8_t)(((fpscr >> 22) & 3u) == 0u &&  /* RMode = round to nearest */
+                   ((fpscr >> 24) & 1u) == 0u &&  /* FZ: flush-to-zero off */
+                   ((fpscr >> 25) & 1u) == 0u);   /* DN: default NaN off */
+#else
+  return (uint8_t)(fegetround() == FE_TONEAREST);
+#endif
+}
+
 M5TrajectorySafetyStatus m5_trajectory_safety_validate(
     const M5TrajectorySafetyInput *input,
     M5TrajectorySafetyWorkspace *workspace,
@@ -1714,6 +1754,9 @@ M5TrajectorySafetyStatus m5_trajectory_safety_validate(
   memset(result, 0, sizeof(*result));
   if (input == NULL || workspace == NULL)
     return reject(result, M5_SAFETY_INVALID, M5_SAFETY_REASON_INPUT_INVALID, 0u);
+  if (!floating_environment_is_supported())
+    return reject(result, M5_SAFETY_NUMERIC_FAILURE,
+                  M5_SAFETY_REASON_NUMERIC, 0u);
   reference = input->candidate_reference;
   if (reference != NULL) {
     result->reference_id = reference->reference_id;

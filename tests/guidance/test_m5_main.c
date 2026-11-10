@@ -10,6 +10,7 @@
 #include <string.h>
 #include <math.h>
 #include <float.h>
+#include <fenv.h>
 #include "ports/port_api.h"
 #include "guidance_update/guidance.h"
 #include "guidance_update/guidance_internal.h"
@@ -5222,6 +5223,234 @@ static void test_m5_safety_consumer_max_deviation_rejected(void)
   CHECK(fx.result.passed == 0u);
 }
 
+static void test_m5_safety_floating_environment_rejected(void)
+{
+  SafetyFx fx;
+  int previous = fegetround();
+  safety_fx_init(&fx, 55000000u);
+  /* MR-009 bounds assume round-to-nearest; a different runtime mode must be
+     rejected, not silently evaluated with the wrong error model. */
+  CHECK(fesetround(FE_DOWNWARD) == 0);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+      == M5_SAFETY_NUMERIC_FAILURE);
+  CHECK(fx.result.passed == 0u);
+  CHECK(fesetround(previous) == 0);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+      == M5_SAFETY_PASS);
+}
+
+/*
+ * S06-095..097: prove the MR-009 envelope participates in the decision.
+ *
+ * Each case places the boundary object at `inflation + d/2` from the binary64
+ * midpoint, where d is the measured |consumer - exact| at that midpoint:
+ *   - the exact curve clears the boundary by d/2 (no mathematical collision);
+ *   - the consumed binary32 curve is d closer, so it penetrates by d/2;
+ *   - the published envelope E >= ~10 d, so the validator must reject.
+ * The status must be the specific collision reason, not merely "not PASS", and
+ * a companion case with a larger margin must pass.
+ */
+static float safety_cell_distance(const float point[3], const float center[3])
+{
+  double sum = 0.0;
+  unsigned axis;
+  for (axis = 0u; axis < 3u; ++axis) {
+    double separation = fabs((double)point[axis] - (double)center[axis]) -
+                        0.5 * (double)M5_MAP_CELL_SIZE_M;
+    if (separation > 0.0) sum += separation * separation;
+  }
+  return (float)sqrt(sum);
+}
+
+/*
+ * S06-095..097: prove the MR-009 envelope participates in the decision.
+ *
+ * Fixture: a velocity-split segment (anchor v = 0, every preview point v = 50)
+ * keeps the curve inside the local map while producing large binary32
+ * coefficients, so the published envelope E is far above the geometry
+ * resolution. The boundary object is placed at `inflation + 0.8*E` from the
+ * binary64 midpoint:
+ *   - the exact curve clears the boundary by 0.8*E > 0 (no mathematical hit);
+ *   - the validator subtracts E from the measured distance, so it must reject;
+ *   - without the envelope the same geometry would pass.
+ * That is what makes these tests a proof that the envelope participates rather
+ * than a proof that some other check fires. The consumer collision margin
+ * (|consumer - exact|) is at float resolution for this fixture, so pointwise
+ * consumer coverage is proven separately by S06-085/S06-086/S06-094.
+ */
+static void safety_velocity_split_reference(SafetyFx *fx, uint64_t now_us)
+{
+  static const float p[3] = {0.0f, 0.0f, -5.0f};
+  static const float v_anchor[3] = {0.0f, 0.0f, 0.0f};
+  static const float v_point[3] = {0.0f, 50.0f, 0.0f};
+  static const float zero[3] = {0.0f, 0.0f, 0.0f};
+  unsigned i, axis;
+
+  safety_fx_init(fx, now_us);
+  safety_generous_envelope(fx, 1000.0f, 100000.0f);
+  for (axis = 0u; axis < 3u; ++axis) {
+    fx->base.nav.core.position_ned_m[axis] = p[axis];
+    fx->base.nav.core.velocity_ned_mps[axis] = v_anchor[axis];
+    fx->base.nav.core.acceleration_ned_mps2[axis] = zero[axis];
+  }
+  safety_point_set_full(&fx->reference.anchor, p, v_anchor, zero);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i)
+    safety_point_set_full(&fx->reference.points[i], p, v_point, zero);
+  safety_map_reset(fx);
+  safety_zero_uncertainty(fx);
+}
+
+static void safety_segment_midpoint(const SafetyFx *fx, unsigned interval,
+                                    float exact[3], float consumer[3])
+{
+  const MotionReferencePoint *a = interval ? &fx->reference.points[interval - 1u]
+                                           : &fx->reference.anchor;
+  const MotionReferencePoint *b = &fx->reference.points[interval];
+  const float h = (float)PRODUCT_PREVIEW_STEP_US * 1e-6f;
+  uint64_t time = fx->reference.header.timestamp_sample_us +
+      (uint64_t)interval * PRODUCT_PREVIEW_STEP_US + PRODUCT_PREVIEW_STEP_US / 2u;
+  ProductMotionPoint sampled;
+  float velocity[3], acceleration[3];
+
+  CHECK(m5_trajectory_safety_test_curve_eval(
+      a->point.position_ned_m, a->point.velocity_ned_mps,
+      a->point.acceleration_ned_mps2, b->point.position_ned_m,
+      b->point.velocity_ned_mps, b->point.acceleration_ned_mps2,
+      h, 0.0f, 1.0f, 0.5f, exact, velocity, acceleration));
+  CHECK(control_sample_reference(&fx->reference, time, &sampled) == STATUS_OK);
+  consumer[0] = sampled.position_ned_m[0];
+  consumer[1] = sampled.position_ned_m[1];
+  consumer[2] = sampled.position_ned_m[2];
+}
+
+static float safety_interval_envelope(SafetyFx *fx, unsigned interval)
+{
+  const MotionReferencePoint *a = interval ? &fx->reference.points[interval - 1u]
+                                           : &fx->reference.anchor;
+  const MotionReferencePoint *b = &fx->reference.points[interval];
+  const float h = (float)PRODUCT_PREVIEW_STEP_US * 1e-6f;
+  float position_error, velocity_error, acceleration_error;
+  CHECK(m5_trajectory_safety_test_curve_envelope(
+      a->point.position_ned_m, a->point.velocity_ned_mps,
+      a->point.acceleration_ned_mps2, b->point.position_ned_m,
+      b->point.velocity_ned_mps, b->point.acceleration_ned_mps2,
+      h, 0.0f, 1.0f, &position_error, &velocity_error, &acceleration_error));
+  CHECK(position_error > 0.0f);
+  CHECK(velocity_error > 0.0f);
+  CHECK(acceleration_error > 0.0f);
+  return position_error;
+}
+
+static void safety_map_with_margin(SafetyFx *fx, float margin)
+{
+  unsigned i;
+  CHECK(m5_local_map_init(&fx->map, &fx->base.nav, fx->base.now,
+      0.10f, margin, 1.0f, M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
+  for (i = 0u; i < M5_MAP_CELL_COUNT; ++i) {
+    fx->map.cells[i].state = M5_MAP_CELL_FREE_CONFIRMED;
+    fx->map.cells[i].log_odds = -4;
+    fx->map.cells[i].source_mask = 1u;
+    fx->map.cells[i].last_update_ms = (uint32_t)(fx->base.now / 1000u);
+  }
+  fx->map.last_ingest_us = fx->base.now;
+  fx->map.source_deadline_us = fx->base.now + 1000000u;
+  fx->input.map = &fx->map;
+  fx->input.expected_map_revision = fx->map.map_revision;
+}
+
+static void test_m5_safety_envelope_static_participation(void)
+{
+  SafetyFx fx;
+  float exact[3], consumer[3], center[3], probe[3];
+  float envelope, distance, margin;
+  uint16_t voxel = 0u;
+
+  safety_velocity_split_reference(&fx, 60000000u);
+  envelope = safety_interval_envelope(&fx, 0u);
+  safety_segment_midpoint(&fx, 0u, exact, consumer);
+
+  probe[0] = exact[0];
+  probe[1] = exact[1] + 1.0f;
+  probe[2] = exact[2];
+  CHECK(m5_local_map_world_to_voxel(&fx.map, probe, &voxel));
+  m5_local_map_voxel_center(&fx.map, voxel, center);
+  distance = safety_cell_distance(exact, center);
+  CHECK(distance > 0.30f);
+
+  margin = distance - 0.8f * envelope - 0.10f;
+  CHECK(margin > 0.02f);
+  safety_map_with_margin(&fx, margin);
+  fx.map.cells[voxel].state = M5_MAP_CELL_OCCUPIED_CONFIRMED;
+  fx.map.cells[voxel].log_odds = 4;
+  fx.map.cells[voxel].source_mask = 1u;
+
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_STATIC_COLLISION);
+  CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_STATIC_COLLISION);
+}
+
+static void test_m5_safety_envelope_dynamic_participation(void)
+{
+  SafetyFx fx;
+  M5DynamicTrack *track;
+  float exact[3], consumer[3];
+  float envelope, target;
+  const float inflation = 0.15000000596f;
+  const float radius = 0.05f;
+  double distance2;
+
+  safety_velocity_split_reference(&fx, 61000000u);
+  envelope = safety_interval_envelope(&fx, 0u);
+  safety_segment_midpoint(&fx, 0u, exact, consumer);
+  target = radius + inflation + 0.8f * envelope;
+
+  track = &fx.map.tracks[0];
+  track->id = 81u;
+  track->source_id = 2u;
+  track->sample_us = fx.base.now;
+  track->expires_us = fx.base.now + 900000u;
+  track->radius_m = radius;
+  track->position_ned_m[0] = exact[0];
+  track->position_ned_m[1] = exact[1] + target;
+  track->position_ned_m[2] = exact[2];
+  memset(track->velocity_ned_mps, 0, sizeof(track->velocity_ned_mps));
+
+  distance2 = 0.0;
+  {
+    unsigned axis;
+    for (axis = 0u; axis < 3u; ++axis) {
+      double difference = (double)exact[axis] - (double)track->position_ned_m[axis];
+      distance2 += difference * difference;
+    }
+  }
+  CHECK(sqrt(distance2) > (double)(radius + inflation));
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_DYNAMIC_COLLISION);
+  CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_DYNAMIC_COLLISION);
+}
+
+static void test_m5_safety_envelope_geofence_participation(void)
+{
+  SafetyFx fx;
+  float exact[3], consumer[3];
+  float envelope, target;
+  const float inflation = 0.15000000596f;
+
+  safety_velocity_split_reference(&fx, 62000000u);
+  envelope = safety_interval_envelope(&fx, 0u);
+  safety_segment_midpoint(&fx, 0u, exact, consumer);
+  /* Keep-in box whose +y edge is `target` above the midpoint; the curve stays
+     at y = 0 for this fixture, so the clearance is exactly `target`. */
+  target = inflation + 0.8f * envelope;
+  safety_keep_in_box(&fx, exact[1] + target);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_GEOFENCE_VIOLATION);
+  CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_GEOFENCE_VIOLATION);
+}
+
 int main(void)
 {
   struct {
@@ -5363,6 +5592,10 @@ int main(void)
     {"m5_safety_consumer_dynamic_track", test_m5_safety_consumer_dynamic_track_rejected},
     {"m5_safety_consumer_geofence_boundary", test_m5_safety_consumer_geofence_boundary},
     {"m5_safety_consumer_max_deviation", test_m5_safety_consumer_max_deviation_rejected},
+    {"m5_safety_floating_environment", test_m5_safety_floating_environment_rejected},
+    {"m5_safety_envelope_static_participation", test_m5_safety_envelope_static_participation},
+    {"m5_safety_envelope_dynamic_participation", test_m5_safety_envelope_dynamic_participation},
+    {"m5_safety_envelope_geofence_participation", test_m5_safety_envelope_geofence_participation},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {
@@ -5374,3 +5607,10 @@ int main(void)
   printf("\nchecks=%d failures=%d\n", g_checks, g_failures);
   return (g_failures == 0) ? 0 : 1;
 }
+
+
+
+
+
+
+
