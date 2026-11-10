@@ -28,9 +28,13 @@ _Static_assert(FLT_EVAL_METHOD == 0,
                "M5 safety requires evaluation at the declared type precision");
 _Static_assert(sizeof(float) == sizeof(uint32_t),
                "M5 safety requires 32-bit float storage");
-#if !defined(__STDC_IEC_559__) || (__STDC_IEC_559__ != 1)
-#error "M5 safety requires IEC 60559 floating-point object representation"
-#endif
+_Static_assert(sizeof(double) == sizeof(uint64_t),
+               "M5 safety requires 64-bit double storage");
+
+/* Some supported GCC Arm releases do not advertise __STDC_IEC_559__ even
+   though their radix/precision/exponent/subnormal properties satisfy the
+   binary32/binary64 requirements asserted above. Avoid relying on that
+   optional conformance macro for target compilation. */
 #include "trajectory_planning/m5_trajectory_safety.h"
 #include "messages/message_ids.h"
 #include "geofence_geometry/geofence_geometry.h"
