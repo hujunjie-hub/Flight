@@ -70,6 +70,11 @@ typedef struct {
   double position[3][6];
   double position_low[3][6];
   double position_high[3][6];
+  /* Bounds on |binary32 consumer evaluation - exact polynomial| over the
+     sub-interval, per axis and derivative order (MR-009). */
+  double eval_position_error[3];
+  double eval_velocity_error[3];
+  double eval_acceleration_error[3];
 } M5SafetyBezier;
 
 typedef struct {
@@ -700,6 +705,99 @@ static double evaluate_bernstein(const double *control, unsigned degree, double 
   return work[0];
 }
 
+/*
+ * MR-009: the consumer (control_sample_reference) evaluates the same quintic in
+ * binary32 with Horner's rule. The validator proves the binary64 polynomial, so
+ * it must add a bound on |consumer_value - exact_value| over the sub-interval.
+ *
+ * consumer_power_coefficients() replicates the consumer's binary32 coefficient
+ * computation operation for operation. consumer_eval_error_bound() then bounds
+ *   (a) the difference between the consumer's coefficients and the exact ones,
+ *   (b) the Horner evaluation rounding, and
+ *   (c) up to four fused multiply-add operations that the production build may
+ *       emit because -ffp-contract is not pinned there yet (MR-009 item 5).
+ * The bound is evaluated at s_max = h * u1 and is therefore valid for the whole
+ * sub-interval; subdivision cannot reduce a systematic bias, which is why this
+ * term must not be absorbed by clearance_margin_m.
+ */
+static void consumer_power_coefficients(
+    const MotionReferencePoint *a,
+    const MotionReferencePoint *b,
+    float h,
+    unsigned axis,
+    float c[6])
+{
+  float p0 = a->point.position_ned_m[axis];
+  float v0 = a->point.velocity_ned_mps[axis];
+  float a0 = a->point.acceleration_ned_mps2[axis];
+  float p1 = b->point.position_ned_m[axis];
+  float v1 = b->point.velocity_ned_mps[axis];
+  float a1 = b->point.acceleration_ned_mps2[axis];
+  float h2 = h * h;
+  float h3 = h2 * h;
+  float h4 = h3 * h;
+  float h5 = h4 * h;
+  float d = ((p1 - p0) - h * v0) - ((0.5f * h) * h) * a0;
+  float dv = (v1 - v0) - h * a0;
+  float da = a1 - a0;
+
+  c[0] = p0;
+  c[1] = v0;
+  c[2] = 0.5f * a0;
+  c[3] = 10 * d / h3 - 4 * dv / h2 + da / (2 * h);
+  c[4] = -15 * d / h4 + 7 * dv / h3 - da / h2;
+  c[5] = 6 * d / h5 - 3 * dv / h4 + da / (2 * h3);
+}
+
+static double consumer_eval_error_bound(
+    const float consumer[6],
+    const double exact[6],
+    unsigned degree,
+    double s_max)
+{
+  const double unit = 0x1p-24; /* binary32 unit roundoff, round-to-nearest */
+  double coefficient_term = 0.0;
+  double rounding_term = 0.0;
+  double power = 1.0;
+  unsigned i;
+
+  if (!(s_max >= 0.0) || !isfinite(s_max)) return INFINITY;
+  for (i = 0u; i <= degree; ++i) {
+    double cf = (double)consumer[i];
+    double ce = exact[i];
+    if (!isfinite(cf) || !isfinite(ce)) return INFINITY;
+    coefficient_term = add_upper_nonnegative(coefficient_term,
+        multiply_upper_nonnegative(fabs(cf - ce), power));
+    rounding_term = add_upper_nonnegative(rounding_term,
+        multiply_upper_nonnegative(fabs(cf), power));
+    power = multiply_upper_nonnegative(power, s_max);
+  }
+  /* Five Horner roundings plus four coefficient-level fused operations. */
+  return add_upper_nonnegative(coefficient_term,
+      multiply_upper_nonnegative(rounding_term, 9.0 * unit));
+}
+
+/* |d^k/dt^k| upper bound of the power-basis polynomial on [0, s_max]. */
+static double polynomial_derivative_magnitude(
+    const float c[6], unsigned degree, unsigned order, double s_max)
+{
+  double total = 0.0;
+  unsigned i, k;
+
+  if (!(s_max >= 0.0) || !isfinite(s_max)) return INFINITY;
+  for (i = order; i <= degree; ++i) {
+    double factor = 1.0;
+    double power = 1.0;
+    for (k = 0u; k < order; ++k) factor *= (double)(i - k);
+    for (k = 0u; k + order < i; ++k)
+      power = multiply_upper_nonnegative(power, s_max);
+    total = add_upper_nonnegative(total,
+        multiply_upper_nonnegative(fabs((double)c[i]) * factor, power));
+  }
+  return total;
+}
+
+
 static uint8_t build_curve(
     const MotionReferencePoint *a,
     const MotionReferencePoint *b,
@@ -753,6 +851,46 @@ static uint8_t build_curve(
         value += local_power[k] * choose[j][k] / choose[5][k];
       if (!isfinite(value)) return 0u;
       curve->position[axis][j] = value;
+    }
+
+    /* MR-009 envelope: bound the binary32 consumer evaluation of this axis
+       against the binary64 coefficients just computed. */
+    {
+      float cf[6], vf[6], af[6];
+      double vc[6], ac[6];
+      double s_max = h * (double)u1;
+      double time_scale = 2.0 * 0x1p-24 * s_max;
+
+      consumer_power_coefficients(a, b, (float)h, axis, cf);
+      for (k = 0u; k < 6u; ++k) {
+        vf[k] = 0.0f;
+        vc[k] = 0.0;
+        af[k] = 0.0f;
+        ac[k] = 0.0;
+      }
+      for (k = 0u; k < 5u; ++k) {
+        vf[k] = (float)(k + 1u) * cf[k + 1u];
+        vc[k] = (double)(k + 1u) * c[k + 1u];
+      }
+      for (k = 0u; k < 4u; ++k) {
+        af[k] = (float)((k + 1u) * (k + 2u)) * cf[k + 2u];
+        ac[k] = (double)((k + 1u) * (k + 2u)) * c[k + 2u];
+      }
+      curve->eval_position_error[axis] = add_upper_nonnegative(
+          consumer_eval_error_bound(cf, c, 5u, s_max),
+          multiply_upper_nonnegative(time_scale,
+              polynomial_derivative_magnitude(cf, 5u, 1u, s_max)));
+      curve->eval_velocity_error[axis] = add_upper_nonnegative(
+          consumer_eval_error_bound(vf, vc, 4u, s_max),
+          multiply_upper_nonnegative(time_scale,
+              polynomial_derivative_magnitude(cf, 5u, 2u, s_max)));
+      curve->eval_acceleration_error[axis] = add_upper_nonnegative(
+          consumer_eval_error_bound(af, ac, 3u, s_max),
+          multiply_upper_nonnegative(time_scale,
+              polynomial_derivative_magnitude(cf, 5u, 3u, s_max)));
+      if (!isfinite(curve->eval_position_error[axis]) ||
+          !isfinite(curve->eval_velocity_error[axis]) ||
+          !isfinite(curve->eval_acceleration_error[axis])) return 0u;
     }
 
     {
@@ -902,6 +1040,18 @@ static uint8_t curve_bounds(
                               interval_abs_max(acceleration_control[i]));
     }
 
+    /* MR-009: the consumed binary32 curve differs from this binary64 curve.
+       Widen the position hull, the velocity/acceleration bounds and the
+       rounding radii by the consumer evaluation envelope. */
+    position_low = nextafter(
+        position_low - curve->eval_position_error[axis], -INFINITY);
+    position_high = nextafter(
+        position_high + curve->eval_position_error[axis], INFINITY);
+    velocity_abs = add_upper_nonnegative(velocity_abs,
+        curve->eval_velocity_error[axis]);
+    acceleration_abs = add_upper_nonnegative(acceleration_abs,
+        curve->eval_acceleration_error[axis]);
+
     position_mid_interval =
         interval_evaluate_bernstein(position_control, 5u, 0.5);
     velocity_mid_interval =
@@ -931,6 +1081,10 @@ static uint8_t curve_bounds(
       velocity_mid_abs = interval_abs_max(velocity_mid_interval);
       position_rounding2 = sum_square_upper(position_rounding2, position_error);
       velocity_rounding2 = sum_square_upper(velocity_rounding2, velocity_error);
+      position_rounding2 = sum_square_upper(position_rounding2,
+          curve->eval_position_error[axis]);
+      velocity_rounding2 = sum_square_upper(velocity_rounding2,
+          curve->eval_velocity_error[axis]);
       velocity_mid2 = sum_square_upper(velocity_mid2, velocity_mid_abs);
     }
 
@@ -1801,6 +1955,65 @@ uint8_t m5_trajectory_safety_test_curve_eval(
         !isfinite(acceleration[axis])) return 0u;
   }
   return 1u;
+}
+
+
+uint8_t m5_trajectory_safety_test_curve_envelope(
+    const float start_position[3],
+    const float start_velocity[3],
+    const float start_acceleration[3],
+    const float end_position[3],
+    const float end_velocity[3],
+    const float end_acceleration[3],
+    float duration_s,
+    float u0,
+    float u1,
+    float *position_error_m,
+    float *velocity_error_mps,
+    float *acceleration_error_mps2)
+{
+  MotionReferencePoint start, end;
+  M5SafetyBezier bezier;
+  double position2 = 0.0, velocity2 = 0.0, acceleration2 = 0.0;
+  unsigned axis;
+
+  if (start_position == NULL || start_velocity == NULL ||
+      start_acceleration == NULL || end_position == NULL ||
+      end_velocity == NULL || end_acceleration == NULL ||
+      position_error_m == NULL || velocity_error_mps == NULL ||
+      acceleration_error_mps2 == NULL ||
+      !finite3(start_position) || !finite3(start_velocity) ||
+      !finite3(start_acceleration) || !finite3(end_position) ||
+      !finite3(end_velocity) || !finite3(end_acceleration) ||
+      !isfinite(duration_s) || duration_s <= 0.0f ||
+      !isfinite(u0) || !isfinite(u1) || u0 < 0.0f ||
+      u1 > 1.0f || u1 <= u0) return 0u;
+
+  memset(&start, 0, sizeof(start));
+  memset(&end, 0, sizeof(end));
+  for (axis = 0u; axis < 3u; ++axis) {
+    start.point.position_ned_m[axis] = start_position[axis];
+    start.point.velocity_ned_mps[axis] = start_velocity[axis];
+    start.point.acceleration_ned_mps2[axis] = start_acceleration[axis];
+    end.point.position_ned_m[axis] = end_position[axis];
+    end.point.velocity_ned_mps[axis] = end_velocity[axis];
+    end.point.acceleration_ned_mps2[axis] = end_acceleration[axis];
+  }
+  if (!build_curve(&start, &end, (double)duration_s,
+                   (float)u0, (float)u1, &bezier)) return 0u;
+
+  for (axis = 0u; axis < 3u; ++axis) {
+    position2 = sum_square_upper(position2, bezier.eval_position_error[axis]);
+    velocity2 = sum_square_upper(velocity2, bezier.eval_velocity_error[axis]);
+    acceleration2 = sum_square_upper(acceleration2,
+                                     bezier.eval_acceleration_error[axis]);
+  }
+  *position_error_m = sqrt_upper_float(position2);
+  *velocity_error_mps = sqrt_upper_float(velocity2);
+  *acceleration_error_mps2 = sqrt_upper_float(acceleration2);
+  return (uint8_t)(isfinite(*position_error_m) &&
+      isfinite(*velocity_error_mps) &&
+      isfinite(*acceleration_error_mps2));
 }
 
 

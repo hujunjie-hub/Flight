@@ -19,6 +19,8 @@
 #include "trajectory_planning/m5_time_scaler.h"
 #include "trajectory_planning/m5_trajectory_safety.h"
 #include "m5_trajectory_safety_test_api.h"
+/* MR-009: link the real M6 reference sampler, not a Python re-implementation. */
+#include "attitude_rate_control/controller_internal.h"
 
 #define T_BOOT 0x1122334455667788ull
 #define T_EPOCH 3u
@@ -4162,9 +4164,12 @@ static void test_m5_safety_keep_in_curve_excursion_rejected(void)
   fx.base.nav.core.velocity_ned_mps[1] = 5.0f;
   safety_map_reset(&fx);
   fx.base.env.max_linear_speed_mps = 10.0f;
-  fx.base.env.max_linear_accel_mps2 = 1000.0f;
+  /* The quintic that reverses +5 -> -5 m/s in 20 ms peaks just below
+     1000 m/s^2; leave headroom for the MR-009 binary32 evaluation envelope so
+     this fixture exercises the geofence path rather than the dynamics gate. */
+  fx.base.env.max_linear_accel_mps2 = 1100.0f;
   fx.base.env.vehicle_extension.max_velocity_ned_mps[1] = 10.0f;
-  fx.base.env.vehicle_extension.max_acceleration_ned_mps2[1] = 1000.0f;
+  fx.base.env.vehicle_extension.max_acceleration_ned_mps2[1] = 1100.0f;
   safety_point_set(&fx.reference.anchor, 0.0f, 0.0f, -5.0f,
                    0.0f, 5.0f, 0.0f);
   for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
@@ -4807,6 +4812,148 @@ static void test_m5_safety_preview_offset_mismatch_rejected(void)
   CHECK(fx.result.passed == 0u);
 }
 
+/*
+ * S06-086 (MR-009): the validator must bound the curve M6 actually evaluates.
+ *
+ * control_sample_reference() from the control model is linked into this binary
+ * and sampled at the same absolute offset_us the consumer uses. The validator's
+ * binary64 curve and its binary32 evaluation envelope come from the test API.
+ * Every sample must satisfy |consumer - exact| <= envelope for position,
+ * velocity and acceleration. The envelope is also checked to be non-zero, so a
+ * future "fix" cannot satisfy the test by returning a zero margin.
+ */
+static void safety_point_set_full(MotionReferencePoint *point,
+                                  const float position[3],
+                                  const float velocity[3],
+                                  const float acceleration[3])
+{
+  unsigned axis;
+  safety_point_set(point, position[0], position[1], position[2],
+                   velocity[0], velocity[1], velocity[2]);
+  for (axis = 0u; axis < 3u; ++axis)
+    point->point.acceleration_ned_mps2[axis] = acceleration[axis];
+}
+
+static void safety_reference_uniform(MotionReference *ref, uint64_t t0)
+{
+  unsigned i;
+  memset(ref, 0, sizeof(*ref));
+  ref->header.timestamp_sample_us = t0;
+  ref->point_count = PRODUCT_PREVIEW_COUNT;
+  ref->anchor.offset_us = 0u;
+  safety_point_set(&ref->anchor, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    ref->points[i].offset_us = (i + 1u) * PRODUCT_PREVIEW_STEP_US;
+    safety_point_set(&ref->points[i], 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+  }
+}
+
+static float safety_fuzz_scaled(uint32_t *state, float scale)
+{
+  int32_t raw = (int32_t)(safety_fuzz_next(state) % 2001u) - 1000;
+  return (float)raw * 0.001f * scale;
+}
+
+static void safety_check_consumer_curve(const MotionReference *ref,
+                                        unsigned sample_count)
+{
+  const float h = (float)PRODUCT_PREVIEW_STEP_US * 1e-6f;
+  unsigned i, k, axis;
+
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    const MotionReferencePoint *a = i ? &ref->points[i - 1u] : &ref->anchor;
+    const MotionReferencePoint *b = &ref->points[i];
+    float position_error, velocity_error, acceleration_error;
+
+    CHECK(m5_trajectory_safety_test_curve_envelope(
+        a->point.position_ned_m, a->point.velocity_ned_mps,
+        a->point.acceleration_ned_mps2, b->point.position_ned_m,
+        b->point.velocity_ned_mps, b->point.acceleration_ned_mps2,
+        h, 0.0f, 1.0f,
+        &position_error, &velocity_error, &acceleration_error));
+    CHECK(position_error > 0.0f);
+    CHECK(velocity_error > 0.0f);
+    CHECK(acceleration_error > 0.0f);
+
+    for (k = 0u; k < sample_count; ++k) {
+      uint32_t local_us = (uint32_t)(((uint64_t)k * PRODUCT_PREVIEW_STEP_US) /
+                                     sample_count);
+      uint64_t time = ref->header.timestamp_sample_us +
+          (uint64_t)i * PRODUCT_PREVIEW_STEP_US + local_us;
+      float local_u = (float)((double)local_us /
+                             (double)PRODUCT_PREVIEW_STEP_US);
+      ProductMotionPoint sampled;
+      float position[3], velocity[3], acceleration[3];
+
+      CHECK(control_sample_reference(ref, time, &sampled) == STATUS_OK);
+      CHECK(m5_trajectory_safety_test_curve_eval(
+          a->point.position_ned_m, a->point.velocity_ned_mps,
+          a->point.acceleration_ned_mps2, b->point.position_ned_m,
+          b->point.velocity_ned_mps, b->point.acceleration_ned_mps2,
+          h, 0.0f, 1.0f, local_u, position, velocity, acceleration));
+      for (axis = 0u; axis < 3u; ++axis) {
+        CHECK(fabsf(sampled.position_ned_m[axis] -
+                    position[axis]) <= position_error);
+        CHECK(fabsf(sampled.velocity_ned_mps[axis] -
+                    velocity[axis]) <= velocity_error);
+        CHECK(fabsf(sampled.acceleration_ned_mps2[axis] -
+                    acceleration[axis]) <= acceleration_error);
+      }
+    }
+  }
+}
+
+static void test_m5_safety_consumer_curve_envelope(void)
+{
+  static const float p0[3] = {1.0f, -2.0f, -8.0f};
+  static const float v0[3] = {3.0f, -1.0f, 0.5f};
+  static const float a0[3] = {0.4f, -0.2f, 0.1f};
+  static const float jerk[3] = {2.0f, -1.0f, 0.3f};
+  const float h = (float)PRODUCT_PREVIEW_STEP_US * 1e-6f;
+  MotionReference ref;
+  uint32_t seed = 0x6D350686u;
+  unsigned trial, i, axis;
+
+  /* Smooth reference: bounded jerk over the full 480 ms horizon. */
+  safety_reference_uniform(&ref, 7000000u);
+  safety_point_set_full(&ref.anchor, p0, v0, a0);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    float t = (float)(i + 1u) * h;
+    float position[3], velocity[3], acceleration[3];
+    for (axis = 0u; axis < 3u; ++axis) {
+      position[axis] = p0[axis] + v0[axis] * t + 0.5f * a0[axis] * t * t +
+                       jerk[axis] * t * t * t / 6.0f;
+      velocity[axis] = v0[axis] + a0[axis] * t + 0.5f * jerk[axis] * t * t;
+      acceleration[axis] = a0[axis] + jerk[axis] * t;
+    }
+    safety_point_set_full(&ref.points[i], position, velocity, acceleration);
+  }
+  safety_check_consumer_curve(&ref, 33u);
+
+  /* Adversarial references: independent random p/v/a per knot, which is the
+     worst case for coefficient cancellation in the binary32 consumer. */
+  for (trial = 0u; trial < 8u; ++trial) {
+    safety_reference_uniform(&ref, 8000000u + trial * 100000u);
+    for (axis = 0u; axis < 3u; ++axis) {
+      ref.anchor.point.position_ned_m[axis] = safety_fuzz_scaled(&seed, 5.0f);
+      ref.anchor.point.velocity_ned_mps[axis] = safety_fuzz_scaled(&seed, 20.0f);
+      ref.anchor.point.acceleration_ned_mps2[axis] =
+          safety_fuzz_scaled(&seed, 10.0f);
+    }
+    for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+      for (axis = 0u; axis < 3u; ++axis) {
+        ref.points[i].point.position_ned_m[axis] =
+            safety_fuzz_scaled(&seed, 5.0f);
+        ref.points[i].point.velocity_ned_mps[axis] =
+            safety_fuzz_scaled(&seed, 20.0f);
+        ref.points[i].point.acceleration_ned_mps2[axis] =
+            safety_fuzz_scaled(&seed, 10.0f);
+      }
+    }
+    safety_check_consumer_curve(&ref, 17u);
+  }
+}
+
 int main(void)
 {
   struct {
@@ -4940,6 +5087,7 @@ int main(void)
     {"m5_safety_dynamic_tangency_preview_seam_ulp", test_m5_safety_dynamic_tangency_and_preview_seam_ulp},
     {"m5_safety_dynamic_adaptive_split_ulp", test_m5_safety_dynamic_adaptive_split_ulp},
     {"m5_safety_dynamic_acceleration_envelope_differential", test_m5_safety_dynamic_acceleration_envelope_differential},
+    {"m5_safety_consumer_curve_envelope", test_m5_safety_consumer_curve_envelope},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {

@@ -34,6 +34,22 @@ uint8_t m5_trajectory_safety_test_curve_eval(
     float velocity[3],
     float acceleration[3]);
 
+/* MR-009: bound on |binary32 consumer curve - binary64 validator curve| over
+   the sub-interval [u0, u1]. Norms over the three axes. */
+uint8_t m5_trajectory_safety_test_curve_envelope(
+    const float start_position[3],
+    const float start_velocity[3],
+    const float start_acceleration[3],
+    const float end_position[3],
+    const float end_velocity[3],
+    const float end_acceleration[3],
+    float duration_s,
+    float u0,
+    float u1,
+    float *position_error_m,
+    float *velocity_error_mps,
+    float *acceleration_error_mps2);
+
 uint8_t m5_trajectory_safety_test_rounding_bounds(
     double value, float *lower, float *upper);
 float m5_trajectory_safety_test_norm_lower_bound(

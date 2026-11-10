@@ -22,11 +22,19 @@ cflags=(
   -Imiddleware/contracts
   -Imiddleware/guidance
   -Itests/guidance
+  # M6 reference sampler: the real consumer curve used by S06-086 (MR-009).
+  -Imiddleware/model/control
+  -Imiddleware/model/control/inner_loop
+  -Imiddleware/model/control/inner_loop/quad_x4
+  -Imiddleware/model/control/outer_loop
 )
+
+consumer_src=middleware/model/control/outer_loop/quad_x4/position_tracking/control_reference.c
 
 gcc "${cflags[@]}" ${EXTRA_CFLAGS:-} \
   middleware/model/fms/geofence_geometry/geofence_geometry.c \
   middleware/guidance/*/*.c \
+  "${consumer_src}" \
   tests/guidance/test_m5_main.c \
   -lm -o "${out}/m5_host_tests"
 
@@ -37,6 +45,7 @@ gcc "${cflags[@]}" ${EXTRA_CFLAGS:-} \
 gcc "${cflags[@]}" -fPIC -shared -Wl,--no-undefined \
   middleware/model/fms/geofence_geometry/geofence_geometry.c \
   middleware/guidance/*/*.c \
+  "${consumer_src}" \
   tests/guidance/test_m5_main.c \
   -lm -o "${out}/libm5_safety_oracle.so"
 
@@ -44,4 +53,4 @@ gcc "${cflags[@]}" -fPIC -shared -Wl,--no-undefined \
 
 python3 tests/guidance/verify_norm_bounds.py "${out}/libm5_safety_oracle.so"
 python3 tests/guidance/verify_dynamic_prediction.py "${out}/libm5_safety_oracle.so"
-python3 tests/guidance/verify_curve_eval_gap.py
+python3 tests/guidance/verify_curve_eval_gap.py "${out}/libm5_safety_oracle.so"
