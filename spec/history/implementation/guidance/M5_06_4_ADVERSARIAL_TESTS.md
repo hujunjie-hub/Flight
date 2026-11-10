@@ -172,3 +172,17 @@ S06-084 另增加大绝对 epoch 端到端不变性测试，使用接近 uint64 
 ## CI #499 compile portability failures
 
 Run #499 did not execute M5 tests: Host compilation rejected a floating-point equality inside `_Static_assert`; Cortex-M7 compilation rejected the optional `__STDC_IEC_559__` macro guard. M4 Host and independent source/time/navigation checks passed; MPC static RAM check passed. Fixes: `b0f40cb`, `0349587`. Await Run #501 before rerunning adversarial cases; do not classify this as an algorithm test failure or a pass.
+
+ 
+## CI #509 adversarial and sanitizer result
+
+Commit `0c761964d4bc6cfeec73ba60464657db450743ee`:
+- M5 Host 269,207 / 0 failures.
+- M5 ASan/UBSan 269,207 / 0 failures.
+- M4/M5 integration 1,000 / 0 failures.
+- Integration ASan/UBSan 1,000 / 0 failures.
+- S06-080 Fraction oracle: 10,007 binary32 upper + 10,007 binary64 lower PASS.
+- S06-084 Fraction prediction oracle: 10,007 PASS.
+- S06-083 adaptive split exact/±1 ULP now verifies actual parent→child processing with `work_units > 1`; all cases PASS.
+
+This closes the CI execution gap for these test suites at the verified commit. It does not close the independent proof review, H723 target runtime, HIL, or flight release gates.
