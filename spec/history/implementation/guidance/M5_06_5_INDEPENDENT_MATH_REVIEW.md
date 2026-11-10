@@ -81,3 +81,19 @@ S06-080 新增 Fraction 精确平方范数 oracle，当前为 IMPLEMENTED / CI_P
 已在 Host 测试中加入 `tests/guidance/verify_norm_bounds.py`：通过 ctypes 调用生产 C helper，以 Python `Fraction` 精确还原 binary32 输入并比较平方范数，不依赖 `sqrt` / `sqrtl` 作为唯一 oracle。固定 seed `0x6D350680`，覆盖 7 组显式边界向量及 10,000 组任意有限 binary32 位模式；测试脚本已接入 `tests/guidance/run_host_tests.sh`。生产代码增加 binary32/binary64 exponent、subnormal、evaluation precision 和 IEC 60559 编译期约束。
 
 当前状态：**IMPLEMENTED / CI_PENDING**。本次提交触发的 GitHub Actions 尚未取得可核验结果；不得标记 PASS。Host/Sanitizer 与 Cortex-M7 编译仍需本次提交的真实 CI 证据。
+ 
+## 6. S06-081..083 源码复核增量（2026-11-10）
+
+后续检查发现，S06-081、S06-082、S06-083 的测试函数已实际存在于 `tests/guidance/test_m5_main.c` 并注册到 Host 测试表；此前表格中的 S06-083 NOT_RUN 已过时。更新后的状态均为 **IMPLEMENTED / CI_PENDING**，尚无本轮 commit 的 CI 结果，不得标记 PASS。
+
+| ID | 已实现覆盖 | 独立 oracle / 局限 | 状态 |
+|---|---|---|---|
+| S06-081 | 64 组恒速相对运动连续最近点差分；64 组恒加速度相对运动解析候选点差分 | 恒加速度 oracle 检查端点、相对 x 速度为零的驻点、相对 x 位置根；以 long double 计算，属于独立解析数值 oracle，不是向外舍入区间证明；随机速度/位置不确定度传播仍需单独覆盖 | IMPLEMENTED / CI_PENDING |
+| S06-082 | 动态碰撞精确相切、内侧 1 ULP、外侧 1 ULP、安全净空；20ms 预览接缝碰撞 | 外侧 1 ULP 允许保守拒绝，唯一硬要求是不得错误 PASS；接缝用例覆盖精确位置及起点 ±1 float ULP | IMPLEMENTED / CI_PENDING |
+| S06-083 | 自适应 DFS 子区间中点碰撞，精确起点及 ±1 float ULP 三组 | 端到端断言 DYNAMIC_COLLISION、passed=0 且 work_units 超过预览区间数，证明进入细分；目前不是整段/分段独立连续距离 oracle 等价证明 | IMPLEMENTED / CI_PENDING |
+
+### S06-080 oracle 扩展
+
+`verify_norm_bounds.py` 已进一步扩展：binary32 上界 10,007 组（7 个显式边界 + 10,000 个固定种子随机向量），以及 binary64 下界 10,007 组（7 个显式边界 + 10,000 个固定种子随机向量）。binary64 下界测试覆盖次正规数、最小正规数、极大有限值、指数跨度及混合尺度；所有断言仍使用 Fraction 精确平方范数，不调用 sqrt 作为 oracle。
+
+新增代码提交：`61dbc4c56240a54aa2a8a3bc54e8392093a1b029`。该提交触发的 CI 结果尚未核验，S06-080 仍为 CI_PENDING。
