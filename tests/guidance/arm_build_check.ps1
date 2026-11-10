@@ -66,8 +66,11 @@ foreach ($src in $hostOnlySources) {
 & $size @objects
 if ($LASTEXITCODE -ne 0) { throw 'arm-none-eabi-size failed' }
 
+$codeCommit = if ($env:FLIGHT_CODE_COMMIT) { $env:FLIGHT_CODE_COMMIT } else { (git rev-parse HEAD).Trim() }
+$sourceHash = (Get-FileHash 'middleware/guidance/trajectory_planning/m5_trajectory_safety.c' -Algorithm SHA256).Hash.ToLowerInvariant()
 $toolchain = @(
-  "commit=$(git rev-parse HEAD)",
+  "commit=$codeCommit",
+  "source_sha256=$sourceHash",
   "compiler=$(& $gcc --version | Select-Object -First 1)",
   "size_tool=$(& $size --version | Select-Object -First 1)",
   "production_objects=$($productionSources.Count)",

@@ -111,3 +111,13 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
 `FIXED_WAITING_RETEST`，必须由独立审查者在 GitHub Issue 上复验后才能进入
 `VERIFIED/CLOSED`。R16 的 `FLIGHT-LOCAL-22`（4,128 B 栈）保持 `OPEN/BLOCKED`，
 不得用降低安全要求或压缩缓冲区的方式关闭。
+
+## 12. R17 阻塞项治理
+
+- `ISSUE_REGISTER.md` 是本地正式临时登记入口；`BLOCKER_BOARD.md` 是派生视图，
+  不得与登记状态分叉。
+- 每个 BLOCKED 项必须有责任方、审批事项、解除条件、复测命令和下一次检查点。
+- GitHub 未授权时保留 `PUBLICATION_PENDING`；不得虚构 Issue 编号或自行
+  VERIFIED/CLOSED。
+- B01/B02（Spec/ABI EOL 重基线）、B03/B04（包版本/链接）、B05（MR-009）、
+  B06（4,232 B 栈）、B07（H723 实机）在 R17 继续保留真实失败/BLOCKED 状态。

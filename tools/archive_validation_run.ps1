@@ -48,6 +48,11 @@ $copyPaths = @(
     "tests/guidance/evidence",
     "spec/validation/flight_acceptance_manifest.json",
     "spec/quality/issue-workflow.json",
+    "spec/quality/ISSUE_REGISTER.md",
+    "spec/quality/BLOCKER_BOARD.md",
+    "spec/quality/ISSUE_WORKFLOW.md",
+    "spec/history/implementation/guidance/M5_06_7_JERK_INTERVAL_PROOF.md",
+    "spec/history/implementation/guidance/MR009_R17_REVIEW_MATERIAL.md",
     "spec/09_需求验证实施与发布管理.md"
 )
 

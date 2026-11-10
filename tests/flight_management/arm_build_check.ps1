@@ -44,4 +44,12 @@ $objects = foreach ($src in $sources) {
 
 & $size @objects
 if ($LASTEXITCODE -ne 0) { throw 'arm-none-eabi-size failed' }
+$codeCommit = if ($env:FLIGHT_CODE_COMMIT) { $env:FLIGHT_CODE_COMMIT } else { (git rev-parse HEAD).Trim() }
+$sourceHash = (Get-FileHash 'middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c' -Algorithm SHA256).Hash.ToLowerInvariant()
+@(
+  "commit=$codeCommit",
+  "source_sha256=$sourceHash",
+  "compiler=$(& $gcc --version | Select-Object -First 1)",
+  "M4_ARM_COMPILE_OK"
+) | Set-Content -LiteralPath (Join-Path $out 'toolchain.txt') -Encoding utf8
 Write-Output 'M4_ARM_COMPILE_OK'

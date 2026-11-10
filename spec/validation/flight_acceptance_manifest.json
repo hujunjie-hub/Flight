@@ -558,15 +558,12 @@
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
-      "R16 exposes separate Bernstein/tail/consumer jerk bounds and verifies each against exact Fraction continuous maxima (S06-112: 360 checked, 1080 component checks, 0 failures).",
-      "R16 injects exact additive seconds through the production conversion and records actual error; S06-113 confirms 3.618-4.059x gamma_2 for the 4x case, not a 1-us substitute.",
-      "R16 returns active interval/local_us/global_us directly from the production locator (S06-108 wrong_local=72) and rejects nonzero wrong profile_hash (S06-111).",
-      "R16 worst validator stack chain is 4,128 B > 4,096 B; Planner Worker productization remains BLOCKED.",
-      "REVOKED: the R7 differential tests are not valid evidence; S06-100..102 remain NOT_RUN and feasibility is NOT ESTABLISHED.",
-      "MR-009 is FIX IMPLEMENTED / WAITING_INDEPENDENT_REVIEW; it is not APPROVED.",
-      "Independent mathematical review MR-001..MR-008 is not yet APPROVED.",
-      "M5-07 gate integration is not complete.",
-      "H723 online obstacle avoidance is not authorized; production profile is OBSTACLE_SOURCE_MODE=NONE and BENCH_INHIBIT."
+      "R17 corrected the R16 stack undercount: real worst chain is 4,232 B, not 4,128 B; Planner Worker remains blocked.",
+      "R17 established ISSUE_REGISTER (FLIGHT-LOCAL-01..25) and BLOCKER_BOARD (B01-B07); GitHub publication remains PENDING.",
+      "B01/B02 are CRLF/LF hash rebaselines (143 types/981 offsets/0 layout mismatches), blocked on OWNER + ABI review.",
+      "B03/B04 are blocked on RT-Thread package version/license approval and a real pkgs --update; no fake RESOLVED.",
+      "B05 MR-009 remains WAITING_INDEPENDENT_REVIEW; B07 H723 runtime/WCET/HIL remains NOT_RUN.",
+      "S06-100..102 remain NOT_RUN; M5-06 is BLOCKED; M5-07 is not started."
     ],
     "next_milestone": "M5-07 only after M5-06 acceptance and explicit independent mathematical approval."
   },
@@ -662,12 +659,12 @@
   },
   "previous_commit_pass_inherited": false,
   "latest_local_validation": {
-    "run_id": "M5-06-R16-20261110",
+    "run_id": "M5-06-R17-20261111",
     "validated_code_commit": "fa1de8f78c2e29eda741ac32985fd38a8c4ee5de",
     "head": "fa1de8f78c2e29eda741ac32985fd38a8c4ee5de",
-    "archive_head_sha": "8cd81a6a0cfb8a4399562331f81888c3aa815efa8d7b041ea1bffc43c78a079a",
-    "archive_commit_sha": "3b95ec0771e8d0e1723841ea6882f2fa6568b86e",
-    "archive_zip_sha256": "8cd81a6a0cfb8a4399562331f81888c3aa815efa8d7b041ea1bffc43c78a079a",
+    "archive_head_sha": "PENDING_ARCHIVE_ZIP_SHA256",
+    "archive_commit_sha": "PENDING_ARCHIVE_COMMIT",
+    "archive_zip_sha256": "PENDING_ARCHIVE_ZIP_SHA256",
     "branch": "opt/stage-02-m5-06-safety-validator",
     "scope": "LOCAL_EXECUTION_ONLY",
     "github_ci": "NOT_RUN_FOR_THIS_HEAD",
@@ -683,14 +680,18 @@
     "blocked_items": [
       "scons_link"
     ],
-    "note": "validated_code_commit and archive_commit_sha are different commits; archive_head_sha/archive_zip_sha256 record the delivered ZIP SHA256 outside the ZIP because a ZIP cannot contain its own hash. The archive includes SHA256SUMS.txt, a Git bundle and r16_test_results.json."
+    "note": "validated_code_commit and archive_commit_sha are different commits; archive_head_sha/archive_zip_sha256 record the delivered ZIP SHA256 outside the ZIP because a ZIP cannot contain its own hash."
   },
   "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
   "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112 three separate bounds)",
   "stack_budget": {
-    "validator_worst_chain_bytes": 4128,
+    "validator_worst_chain_bytes": 4232,
     "planner_worker_limit_bytes": 4096,
     "status": "EXCEEDED_BLOCKED",
-    "record": "build/validation/analysis_p2.md"
-  }
+    "record": "build/validation/analysis_p2.md",
+    "chain": "validate 1112 + build_curve 2824 + interval_scale 104 + interval_mul 80 + interval_bounds 64 + interval_invalid 48"
+  },
+  "blocker_board": "spec/quality/BLOCKER_BOARD.md",
+  "issue_register": "spec/quality/ISSUE_REGISTER.md",
+  "mr009_review_material": "spec/history/implementation/guidance/MR009_R17_REVIEW_MATERIAL.md"
 }

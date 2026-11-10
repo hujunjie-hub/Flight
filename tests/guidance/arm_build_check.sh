@@ -78,7 +78,8 @@ for src in "${host_only_sources[@]}"; do
 done
 
 {
-  echo "commit=$(git rev-parse HEAD)"
+  echo "commit=${FLIGHT_CODE_COMMIT:-$(git rev-parse HEAD)}"
+  echo "source_sha256=$(sha256sum middleware/guidance/trajectory_planning/m5_trajectory_safety.c | cut -d' ' -f1)"
   echo "compiler=$("$cc" --version | head -n 1)"
   echo "size_tool=$("$size" --version | head -n 1)"
   echo "production_objects=${#production_sources[@]}"
