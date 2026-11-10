@@ -3175,6 +3175,9 @@ static void test_m5_safety_dynamic_adaptive_split_ulp(void)
     float obstacle_start_x = -0.5f;
     safety_fx_init(&fx, 172000000u + (uint64_t)boundary_case * 1000000u);
     safety_set_constant_position(&fx, 0.0f, 0.0f, 0.0f);
+    /* Isolate adaptive subdivision from response-delay inflation: the parent
+       midpoint must be unresolved, not already classified as collision. */
+    fx.input.response_delay_us = 0u;
     if (boundary_case == 1u)
       obstacle_start_x = nextafterf(-0.5f, INFINITY);
     else if (boundary_case == 2u)
