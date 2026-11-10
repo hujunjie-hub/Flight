@@ -21,6 +21,11 @@ typedef struct {
   uint32_t started, provisional_parameters, imu_batches, imu_rejected;
   uint32_t measurement_rejected, nav_updates, control_updates, control_rejected;
   uint32_t planning_updates, mpc_updates, queue_overruns, deadline_misses;
+  /* M6 acceptance counters: every MPC job is classified by the status the
+   * outer loop returned, and the covered time accumulates only for accepted
+   * jobs so a fallback window can never be counted as coverage. */
+  uint32_t mpc_solved, mpc_rejected;
+  uint64_t mpc_covered_us;
   uint32_t event_drops, log_event_drops, sd_write_errors;
   uint32_t critical_event_drops, nor_io_errors;
   bool sd_recording, nor_recording;

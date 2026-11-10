@@ -24,9 +24,16 @@ static void task_mpc_step(void)
     if (ready)
     {
         ControllerInput input;
+        Status status;
         runtime_data_controller_input(&worker_bundle, &input, runtime_now_us());
-        (void)control_outer_update(&input);
+        status = control_outer_update(&input);
         runtime_stats.mpc_updates++;
+        if (status == STATUS_OK) {
+            runtime_stats.mpc_solved++;
+            runtime_stats.mpc_covered_us += (uint64_t)TASK_MPC_PERIOD_MS * 1000u;
+        } else {
+            runtime_stats.mpc_rejected++;
+        }
     }
 }
 
