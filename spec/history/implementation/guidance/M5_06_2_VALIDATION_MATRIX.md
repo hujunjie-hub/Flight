@@ -243,3 +243,8 @@ Run #499 / `1144ce8`：
 MPC 静态 RAM 29,252 B，worker stack 8,192 B，最大静态 frame 2,024 B。M5-06 validator 仅作为 Cortex-M7 object 编译，不进入产品链接。
 
 **边界：** 当前 Host/SIL 和 Cortex-M7 编译验证通过，不等于独立数学证明完成、H723 WCET/RTA、HIL 或实机飞行通过。MR-008 和其他独立审查项仍保持 OPEN。
+
+ 
+### S06-081 oracle improvement
+
+The constant-acceleration test no longer uses 513 uniform samples as its minimum-distance oracle. It now evaluates the analytic continuous-time candidate set: both endpoints, the root of relative velocity, and all in-horizon roots of relative position, using long double. This removes the fixed-grid miss risk for the tested 1D constant-acceleration model. It remains a test-model oracle, not a formal general 3D interval proof. Commit `a14b9f1`; CI_PENDING.
