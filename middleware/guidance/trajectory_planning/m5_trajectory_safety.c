@@ -924,8 +924,12 @@ static uint8_t build_curve(
   double t_power[6], dt_power[6];
   unsigned axis, i, k, j;
   if (!(dt > 0.0) || !isfinite(dt) || !isfinite(t0)) return 0u;
-  curve->start_time_s = t0;
-  curve->end_time_s = t0 + dt;
+  /* Store an outward physical span. The consumer polynomial is evaluated from
+     these bounds, so a rounded-down end must not clip the gamma_2 tail. */
+  curve->start_time_s = nextafter(t0, -INFINITY);
+  curve->end_time_s = nextafter(t0 + dt, INFINITY);
+  if (!isfinite(curve->start_time_s) || !isfinite(curve->end_time_s))
+    return 0u;
   t_power[0] = 1.0;
   dt_power[0] = 1.0;
   for (i = 1u; i <= 5u; ++i) {
@@ -1247,18 +1251,25 @@ static uint8_t curve_bounds(
     /* Third derivative. A degree-5 Bernstein position has a degree-2 Bernstein
        jerk with control points
            60/d^3 * (B[k+3] - 3B[k+2] + 3B[k+1] - B[k]).
-       The convex hull bounds |jerk| on [0,1]; the consumer may evaluate past
-       the sub-interval end by gamma_2*s_end, so the same quadratic is evaluated
-       with interval arithmetic on the extended interval. The consumer's own
-       binary32 coefficients contribute a second quadratic in physical time.
-       Taking the maximum of both is conservative for the consumed reference. */
+       Three conservative bounds are combined:
+         1. the Bernstein convex hull on the original [0,1] interval;
+         2. the same polynomial converted to power basis and evaluated with
+            interval Horner on the consumer tail [1, 1+gamma_2*ratio],
+            ratio = end_time/duration;
+         3. the consumer's own binary32 coefficients in physical seconds.
+       All three use outward interval arithmetic; taking their maximum covers
+       the consumed reference. A failed interval is a NUMERIC_FAILURE. */
     {
       M5SafetyInterval duration_i, duration_cubed, scale;
       M5SafetyInterval jerk_control[3];
       M5SafetyInterval u_i, tail_value;
       M5SafetyInterval s_i, consumer_value;
-      double u_end, u_tail, s_tail, gamma2;
-      double jerk_abs = 0.0;
+      M5SafetyInterval power0, power1, power2;
+      double ratio, u_tail, s_tail, gamma2;
+      double bernstein_abs = 0.0;
+      double tail_abs = 0.0;
+      double consumer_abs = 0.0;
+      double jerk_abs;
       unsigned k;
 
       duration_i = interval_bounds(
@@ -1278,25 +1289,39 @@ static uint8_t curve_bounds(
                          position_control[k]));
         jerk_control[k] = interval_mul(scale, delta3);
         if (jerk_control[k].valid == 0u) return 0u;
-        jerk_abs = fmax(jerk_abs, interval_abs_max(jerk_control[k]));
+        bernstein_abs = fmax(bernstein_abs,
+                             interval_abs_max(jerk_control[k]));
       }
 
+      /* Bernstein-to-power: b(u) = b0 + 2(b1-b0)u + (b0-2b1+b2)u^2. */
+      power0 = jerk_control[0];
+      power1 = interval_scale(
+          interval_sub(jerk_control[1], jerk_control[0]), 2.0);
+      power2 = interval_add(
+          interval_sub(jerk_control[0],
+                       interval_scale(jerk_control[1], 2.0)),
+          jerk_control[2]);
+      if (power1.valid == 0u || power2.valid == 0u) return 0u;
+
       gamma2 = gamma2_upper();
-      /* Normalized consumer overshoot: u_tail = u_end + gamma_2*u_end. */
-      u_end = curve->end_time_s / duration_s;
-      u_end = nextafter(u_end, INFINITY);
-      u_tail = add_upper_nonnegative(u_end,
-          multiply_upper_nonnegative(gamma2, u_end));
+      /* The sub-interval ends at normalized coordinate 1; the consumer may
+         extend by gamma_2*s_end, i.e. by gamma_2*(end_time/duration) in the
+         normalized coordinate. */
+      ratio = curve->end_time_s / duration_s;
+      ratio = nextafter(ratio, INFINITY);
+      if (!isfinite(ratio) || ratio <= 0.0) return 0u;
+      u_tail = add_upper_nonnegative(1.0,
+          multiply_upper_nonnegative(gamma2, ratio));
       if (!isfinite(u_tail) || u_tail < 1.0) return 0u;
       if (u_tail > 1.0) {
         u_i = interval_bounds(1.0, u_tail);
         if (u_i.valid == 0u) return 0u;
         tail_value = interval_add(
-            interval_mul(jerk_control[2], u_i), jerk_control[1]);
+            interval_mul(power2, u_i), power1);
         tail_value = interval_add(
-            interval_mul(tail_value, u_i), jerk_control[0]);
+            interval_mul(tail_value, u_i), power0);
         if (tail_value.valid == 0u) return 0u;
-        jerk_abs = fmax(jerk_abs, interval_abs_max(tail_value));
+        tail_abs = interval_abs_max(tail_value);
       }
 
       /* Consumer polynomial in physical seconds, using the exact binary32
@@ -1315,7 +1340,9 @@ static uint8_t curve_bounds(
           interval_mul(consumer_value, s_i),
           interval_exact(curve->jerk_power[axis][0]));
       if (consumer_value.valid == 0u) return 0u;
-      jerk_abs = fmax(jerk_abs, interval_abs_max(consumer_value));
+      consumer_abs = interval_abs_max(consumer_value);
+
+      jerk_abs = fmax(bernstein_abs, fmax(tail_abs, consumer_abs));
 
       bounds->jerk_axis_bound[axis] = round_up_float(jerk_abs);
       if (!isfinite(bounds->jerk_axis_bound[axis])) return 0u;
@@ -2445,6 +2472,44 @@ uint8_t m5_trajectory_safety_test_interval_op(
 extern Status control_sample_reference(const MotionReference *ref,
                                        uint64_t time,
                                        ProductMotionPoint *out);
+extern float control_reference_convert_local_time(uint64_t local_us,
+                                                  float seconds_per_us);
+extern uint8_t control_reference_time_within_gamma2(float local_seconds,
+                                                    uint64_t local_us);
+
+uint8_t m5_trajectory_safety_test_time_conversion(
+    uint32_t step_us, uint32_t interval, uint32_t offset_us, uint8_t mode,
+    float *seconds, uint8_t *within_gamma2)
+{
+  uint64_t local_us;
+  uint64_t true_local_us;
+  float scale = 1e-6f;
+  double gamma2;
+
+  if (seconds == NULL || within_gamma2 == NULL ||
+      interval >= PRODUCT_PREVIEW_COUNT ||
+      (step_us != (uint32_t)PRODUCT_PREVIEW_STEP_US &&
+       step_us != (uint32_t)PRODUCT_ROUTE_PREVIEW_STEP_US) ||
+      offset_us > step_us || mode > 3u) return 0u;
+  true_local_us = offset_us;
+  local_us = offset_us;
+  if (mode == 1u) {
+    local_us = (uint64_t)interval * step_us + offset_us;
+  } else if (mode == 2u) {
+    gamma2 = gamma2_upper();
+    {
+      uint64_t error_us = (uint64_t)(4.0 * gamma2 * (double)offset_us);
+      if (error_us == 0u) error_us = 1u;
+      local_us += error_us;
+    }
+  } else if (mode == 3u) {
+    scale = 1e-6f * (float)step_us / (float)(step_us + 1000u);
+  }
+  *seconds = control_reference_convert_local_time(local_us, scale);
+  *within_gamma2 = control_reference_time_within_gamma2(*seconds,
+                                                        true_local_us);
+  return (uint8_t)(isfinite(*seconds) && (*within_gamma2 <= 1u));
+}
 
 uint8_t m5_trajectory_safety_test_consumer_time(
     uint32_t step_us, uint32_t offset_us, float *seconds)
@@ -2741,24 +2806,30 @@ uint8_t m5_trajectory_safety_test_active_segment(
   return (uint8_t)(isfinite(local_seconds) && isfinite(coefficients[0]));
 }
 
-uint8_t m5_trajectory_safety_test_product_limits(
+uint8_t m5_trajectory_safety_test_product_envelope(
     float *max_linear_speed_mps, float *max_linear_accel_mps2,
     float max_velocity_ned_mps[3], float max_acceleration_ned_mps2[3],
-    float max_jerk_ned_mps3[3])
+    float max_jerk_ned_mps3[3], uint32_t *valid_mask,
+    uint32_t *safety_envelope_id, uint32_t *config_version,
+    uint32_t *parameter_hash, uint32_t *profile_hash)
 {
   ProductFmsConfig config;
   SafetyEnvelope envelope;
   unsigned axis;
+
   if (max_linear_speed_mps == NULL || max_linear_accel_mps2 == NULL ||
       max_velocity_ned_mps == NULL || max_acceleration_ned_mps2 == NULL ||
-      max_jerk_ned_mps3 == NULL) return 0u;
+      max_jerk_ned_mps3 == NULL || valid_mask == NULL ||
+      safety_envelope_id == NULL || config_version == NULL ||
+      parameter_hash == NULL || profile_hash == NULL) return 0u;
   fms_model_default_config(&config);
+  if (fms_product_validate_config(&config) != STATUS_OK) return 0u;
   if (fms_product_build_safety_envelope(&fms_quad_x4_policy, &config, 1u,
                                         &envelope) != STATUS_OK) {
     return 0u;
   }
   if (envelope.safety_envelope_id == 0u ||
-      (envelope.vehicle_extension.valid_mask & PRODUCT_ENVELOPE_VALID_JERK) == 0u ||
+      envelope.vehicle_extension.valid_mask != 0x7Fu ||
       !isfinite(envelope.max_linear_speed_mps) ||
       !isfinite(envelope.max_linear_accel_mps2)) {
     return 0u;
@@ -2773,7 +2844,24 @@ uint8_t m5_trajectory_safety_test_product_limits(
     max_jerk_ned_mps3[axis] =
         envelope.vehicle_extension.max_jerk_ned_mps3[axis];
   }
+  *valid_mask = envelope.vehicle_extension.valid_mask;
+  *safety_envelope_id = envelope.safety_envelope_id;
+  *config_version = config.config_version;
+  *parameter_hash = config.parameter_hash;
+  *profile_hash = config.profile_hash;
   return 1u;
+}
+
+uint8_t m5_trajectory_safety_test_product_limits(
+    float *max_linear_speed_mps, float *max_linear_accel_mps2,
+    float max_velocity_ned_mps[3], float max_acceleration_ned_mps2[3],
+    float max_jerk_ned_mps3[3])
+{
+  uint32_t valid_mask, envelope_id, config_version, parameter_hash, profile_hash;
+  return m5_trajectory_safety_test_product_envelope(
+      max_linear_speed_mps, max_linear_accel_mps2, max_velocity_ned_mps,
+      max_acceleration_ned_mps2, max_jerk_ned_mps3, &valid_mask,
+      &envelope_id, &config_version, &parameter_hash, &profile_hash);
 }
 
 #endif /* FLIGHT_M5_SAFETY_TEST_API */

@@ -26,11 +26,13 @@ from fractions import Fraction
 from math import comb
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from m5_product_envelope import read_product_envelope
+from m5_product_envelope import envelope_legal as product_legal
+
 SEED = 0x6D350107
 STEPS = (20000, 40000)
 CASES = 150
-V_MAX = 8.0
-A_MAX = 4.0
 P_MAX = 2.0
 ROUNDINGS = (10, 12, 10)
 U = Fraction(1, 1 << 24)
@@ -119,6 +121,7 @@ def series(coefficients, order):
 class Probes:
     def __init__(self, path):
         library = ctypes.CDLL(path)
+        self.library = library
         pointer = ctypes.POINTER(ctypes.c_float)
         self.full = library.m5_trajectory_safety_test_consumer_full_sample
         self.full.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
@@ -139,57 +142,18 @@ class Probes:
 
 
 
-def read_limits(probes):
-    speed = ctypes.c_float()
-    accel = ctypes.c_float()
-    velocity = (ctypes.c_float * 3)()
-    acceleration = (ctypes.c_float * 3)()
-    jerk = (ctypes.c_float * 3)()
-    if not probes.limits(ctypes.byref(speed), ctypes.byref(accel), velocity,
-                         acceleration, jerk):
-        raise SystemExit('product limit API failed')
-    return (float(speed.value), float(accel.value),
-            [float(velocity[i]) for i in range(3)],
-            [float(acceleration[i]) for i in range(3)],
-            [float(jerk[i]) for i in range(3)])
-
-
-def envelope_legal(state, h, step_us, v_max, a_max, per_axis_v, per_axis_a,
-                   per_axis_j):
-    """Per-axis, 3-D norm and jerk limits over the whole evaluation interval."""
-    t_max = Fraction(step_us, 1000000)
-    s_eval = max(t_max, Fraction(f32(h))) + GAMMA2 * t_max
-    speed_sq = Fraction(0)
-    accel_sq = Fraction(0)
-    for axis in range(3):
-        exact = exact_coefficients(state[0][axis], state[1][axis], state[2][axis],
-                                   state[3][axis], state[4][axis], state[5][axis], h)
-        velocity = [Fraction(k) * exact[k] for k in range(1, 6)]
-        acceleration = [Fraction(k * (k - 1)) * exact[k] for k in range(2, 6)]
-        jerk = [Fraction(k * (k - 1) * (k - 2)) * exact[k] for k in range(3, 6)]
-        v_bound = bernstein(velocity, s_eval)
-        a_bound = bernstein(acceleration, s_eval)
-        j_bound = bernstein(jerk, s_eval)
-        if v_bound > Fraction(f32(per_axis_v[axis])):
-            return False
-        if a_bound > Fraction(f32(per_axis_a[axis])):
-            return False
-        if j_bound > Fraction(f32(per_axis_j[axis])):
-            return False
-        speed_sq += v_bound * v_bound
-        accel_sq += a_bound * a_bound
-    return (speed_sq <= Fraction(f32(v_max)) ** 2 and
-            accel_sq <= Fraction(f32(a_max)) ** 2)
-
 def main():
     if len(sys.argv) < 2:
         raise SystemExit('usage: verify_consumer_error_budget.py <libm5_safety_oracle.so>')
     probes = Probes(sys.argv[1])
-    v_max, a_max, per_axis_v, per_axis_a, per_axis_j = read_limits(probes)
+    limits = read_product_envelope(probes.library)
     rnd = random.Random(SEED)
     checked = 0
+    candidates = 0
     legal_cases = 0
     stress_cases = 0
+    rejected = {'speed': 0, 'acceleration': 0, 'jerk': 0,
+                'speed_norm': 0, 'acceleration_norm': 0}
     failures = []
     worst = {"ratio": 0.0}
     component_max = [{"coefficient": 0.0, "horner": 0.0, "time": 0.0} for _ in range(3)]
@@ -199,16 +163,21 @@ def main():
         s_eval = max(t_max, Fraction(h)) + GAMMA2 * t_max
         for _ in range(CASES):
             p0 = [f32(rnd.uniform(-P_MAX, P_MAX)) for _ in range(3)]
-            v0 = [f32(rnd.uniform(-V_MAX, V_MAX)) for _ in range(3)]
-            a0 = [f32(rnd.uniform(-A_MAX, A_MAX)) for _ in range(3)]
-            jerk = [f32(rnd.uniform(-20.0, 20.0)) for _ in range(3)]
+            v0 = [f32(rnd.uniform(-limits.velocity[axis], limits.velocity[axis]))
+                  for axis in range(3)]
+            a0 = [f32(rnd.uniform(-limits.acceleration[axis],
+                                  limits.acceleration[axis])) for axis in range(3)]
+            jerk = [f32(rnd.uniform(-limits.jerk[axis], limits.jerk[axis]))
+                    for axis in range(3)]
             p1 = [f32(p0[i] + v0[i] * h + 0.5 * a0[i] * h * h
                       + jerk[i] * h ** 3 / 6.0) for i in range(3)]
             v1 = [f32(v0[i] + a0[i] * h + 0.5 * jerk[i] * h * h) for i in range(3)]
             a1 = [f32(a0[i] + jerk[i] * h) for i in range(3)]
             state = (p0, v0, a0, p1, v1, a1)
-            if not envelope_legal(state, h, step_us, v_max, a_max, per_axis_v,
-                                  per_axis_a, per_axis_j):
+            candidates += 1
+            legal, reason = product_legal(state, h, step_us, limits)
+            if not legal:
+                rejected[reason] = rejected.get(reason, 0) + 1
                 stress_cases += 1
                 continue
             legal_cases += 1
@@ -286,10 +255,25 @@ def main():
         "test": "S06-107",
         "seed": f"0x{SEED:X}",
         "steps": list(STEPS),
-        "cases": CASES,
+        "candidate_cases": candidates,
         "legal_cases": legal_cases,
         "stress_cases": stress_cases,
-        "checked": checked,
+        "checked_samples": checked,
+        "jerk_rejected_cases": rejected["jerk"],
+        "speed_rejected_cases": rejected["speed"] + rejected["speed_norm"],
+        "acceleration_rejected_cases": (rejected["acceleration"] +
+                                        rejected["acceleration_norm"]),
+        "product_envelope": {
+            "max_linear_speed_mps": limits.speed,
+            "max_linear_accel_mps2": limits.accel,
+            "max_velocity_ned_mps": limits.velocity,
+            "max_acceleration_ned_mps2": limits.acceleration,
+            "max_jerk_ned_mps3": limits.jerk,
+            "valid_mask": limits.valid_mask,
+            "config_version": limits.config_version,
+            "parameter_hash": limits.parameter_hash,
+            "profile_hash": limits.profile_hash,
+        },
         "component_max": component_max,
         "worst": worst,
         "library_sha256": hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest(),

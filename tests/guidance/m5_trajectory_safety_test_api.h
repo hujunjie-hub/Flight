@@ -107,6 +107,13 @@ uint8_t m5_trajectory_safety_test_interval_op(
 uint8_t m5_trajectory_safety_test_consumer_time(
     uint32_t step_us, uint32_t offset_us, float *seconds);
 
+/* S06-113: use the production local-time conversion and the production C
+   gamma_2 predicate with an injected error. mode 0 normal, 1 wrong local time,
+   2 +4*gamma_2, 3 wrong segment duration. */
+uint8_t m5_trajectory_safety_test_time_conversion(
+    uint32_t step_us, uint32_t interval, uint32_t offset_us, uint8_t mode,
+    float *seconds, uint8_t *within_gamma2);
+
 /* S06-103 extension: arbitrary interval, base time and endpoint states.
    `seconds` is measured separately with a unit-velocity companion reference,
    so the time error and the curve-evaluation error can be checked separately. */
@@ -154,5 +161,13 @@ uint8_t m5_trajectory_safety_test_product_limits(
     float *max_linear_speed_mps, float *max_linear_accel_mps2,
     float max_velocity_ned_mps[3], float max_acceleration_ned_mps2[3],
     float max_jerk_ned_mps3[3]);
+
+/* Extended product identity used by the Python oracles. */
+uint8_t m5_trajectory_safety_test_product_envelope(
+    float *max_linear_speed_mps, float *max_linear_accel_mps2,
+    float max_velocity_ned_mps[3], float max_acceleration_ned_mps2[3],
+    float max_jerk_ned_mps3[3], uint32_t *valid_mask,
+    uint32_t *safety_envelope_id, uint32_t *config_version,
+    uint32_t *parameter_hash, uint32_t *profile_hash);
 
 #endif /* M5_TRAJECTORY_SAFETY_TEST_API_H */

@@ -19,11 +19,13 @@ from fractions import Fraction
 from math import comb, sqrt
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from m5_product_envelope import read_product_envelope
+from m5_product_envelope import envelope_legal as product_legal
+
 SEED = 0x6D350105
 STEPS = (20000, 40000)
 CASES_PER_STEP = 120
-V_MAX = 8.0
-A_MAX = 4.0
 P_MAX = 2.0
 ROUNDINGS = (10, 12, 10)
 U = Fraction(1, 1 << 24)
@@ -113,6 +115,7 @@ def budget(start_p, start_v, start_a, end_p, end_v, end_a, h, step_us,
 class Probes:
     def __init__(self, path):
         library = ctypes.CDLL(path)
+        self.library = library
         pointer = ctypes.POINTER(ctypes.c_float)
         self.sample = library.m5_trajectory_safety_test_consumer_interval_sample
         self.sample.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
@@ -173,49 +176,42 @@ def exact_vector(state, h, s):
     return out
 
 
-def envelope_legal(state, h, step_us):
-    """Per-axis and 3-D norm limits on the physical interval."""
-    t_max = Fraction(step_us, 1000000)
-    speed_sq = Fraction(0)
-    accel_sq = Fraction(0)
-    for axis in range(3):
-        exact = exact_coefficients(state[0][axis], state[1][axis], state[2][axis],
-                                   state[3][axis], state[4][axis], state[5][axis], h)
-        velocity = [Fraction(k) * exact[k] for k in range(1, 6)]
-        acceleration = [Fraction(k * (k - 1)) * exact[k] for k in range(2, 6)]
-        v_bound = bernstein(velocity, t_max)
-        a_bound = bernstein(acceleration, t_max)
-        if v_bound > Fraction(f32(V_MAX)) or a_bound > Fraction(f32(A_MAX)):
-            return False
-        speed_sq += v_bound * v_bound
-        accel_sq += a_bound * a_bound
-    return (speed_sq <= Fraction(f32(V_MAX)) ** 2 and
-            accel_sq <= Fraction(f32(A_MAX)) ** 2)
-
 def main():
     if len(sys.argv) < 2:
         raise SystemExit('usage: verify_continuous_error_budget.py <libm5_safety_oracle.so>')
     probes = Probes(sys.argv[1])
+    limits = read_product_envelope(probes.library)
     rnd = random.Random(SEED)
     worst_ratio = 0.0
     worst_case = None
     checked = 0
+    candidates = 0
+    legal_cases = 0
+    rejected = {'speed': 0, 'acceleration': 0, 'jerk': 0,
+                'speed_norm': 0, 'acceleration_norm': 0}
     component_max = [0.0, 0.0, 0.0, 0.0]
     failures = []
     for step_us in STEPS:
         h = f32(step_us * f32(1e-6))
         for _ in range(CASES_PER_STEP):
             p0 = [f32(rnd.uniform(-P_MAX, P_MAX)) for _ in range(3)]
-            v0 = [f32(rnd.uniform(-V_MAX, V_MAX)) for _ in range(3)]
-            a0 = [f32(rnd.uniform(-A_MAX, A_MAX)) for _ in range(3)]
-            jerk = [f32(rnd.uniform(-20.0, 20.0)) for _ in range(3)]
+            v0 = [f32(rnd.uniform(-limits.velocity[axis], limits.velocity[axis]))
+                  for axis in range(3)]
+            a0 = [f32(rnd.uniform(-limits.acceleration[axis],
+                                  limits.acceleration[axis])) for axis in range(3)]
+            jerk = [f32(rnd.uniform(-limits.jerk[axis], limits.jerk[axis]))
+                    for axis in range(3)]
             p1 = [f32(p0[i] + v0[i] * h + 0.5 * a0[i] * h * h
                       + jerk[i] * h ** 3 / 6.0) for i in range(3)]
             v1 = [f32(v0[i] + a0[i] * h + 0.5 * jerk[i] * h * h) for i in range(3)]
             a1 = [f32(a0[i] + jerk[i] * h) for i in range(3)]
             state = (p0, v0, a0, p1, v1, a1)
-            if not envelope_legal(state, h, step_us):
+            candidates += 1
+            legal, reason = product_legal(state, h, step_us, limits)
+            if not legal:
+                rejected[reason] = rejected.get(reason, 0) + 1
                 continue
+            legal_cases += 1
             c_series = probes.coefficients(step_us, 0, 0, state)
             if c_series is None:
                 failures.append("coefficient API failed")
@@ -255,6 +251,24 @@ def main():
         "seed": f"0x{SEED:X}",
         "steps": list(STEPS),
         "cases_per_step": CASES_PER_STEP,
+        "candidate_cases": candidates,
+        "legal_cases": legal_cases,
+        "stress_cases": candidates - legal_cases,
+        "jerk_rejected_cases": rejected["jerk"],
+        "speed_rejected_cases": rejected["speed"] + rejected["speed_norm"],
+        "acceleration_rejected_cases": (rejected["acceleration"] +
+                                        rejected["acceleration_norm"]),
+        "product_envelope": {
+            "max_linear_speed_mps": limits.speed,
+            "max_linear_accel_mps2": limits.accel,
+            "max_velocity_ned_mps": limits.velocity,
+            "max_acceleration_ned_mps2": limits.acceleration,
+            "max_jerk_ned_mps3": limits.jerk,
+            "valid_mask": limits.valid_mask,
+            "config_version": limits.config_version,
+            "parameter_hash": limits.parameter_hash,
+            "profile_hash": limits.profile_hash,
+        },
         "checked_samples": checked,
         "component_max_m": {
             "coefficient": component_max[0],

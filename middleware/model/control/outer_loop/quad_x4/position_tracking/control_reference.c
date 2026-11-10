@@ -1,4 +1,30 @@
 #include "attitude_rate_control/controller_internal.h"
+#include <math.h>
+
+/* The single local-time conversion used by production and by the M5-06 test
+   hooks. `seconds_per_us` is normally 1e-6f; a test may pass a deliberately
+   wrong scale to exercise the gamma_2 check. */
+float control_reference_convert_local_time(uint64_t local_us,
+                                           float seconds_per_us)
+{
+  return (float)local_us * seconds_per_us;
+}
+
+/* C-side gamma_2 predicate. The exact reference is local_us/1e6. */
+uint8_t control_reference_time_within_gamma2(float local_seconds,
+                                             uint64_t local_us)
+{
+  double nu2 = 2.0 * 0x1p-24;
+  double gamma2;
+  double exact;
+  double bound;
+  nu2 = nextafter(nu2, INFINITY);
+  gamma2 = nu2 / (1.0 - nu2);
+  gamma2 = nextafter(gamma2, INFINITY);
+  exact = (double)local_us / 1000000.0;
+  bound = nextafter(gamma2 * exact, INFINITY);
+  return (uint8_t)(fabs((double)local_seconds - exact) <= bound);
+}
 
 /* Segment lookup and local time. Shared by control_sample_reference() and the
    M5-06 test hooks so the measured local time is the production computation,
@@ -35,7 +61,8 @@ Status control_reference_locate_segment(const MotionReference *ref, uint64_t tim
   if (!finite_array((*a)->point.position_ned_m, 11) ||
       !finite_array((*b)->point.position_ned_m, 11))
     return STATUS_NUMERIC_ERROR;
-  *local_seconds = (float)(offset - (*a)->offset_us) * 1e-6f;
+  *local_seconds = control_reference_convert_local_time(
+      offset - (*a)->offset_us, 1e-6f);
   *step_us_out = step_us;
   return STATUS_OK;
 }

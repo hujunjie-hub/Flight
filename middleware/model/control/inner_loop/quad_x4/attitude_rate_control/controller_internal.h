@@ -56,6 +56,12 @@ Status control_allocate_from_previous(const float inv[4][4], const float eff[4][
                                       const float lo[4], const float hi[4],
                                       float min_thrust, float max_thrust, ControlAllocation *out);
 /* Shared segment lookup: production and test hooks use this same function. */
+/* Single local-time conversion (normally seconds_per_us = 1e-6f). */
+float control_reference_convert_local_time(uint64_t local_us,
+                                           float seconds_per_us);
+/* C-side gamma_2 predicate used by the M5-06 time-error test path. */
+uint8_t control_reference_time_within_gamma2(float local_seconds,
+                                             uint64_t local_us);
 /* Shared quintic coefficient generation (production and test hooks). */
 void control_reference_hermite_coefficients(const float p0[3], const float v0[3],
                                             const float a0[3], const float p1[3],

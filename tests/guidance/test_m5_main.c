@@ -5612,6 +5612,18 @@ static void test_m5_safety_product_envelope_source(void)
       &speed, &accel, velocity, acceleration, jerk));
   CHECK(speed == envelope.max_linear_speed_mps);
   CHECK(accel == envelope.max_linear_accel_mps2);
+  {
+    uint32_t valid_mask, envelope_id, config_version, parameter_hash, profile_hash;
+    float v2[3], a2[3], j2[3];
+    CHECK(m5_trajectory_safety_test_product_envelope(
+        &speed, &accel, v2, a2, j2, &valid_mask, &envelope_id,
+        &config_version, &parameter_hash, &profile_hash));
+    CHECK(valid_mask == envelope.vehicle_extension.valid_mask);
+    CHECK(envelope_id == envelope.safety_envelope_id);
+    CHECK(config_version == config.config_version);
+    CHECK(parameter_hash == config.parameter_hash);
+    CHECK(profile_hash == config.profile_hash);
+  }
   for (axis = 0u; axis < 3u; ++axis) {
     CHECK(velocity[axis] ==
           envelope.vehicle_extension.max_velocity_ned_mps[axis]);
@@ -5638,39 +5650,79 @@ static void test_m5_safety_product_envelope_source(void)
 static void test_m5_safety_consumer_time_error_c_path(void)
 {
   static const uint32_t steps[2] = {20000u, 40000u};
-  static const uint32_t offsets[4] = {0u, 10000u, 19999u, 20000u};
-  const double gamma2 = (2.0 * 0x1p-24) / (1.0 - 2.0 * 0x1p-24);
-  unsigned s, k, i;
+  static const uint32_t intervals[3] = {0u, 11u, 23u};
+  unsigned s, i, k;
 
   for (s = 0u; s < 2u; ++s) {
-    MotionReference ref;
-    memset(&ref, 0, sizeof(ref));
-    ref.header.timestamp_sample_us = 1000000u;
-    ref.point_count = PRODUCT_PREVIEW_COUNT;
-    ref.anchor.offset_us = 0u;
-    safety_point_set(&ref.anchor, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f);
-    for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
-      float t = (float)((double)(i + 1u) * (double)steps[s] * 1.0e-6);
-      ref.points[i].offset_us = (i + 1u) * steps[s];
-      safety_point_set(&ref.points[i], t, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f);
-    }
-    for (k = 0u; k < 4u; ++k) {
-      ProductMotionPoint out;
-      double s_c, s_exact, bound, injected;
-      uint32_t offset_us = offsets[k] <= steps[s] ? offsets[k] : steps[s];
-      CHECK(control_sample_reference(&ref, ref.header.timestamp_sample_us +
-                                     offset_us, &out) == STATUS_OK);
-      s_c = (double)out.position_ned_m[0];
-      s_exact = (double)offset_us / 1000000.0;
-      bound = gamma2 * s_exact;
-      CHECK(fabs(s_c - s_exact) <= bound);
-      if (s_exact > 0.0) {
-        injected = s_c + 4.0 * bound;
-        CHECK(fabs(injected - s_exact) > bound);
+    uint32_t offsets[4] = {0u, steps[s] / 2u, steps[s] - 1u, steps[s]};
+    for (i = 0u; i < 3u; ++i) {
+      for (k = 0u; k < 4u; ++k) {
+        float seconds = 0.0f;
+        uint8_t within = 0u;
+        CHECK(m5_trajectory_safety_test_time_conversion(
+            steps[s], intervals[i], offsets[k], 0u, &seconds, &within));
+        CHECK(within == 1u);
+        CHECK(m5_trajectory_safety_test_time_conversion(
+            steps[s], intervals[i], offsets[k], 2u, &seconds, &within));
+        CHECK(within == 0u);
+        if (offsets[k] > 0u) {
+          CHECK(m5_trajectory_safety_test_time_conversion(
+              steps[s], intervals[i], offsets[k], 3u, &seconds, &within));
+          CHECK(within == 0u);
+        }
+        if ((uint64_t)intervals[i] * steps[s] + offsets[k] != offsets[k]) {
+          CHECK(m5_trajectory_safety_test_time_conversion(
+              steps[s], intervals[i], offsets[k], 1u, &seconds, &within));
+          CHECK(within == 0u);
+        }
       }
     }
   }
 }
+
+/* S06-111b: the Host test API and production FMS init share the same config
+   validation rules. Every invalid variant must be rejected before the builder
+   is used. */
+static void test_m5_safety_product_config_validation(void)
+{
+  ProductFmsConfig config;
+
+  fms_model_default_config(&config);
+  CHECK(fms_product_validate_config(&config) == STATUS_OK);
+
+  fms_model_default_config(&config);
+  config.config_version = 0u;
+  CHECK(fms_product_validate_config(&config) != STATUS_OK);
+
+  fms_model_default_config(&config);
+  config.parameter_hash = 0u;
+  CHECK(fms_product_validate_config(&config) != STATUS_OK);
+
+  fms_model_default_config(&config);
+  config.profile_hash = 0u;
+  CHECK(fms_product_validate_config(&config) != STATUS_OK);
+
+  fms_model_default_config(&config);
+  config.payload.safety_policy_id = 0xDEADBEEFu;
+  CHECK(fms_product_validate_config(&config) != STATUS_OK);
+
+  fms_model_default_config(&config);
+  config.payload.output_policy_id = 3u;
+  CHECK(fms_product_validate_config(&config) != STATUS_OK);
+
+  fms_model_default_config(&config);
+  config.payload.verified_input_mask = 1u << PREARM_ID_COUNT;
+  CHECK(fms_product_validate_config(&config) != STATUS_OK);
+
+  fms_model_default_config(&config);
+  config.payload.attitude_std_limit_rad = 0.0f / 0.0f;
+  CHECK(fms_product_validate_config(&config) != STATUS_OK);
+
+  fms_model_default_config(&config);
+  config.payload.nav_enter_ratio = 1.0f;
+  CHECK(fms_product_validate_config(&config) != STATUS_OK);
+}
+
 
 /* S06-110d: the continuous jerk bound must cover the analytic third
    derivative on the whole sub-interval and on the consumer gamma_2 tail. The
@@ -5718,17 +5770,17 @@ static void test_m5_safety_jerk_bound_covers_analytic(void)
           u = (double)u0 + ((double)u1 - (double)u0) *
               ((double)sample / 64.0);
         } else {
-          double delta_u = gamma2 * (double)u1 /
-              ((double)u1 - (double)u0);
-          u = (double)u1 + delta_u *
-              ((double)(sample - 64u) / (double)tail_samples);
+          /* Sample inside the gamma_2 tail. The exact endpoint of the full
+             tail and the stationary point are covered by S06-112. */
+          u = (double)u1 + 0.5 * gamma2 * (double)u1 *
+              ((double)(sample - 64u) / (double)(tail_samples + 1u));
         }
         t = (double)h * u;
         for (axis = 0u; axis < 3u; ++axis) {
           double jerk = 6.0 * (double)coefficients[axis][3] +
                         24.0 * (double)coefficients[axis][4] * t +
                         60.0 * (double)coefficients[axis][5] * t * t;
-          CHECK(fabs(jerk) <= (double)bound[axis] * 1.000001 + 1e-7);
+          CHECK(fabs(jerk) <= (double)bound[axis]);
         }
       }
     }
@@ -5885,6 +5937,7 @@ int main(void)
     {"m5_safety_jerk_bound_covers_analytic", test_m5_safety_jerk_bound_covers_analytic},
     {"m5_safety_jerk_zero_limit", test_m5_safety_jerk_zero_limit_invalid},
     {"m5_safety_product_envelope_source", test_m5_safety_product_envelope_source},
+    {"m5_safety_product_config_validation", test_m5_safety_product_config_validation},
     {"m5_safety_consumer_time_error_c", test_m5_safety_consumer_time_error_c_path},
   };
   size_t i;

@@ -13,9 +13,76 @@
  * approval, and PreArm fails closed when the matching verified_input bit is
  * absent.
  */
+#include <math.h>
 #include <string.h>
 #include "fms_contract/fms_model.h"
 #include "flight_policy/fms_policy.h"
+
+static uint8_t fms_mask_only_bits(uint32_t mask, uint32_t allowed)
+{
+  return (uint8_t)((mask & ~allowed) == 0u);
+}
+
+Status fms_product_validate_config(const ProductFmsConfig *config)
+{
+  const ProductFmsConfigPayload *p;
+
+  if (config == NULL) {
+    return STATUS_INVALID_ARGUMENT;
+  }
+  if (config->config_version == 0u || config->parameter_hash == 0u ||
+      config->profile_hash == 0u) {
+    return STATUS_INVALID_ARGUMENT;
+  }
+  p = &config->payload;
+  if (p->safety_policy_id != fms_quad_x4_policy.safety_policy_id) {
+    return STATUS_PROFILE_MISMATCH;
+  }
+  /* 0 = no output allowed; 1/2 are bench/simulation policies. Real strategies
+   * (>=0x100) need a registered verification record that this build cannot
+   * prove, so they are rejected rather than silently accepted. */
+  if (p->output_policy_id > 2u) {
+    return STATUS_UNSUPPORTED;
+  }
+  if (!fms_mask_only_bits(p->verified_input_mask, (1u << PREARM_ID_COUNT) - 1u)) {
+    return STATUS_OUT_OF_RANGE;
+  }
+  if (p->rc_lost_timeout_us < 50000u || p->rc_lost_timeout_us > 2000000u) {
+    return STATUS_OUT_OF_RANGE;
+  }
+  if (p->rc_recovery_dwell_us > 5000000u) {
+    return STATUS_OUT_OF_RANGE;
+  }
+  if (p->landed_dwell_us < 500000u || p->landed_dwell_us > 10000000u) {
+    return STATUS_OUT_OF_RANGE;
+  }
+  if (p->first_reference_timeout_us < 50000u || p->first_reference_timeout_us > 200000u) {
+    return STATUS_OUT_OF_RANGE;
+  }
+  if (p->nav_enter_dwell_us > 5000000u) {
+    return STATUS_OUT_OF_RANGE;
+  }
+  if (!isfinite(p->attitude_std_limit_rad) || p->attitude_std_limit_rad <= 0.0f ||
+      !isfinite(p->heading_std_limit_rad) || p->heading_std_limit_rad <= 0.0f ||
+      !isfinite(p->horizontal_position_std_limit_m) ||
+      p->horizontal_position_std_limit_m <= 0.0f ||
+      !isfinite(p->vertical_position_std_limit_m) ||
+      p->vertical_position_std_limit_m <= 0.0f ||
+      !isfinite(p->horizontal_velocity_std_limit_mps) ||
+      p->horizontal_velocity_std_limit_mps <= 0.0f ||
+      !isfinite(p->vertical_velocity_std_limit_mps) ||
+      p->vertical_velocity_std_limit_mps <= 0.0f) {
+    return STATUS_NUMERIC_ERROR;
+  }
+  if (!isfinite(p->nav_enter_ratio) || p->nav_enter_ratio <= 0.0f ||
+      p->nav_enter_ratio >= 1.0f) {
+    return STATUS_NUMERIC_ERROR;
+  }
+  if (p->geofence_required > 1u) {
+    return STATUS_OUT_OF_RANGE;
+  }
+  return STATUS_OK;
+}
 
 const FmsPolicy fms_quad_x4_policy = {
   .fms_policy_id = QUAD_X4_FMS_POLICY_ID,

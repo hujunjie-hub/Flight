@@ -96,11 +96,13 @@ def run(probes, step_us, interval, base, offset_us, state):
                                 endpoints[axis * 6 + 4], endpoints[axis * 6 + 5], h)
              for axis in range(3)]
     global_us = interval * step_us + offset_us
+    local_us = global_us - active.value * step_us
     s_c = Fraction(seconds.value)
-    s_exact = Fraction(global_us - active.value * step_us, 1000000)
+    s_exact = Fraction(local_us, 1000000)
     measured = [Fraction(f32(position[axis])) for axis in range(3)]
     return {"c": c_series, "exact": exact, "measured": measured,
-            "s_c": s_c, "s_exact": s_exact, "h": h, "active": active.value}
+            "s_c": s_c, "s_exact": s_exact, "h": h, "active": active.value,
+            "global_us": global_us, "local_us": local_us}
 
 
 def decompose_axes(data, coefficients=None, s_exact=None):
@@ -148,6 +150,7 @@ def main():
     checked = 0
     coeff_mix_checked = 0
     coeff_mix_skipped = 0
+    wrong_local_checked = 0
     failures = []
     for step_us in STEPS:
         for interval in INTERVALS:
@@ -189,8 +192,9 @@ def main():
                         # C: global offset used as local time. Only meaningful when
                         # the active segment is not the one the global offset names
                         # (interval > 0 or the seam at offset == step).
-                        global_us = interval * step_us + offset_us
-                        if data["active"] != interval:
+                        global_us = data["global_us"]
+                        if data["local_us"] != global_us:
+                            wrong_local_checked += 1
                             wrong_local = decompose(
                                 data, s_exact=Fraction(global_us, 1000000))
                             if wrong_local[2] <= max(2 * honest[2], Fraction(1, 10 ** 12)):
@@ -214,7 +218,8 @@ def main():
                                     f"{step_us}/{interval}/{offset_us}")
     print(f"M5_S06_108_TIME_ERROR_DETECTION cases={checked} "
           f"coeff_mix_checked={coeff_mix_checked} "
-          f"coeff_mix_skipped={coeff_mix_skipped} failures={len(failures)}")
+          f"coeff_mix_skipped={coeff_mix_skipped} "
+          f"wrong_local_checked={wrong_local_checked} failures={len(failures)}")
     for failure in failures[:10]:
         print("FAIL:", failure)
     if failures:
