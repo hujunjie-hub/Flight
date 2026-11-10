@@ -65,4 +65,15 @@ foreach ($src in $hostOnlySources) {
 
 & $size @objects
 if ($LASTEXITCODE -ne 0) { throw 'arm-none-eabi-size failed' }
+
+$toolchain = @(
+  "commit=$(git rev-parse HEAD)",
+  "compiler=$(& $gcc --version | Select-Object -First 1)",
+  "size_tool=$(& $size --version | Select-Object -First 1)",
+  "production_objects=$($productionSources.Count)",
+  "host_only_objects=$($hostOnlySources.Count)",
+  "flags=$($flags -join ' ')",
+  'M5-06 scope=Host/SIL-only validator object cross-compiled for Cortex-M7; not linked into product'
+)
+Set-Content -LiteralPath (Join-Path $out 'toolchain.txt') -Value $toolchain -Encoding utf8
 Write-Output 'M5_ARM_COMPILE_OK'
