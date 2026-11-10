@@ -426,8 +426,8 @@
       "seed": "deterministic",
       "cases": 60002,
       "status_at_code_baseline": "PASS",
-      "oracle": "active-segment decomposition: E_coefficient 2.91e-08, E_horner 1.13e-07, E_time 1.79e-09; seams use the next segment start; 144 cases; t_max denominator",
-      "local_run": "M5-06-R12-20261110"
+      "oracle": "max_time_error_ratio 0.288; components separated",
+      "local_run": "M5-06-R13-20261110"
     },
     {
       "id": "S06-104",
@@ -436,7 +436,7 @@
       "cases": 157,
       "status_at_code_baseline": "TEST_EXECUTION_PASS",
       "oracle": "coefficient_error_bound_m over 157 legal cases out of 808 candidates (per-axis and 3-D envelope); coefficient-only",
-      "local_run": "M5-06-R12-20261110",
+      "local_run": "M5-06-R13-20261110",
       "mathematical_feasibility": "MATHEMATICAL_FEASIBILITY_NOT_ESTABLISHED"
     },
     {
@@ -447,8 +447,8 @@
       "status_at_code_baseline": "TEST_EXECUTION_PASS",
       "mathematical_scope": "SINGLE_STATE_CONTINUOUS_BOUND_PLUS_FINITE_REGRESSION",
       "global_proof": "NOT_ESTABLISHED",
-      "oracle": "position budget from real C coefficients (active segment), 3-D outward sqrt, 995 samples; global proof NOT established",
-      "local_run": "M5-06-R11-20261110"
+      "oracle": "position budget from real C coefficients only (no Python fallback)",
+      "local_run": "M5-06-R13-20261110"
     },
     {
       "id": "S06-106",
@@ -457,7 +457,7 @@
       "cases": 60002,
       "status_at_code_baseline": "PASS",
       "oracle": "exhaustive integer offsets with the physical reference and gamma_2",
-      "local_run": "M5-06-R11-20261110"
+      "local_run": "M5-06-R13-20261110"
     },
     {
       "id": "S06-107",
@@ -465,8 +465,8 @@
       "seed": "0x6D350107",
       "cases": 300,
       "status_at_code_baseline": "PASS",
-      "oracle": "p/v/a budgets from real C coefficients and real consumer output; 22 legal and 278 stress samples reported separately",
-      "local_run": "M5-06-R11-20261110"
+      "oracle": "p/v/a budgets; legal 22 / stress 278 samples",
+      "local_run": "M5-06-R13-20261110"
     },
     {
       "id": "S06-108",
@@ -476,12 +476,21 @@
       "status_at_code_baseline": "PASS",
       "oracle": "mixed-segment, 4x gamma_2 and wrong-duration references are rejected; in-bound value accepted",
       "local_run": "M5-06-R12-20261110"
+    },
+    {
+      "id": "S06-109",
+      "name": "Real-C positive matrix",
+      "seed": "deterministic",
+      "cases": 96,
+      "status_at_code_baseline": "PASS",
+      "oracle": "triangle inequality and gamma_2 hold for 2x3x2x4x2 combinations",
+      "local_run": "M5-06-R13-20261110"
     }
   ],
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
-      "R12 fixed the phase-B decomposition with the active-segment API, switched S06-105 to real C coefficients and corrected the worst stack chain to 3,912 B.",
+      "R13 added real-C negative/positive matrices (S06-108/109), removed the Python coefficient fallback and split the S06-103 ratios. Product config source and jerk enforcement remain OPEN.",
       "REVOKED: the R7 differential tests are not valid evidence; S06-100..102 remain NOT_RUN and feasibility is NOT ESTABLISHED.",
       "SUPERSEDED: the R9/R10 fixed-factor infeasibility conclusions are revoked and must not be cited.",
       "R5 fixed a geofence clearance gap: check_geofences() did not subtract position_rounding_error_m.",
@@ -583,10 +592,10 @@
   },
   "previous_commit_pass_inherited": false,
   "latest_local_validation": {
-    "run_id": "M5-06-R12-20261110",
-    "validated_code_commit": "f5e6c33fe6c3c66695879eaa63854e01d8befaa8",
-    "head": "f5e6c33fe6c3c66695879eaa63854e01d8befaa8",
-    "archive_head_sha": "PENDING_ARCHIVE_COMMIT",
+    "run_id": "M5-06-R13-20261110",
+    "validated_code_commit": "1461807e112aacb5c97e18e6a4b0bad1ee8ef9cc",
+    "head": "1461807e112aacb5c97e18e6a4b0bad1ee8ef9cc",
+    "archive_head_sha": "see work/validation/archives/M5-06-R13-20261110/archive_manifest.json",
     "branch": "opt/stage-02-m5-06-safety-validator",
     "scope": "LOCAL_EXECUTION_ONLY",
     "github_ci": "NOT_RUN_FOR_THIS_HEAD",
@@ -603,5 +612,7 @@
       "scons_link"
     ],
     "note": "validated_code_commit and archive_head_sha are different commits: the archive commit contains documentation/manifest updates only. They are not claimed to be identical. Local results are never reported as GitHub CI success."
-  }
+  },
+  "product_config_source": "NOT_ESTABLISHED",
+  "jerk_enforcement": "NOT_IMPLEMENTED_IN_VALIDATOR (issue 17)"
 }
