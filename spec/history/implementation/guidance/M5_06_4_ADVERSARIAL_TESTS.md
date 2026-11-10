@@ -167,3 +167,8 @@ S06-074..079 静态/动态端到端扫掠差分、加速度包络、预览接缝
 
 
 S06-084 另增加大绝对 epoch 端到端不变性测试，使用接近 uint64 上限但保留完整预测租约和 proof horizon 的时间戳；相同相对时间下必须与低 epoch fixture 得到相同安全结果。Fraction oracle 覆盖 10,007 组输入。当前仅 IMPLEMENTED / CI_PENDING。
+
+ 
+## CI #499 compile portability failures
+
+Run #499 did not execute M5 tests: Host compilation rejected a floating-point equality inside `_Static_assert`; Cortex-M7 compilation rejected the optional `__STDC_IEC_559__` macro guard. M4 Host and independent source/time/navigation checks passed; MPC static RAM check passed. Fixes: `b0f40cb`, `0349587`. Await Run #501 before rerunning adversarial cases; do not classify this as an algorithm test failure or a pass.
