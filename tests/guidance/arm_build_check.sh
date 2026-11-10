@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
-# Cortex-M7 compile checks for production M4/M5 sources and the Host/SIL-only
-# M5-06 validator translation unit. The validator object is NOT linked into
-# the product; this is architecture/compiler compatibility evidence only.
-# Not a target link, WCET, runtime stack watermark, RTA, HIL, or flight result.
+# Cortex-M7 compile checks for the production M4/M5 sources and for the
+# Host/SIL-only M5 advanced-planner translation units (local map, A*, time
+# scaler, smoother, minimum-jerk kernel and the M5-06 safety validator).
+# These objects are NOT linked into the product; this is architecture and
+# compiler-compatibility evidence only, not a target link, WCET, runtime stack
+# watermark, RTA, HIL or flight result.
+#
+# The object set is intentionally the full middleware/guidance tree so that
+# tests/guidance/check_memory_budget.py is charged with the same translation
+# units that this script compiles.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -32,7 +38,8 @@ flags=(
   -Imiddleware/guidance
 )
 
-sources=(
+# Sources compiled into the H723/NONE product slice.
+production_sources=(
   middleware/model/fms/geofence_geometry/geofence_geometry.c
   middleware/guidance/guidance_update/guidance.c
   middleware/guidance/trajectory_planning/trajectory_math.c
@@ -43,24 +50,39 @@ sources=(
   middleware/guidance/guidance_update/guidance_config.c
 )
 
+# Host/SIL-only M5 advanced planner and M5-06 validator translation units.
+# They are compiled for Cortex-M7 only to prove compiler/architecture
+# compatibility; the macro keeps their production guards satisfied.
+host_only_sources=(
+  middleware/guidance/trajectory_planning/m5_local_map.c
+  middleware/guidance/trajectory_planning/m5_kinodynamic_astar.c
+  middleware/guidance/trajectory_planning/m5_time_scaler.c
+  middleware/guidance/trajectory_planning/m5_path_smoother.c
+  middleware/guidance/trajectory_planning/minimum_jerk_optimizer.c
+  middleware/guidance/trajectory_planning/m5_trajectory_safety.c
+)
+
 objects=()
-for src in "${sources[@]}"; do
+for src in "${production_sources[@]}"; do
   obj="$out/$(basename "$src" .c).o"
   echo "CC $src"
   "$cc" "${flags[@]}" -c "$src" -o "$obj"
   objects+=("$obj")
 done
 
-m5_safety_src="middleware/guidance/trajectory_planning/m5_trajectory_safety.c"
-m5_safety_obj="$out/m5_trajectory_safety_host_only.o"
-echo "CC $m5_safety_src (Host/SIL-only source, Cortex-M7 compile check only)"
-"$cc" "${flags[@]}" -DFLIGHT_M5_HOST_PLANNER -c "$m5_safety_src" -o "$m5_safety_obj"
-objects+=("$m5_safety_obj")
+for src in "${host_only_sources[@]}"; do
+  obj="$out/$(basename "$src" .c).o"
+  echo "CC $src (Host/SIL-only source, Cortex-M7 compile check only)"
+  "$cc" "${flags[@]}" -DFLIGHT_M5_HOST_PLANNER -c "$src" -o "$obj"
+  objects+=("$obj")
+done
 
 {
   echo "commit=$(git rev-parse HEAD)"
   echo "compiler=$("$cc" --version | head -n 1)"
   echo "size_tool=$("$size" --version | head -n 1)"
+  echo "production_objects=${#production_sources[@]}"
+  echo "host_only_objects=${#host_only_sources[@]}"
   printf 'flags='
   printf '%s ' "${flags[@]}"
   echo

@@ -3,6 +3,11 @@
 The temporary rtconfig.h overlay is restored in finally. Function roots keep
 both production Ports in the link despite the BSP's empty application loop.
 No new thread, hardware output or automatic arming is installed by this check.
+
+Exit codes: 0 = firmware linked, 1 = build failed, 2 = BLOCKED because the
+RT-Thread packages tree (packages/SConscript) is not part of the repository.
+A blocked check is not a pass; it is reported separately so that CI and local
+evidence never claim a firmware link that did not happen.
 """
 from pathlib import Path
 import hashlib
@@ -16,8 +21,35 @@ ROOT = next(p for p in Path(__file__).resolve().parents if (p/'SConstruct').is_f
 OUT = ROOT / "build/m4_m5_implementation/target"
 
 
+def blocked(reason):
+    OUT.mkdir(parents=True, exist_ok=True)
+    report = {"status": "BLOCKED", "blocked_reason": reason,
+        "scope": "FIRMWARE_LINK_WITH_M4_M5_PORT_ROOTS_NO_RUNTIME_DISPATCH",
+        "hardware_execution": "NOT_RUN"}
+    (OUT / "target_build.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(json.dumps(report, indent=2))
+    return 2
+
+
+def resolve_arm_bin():
+    configured = os.environ.get("FLIGHT_ARM_BIN")
+    if configured:
+        return configured
+    candidate = Path(r"D:\STM32CubeCLT\GNU-tools-for-STM32\bin")
+    return str(candidate) if candidate.is_dir() else ""
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
+    # packages/ is .gitignored upstream (RT-Thread package manager output), so a
+    # fresh clone cannot run the root SConscript. Report that explicitly
+    # instead of surfacing an opaque "missing SConscript" build error.
+    if not (ROOT / "packages/SConscript").is_file():
+        return blocked(
+            "packages/SConscript is absent: the RT-Thread package tree is "
+            "gitignored and is not produced by this repository. Run the "
+            "RT-Thread package manager (pkgs --update) for the selected "
+            ".config before the firmware link check.")
     python = ROOT / "build/m4_m5_tools/Scripts/python.exe"
     if not python.is_file():
         raise SystemExit("Install SCons in build/m4_m5_tools first (see implementation report)")
@@ -30,7 +62,7 @@ def main():
         artifacts[name] = path.read_bytes() if path.exists() else None
     env = os.environ.copy()
     env["RTT_CC"] = "gcc"
-    env["RTT_EXEC_PATH"] = env.get("FLIGHT_ARM_BIN", r"D:\STM32CubeCLT\GNU-tools-for-STM32\bin")
+    env["RTT_EXEC_PATH"] = resolve_arm_bin()
     command = [str(python), "-c",
         "import rtconfig; rtconfig.LFLAGS += ' -Wl,-u,fms_policy_update,-u,fms_policy_init,-u,guidance_update,-u,guidance_init'; "
         "from SCons.Script import main; main()", "-Q", "-j4"]

@@ -1,5 +1,6 @@
-# ARM (Cortex-M7) compile check for T191-C-M5 (M5 Guidance).
-# Not a target build, WCET or hardware result.
+# ARM (Cortex-M7) compile check for T191-C-M5 (M5 Guidance), including the
+# Host/SIL-only advanced planner and M5-06 validator translation units.
+# Not a target build, WCET, runtime stack watermark or hardware result.
 $ErrorActionPreference = 'Stop'
 
 $layoutRoot = Get-Item -LiteralPath $PSScriptRoot
@@ -19,12 +20,15 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 
 $flags = @(
   '-mcpu=cortex-m7', '-mthumb', '-mfpu=fpv5-d16', '-mfloat-abi=hard',
-  '-std=c11', '-Wall', '-Wextra', '-Werror', '-fno-short-enums',
+  '-std=c11', '-Wall', '-Wextra', '-Werror', '-fno-short-enums', '-fstack-usage',
+  '-fno-fast-math', '-fno-unsafe-math-optimizations',
+  '-ffp-contract=off', '-frounding-math', '-fexcess-precision=standard',
   '-Imiddleware/contracts', '-Imiddleware/model/fms',
   '-Imiddleware/guidance'
 )
 
-$sources = @(
+# Sources compiled into the H723/NONE product slice.
+$productionSources = @(
   'middleware/model/fms/geofence_geometry/geofence_geometry.c',
   'middleware/guidance/guidance_update/guidance.c',
   'middleware/guidance/trajectory_planning/trajectory_math.c',
@@ -35,11 +39,28 @@ $sources = @(
   'middleware/guidance/guidance_update/guidance_config.c'
 )
 
-$objects = foreach ($src in $sources) {
+# Host/SIL-only M5 advanced planner and M5-06 validator translation units.
+$hostOnlySources = @(
+  'middleware/guidance/trajectory_planning/m5_local_map.c',
+  'middleware/guidance/trajectory_planning/m5_kinodynamic_astar.c',
+  'middleware/guidance/trajectory_planning/m5_time_scaler.c',
+  'middleware/guidance/trajectory_planning/m5_path_smoother.c',
+  'middleware/guidance/trajectory_planning/minimum_jerk_optimizer.c',
+  'middleware/guidance/trajectory_planning/m5_trajectory_safety.c'
+)
+
+$objects = @()
+foreach ($src in $productionSources) {
   $obj = Join-Path $out ((Split-Path $src -Leaf).Replace('.c', '.o'))
   & $gcc @flags -c $src -o $obj
   if ($LASTEXITCODE -ne 0) { throw "ARM compile failed: $src" }
-  $obj
+  $objects += $obj
+}
+foreach ($src in $hostOnlySources) {
+  $obj = Join-Path $out ((Split-Path $src -Leaf).Replace('.c', '.o'))
+  & $gcc @flags -DFLIGHT_M5_HOST_PLANNER -c $src -o $obj
+  if ($LASTEXITCODE -ne 0) { throw "ARM compile failed: $src" }
+  $objects += $obj
 }
 
 & $size @objects

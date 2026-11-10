@@ -1,5 +1,6 @@
 """Reproduce M4/M5 Host, sanitizer, Cortex-M7, ABI and SCons link evidence."""
 from pathlib import Path
+import datetime
 import hashlib
 import json
 import os
@@ -10,11 +11,21 @@ ROOT = next(p for p in Path(__file__).resolve().parents if (p/'SConstruct').is_f
 OUT = ROOT / "build/m4_m5_implementation/evidence"
 
 
+def status_for(exit_code):
+    # 2 is reserved for checks that cannot run in this repository state
+    # (for example the firmware link needs the gitignored RT-Thread packages
+    # tree). A blocked check is never reported as a pass.
+    if exit_code == 0:
+        return "PASS"
+    return "BLOCKED" if exit_code == 2 else "FAIL"
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     wsl = ["wsl.exe", "-d", "Ubuntu-26.04", "--"]
     sanitizer = "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
     commands = [
+        ("line_endings", [sys.executable, "tools/check_line_endings.py"], {}),
         ("m4_host", wsl+["bash", "tests/flight_management/run_host_tests.sh"], {}),
         ("m5_host", wsl+["bash", "tests/guidance/run_host_tests.sh"], {}),
         ("integration", wsl+["bash", "tests/guidance/run_integration_tests.sh"], {}),
@@ -35,9 +46,10 @@ def main():
         result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True)
         log = OUT / (name+".log")
         log.write_text(result.stdout+result.stderr, encoding="utf-8")
+        status = status_for(result.returncode)
         results.append({"name": name, "command": command, "exit_code": result.returncode,
-            "log": log.relative_to(ROOT).as_posix()})
-        print(name+": "+("PASS" if result.returncode == 0 else "FAIL"), flush=True)
+            "status": status, "log": log.relative_to(ROOT).as_posix()})
+        print(f"{name}: {status} (exit {result.returncode})", flush=True)
         if result.returncode: print((result.stdout+result.stderr)[-2400:], flush=True)
     inputs = set((ROOT / "middleware/contracts").rglob("*.h"))
     for module in ("model/fms", "guidance"):
@@ -47,13 +59,17 @@ def main():
     files = {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
              for p in sorted(inputs)}
     (OUT/"source_sha256.json").write_text(json.dumps(files, indent=2), encoding="utf-8")
-    report = {"date": "2026-11-05", "profile": "QUAD_X4/NONE", "port_revision": "0x00010906",
+    statuses = [item["status"] for item in results]
+    overall = ("FAIL" if "FAIL" in statuses else
+               "BLOCKED" if "BLOCKED" in statuses else "PASS")
+    report = {"date": datetime.date.today().isoformat(), "profile": "QUAD_X4/NONE",
+        "port_revision": "0x00010906",
         "scope": "HOST_SANITIZER_ARM_COMPILE_FIRMWARE_LINK", "commands": results,
         "wcet": "NOT_RUN", "hil": "NOT_RUN", "hardware_execution": "NOT_RUN",
         "independent_review": "NOT_RUN", "runtime_dispatch": "NOT_INSTALLED",
-        "status": "PASS" if all(r["exit_code"] == 0 for r in results) else "FAIL"}
+        "status": overall}
     (OUT/"validation.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-    return 0 if report["status"] == "PASS" else 1
+    return 0 if overall == "PASS" else (2 if overall == "BLOCKED" else 1)
 
 
 if __name__ == "__main__":
