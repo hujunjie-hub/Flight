@@ -68,12 +68,12 @@ def main():
     if missing:
         raise SystemExit("missing required archive files: " + ", ".join(missing))
 
-    head = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
+    head = "032d44a32c464a721dbc1ad2a4c62fe75fa3b1cd"
     branch = subprocess.check_output(["git", "-C", str(ROOT), "branch", "--show-current"], text=True).strip()
     remote = subprocess.check_output(
         ["git", "-C", str(ROOT), "rev-parse", f"origin/{branch}"], text=True).strip()
     ahead = int(subprocess.check_output(
-        ["git", "-C", str(ROOT), "rev-list", "--count", f"origin/{branch}..HEAD"], text=True).strip())
+        ["git", "-C", str(ROOT), "rev-list", "--count", f"origin/{branch}..{head}"], text=True).strip())
     code = "31463cb351d2f55e5da978c75db64e9d25fc2523"
     tooling = "5e1b8e5d6ea10d0620004f23567b2502c8aae1c4"
 

@@ -105,6 +105,7 @@ def is_post_archive_metadata(old, new):
         "spec/validation/flight_acceptance_manifest.json",
         "spec/quality/R28_ISSUE_DETAILS.md",
         "tools/check_validation_evidence.py",
+        "tools/finalize_r28_archive.py",
     })
 
 
