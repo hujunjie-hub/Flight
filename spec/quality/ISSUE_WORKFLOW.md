@@ -121,3 +121,13 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
   VERIFIED/CLOSED。
 - B01/B02（Spec/ABI EOL 重基线）、B03/B04（包版本/链接）、B05（MR-009）、
   B06（4,232 B 栈）、B07（H723 实机）在 R17 继续保留真实失败/BLOCKED 状态。
+
+## 13. R19 发布状态规则
+
+- 当前 `GITHUB_PUBLICATION = PENDING`；`spec/quality/ISSUE_REGISTER.md` 是正式本地登记，
+  `BLOCKER_BOARD.md` 只是派生视图。
+- 未授权时不得创建/声称 GitHub Issue 编号，不得把本地状态写成 CLOSED。
+- 授权后才可把本地条目同步到 GitHub Issues，并保持状态一致；GitHub 在线 Issue
+  是同步后的在线入口。
+- 独立复验前，本地状态最多 `FIXED_WAITING_RETEST`；`VERIFIED/CLOSED` 只能由
+  独立审查者确认。

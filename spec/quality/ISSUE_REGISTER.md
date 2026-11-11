@@ -1,6 +1,6 @@
 # Flight 问题登记清单入口
 
-本文件是 GitHub Issues 的使用入口，不复制维护一份静态 Issue 清单。**实时问题列表以 GitHub Issues 为准**。
+本文件是当前本地正式问题登记入口。`GITHUB_PUBLICATION = PENDING`：GitHub 发布未获授权前，以本文件为正式登记；获得明确授权后，GitHub Issues 才作为在线同步入口。不得虚构 GitHub Issue 编号，也不得出现本地 CLOSED、GitHub OPEN 的状态冲突。
 
 - [全部开放问题](https://github.com/hujunjie-hub/Flight/issues?q=is%3Aissue+is%3Aopen)
 - [开放的安全问题](https://github.com/hujunjie-hub/Flight/issues?q=is%3Aissue+is%3Aopen+label%3Akind%3Asafety)
@@ -22,7 +22,7 @@
 
 状态必须按 [Issue 工作流](ISSUE_WORKFLOW.md) 更新；关闭前必须完成 [Issue 关闭清单](ISSUE_CLOSURE_CHECKLIST.md)。
 
-GitHub label 尚未创建时，先在 Issue 正文填写 Quality Status 和 Severity，并在后续补齐标签；不能因标签缺失而省略问题登记。不得在本文件手工抄录开放问题，以免与 GitHub Issue 状态分叉。
+GitHub 发布前，本地状态最多到 FIXED_WAITING_RETEST；未经独立复验不得标记 VERIFIED/CLOSED。BLOCKER_BOARD.md 只是本文件的派生视图，不得维护独立状态。
 
 ## 本地正式临时登记（GitHub 发布待授权）
 
@@ -59,6 +59,9 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-25 | S0 | H723 栈水位/WCET/RTA/HIL/实机避障 NOT_RUN | 无硬件；B07 | NOT_RUN | BLOCKED |
 | FLIGHT-LOCAL-26 | S1 | `roll_map_to_position` 栈拷贝 32,840 B，Planner 产品化阻断 | R18 7554b41 逐轴原地滚动 + 差分测试 | m5_map_roll_inplace_differential；roll 40 B + axis 64 B | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-27 | S2 | ICD+M4 静态余量仅 232 B（48,920 / 49,152 B） | 未扩大预算；每次静态布局变更复算 | memory_budget PASS + WARN | OPEN / RISK |
+| FLIGHT-LOCAL-28 | S1 | S06-112 把所有 C API 拒绝都计为预期 fail-closed，可能掩盖合法样本意外拒绝 | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 状态码区分；次正规仅接受 NUMERIC | S06-112 140 legal/20 subnormal status=2 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-29 | S2 | R18 地图原地滚动报告 104 B，漏算 map_cell_at 24 B；真实 128 B | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 反汇编/.su 修正 | roll 40 + axis 64 + map_cell_at 24 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-30 | S2 | R18 Manifest 归档字段/外部 sidecar 未闭环 | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 archive script + external report | r19 archive report/sidecar | FIXED_WAITING_RETEST |
 
 历史 draft 01–20 保留在 `build/validation/issue_drafts/`；本表按根因去重，不删除
 任何失败记录。

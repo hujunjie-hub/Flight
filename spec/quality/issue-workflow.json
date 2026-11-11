@@ -229,5 +229,10 @@
     "independent_review",
     "spec09_updated_if_applicable",
     "evidence_archive"
-  ]
+  ],
+  "local_register": "spec/quality/ISSUE_REGISTER.md",
+  "blocker_view": "spec/quality/BLOCKER_BOARD.md",
+  "publication_status": "PENDING",
+  "authoritative_store_when_pending": "spec/quality/ISSUE_REGISTER.md",
+  "github_issue_number_policy": "Do not invent GitHub issue numbers before publication authorization."
 }

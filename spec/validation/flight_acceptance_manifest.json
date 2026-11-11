@@ -538,7 +538,7 @@
       "wrong_tail_underbound": 122,
       "status_at_code_baseline": "PASS",
       "oracle": "local sub-interval Bernstein controls; separate Bernstein/tail/consumer/total bounds; exact Fraction endpoints+stationary; old formula whole [1,u_tail] including stationary; true zero and constant acceleration states",
-      "local_run": "M5-06-R18-20261111",
+      "local_run": "M5-06-R19-20261111",
       "candidate_cases": 160,
       "legal_cases": 140,
       "axis_cases_checked": 420,
@@ -546,7 +546,10 @@
       "tail_checks": 420,
       "consumer_checks": 420,
       "total_checks": 420,
-      "states": 8
+      "states": 8,
+      "fail_closed_statuses": {
+        "2": 20
+      }
     },
     {
       "id": "S06-113",
@@ -664,12 +667,14 @@
   },
   "previous_commit_pass_inherited": false,
   "latest_local_validation": {
-    "run_id": "M5-06-R18-20261111",
-    "validated_code_commit": "7554b412aca0802838f6ee98d6465fd0ecf8c786",
-    "head": "7554b412aca0802838f6ee98d6465fd0ecf8c786",
-    "archive_head_sha": "274cc7c2b7f8808104e64d9e1eff0817a1f1fb50",
-    "archive_commit_sha": "274cc7c2b7f8808104e64d9e1eff0817a1f1fb50",
-    "archive_zip_sha256": "22036cf45acea6e6feffd464db03ec7286f6b717994d27897ed47971f6be04ea",
+    "run_id": "M5-06-R19-20261111",
+    "validated_code_commit": "8b112f0279735f4f9977f4314b81dccf203b14c3",
+    "head": "8b112f0279735f4f9977f4314b81dccf203b14c3",
+    "archive_head_sha": "EXTERNAL_ARCHIVE_REPORT",
+    "archive_commit_sha": "EXTERNAL_ARCHIVE_REPORT",
+    "archive_zip_sha256": "SEE_EXTERNAL_SHA256_SIDECAR",
+    "archive_external_report": "work/validation/archives/M5-06-R19-20261111.archive_report.json",
+    "archive_zip_size_bytes": null,
     "branch": "opt/stage-02-m5-06-safety-validator",
     "scope": "LOCAL_EXECUTION_ONLY",
     "github_ci": "NOT_RUN_FOR_THIS_HEAD",
@@ -685,9 +690,7 @@
     "blocked_items": [
       "scons_link"
     ],
-    "note": "validated_code_commit is the code commit; archive_head_sha and archive_commit_sha are the archive HEAD commit; archive_zip_sha256 is the ZIP SHA256 recorded outside the ZIP because a ZIP cannot contain its own hash.",
-    "archive_zip_size_bytes": 35739511,
-    "archive_external_report": "work/validation/archives/M5-06-R18-20261111.archive_report.json"
+    "note": "validated_code_commit is the code commit; archive HEAD and ZIP SHA256 are recorded in the external archive report and sidecar; the ZIP cannot contain its own hash."
   },
   "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
   "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112 three separate bounds)",
@@ -695,7 +698,7 @@
     "validator_worst_chain_bytes": 4248,
     "planner_worker_limit_bytes": 4096,
     "status": "EXCEEDED_BLOCKED",
-    "roll_map_to_position_bytes": 104,
+    "roll_map_to_position_bytes": 128,
     "roll_map_reference_stack_only_bytes": 32840,
     "chain": "validate 1112 + build_curve 2824 + interval_scale 112 (SP) + interval_mul 88 (SP) + interval_bounds 64 + interval_invalid 48",
     "record": "build/validation/analysis_p2.md"
@@ -704,7 +707,9 @@
   "issue_register": "spec/quality/ISSUE_REGISTER.md",
   "mr009_review_material": "spec/history/implementation/guidance/MR009_R17_REVIEW_MATERIAL.md",
   "resource_risks": {
-    "FLIGHT-LOCAL-26": "roll_map_to_position 40 B + roll_axis_inplace 64 B; legacy reference 32,840 B is Host-test only",
-    "FLIGHT-LOCAL-27": "ICD+M4 static 48,920 / 49,152 B; 232 B headroom, WARN; budget change needs approval"
+    "FLIGHT-LOCAL-26": "roll_map_to_position 40 B + roll_axis_inplace 64 B + map_cell_at 24 B = 128 B; legacy reference 32,840 B is Host-test only",
+    "FLIGHT-LOCAL-27": "ICD+M4 static 48,920 / 49,152 B; 232 B headroom, WARN; budget change needs approval",
+    "FLIGHT-LOCAL-29": "R18 reported 104 B; R19 objdump confirms map_cell_at 24 B, true 128 B",
+    "FLIGHT-LOCAL-30": "R19 external sidecar/report; no PENDING in formal manifest"
   }
 }

@@ -1,11 +1,11 @@
-# Flight M5-06 阻塞项视图（R17）
+# Flight M5-06 阻塞项视图（R19）
 
 本文件只做 Issue Register 的**派生视图**，不维护第二套状态。数据源：
 `spec/quality/ISSUE_REGISTER.md`。状态、严重度、责任方和复验结论以该登记为准。
 `GITHUB_PUBLICATION = PENDING`：Agent 无 GitHub 写权限，不虚构 Issue 编号或在线状态。
 
 当前基线：代码 `fa1de8f78c2e29eda741ac32985fd38a8c4ee5de`（R16），
-R17 工作基线 `4858927...`；RUN_ID `M5-06-R17-20261111`。
+R19 工作基线 `7554b41...`；RUN_ID `M5-06-R19-20261111`。
 所有命令均从仓库根目录执行；Host/SIL 结果不构成 H723 实机、HIL 或飞行放行。
 
 ---
@@ -183,11 +183,12 @@ R17 工作基线 `4858927...`；RUN_ID `M5-06-R17-20261111`。
 
 ### FLIGHT-LOCAL-26 roll_map_to_position 32,840 B
 
-- 状态：FIXED_WAITING_RETEST（R18 代码，等待独立复验）。
+- 状态：FIXED_WAITING_RETEST（R18/R19 代码，等待独立复验）。
 - 修复：逐轴原地滚动（x→y→z），不再复制 4096-cell 栈数组；`roll_map_to_position`
-  40 B + `roll_axis_inplace` 64 B，峰值 104 B（原 32,840 B）。
-- 差分测试：`m5_map_roll_inplace_differential` 覆盖 shift -16/-15/-8/-1/0/1/7/15/16、
-  单轴/组合轴、随机/边界，比较 cells/center/revision；Host PASS。
+  40 B + `roll_axis_inplace` 64 B + `map_cell_at` 24 B，峰值 **128 B**（原 32,840 B）。
+- R18 报告 104 B 漏算 `map_cell_at`；R19 反汇编确认调用，登记 FLIGHT-LOCAL-29。
+- 差分测试：`m5_map_roll_inplace_differential` 覆盖边界 shift，`m5_map_roll_inplace_random`
+  固定 seed 0x4D415052、1000 cases、0 failed，比较 4096 cells/center/revision；Host PASS。
 - 仍为 Host/SIL-only；不得据此宣称 H723 Planner 已产品化。
 
 ### FLIGHT-LOCAL-27 ICD+M4 余量 232 B
@@ -196,6 +197,21 @@ R17 工作基线 `4858927...`；RUN_ID `M5-06-R17-20261111`。
 - 当前 48 KiB 上限，使用 48,920 B，余量 232 B；`check_memory_budget.py` 输出 WARN。
 - 任何 ICD/FMS/M4 静态布局变更必须重跑预算；不得擅自扩大 48 KiB 上限。
 - 解除条件：预算复核/审批；当前不阻断 Host/SIL 算法测试，但属未来产品化风险。
+
+### FLIGHT-LOCAL-28 S06-112 拒绝分类
+
+- S1；R19 代码提交 `8b112f0279735f4f9977f4314b81dccf203b14c3`。
+- 正常样本必须计算，只有 subnormal 预期拒绝（status=2/3 NUMERIC）；意外拒绝计 FAIL，
+  不计 fail_closed_cases。
+
+### FLIGHT-LOCAL-29 地图栈漏算
+
+- S2；R18 报 104 B，R19 修正为 128 B（+map_cell_at 24 B）；已完成 .su/objdump 核对。
+
+### FLIGHT-LOCAL-30 归档字段
+
+- S2；R19 archive script 生成外部 sidecar/report；正式 Manifest 不再用 PENDING 冒充完整值，
+  ZIP 内不保存自身哈希。
 
 ## 派生规则
 
