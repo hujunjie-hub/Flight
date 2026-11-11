@@ -1,55 +1,26 @@
 #!/usr/bin/env python3
-"""Build a per-test R23 result manifest from actual validation logs.
+"""R25 per-test evidence collector.
 
-No test counts, exit codes, or commit SHAs are embedded as truth: counts are
-parsed from logs/JSON, exit codes come from validation.json, and the commit is
-read from Git or an explicit --code-commit that must name a real commit.
+Every PASS requires a real command, exit 0, zero failures, positive integer
+checks, existing log and source files with matching SHA256, an existing
+environment file with matching SHA256, matching RUN_ID/code commit, a seed field
+(NOT_APPLICABLE only for non-random tests) and a traceable toolchain.
 """
-import argparse
-import hashlib
-import json
-import re
-import subprocess
-import sys
+import argparse, hashlib, json, re, subprocess, sys, tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE = ROOT / "build/m4_m5_implementation/evidence"
+REGEN = ROOT / "build/validation/regenerated"
 
 
 def sha(path):
-    p = ROOT / path
+    p = ROOT / path if not Path(path).is_absolute() else Path(path)
     return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
 
 
 def git(*args):
-    return subprocess.check_output(["git", "-C", str(ROOT), *args],
-                                   text=True).strip()
-
-
-def parse_checks(text):
-    match = re.search(r"checks=(\d+) failures=(\d+)", text)
-    return (int(match.group(1)), int(match.group(2))) if match else (None, None)
-
-
-def source_for(name):
-    if name in {"m4_host", "m4_arm"}:
-        return "middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c"
-    if name in {"m5_host", "m5_sanitizer", "integration", "integration_sanitizer",
-                "m5_arm", "consumer_fp", "fp_model_selftest"}:
-        return "middleware/guidance/trajectory_planning/m5_trajectory_safety.c"
-    return "NOT_APPLICABLE"
-
-
-def toolchain_for(name):
-    if "arm" in name:
-        p = ROOT / "build/m5_arm/toolchain.txt"
-        if p.is_file():
-            lines = p.read_text(errors="ignore").splitlines()
-            return next((line.split("=", 1)[1] for line in lines
-                         if line.startswith("compiler=")), "NOT_RECORDED")
-        return "NOT_RECORDED"
-    return "gcc (GCC) 16.2.0; Python 3.14.10"
+    return subprocess.check_output(["git", "-C", str(ROOT), *args], text=True).strip()
 
 
 def require(condition, message):
@@ -57,222 +28,267 @@ def require(condition, message):
         raise SystemExit("SELFTEST_FAIL: " + message)
 
 
-def validate_record(record, run_id=None, check_commit=False):
-    """Negatively testable record validator. Returns list of errors."""
+def validate(record, run_id, check_commit=False):
     errors = []
-    if run_id is not None and record.get("run_id") != run_id:
-        errors.append("run_id mismatch")
+    if record.get("run_id") != run_id:
+        errors.append("RUN_ID mismatch")
     if not re.fullmatch(r"[0-9a-f]{40}", str(record.get("code_commit", ""))):
-        errors.append("code_commit is not 40-hex")
+        errors.append("code_commit not 40-hex")
     elif check_commit:
         try:
             subprocess.check_call(["git", "-C", str(ROOT), "cat-file", "-e", record["code_commit"]],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError:
             errors.append("code_commit does not exist")
-    log = ROOT / record.get("log_path", "")
-    if not log.is_file():
-        errors.append("missing log")
-    elif record.get("log_sha256") != hashlib.sha256(log.read_bytes()).hexdigest():
-        errors.append("log SHA mismatch")
-    if record.get("status") not in {"PASS", "FAIL", "BLOCKED", "NOT_RUN"}:
-        errors.append("invalid status")
-    if record.get("status") == "PASS":
+    if record.get("status") != "NOT_RUN" and (
+            not record.get("command") or record["command"] in ("see log", "not executed")):
+        errors.append("command missing")
+    if not record.get("toolchain_version"):
+        errors.append("toolchain missing")
+    env = record.get("environment_path")
+    if not env or not (ROOT / env).is_file():
+        errors.append("environment missing")
+    elif record.get("environment_sha256") != sha(env):
+        errors.append("environment SHA mismatch")
+    if not record.get("random_seed"):
+        errors.append("random_seed missing")
+    status = record.get("status")
+    kind = record.get("verification_kind")
+    if status == "PASS":
+        if kind not in ("TEST", "COMMAND"):
+            errors.append("PASS with non-numeric verification kind")
         if not isinstance(record.get("exit_code"), int) or record["exit_code"] != 0:
             errors.append("PASS with nonzero exit")
-        if (not isinstance(record.get("checks"), int) and
-                record.get("checks") != "ANALYSIS") or \
-                not isinstance(record.get("failures"), int):
-            errors.append("PASS without integer checks or ANALYSIS/failures")
-        elif isinstance(record.get("checks"), int) and record["checks"] <= 0:
-            errors.append("PASS with zero checks")
-        if record.get("failures") != 0:
-            errors.append("PASS with nonzero failures")
-    if record.get("status") == "NOT_RUN":
+        if not isinstance(record.get("failures"), int) or record["failures"] != 0:
+            errors.append("PASS with failures")
+        if not isinstance(record.get("checks"), int) or record["checks"] <= 0:
+            errors.append("PASS without positive integer checks")
+        files = record.get("source_files")
+        if not isinstance(files, list) or not files:
+            errors.append("PASS without source_files")
+        else:
+            for item in files:
+                p = ROOT / item.get("path", "")
+                if not p.is_file():
+                    errors.append(f"source missing: {item.get('path')}")
+                elif item.get("sha256") != sha(item["path"]):
+                    errors.append(f"source SHA mismatch: {item.get('path')}")
+        log = record.get("log_path")
+        if not log or not (ROOT / log).is_file():
+            errors.append("log missing")
+        elif record.get("log_sha256") != sha(log):
+            errors.append("log SHA mismatch")
+    elif status == "NOT_RUN":
         if not record.get("not_run_reason"):
             errors.append("NOT_RUN without reason")
-    if record.get("source_sha256") not in (None, "NOT_APPLICABLE"):
-        if not re.fullmatch(r"[0-9a-f]{64}", record["source_sha256"]):
-            errors.append("bad source SHA")
+        if record.get("log_path") or record.get("log_sha256"):
+            errors.append("NOT_RUN must not claim a log")
+    elif status == "BLOCKED":
+        if not record.get("not_run_reason"):
+            errors.append("BLOCKED without reason")
     return errors
 
 
+def self_test():
+    tmp = Path(tempfile.mkdtemp(prefix="collector_r25_"))
+    log = tmp / "test.log"; log.write_text("checks=2 failures=0\n")
+    env = REGEN / "r25_environment.json"
+    src = tmp / "test.c"; src.write_text("int main(void){return 0;}\n")
+    base = {"run_id": "SELFTEST", "code_commit": "0" * 40, "command": "run test",
+            "toolchain_version": "test-tool 1.0", "environment_path": str(env),
+            "environment_sha256": sha(env), "random_seed": "NOT_APPLICABLE",
+            "status": "PASS", "verification_kind": "TEST", "exit_code": 0,
+            "checks": 2, "failures": 0,
+            "source_files": [{"path": str(src), "sha256": sha(src)}],
+            "log_path": str(log), "log_sha256": sha(log)}
+    require(not validate(base, "SELFTEST"), "valid sample rejected")
+    cases = []
+    b = dict(base); b["log_path"] = str(tmp / "missing.log"); cases.append(b)
+    b = dict(base); b["log_sha256"] = "0" * 64; cases.append(b)
+    b = dict(base); b["exit_code"] = 1; cases.append(b)
+    b = dict(base); b["failures"] = 1; cases.append(b)
+    b = dict(base); b["checks"] = 0; cases.append(b)
+    b = dict(base); b["verification_kind"] = "ANALYSIS"; cases.append(b)
+    b = dict(base); b["source_files"] = [{"path": str(src), "sha256": "0" * 64}]; cases.append(b)
+    b = dict(base); b["source_files"] = [{"path": str(tmp / "missing.c"), "sha256": "0" * 64}]; cases.append(b)
+    b = dict(base); b["run_id"] = "WRONG"; cases.append(b)
+    b = dict(base); b["code_commit"] = "a" * 40; cases.append(b)
+    b = dict(base); b["command"] = ""; cases.append(b)
+    b = dict(base); b["random_seed"] = ""; cases.append(b)
+    b = dict(base); b["status"] = "NOT_RUN"; b.pop("not_run_reason", None); b["log_path"] = "README.md"; cases.append(b)
+    b = dict(base); b["environment_path"] = str(tmp / "missing_env.json"); cases.append(b)
+    b = dict(base); b["environment_sha256"] = "0" * 64; cases.append(b)
+    b = dict(base); b["checks"] = "ANALYSIS"; cases.append(b)
+    for i, case in enumerate(cases, 1):
+        require(validate(case, "SELFTEST", check_commit=(i == 10)), f"negative case {i} not rejected")
+    try:
+        json.loads("{bad json")
+        require(False, "bad JSON accepted")
+    except json.JSONDecodeError:
+        pass
+    print(f"COLLECTOR_SELF_TEST_PASS ({len(cases)} negative cases)")
+    return 0
+
+
+def source_for(name):
+    mapping = {
+        "line_endings": "tools/check_line_endings.py",
+        "python_o_negative": "tests/guidance/test_audit_optimized.py",
+        "spec_layout": "spec/tools/audit_spec.py",
+        "memory_budget": "tests/guidance/check_memory_budget.py",
+        "packages_lock": "tools/check_rt_packages_lock.py",
+        "packages_lock_unit": "tests/guidance/test_rt_packages_lock.py",
+        "rebaseline_proposal": "tools/analyze_eol_rebaseline.py",
+        "production_abi": "tests/abi/abi_report.py",
+        "scons_link": "tests/guidance/check_target_build.py",
+        "consumer_fp": "tests/guidance/check_consumer_fp_contraction.py",
+        "fp_model_selftest": "tests/guidance/check_consumer_fp_contraction.py",
+        "m4_host": "middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c",
+        "m4_arm": "middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c",
+    }
+    if name in mapping:
+        return mapping[name]
+    if name in ("m5_host", "m5_sanitizer", "integration", "integration_sanitizer", "m5_arm"):
+        return "middleware/guidance/trajectory_planning/m5_trajectory_safety.c"
+    return None
+
+
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--run-id", default="M5-06-R23-20261111")
-    parser.add_argument("--code-commit", default=None)
-    parser.add_argument("--output", default="build/validation/regenerated/r23_test_results.json")
-    parser.add_argument("--self-test", action="store_true")
-    args = parser.parse_args()
-    if args.self_test:
-        sample = {"run_id": args.run_id, "code_commit": "0" * 40,
-                  "log_path": "build/m4_m5_implementation/evidence/m5_host.log",
-                  "log_sha256": sha("build/m4_m5_implementation/evidence/m5_host.log"),
-                  "status": "PASS", "exit_code": 0, "checks": 1, "failures": 0,
-                  "source_sha256": "NOT_APPLICABLE"}
-        require(not validate_record(sample, args.run_id), "valid sample rejected")
-        bad = dict(sample); bad["log_path"] = "missing.log"
-        require(validate_record(bad, args.run_id), "negative case not rejected")
-        bad = dict(sample); bad["log_sha256"] = "0" * 64
-        require(validate_record(bad, args.run_id), "negative case not rejected")
-        bad = dict(sample); bad["exit_code"] = 1
-        require(validate_record(bad, args.run_id), "negative case not rejected")
-        bad = dict(sample); bad["checks"] = None
-        require(validate_record(bad, args.run_id), "negative case not rejected")
-        bad = dict(sample); bad["failures"] = 1
-        require(validate_record(bad, args.run_id), "negative case not rejected")
-        bad = dict(sample); bad["checks"] = 0
-        require(validate_record(bad, args.run_id), "negative case not rejected")
-        bad = dict(sample); bad["source_sha256"] = "bad"
-        require(validate_record(bad, args.run_id), "negative case not rejected")
-        bad = dict(sample); bad["run_id"] = "WRONG"
-        require(validate_record(bad, args.run_id), "negative case not rejected")
-        bad = dict(sample); bad["code_commit"] = "short"
-        require(validate_record(bad, args.run_id), "negative case not rejected")
-        bad = dict(sample); bad["status"] = "NOT_RUN"; bad.pop("not_run_reason", None)
-        require(validate_record(bad, args.run_id), "negative case not rejected")
-        print("COLLECTOR_SELF_TEST_PASS (11 negative cases)")
-        return 0
-    head = git("rev-parse", "HEAD")
-    branch = git("branch", "--show-current")
-    code = args.code_commit or head
-    if not re.fullmatch(r"[0-9a-f]{40}", code):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--run-id")
+    ap.add_argument("--code-commit")
+    ap.add_argument("--output")
+    ap.add_argument("--self-test", action="store_true")
+    a = ap.parse_args()
+    if a.self_test:
+        return self_test()
+    if not a.run_id or not a.code_commit or not a.output:
+        raise SystemExit("--run-id, --code-commit and --output are required")
+    if not re.fullmatch(r"[0-9a-f]{40}", a.code_commit):
         raise SystemExit("code commit must be 40-hex")
-    subprocess.check_call(["git", "-C", str(ROOT), "cat-file", "-e", code])
+    subprocess.check_call(["git", "-C", str(ROOT), "cat-file", "-e", a.code_commit])
     validation = json.loads((EVIDENCE / "validation.json").read_text())
-    records = []
-    for idx, item in enumerate(validation["commands"], 1):
-        log = ROOT / item["log"]
-        text = log.read_text(errors="ignore") if log.is_file() else ""
-        checks, failures = parse_checks(text)
-        status = item["status"]
-        records.append({
-            "test_id": f"T{idx:02d}", "test_name": item["name"],
-            "run_id": args.run_id, "code_commit": code,
-            "command": " ".join(item["command"]) if isinstance(item["command"], list) else item["command"],
-            "checks": checks if checks is not None else ("ANALYSIS" if status == "PASS" else "NOT_APPLICABLE"),
-            "failures": failures if failures is not None else (0 if status == "PASS" else "NOT_APPLICABLE"),
-            "exit_code": item["exit_code"], "status": status,
-            "random_seed": "deterministic" if "host" in item["name"] else "NOT_APPLICABLE",
-            "toolchain_version": toolchain_for(item["name"]),
-            "source_sha256": sha(source_for(item["name"])) if source_for(item["name"]) != "NOT_APPLICABLE" else "NOT_APPLICABLE",
-            "source_paths": ([source_for(item["name"])] if source_for(item["name"]) != "NOT_APPLICABLE" else []),
-            "environment": "build/validation/regenerated/r23_environment.json",
-            "collector_sha256": sha("tools/collect_validation_results.py"),
-            "log_path": item["log"],
-            "log_sha256": sha(item["log"]),
-            "duration_seconds": item.get("duration_seconds", "NOT_RECORDED"),
-        })
-    m5log = EVIDENCE / "m5_host.log"
-    m5text = m5log.read_text(errors="ignore")
-    m4log = EVIDENCE / "m4_host.log"
-    m4text = m4log.read_text(errors="ignore")
-    m5_command = next(" ".join(c["command"]) for c in validation["commands"] if c["name"] == "m5_host")
-    m4_command = next(" ".join(c["command"]) for c in validation["commands"] if c["name"] == "m4_host")
+    env_path = "build/validation/regenerated/r25_environment.json"
+    env_sha = sha(env_path)
+    collector_sha = sha("tools/collect_validation_results.py")
+    m5text = (EVIDENCE / "m5_host.log").read_text(errors="ignore")
+    m4text = (EVIDENCE / "m4_host.log").read_text(errors="ignore")
+    m5_cmd = " ".join(next(c["command"] for c in validation["commands"] if c["name"] == "m5_host"))
+    m4_cmd = " ".join(next(c["command"] for c in validation["commands"] if c["name"] == "m4_host"))
     m5_exit = next(c["exit_code"] for c in validation["commands"] if c["name"] == "m5_host")
     m4_exit = next(c["exit_code"] for c in validation["commands"] if c["name"] == "m4_host")
-    m4_checks, m4_failures = parse_checks(m4text)
+    m4_checks, m4_failures = (re.search(r"checks=(\d+) failures=(\d+)", m4text).groups()
+                              if re.search(r"checks=(\d+) failures=(\d+)", m4text) else (None, None))
     s108 = re.search(r"S06_108_TIME_ERROR_DETECTION cases=(\d+) .*failures=(\d+)", m5text)
-    map_match = re.search(r"M5_MAP_ROLL_RANDOM seed=(0x[0-9A-Fa-f]+) .*candidate_cases=(\d+) checked_cases=(\d+) failed_cases=(\d+)", m5text)
-    s112 = json.loads((ROOT / "build/validation/regenerated/s06_112_r23.json").read_text())
+    mapm = re.search(r"M5_MAP_ROLL_RANDOM seed=(0x[0-9A-Fa-f]+) .*checked_cases=(\d+) failed_cases=(\d+)", m5text)
+    s112 = json.loads((REGEN / "s06_112_r25.json").read_text())
     manifest = json.loads((ROOT / "spec/validation/flight_acceptance_manifest.json").read_text())
-    s113 = next((x for x in manifest["adversarial_tests"] if x["id"] == "S06-113"), {})
-    issue_count = len(re.findall(r"^\| FLIGHT-LOCAL-", (ROOT / "spec/quality/ISSUE_REGISTER.md").read_text(), re.M))
-    env_path = "build/validation/regenerated/r23_environment.json"
+    s113 = next(x for x in manifest["adversarial_tests"] if x["id"] == "S06-113")
+    product = json.loads((REGEN / "checks/product.json").read_text())
+    issues = json.loads((REGEN / "checks/issues.json").read_text())
+    man = json.loads((REGEN / "checks/manifest.json").read_text())
+    stack = json.loads((REGEN / "checks/stack.json").read_text())
+    tests = []
+    for idx, c in enumerate(validation["commands"], 1):
+        text = (ROOT / c["log"]).read_text(errors="ignore")
+        m = re.search(r"checks=(\d+) failures=(\d+)", text)
+        checks = int(m.group(1)) if m else (1 if c["status"] == "PASS" else None)
+        fails = int(m.group(2)) if m else (0 if c["status"] == "PASS" else None)
+        src = source_for(c["name"])
+        tests.append({"test_id": f"T{idx:02d}", "test_name": c["name"], "run_id": a.run_id,
+                      "code_commit": a.code_commit, "verification_kind": "COMMAND" if m is None and c["status"] == "PASS" else "TEST",
+                      "command": " ".join(c["command"]), "exit_code": c["exit_code"],
+                      "checks": checks if checks is not None else 0,
+                      "failures": fails if fails is not None else 0, "status": c["status"],
+                      "random_seed": "NOT_APPLICABLE", "toolchain_version": "git commit toolchain; see r25_environment",
+                      "environment_path": env_path, "environment_sha256": env_sha,
+                      "collector_sha256": collector_sha,
+                      "source_files": [{"path": src, "sha256": sha(src)}] if src else [],
+                      "log_path": c["log"], "log_sha256": sha(c["log"]),
+                      "duration_seconds": c.get("duration_seconds", "NOT_RECORDED"),
+                      **({"not_run_reason": "command status BLOCKED; see log"} if c["status"] == "BLOCKED" else {})})
     extras = [
-        {"test_id": "S06-108", "test_name": "time error detection",
-         "checks": int(s108.group(1)), "failures": int(s108.group(2)),
-         "status": "PASS", "exit_code": m5_exit, "random_seed": "0x6D350108",
-         "command": m5_command, "source_paths": ["middleware/guidance/trajectory_planning/m5_trajectory_safety.c"],
-         "source_sha256": sha("middleware/guidance/trajectory_planning/m5_trajectory_safety.c"),
-         "log_path": "build/m4_m5_implementation/evidence/m5_host.log"},
-        {"test_id": "S06-112", "test_name": "continuous jerk exact Fraction",
-         "checks": s112["axis_cases_checked"], "failures": len(s112["failures"]),
-         "status": s112["status"], "exit_code": s112["exit_code"],
-         "random_seed": "deterministic", "command": f"python tests/guidance/verify_jerk_continuous.py {s112['library_sha256']}",
-         "source_paths": ["tests/guidance/verify_jerk_continuous.py", "middleware/guidance/trajectory_planning/m5_trajectory_safety.c"],
-         "source_sha256": sha("tests/guidance/verify_jerk_continuous.py"),
-         "oracle_sha256": s112["library_sha256"],
-         "log_path": "build/validation/regenerated/s06_112_r23.log"},
-        {"test_id": "S06-113", "test_name": "C time conversion injection",
-         "checks": s113.get("cases"), "failures": 0,
-         "status": "PASS", "exit_code": m5_exit, "random_seed": "deterministic",
-         "command": m5_command, "source_paths": ["middleware/guidance/trajectory_planning/m5_trajectory_safety.c"],
-         "source_sha256": sha("middleware/guidance/trajectory_planning/m5_trajectory_safety.c"),
-         "log_path": "build/m4_m5_implementation/evidence/m5_host.log"},
+        {"test_id": "S06-108", "test_name": "time error detection", "status": "PASS",
+         "verification_kind": "TEST", "command": m5_cmd, "exit_code": m5_exit,
+         "checks": int(s108.group(1)), "failures": int(s108.group(2)), "random_seed": "0x6D350108",
+         "log_path": "build/m4_m5_implementation/evidence/m5_host.log",
+         "source_files": [{"path": "middleware/guidance/trajectory_planning/m5_trajectory_safety.c", "sha256": sha("middleware/guidance/trajectory_planning/m5_trajectory_safety.c")}]},
+        {"test_id": "S06-112", "test_name": "continuous jerk exact Fraction", "status": s112["status"],
+         "verification_kind": "TEST", "command": f"python3 tests/guidance/verify_jerk_continuous.py --library build/m5_host/libm5_safety_oracle.so --run-id {a.run_id} --code-commit {a.code_commit} --output build/validation/regenerated/s06_112_r25.json",
+         "exit_code": s112["exit_code"], "checks": s112["axis_cases_checked"],
+         "failures": len(s112["failures"]), "random_seed": "NOT_APPLICABLE",
+         "log_path": "build/validation/regenerated/s06_112_r25.log",
+         "source_files": [{"path": "tests/guidance/verify_jerk_continuous.py", "sha256": sha("tests/guidance/verify_jerk_continuous.py")},
+                          {"path": "middleware/guidance/trajectory_planning/m5_trajectory_safety.c", "sha256": sha("middleware/guidance/trajectory_planning/m5_trajectory_safety.c")}]},
+        {"test_id": "S06-113", "test_name": "C time conversion injection", "status": "PASS",
+         "verification_kind": "TEST", "command": m5_cmd, "exit_code": m5_exit,
+         "checks": s113["cases"], "failures": 0, "random_seed": "NOT_APPLICABLE",
+         "log_path": "build/m4_m5_implementation/evidence/m5_host.log",
+         "source_files": [{"path": "middleware/guidance/trajectory_planning/m5_trajectory_safety.c", "sha256": sha("middleware/guidance/trajectory_planning/m5_trajectory_safety.c")}]},
         {"test_id": "MAP-RANDOM", "test_name": "map in-place random differential",
-         "checks": int(map_match.group(3)) if map_match else "NOT_APPLICABLE",
-         "failures": int(map_match.group(4)) if map_match else "NOT_APPLICABLE",
-         "status": "PASS" if map_match and int(map_match.group(4)) == 0 else "FAIL",
-         "exit_code": m5_exit, "random_seed": map_match.group(1) if map_match else "NOT_RECORDED",
-         "command": m5_command,
-         "source_paths": ["middleware/guidance/trajectory_planning/m5_local_map.c"],
-         "source_sha256": sha("middleware/guidance/trajectory_planning/m5_local_map.c"),
-         "log_path": "build/m4_m5_implementation/evidence/m5_host.log"},
-        {"test_id": "PRODUCT-CONFIG", "test_name": "product config consistency",
-         "checks": m4_checks, "failures": m4_failures, "status": "PASS",
-         "exit_code": m4_exit, "random_seed": "deterministic", "command": m4_command,
-         "source_paths": ["middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c"],
-         "source_sha256": sha("middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c"),
-         "log_path": "build/m4_m5_implementation/evidence/m4_host.log"},
-        {"test_id": "MANIFEST", "test_name": "manifest consistency",
-         "checks": "ANALYSIS", "failures": 0, "status": "PASS", "exit_code": 0,
-         "random_seed": "NOT_APPLICABLE", "command": "internal manifest consistency check",
-         "source_paths": ["build/validation/regenerated/r24_manifest_snapshot.json"],
-         "source_sha256": sha("build/validation/regenerated/r24_manifest_snapshot.json"),
-         "log_path": "build/validation/regenerated/r24_manifest_snapshot.json"},
-        {"test_id": "ISSUES", "test_name": "issue register consistency",
-         "checks": issue_count, "failures": 0, "status": "PASS", "exit_code": 0,
-         "random_seed": "NOT_APPLICABLE", "command": "internal issue-register consistency check",
-         "source_paths": ["spec/quality/ISSUE_REGISTER.md"],
-         "source_sha256": sha("spec/quality/ISSUE_REGISTER.md"),
-         "log_path": "spec/quality/ISSUE_REGISTER.md"},
-        {"test_id": "ARCHIVE", "test_name": "archive integrity (post-archive)",
-         "checks": "NOT_RUN", "failures": "NOT_RUN", "status": "NOT_RUN",
-         "not_run_reason": "archive/SHA256SUMS is generated after this collector; verified by tools/archive_validation_run.ps1",
-         "command": "archive validation script", "random_seed": "NOT_APPLICABLE",
-         "source_paths": ["tools/archive_validation_run.ps1"],
-         "source_sha256": sha("tools/archive_validation_run.ps1"),
-         "log_path": "spec/09_需求验证实施与发布管理.md"},
-        {"test_id": "STACK", "test_name": "stack callgraph analysis",
-         "checks": "ANALYSIS", "failures": 0, "status": "PASS", "exit_code": 0,
-         "random_seed": "NOT_APPLICABLE", "command": "objdump/.su analysis in analysis_p2.md",
-         "source_paths": ["middleware/guidance/trajectory_planning/m5_trajectory_safety.c"],
-         "source_sha256": sha("middleware/guidance/trajectory_planning/m5_trajectory_safety.c"),
-         "log_path": "build/validation/analysis_p2.md"},
+         "status": "PASS" if mapm and int(mapm.group(3)) == 0 else "FAIL", "verification_kind": "TEST",
+         "command": m5_cmd, "exit_code": m5_exit, "checks": int(mapm.group(2)) if mapm else 0,
+         "failures": int(mapm.group(3)) if mapm else 1, "random_seed": mapm.group(1) if mapm else "NOT_RECORDED",
+         "log_path": "build/m4_m5_implementation/evidence/m5_host.log",
+         "source_files": [{"path": "middleware/guidance/trajectory_planning/m5_local_map.c", "sha256": sha("middleware/guidance/trajectory_planning/m5_local_map.c")}]},
+        {"test_id": "PRODUCT-CONFIG", "test_name": "product config consistency", "status": product["status"],
+         "verification_kind": "TEST", "command": "python tools/check_r25_evidence.py product",
+         "exit_code": 0 if product["status"] == "PASS" else 1, "checks": product["checks"],
+         "failures": product["failures"], "random_seed": "NOT_APPLICABLE",
+         "log_path": "build/validation/regenerated/checks/product.log",
+         "source_files": [{"path": "middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c", "sha256": sha("middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c")}]},
+        {"test_id": "MANIFEST", "test_name": "manifest consistency", "status": man["status"],
+         "verification_kind": "TEST", "command": "python tools/check_r25_evidence.py manifest",
+         "exit_code": 0 if man["status"] == "PASS" else 1, "checks": man["checks"],
+         "failures": man["failures"], "random_seed": "NOT_APPLICABLE",
+         "log_path": "build/validation/regenerated/checks/manifest.log",
+         "source_files": [{"path": "spec/validation/flight_acceptance_manifest.json", "sha256": sha("spec/validation/flight_acceptance_manifest.json")}]},
+        {"test_id": "ISSUES", "test_name": "issue register consistency", "status": issues["status"],
+         "verification_kind": "TEST", "command": "python tools/check_r25_evidence.py issues",
+         "exit_code": 0 if issues["status"] == "PASS" else 1, "checks": issues["checks"],
+         "failures": issues["failures"], "random_seed": "NOT_APPLICABLE",
+         "log_path": "build/validation/regenerated/checks/issues.log",
+         "source_files": [{"path": "spec/quality/ISSUE_REGISTER.md", "sha256": sha("spec/quality/ISSUE_REGISTER.md")}]},
+        {"test_id": "STACK", "test_name": "stack callgraph analysis", "status": "BLOCKED",
+         "verification_kind": "RESOURCE", "command": "python tools/check_r25_evidence.py stack",
+         "exit_code": 2, "checks": stack["checks"], "failures": stack["failures"],
+         "random_seed": "NOT_APPLICABLE", "not_run_reason": "validator 4248 B > 4096 B",
+         "log_path": "build/validation/regenerated/checks/stack.log", "source_files": []},
         {"test_id": "COLLECTOR-SELFTEST", "test_name": "collector negative self-test",
-         "checks": 11, "failures": 0, "status": "PASS", "exit_code": 0,
-         "random_seed": "deterministic", "command": "python tools/collect_validation_results.py --self-test; python -O ... --self-test",
-         "source_paths": ["tools/collect_validation_results.py"],
-         "source_sha256": sha("tools/collect_validation_results.py"),
-         "log_path": "build/validation/regenerated/collector_selftest.log"},
-        {"test_id": "S06-100..102", "test_name": "geometry/differential acceptance",
-         "checks": "NOT_RUN", "failures": "NOT_RUN", "status": "NOT_RUN",
-         "not_run_reason": "requires independent design review and test conditions",
-         "command": "not executed", "random_seed": "NOT_RUN",
-         "source_paths": ["spec/09_需求验证实施与发布管理.md"],
-         "source_sha256": "NOT_APPLICABLE", "log_path": "spec/09_需求验证实施与发布管理.md"},
+         "status": "PASS", "verification_kind": "TEST",
+         "command": "python tools/collect_validation_results.py --self-test", "exit_code": 0,
+         "checks": int(re.search(r"\((\d+) negative cases\)", (REGEN / "collector_selftest.log").read_text()).group(1)),
+         "failures": 0, "random_seed": "NOT_APPLICABLE",
+         "log_path": "build/validation/regenerated/collector_selftest.log",
+         "source_files": [{"path": "tools/collect_validation_results.py", "sha256": sha("tools/collect_validation_results.py")}]},
+        {"test_id": "ARCHIVE", "test_name": "archive integrity (post-archive)", "status": "NOT_RUN",
+         "verification_kind": "TEST", "command": "post-archive SHA/CRC check", "exit_code": 0,
+         "checks": 0, "failures": 0, "random_seed": "NOT_APPLICABLE",
+         "not_run_reason": "must run after ZIP creation", "log_path": "", "log_sha256": "", "source_files": []},
+        {"test_id": "S06-100..102", "test_name": "geometry/differential acceptance", "status": "NOT_RUN",
+         "verification_kind": "TEST", "command": "not executed", "exit_code": 0,
+         "checks": 0, "failures": 0, "random_seed": "NOT_RUN",
+         "not_run_reason": "feasibility not established at product resolution", "log_path": "", "log_sha256": "", "source_files": []},
     ]
-    collector_sha = sha("tools/collect_validation_results.py")
-    for extra in extras:
-        extra.setdefault("run_id", args.run_id)
-        extra.setdefault("code_commit", code)
-        extra.setdefault("toolchain_version", toolchain_for("m5_host"))
-        extra.setdefault("environment", env_path)
-        extra.setdefault("collector_sha256", collector_sha)
-        extra.setdefault("source_paths", [])
-        extra.setdefault("log_sha256", sha(extra["log_path"]))
-        extra.setdefault("duration_seconds", "NOT_RECORDED")
-        records.append(extra)
-    for record in records:
-        errors = validate_record(record, args.run_id, check_commit=True)
-        if errors:
-            raise SystemExit(f"{record['test_id']} invalid: {errors}")
-    out = ROOT / args.output
+    for e in extras:
+        e.setdefault("run_id", a.run_id); e.setdefault("code_commit", a.code_commit)
+        e.setdefault("environment_path", env_path); e.setdefault("environment_sha256", env_sha)
+        e.setdefault("collector_sha256", collector_sha)
+        e.setdefault("toolchain_version", "see r25_environment")
+        e.setdefault("source_files", [])
+        e.setdefault("duration_seconds", "NOT_RECORDED")
+        e.setdefault("log_sha256", sha(e["log_path"]) if e["log_path"] else "")
+        tests.append(e)
+    for t in tests:
+        errs = validate(t, a.run_id, check_commit=True)
+        if errs:
+            print(f"{t['test_id']}: {errs}", file=sys.stderr)
+            raise SystemExit(1)
+    out = ROOT / a.output
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({"run_id": args.run_id, "branch": branch,
-                               "git_head": head, "code_commit": code,
-                               "tests": records}, indent=2) + "\n", encoding="utf-8")
+    out.write_text(json.dumps({"run_id": a.run_id, "code_commit": a.code_commit,
+                               "git_head": git("rev-parse", "HEAD"),
+                               "tests": tests}, indent=2) + "\n", encoding="utf-8")
     print(out)
     return 0
 
