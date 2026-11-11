@@ -7,7 +7,7 @@
 输入基线：R22 代码 `9e4f5eff5b7140815c09e0151e7f43ced128772f`；
 R22 归档 HEAD `8fcd4eacda93bf953882f5bb079e891839a1f3da`。
 R23 validated code `e89cb7d94e6c992c8dfa71c3cb565ae4c5f6248a`；
-Remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；本地领先 63 commits；
+Remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；本地领先 68 commits；
 RUN_ID `M5-06-R23-20261111`。
 所有命令均从仓库根目录执行；Host/SIL 结果不构成 H723 实机、HIL 或飞行放行。
 
