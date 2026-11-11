@@ -43,6 +43,21 @@ TINY = ([0.0, 0.0, -5.0], [0.0, 0.0, 0.0], [1.0e-18, -1.0e-18, 2.0e-18],
 HUGE = ([0.0, 0.0, -5.0], [0.0, 0.0, 0.0], [1.0e15, -1.0e15, 5.0e14],
         [1.0e13, -1.0e13, -5.0], [0.0, 0.0, 0.0],
         [-1.0e15, 1.0e15, -5.0e14])
+R14B_EXPECTED_UNDERBOUND = {
+    (20000, 0.0, 1.0, 0): ('633318622101522/70368727400449',
+                           '1266637848182802/70368727400449'),
+    (20000, 0.25, 1.0, 0): ('1899957451751491/562949819203592',
+                            '1266637848182802/70368727400449'),
+    (20000, 0.5, 1.0, 0): ('633319075086354/70368727400449',
+                           '1266637848182802/70368727400449'),
+    (40000, 0.0, 1.0, 0): ('316659311050761/70368727400449',
+                           '633318924091401/70368727400449'),
+    (40000, 0.25, 1.0, 0): ('1899957451751491/1125899638407184',
+                            '633318924091401/70368727400449'),
+    (40000, 0.5, 1.0, 0): ('316659537543177/70368727400449',
+                           '633318924091401/70368727400449'),
+}
+
 SUBNORMAL = ([0.0, 0.0, -5.0], [0.0, 0.0, 0.0],
              [1.17549435e-38, 1.40129846e-45, 0.0],
              [1.0e-40, 0.0, -5.0], [0.0, 0.0, 0.0],
@@ -306,9 +321,22 @@ def main():
     if not all(item.get('wrong_max_fraction') and item.get('true_tail_fraction')
                for item in r14b_under):
         failures.append('R14b under-bound record lacks exact Fraction')
+    actual_r14b = {}
+    for item in r14b_under:
+        key = (item['step_us'], item['u0'], item['u1'], item['axis'])
+        actual_r14b[key] = (item.get('wrong_max_fraction'),
+                            item.get('true_tail_fraction'))
+    if actual_r14b != R14B_EXPECTED_UNDERBOUND:
+        failures.append('R14b exact under-bound records differ from R22 baseline')
+    for key, (wrong, true) in R14B_EXPECTED_UNDERBOUND.items():
+        if Fraction(wrong) >= Fraction(true):
+            failures.append(f'R14b expected under-bound is not under-bound: {key}')
+    status = 'FAIL' if failures else 'PASS'
     report = {
         'test': 'S06-112',
-        'run_id': 'M5-06-R22-20261111',
+        'status': status,
+        'exit_code': 1 if failures else 0,
+        'run_id': 'M5-06-R23-20261111',
         'code_commit': os.environ.get('FLIGHT_CODE_COMMIT', 'UNKNOWN'),
         'library_sha256': hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest(),
         'environment': {
@@ -343,10 +371,15 @@ def main():
     }
     print(json.dumps(report, indent=2))
     if failures:
+        print(f'M5_S06_112_CONTINUOUS_JERK_{status} '
+              f'(local sub-interval Bernstein, three separate bounds, exact Fraction '
+              f'endpoints+stationary, old formula whole tail including stationary)',
+              file=sys.stderr)
         return 1
     print('M5_S06_112_CONTINUOUS_JERK_PASS '
           '(local sub-interval Bernstein, three separate bounds, exact Fraction '
-          'endpoints+stationary, old formula whole tail including stationary)')
+          'endpoints+stationary, old formula whole tail including stationary)',
+          file=sys.stderr)
     return 0
 
 
