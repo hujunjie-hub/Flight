@@ -135,3 +135,30 @@ jerk_axis_bound      : 上述三者最大值
 `min_slack` 非负；零曲线的最小 slack 为 binary32 最小次正规数（向上取整）。
 
 S06-113 不改变本证明；它验证时间转换的注入误差，不是 jerk 证明的一部分。
+
+## 10. R18 局部子区间 Bernstein 修正
+
+R17 的负向测试使用**整段** Bernstein 控制点，却用局部子区间坐标 `u_tail`，二者
+不匹配。R18 改为从幂基系数构造局部子区间控制点：
+
+```text
+t0 = h*u0, dt = h*(u1-u0)
+q_k = sum_{i=k..5} c_i * C(i,k) * t0^(i-k) * dt^k
+B_j = sum_{k=0..j} q_k * C(j,k) / C(5,k)
+J_k = 60/dt^3 * (B[k+3]-3B[k+2]+3B[k+1]-B[k])
+```
+
+旧错误公式 `J0+J1*u+J2*u²` 在 `[1,u_tail]` 全闭区间求最大绝对值，J2≠0 时纳入
+`u* = -J1/(2J2)`（位于区间时）。
+
+实际统计（不再沿用 R16 的 360/1080）：
+
+```text
+candidate_cases=160, legal_cases=140, fail_closed_cases=20
+axis_cases_checked=420
+bernstein_checks=420, tail_checks=420, consumer_checks=420, total_checks=420
+wrong_tail_checked=420, wrong_tail_underbound=122
+```
+
+新增真正零 jerk 状态（位置/速度/加速度全零，X/Y/Z）和独立恒加速度非零状态。
+60/d³、position_low/high、正确 Bernstein-to-power 与 consumer binary32 上界保持。

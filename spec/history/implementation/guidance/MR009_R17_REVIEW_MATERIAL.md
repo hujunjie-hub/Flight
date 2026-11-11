@@ -17,7 +17,7 @@ Agent 不得自行标记 APPROVED。
 
 | 证据 | 结果 |
 |---|---|
-| S06-112 | 360 checked / 1080 component checks / 20 fail-closed / 0 failures；旧 Bernstein-as-power 248/300 欠界 |
+| S06-112 | R18 局部子区间：candidate=160 / legal=140 / fail_closed=20 / axis=420；bernstein/tail/consumer/total 各 420 checks；旧公式 whole-tail 420 checked / 122 欠界 / 0 failures |
 | S06-113 | 76 checked / 18 actual-error checks；mode2 error/γ₂ 3.618–4.059 |
 | S06-108 | 96 cases / 72 wrong-local checks / 0 failures |
 | S06-110d | 5 子区间 × 4 状态，解析 jerk ≤ bound |
@@ -31,7 +31,7 @@ Agent 不得自行标记 APPROVED。
 - [ ] 独立检查 `u_tail` 坐标，确认 `ratio*(1+γ₂)` 不再出现。
 - [ ] 独立检查 consumer 多项式系数来源是真实 C binary32，不是 Python 副本。
 - [ ] 独立复算 Fraction 端点/驻点最大值，确认无容差。
-- [ ] 检查 S06-112 三类上界是否分别覆盖各自区间，total 是否为最大值。
+- [ ] 检查 S06-112 局部 Bernstein 控制点、三类上界分别覆盖、total 是否为最大值、旧公式 whole-tail 驻点。
 - [ ] 检查 S06-113 注入的是 additive seconds，实际误差不是 1 微秒。
 - [ ] 检查任意区间失效都走 NUMERIC_FAILURE，不静默 PASS。
 - [ ] 检查结论没有越过 Host/SIL 范围。
@@ -40,7 +40,7 @@ Agent 不得自行标记 APPROVED。
 
 - 独立审查者尚未签字；
 - S06-100..102 仍 NOT_RUN；
-- 4,096 B 产品化预算不满足（4,232 B）；MR-009 数学证明不等于产品化。
+- 4,096 B 产品化预算不满足（4,248 B）；MR-009 数学证明不等于产品化。
 - 审查者必须明确 APPROVED / REJECTED / NEEDS_INFO，不得以 CI PASS 代替。
 
 ## 5. 结论栏

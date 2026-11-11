@@ -5,6 +5,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 $rootItem = Get-Item -LiteralPath $PSScriptRoot
 while (-not (Test-Path -LiteralPath (Join-Path $rootItem.FullName "SConstruct"))) {
@@ -109,8 +111,8 @@ if ($LASTEXITCODE -eq 0) { $pythonVersion = ($pythonOutput -join " ").Trim() }
 
 $wslVersion = "NOT_AVAILABLE"
 if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
-    $wslOutput = & wsl.exe --version 2>&1
-    if ($LASTEXITCODE -eq 0) { $wslVersion = ($wslOutput -join [Environment]::NewLine).Trim() }
+    $wslOutput = & wsl.exe -d Ubuntu-26.04 -- bash -lc "uname -srmo" 2>&1
+    if ($LASTEXITCODE -eq 0) { $wslVersion = ($wslOutput -join " ").Trim() }
 }
 
 $evidenceFiles = @()
@@ -124,6 +126,15 @@ Get-ChildItem -LiteralPath $runDir -Recurse -File | ForEach-Object {
     }
 }
 
+$codeCommit = "NOT_RECORDED"
+try {
+    $manifestPath = Join-Path $repoRoot "spec/validation/flight_acceptance_manifest.json"
+    if (Test-Path -LiteralPath $manifestPath) {
+        $manifestJson = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        $codeCommit = $manifestJson.latest_local_validation.validated_code_commit
+    }
+} catch { $codeCommit = "NOT_RECORDED" }
+
 $archiveManifest = [ordered]@{
     schema_version = "1.0"
     project = "Flight"
@@ -132,6 +143,8 @@ $archiveManifest = [ordered]@{
     repository_root = $repoRoot
     branch = $branch
     head_sha = $head
+    code_commit = $codeCommit
+    archive_head_sha = $head
     remote_m5_branch_sha_at_archive_time = $remoteHead
     head_commit = $commit
     git_status = $status
@@ -160,8 +173,36 @@ Get-ChildItem -LiteralPath $runDir -Recurse -File | Where-Object { $_.Name -ne "
     [System.Text.UTF8Encoding]::new($false)
 )
 
+# Re-verify every SHA256SUMS entry after writing.
+foreach ($line in $sumLines) {
+    $parts = $line -split '  ', 2
+    if ($parts.Count -ne 2) { throw "Malformed SHA256SUMS line: $line" }
+    $file = Join-Path $runDir $parts[1]
+    if (-not (Test-Path -LiteralPath $file)) { throw "Missing evidence file: $file" }
+    $actual = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actual -ne $parts[0]) { throw "SHA256 mismatch: $file" }
+}
+
 Compress-Archive -LiteralPath $runDir -DestinationPath $zipPath -CompressionLevel Optimal
 $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$zipName = [IO.Path]::GetFileName($zipPath)
+$sidecarPath = $zipPath + ".sha256"
+"$zipHash  $zipName" | Set-Content -LiteralPath $sidecarPath -Encoding ascii
+
+$externalReport = [ordered]@{
+    schema_version = "1.0"
+    run_id = $RunId
+    code_commit = $codeCommit
+    archive_head_sha = $head
+    archive_zip_sha256 = $zipHash
+    archive_zip_path = $zipPath
+    archive_zip_size_bytes = (Get-Item -LiteralPath $zipPath).Length
+    sidecar_path = $sidecarPath
+    created_utc = (Get-Date).ToUniversalTime().ToString("o")
+    scope = "LOCAL_EXECUTION_ONLY; not GitHub CI, H723 runtime, HIL or flight"
+}
+$externalReportPath = Join-Path $archiveRoot ($RunId + ".archive_report.json")
+$externalReport | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $externalReportPath -Encoding UTF8
 
 Write-Output "FLIGHT_VALIDATION_ARCHIVE_CREATED"
 Write-Output ("RUN_ID=" + $RunId)
@@ -170,4 +211,6 @@ Write-Output ("BRANCH=" + $branch)
 Write-Output ("DIRECTORY=" + $runDir)
 Write-Output ("ZIP=" + $zipPath)
 Write-Output ("ZIP_SHA256=" + $zipHash)
+Write-Output ("ZIP_SIDECAR=" + $sidecarPath)
+Write-Output ("ARCHIVE_REPORT=" + $externalReportPath)
 Write-Output "Review the ZIP for secrets before sharing it."

@@ -89,7 +89,7 @@ R17 工作基线 `4858927...`；RUN_ID `M5-06-R17-20261111`。
 |---|---|
 | Issue | FLIGHT-LOCAL-03（draft 03） |
 | 严重度/类型/模块 | S2 / build / firmware-link |
-| 当前 SHA | `fa1de8f` |
+| 当前 SHA | `7554b41` |
 | 预期 | `check_target_build.py` exit 0，生成并检查 ELF/BIN/MAP |
 | 实际 | exit 2 `BLOCKED`：`packages/SConscript` 不存在；`packages/` 是 gitignored，且从未进入 Git 历史 |
 | 根因 | 依赖 B03 的 `pkgs --update`；本地没有 RT-Thread env/packages 树 |
@@ -117,7 +117,7 @@ R17 工作基线 `4858927...`；RUN_ID `M5-06-R17-20261111`。
 | 预期 | 独立审查逐项 APPROVED；MR-009 关闭 |
 | 实际 | `FIX_IMPLEMENTED_WAITING_INDEPENDENT_REVIEW`；未 APPROVED |
 | 审查项 | Bernstein jerk `60/d³`；Bernstein→power `p0,p1,p2`；原区间/尾段 `u_tail=1+γ₂·ratio`；consumer binary32 `6c3+24c4s+60c5s²`；Fraction 端点/驻点；S06-108/112/113；FP 异常与 fail-closed |
-| 复现 | `python tests/guidance/run_host_tests.sh`；S06-112 360/1080 component checks、20 fail-closed；S06-113 76 checks、actual error 3.618–4.059γ₂；日志 `build/m4_m5_implementation/evidence/m5_host.log` |
+| 复现 | `python tests/guidance/run_host_tests.sh`；S06-112 candidate=160/legal=140/fail_closed=20/axis=420，bernstein/tail/consumer/total 各 420 checks，旧公式 whole-tail 420/122 欠界；S06-113 76 checks、actual error 3.618–4.059γ₂；日志 `build/m4_m5_implementation/evidence/m5_host.log` |
 | 安全影响 | 证明链未独立复验，不能宣称消费曲线净空已证明 |
 | fail-closed | 是；S06-100..102 保持 NOT_RUN |
 | 阻断 | M5-06 验收、M5-07 |
@@ -137,12 +137,12 @@ R17 工作基线 `4858927...`；RUN_ID `M5-06-R17-20261111`。
 |---|---|
 | Issue | FLIGHT-LOCAL-22（栈超限）+ FLIGHT-LOCAL-24（R16 漏算） |
 | 严重度/类型/模块 | S1 / resource / M5-06 |
-| 当前 SHA | `fa1de8f`；`.su` `build/m5_arm/m5_trajectory_safety.su` SHA256 `20280ada…f57b` |
+| 当前 SHA | `7554b41`；`.su` `build/m5_arm/m5_trajectory_safety.su` SHA256 `20280ada…f57b` |
 | 预期 | 最坏真实嵌套链 ≤ 4,096 B，且保留调用者/中断余量 |
-| 实际 | **4,232 B**：validate 1,112 + build_curve 2,824 + interval_scale 104 + interval_mul 80 + interval_bounds 64 + interval_invalid 48 |
-| 根因 | `interval_mul` 调用 `interval_bounds`，`interval_bounds` 错误分支调用 `interval_invalid`；R16 分析只算到 `interval_mul`，漏 112 B |
+| 实际 | **4,248 B**：validate 1,112 + build_curve 2,824 + interval_scale 112 (SP) + interval_mul 88 (SP) + interval_bounds 64 + interval_invalid 48 |
+| 根因 | `interval_mul` 调用 `interval_bounds`，`interval_bounds` 错误分支调用 `interval_invalid`；R16 先选了较短的 consumer_eval_error_bound 路径（4,128 B，子调用 192 B）；R17 的真实路径子调用 296 B，差 104 B；R18 再发现 interval_scale/interval_mul 的 `.su` 各少 8 B，最终 4,248 B |
 | 复现 | `arm-none-eabi-objdump -d build/m5_arm/m5_trajectory_safety.o`；`.su`；`build/validation/analysis_p2.md` |
-| 第二/动态/静态 | 3,280 B / 1,936 B / 1,408 B；DFS 工作栈 464 B |
+| 第二/动态/静态 | 3,288 B / 1,944 B / 1,408 B；DFS 工作栈 464 B |
 | 未计入 | 调用者、异常/中断上下文、libm `fmax/fmin/sqrt`、编译器尾调用变化、target runtime |
 | 安全影响 | 不能进入 4,096 B Planner Worker；强行进入会栈溢出 |
 | fail-closed | 是；产品化阻断 |
@@ -163,7 +163,7 @@ R17 工作基线 `4858927...`；RUN_ID `M5-06-R17-20261111`。
 |---|---|
 | Issue | FLIGHT-LOCAL-25（新登记） |
 | 严重度/类型/模块 | S0 / verification-gap / H723 target |
-| 当前 SHA | `fa1de8f` |
+| 当前 SHA | `7554b41` |
 | 预期 | 真实硬件栈水位、WCET/RTA、DWT trace、目标资源、HIL、故障注入、实机避障证据 |
 | 实际 | 全部 NOT_RUN；无硬件/调试器/HIL 台架 |
 | 子项 | 栈水位（最高 watermark）；WCET/RTA（最坏执行时间/响应时间）；DWT trace；链接后 RAM/Flash/stack；HIL 故障注入；实机避障 |
@@ -177,6 +177,25 @@ R17 工作基线 `4858927...`；RUN_ID `M5-06-R17-20261111`。
 | 下一步 | 准备测试计划与接线/安全审查；不进入 M5-07 |
 
 ---
+
+
+## R18 资源追加项
+
+### FLIGHT-LOCAL-26 roll_map_to_position 32,840 B
+
+- 状态：FIXED_WAITING_RETEST（R18 代码，等待独立复验）。
+- 修复：逐轴原地滚动（x→y→z），不再复制 4096-cell 栈数组；`roll_map_to_position`
+  40 B + `roll_axis_inplace` 64 B，峰值 104 B（原 32,840 B）。
+- 差分测试：`m5_map_roll_inplace_differential` 覆盖 shift -16/-15/-8/-1/0/1/7/15/16、
+  单轴/组合轴、随机/边界，比较 cells/center/revision；Host PASS。
+- 仍为 Host/SIL-only；不得据此宣称 H723 Planner 已产品化。
+
+### FLIGHT-LOCAL-27 ICD+M4 余量 232 B
+
+- 状态：OPEN / RISK（S2）。
+- 当前 48 KiB 上限，使用 48,920 B，余量 232 B；`check_memory_budget.py` 输出 WARN。
+- 任何 ICD/FMS/M4 静态布局变更必须重跑预算；不得擅自扩大 48 KiB 上限。
+- 解除条件：预算复核/审批；当前不阻断 Host/SIL 算法测试，但属未来产品化风险。
 
 ## 派生规则
 

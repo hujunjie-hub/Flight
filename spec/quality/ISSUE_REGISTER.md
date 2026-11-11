@@ -53,10 +53,12 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-19 | S0 | R14b 尾段 Bernstein 当幂基 | R16 fa1de8f | S06-112 1080 checks | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-20 | S1 | S06-108 漏 active 不变；C 注入不真实 | R16 fa1de8f | S06-108/113 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-21 | S2 | 非零错误 profile_hash 未拒绝 | R16 fa1de8f | S06-111 negative | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-22 | S1 | Validator 最坏栈 4,232 B > 4,096 B | 未修复；B06 | analysis_p2 R17 | OPEN / BLOCKED |
+| FLIGHT-LOCAL-22 | S1 | Validator 最坏栈 4,248 B > 4,096 B | 未修复；B06 | analysis_p2 R17 | OPEN / BLOCKED |
 | FLIGHT-LOCAL-23 | S2 | R15 工具链 SHA/archive 字段不一致 | R16/R17 归档流程 | R16 manifest/bundle | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-24 | S1 | R16 栈分析漏算 interval_bounds/invalid，报 4,128 而非 4,232 | R17 分析修正 | 本文件/analysis_p2 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-24 | S1 | R16 选了 4,128 的短路径；R17 真实路径 4,232；R18 SP 修正 4,248 | R17 分析修正 | 本文件/analysis_p2 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-25 | S0 | H723 栈水位/WCET/RTA/HIL/实机避障 NOT_RUN | 无硬件；B07 | NOT_RUN | BLOCKED |
+| FLIGHT-LOCAL-26 | S1 | `roll_map_to_position` 栈拷贝 32,840 B，Planner 产品化阻断 | R18 7554b41 逐轴原地滚动 + 差分测试 | m5_map_roll_inplace_differential；roll 40 B + axis 64 B | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-27 | S2 | ICD+M4 静态余量仅 232 B（48,920 / 49,152 B） | 未扩大预算；每次静态布局变更复算 | memory_budget PASS + WARN | OPEN / RISK |
 
 历史 draft 01–20 保留在 `build/validation/issue_drafts/`；本表按根因去重，不删除
 任何失败记录。
