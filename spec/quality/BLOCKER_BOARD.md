@@ -1,14 +1,14 @@
-# Flight M5-06 阻塞项视图（R22）
+# Flight M5-06 阻塞项视图（R23）
 
 本文件只做 Issue Register 的**派生视图**，不维护第二套状态。数据源：
 `spec/quality/ISSUE_REGISTER.md`。状态、严重度、责任方和复验结论以该登记为准。
 `GITHUB_PUBLICATION = PENDING`：Agent 无 GitHub 写权限，不虚构 Issue 编号或在线状态。
 
-输入基线：R21 代码 `0642bdaf9ba370c079b3b447a3d4acc4cd0bc514`；
-R21 归档 HEAD `0279bea861e4975e938f8f71150b0cf286c29ee7`。
-R22 validated code `9e4f5eff5b7140815c09e0151e7f43ced128772f`；
-Remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；本地领先 58 commits；
-RUN_ID `M5-06-R22-20261111`。
+输入基线：R22 代码 `9e4f5eff5b7140815c09e0151e7f43ced128772f`；
+R22 归档 HEAD `8fcd4eacda93bf953882f5bb079e891839a1f3da`。
+R23 validated code `e89cb7d94e6c992c8dfa71c3cb565ae4c5f6248a`；
+Remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；本地领先 60 commits；
+RUN_ID `M5-06-R23-20261111`。
 所有命令均从仓库根目录执行；Host/SIL 结果不构成 H723 实机、HIL 或飞行放行。
 
 ---
@@ -249,6 +249,18 @@ RUN_ID `M5-06-R22-20261111`。
 ### FLIGHT-LOCAL-38 逐项测试证据
 
 - S2；R22 `r22_test_results.json` 逐项 RUN_ID/code/command/checks/failures/exit/seed/toolchain/log SHA。
+
+### FLIGHT-LOCAL-39 S06-112 JSON
+
+- S1；R23 e89cb7d；JSON-only + 独立 log；R14b 6 条精确记录；JSON_OK。
+
+### FLIGHT-LOCAL-40 结果收集器
+
+- S1；R23 e89cb7d `tools/collect_validation_results.py`；9 负向自测；逐项字段完整。
+
+### FLIGHT-LOCAL-41 R22 工作区
+
+- S2；R23 `R23_WORKTREE_REVIEW.md`；ABI 失败证据保留不提交；旧 collector 标 HISTORICAL。
 
 ## 派生规则
 

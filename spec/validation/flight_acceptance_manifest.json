@@ -538,7 +538,7 @@
       "wrong_tail_underbound": 122,
       "status_at_code_baseline": "PASS",
       "oracle": "local sub-interval Bernstein; test status enum separate from production statuses; legal samples status=0; subnormal only BUILD/BOUNDS NUMERIC; exact Fraction endpoints+stationary; old formula whole [1,u_tail] including stationary",
-      "local_run": "M5-06-R22-20261111",
+      "local_run": "M5-06-R23-20261111",
       "candidate_cases": 160,
       "legal_cases": 140,
       "axis_cases_checked": 420,
@@ -550,13 +550,14 @@
       "fail_closed_statuses": {
         "2": 20
       },
-      "evidence_file": "build/validation/regenerated/s06_112_r22.json",
+      "evidence_file": "build/validation/regenerated/s06_112_r23.json",
       "historical_evidence_index": "build/validation/regenerated/S06_112_EVIDENCE_INDEX.md",
       "invalid_input_status": 1,
       "r14b_axis_checks": 60,
       "r14b_axis_underbound": 6,
       "library_sha256": "4d48d4eefb828515db418affb522e7b32df5a551010db2c114bb2f72856858be",
-      "run_id": "M5-06-R22-20261111"
+      "run_id": "M5-06-R23-20261111",
+      "log_file": "build/validation/regenerated/s06_112_r23.log"
     },
     {
       "id": "S06-113",
@@ -574,8 +575,8 @@
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
-      "R22 enforces the exact S06-112 matrix and explicit R14b 60/6 under-bound records with exact Fractions.",
-      "R22 adds r22_environment.json and r22_test_results.json, binds every test to RUN_ID/code/source/log SHA, and marks old evidence/manifests HISTORICAL.",
+      "R23 emits valid S06-112 JSON plus separate PASS log and matches all six R14b exact under-bound records.",
+      "R23 collector is log/Git-driven with 9 negative self-tests; r23_test_results covers 28 independent items with RUN_ID/code/exit/source/log SHA.",
       "Current resources: map roll 128 B; validator 4,248 B > 4,096 B (152 B over); DFS 464 B.",
       "B01/B02 rebaseline, B03/B04 package/link, B05 MR-009, B06 stack and B07 H723 remain blocked/open.",
       "S06-100..102 remain NOT_RUN; M5-06 is BLOCKED; M5-07 is not started."
@@ -674,15 +675,16 @@
   },
   "previous_commit_pass_inherited": false,
   "latest_local_validation": {
-    "run_id": "M5-06-R22-20261111",
-    "validated_code_commit": "9e4f5eff5b7140815c09e0151e7f43ced128772f",
-    "head": "9e4f5eff5b7140815c09e0151e7f43ced128772f",
-    "archive_head_sha": "8fcd4eacda93bf953882f5bb079e891839a1f3da",
-    "archive_commit_sha": "8fcd4eacda93bf953882f5bb079e891839a1f3da",
+    "run_id": "M5-06-R23-20261111",
+    "validated_code_commit": "e89cb7d94e6c992c8dfa71c3cb565ae4c5f6248a",
+    "head": "e89cb7d94e6c992c8dfa71c3cb565ae4c5f6248a",
+    "tooling_commit": "21b6f063dde413492860a91819651599e741f884",
+    "archive_head_sha": "EXTERNAL_ARCHIVE_REPORT",
+    "archive_commit_sha": "EXTERNAL_ARCHIVE_REPORT",
     "archive_zip_sha256": "SEE_EXTERNAL_SHA256_SIDECAR",
-    "archive_zip_sidecar": "work/validation/archives/M5-06-R22-20261111.zip.sha256",
-    "archive_external_report": "work/validation/archives/M5-06-R22-20261111.archive_report.json",
-    "archive_zip_size_bytes": 35801692,
+    "archive_zip_sidecar": "work/validation/archives/M5-06-R23-20261111.zip.sha256",
+    "archive_external_report": "work/validation/archives/M5-06-R23-20261111.archive_report.json",
+    "archive_zip_size_bytes": null,
     "branch": "opt/stage-02-m5-06-safety-validator",
     "scope": "LOCAL_EXECUTION_ONLY",
     "github_ci": "NOT_RUN_FOR_THIS_HEAD",
@@ -698,11 +700,11 @@
     "blocked_items": [
       "scons_link"
     ],
-    "input_baseline_code_commit": "0642bdaf9ba370c079b3b447a3d4acc4cd0bc514",
-    "input_baseline_archive_head": "0279bea861e4975e938f8f71150b0cf286c29ee7",
+    "input_baseline_code_commit": "9e4f5eff5b7140815c09e0151e7f43ced128772f",
+    "input_baseline_archive_head": "8fcd4eacda93bf953882f5bb079e891839a1f3da",
     "remote_head": "51e7e923419733f5aa3b21efa1e46588629623ed",
-    "ahead_commit_count": 58,
-    "note": "validated_code_commit is the code commit; archive HEAD and ZIP SHA256 are recorded in the external archive report and sidecar; the ZIP cannot contain its own hash."
+    "ahead_commit_count": null,
+    "note": "validated_code_commit is the validation code commit; archive HEAD and ZIP SHA256 are in the external report/sidecar; the ZIP cannot contain its own hash."
   },
   "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
   "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112 three separate bounds)",
@@ -725,14 +727,17 @@
     "FLIGHT-LOCAL-30": "R19 external sidecar/report; no PENDING in formal manifest"
   },
   "s06_112_evidence": {
-    "current": "build/validation/regenerated/s06_112_r22.json",
+    "current": "build/validation/regenerated/s06_112_r23.json",
+    "current_log": "build/validation/regenerated/s06_112_r23.log",
     "historical_index": "build/validation/regenerated/S06_112_EVIDENCE_INDEX.md",
-    "historical_general_index": "build/validation/regenerated/HISTORICAL_EVIDENCE_INDEX.md",
-    "rule": "only R22 is current; R16/R18/R19/R20/R21 are HISTORICAL/SUPERSEDED with SHA256"
+    "rule": "only R23 is current; older files HISTORICAL/SUPERSEDED"
   },
   "github_issue_sync": "PENDING_OWNER_AUTHORIZATION",
   "blocker_view": "spec/quality/BLOCKER_BOARD.md",
   "r22_environment": "build/validation/regenerated/r22_environment.json",
   "r22_test_results": "build/validation/regenerated/r22_test_results.json",
-  "historical_manifest_index": "build/validation/regenerated/HISTORICAL_EVIDENCE_INDEX.md"
+  "historical_manifest_index": "build/validation/regenerated/HISTORICAL_EVIDENCE_INDEX.md",
+  "r23_environment": "build/validation/regenerated/r23_environment.json",
+  "r23_test_results": "build/validation/regenerated/r23_test_results.json",
+  "r23_worktree_review": "build/validation/regenerated/R23_WORKTREE_REVIEW.md"
 }
