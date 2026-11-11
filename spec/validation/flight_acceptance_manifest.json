@@ -575,9 +575,9 @@
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
-      "R25 collector requires numeric checks and real source/log/environment SHA; 16 negative tests pass under -O.",
-      "S06-112 CLI/JSON is R25-bound and R14b exact 6/6; STACK is BLOCKED at 4248 B.",
-      "Horner H_k is implemented in production, but dedicated FLT_MAX cancellation/scaling tests remain incomplete.",
+      "R26 collector derives S06-108/S06-113/map metrics from logs and enforces numeric checks; 16 negative tests pass under -O.",
+      "R26 patch stdout/stderr separated and apply-checked; CRLF byte differences documented with raw copies.",
+      "Horner H_k implementation is present; dedicated FLT_MAX cancellation/velocity/acceleration tests remain incomplete.",
       "B01-B07 remain blocked/open; S06-100..102 NOT_RUN; MR-009 not APPROVED."
     ],
     "next_milestone": "M5-07 only after M5-06 acceptance and explicit independent mathematical approval."
@@ -674,16 +674,16 @@
   },
   "previous_commit_pass_inherited": false,
   "latest_local_validation": {
-    "run_id": "M5-06-R25-20261111",
+    "run_id": "M5-06-R26-20261111",
     "validated_code_commit": "cd8d4a15dc2c047e63692f74bfad2b612e991bcf",
     "head": "cd8d4a15dc2c047e63692f74bfad2b612e991bcf",
-    "tooling_commit": "8b8204f1528b64f59144b16e842b3ee38e8001e7",
-    "archive_head_sha": "4a66ac907c44036a353b5c7f42a36ac455de55f5",
-    "archive_commit_sha": "4a66ac907c44036a353b5c7f42a36ac455de55f5",
+    "tooling_commit": "714f920b5cf2271d90a499b8a07e1ed5d139ff62",
+    "archive_head_sha": "EXTERNAL_ARCHIVE_REPORT",
+    "archive_commit_sha": "EXTERNAL_ARCHIVE_REPORT",
     "archive_zip_sha256": "SEE_EXTERNAL_SHA256_SIDECAR",
-    "archive_zip_sidecar": "work/validation/archives/M5-06-R25-20261111.zip.sha256",
-    "archive_external_report": "work/validation/archives/M5-06-R25-20261111.archive_report.json",
-    "archive_zip_size_bytes": 35988466,
+    "archive_zip_sidecar": "work/validation/archives/M5-06-R26-20261111.zip.sha256",
+    "archive_external_report": "work/validation/archives/M5-06-R26-20261111.archive_report.json",
+    "archive_zip_size_bytes": null,
     "branch": "opt/stage-02-m5-06-safety-validator",
     "scope": "LOCAL_EXECUTION_ONLY",
     "github_ci": "NOT_RUN_FOR_THIS_HEAD",
@@ -699,11 +699,11 @@
     "blocked_items": [
       "scons_link"
     ],
-    "input_baseline_code_commit": "e89cb7d94e6c992c8dfa71c3cb565ae4c5f6248a",
-    "input_baseline_archive_head": "f3f709fbe8a432591a7360d40f298f6ce3b945f1",
+    "input_baseline_code_commit": "cd8d4a15dc2c047e63692f74bfad2b612e991bcf",
+    "input_baseline_archive_head": "4a66ac907c44036a353b5c7f42a36ac455de55f5",
     "remote_head": "51e7e923419733f5aa3b21efa1e46588629623ed",
-    "ahead_commit_count": 76,
-    "note": "validated_code_commit is the code commit; tooling_commit is the collector/checker commit; archive HEAD and ZIP SHA are external."
+    "ahead_commit_count": null,
+    "note": "validated_code_commit is the code commit; tooling_commit is the collector/checker commit; archive metadata is external."
   },
   "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
   "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112 three separate bounds)",
@@ -747,5 +747,8 @@
   "r25_environment": "build/validation/regenerated/r25_environment.json",
   "r25_test_results": "build/validation/regenerated/r25_test_results.json",
   "r25_worktree_review": "build/validation/regenerated/R25_WORKTREE_REVIEW.md",
-  "r25_manifest_snapshot": "build/validation/regenerated/r25_manifest_snapshot.json"
+  "r25_manifest_snapshot": "build/validation/regenerated/r25_manifest_snapshot.json",
+  "r26_environment": "build/validation/regenerated/r26_environment.json",
+  "r26_test_results": "build/validation/regenerated/r26_test_results.json",
+  "r26_worktree_review": "build/validation/regenerated/R26_WORKTREE_REVIEW.md"
 }
