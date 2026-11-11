@@ -74,14 +74,18 @@ foreach ($relative in $copyPaths) {
 
 # Preserve local tracked edits as a binary-capable patch. Inspect the archive
 # before sharing it; never include credentials, tokens, private keys or secrets.
-$patch = & git -C $repoRoot diff --binary HEAD 2>&1
+$patchPath = Join-Path $runDir "working_tree.patch"
+$patchStderr = Join-Path $runDir "working_tree.patch.stderr.log"
+$patch = & git -C $repoRoot diff --binary HEAD 2> $patchStderr
 if ($LASTEXITCODE -eq 0 -and $patch.Count -gt 0) {
-    $patchPath = Join-Path $runDir "working_tree.patch"
+    $patchText = ($patch -join "`n").TrimEnd("`r", "`n") + "`n"
     [System.IO.File]::WriteAllText(
         $patchPath,
-        ($patch -join [Environment]::NewLine),
+        $patchText,
         [System.Text.UTF8Encoding]::new($false)
     )
+} else {
+    Set-Content -LiteralPath $patchPath -Value "" -Encoding utf8NoBOM
 }
 
 $untracked = & git -C $repoRoot ls-files --others --exclude-standard 2>&1
