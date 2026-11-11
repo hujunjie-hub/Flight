@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 
 ROOT = next(p for p in Path(__file__).resolve().parents if (p/'SConstruct').is_file())
 OUT = ROOT / "build/m4_m5_implementation/evidence"
@@ -51,12 +52,15 @@ def main():
     results = []
     for name, command, additions in commands:
         env = os.environ.copy(); env.update(additions)
+        started = time.monotonic()
         result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True)
+        duration_seconds = time.monotonic() - started
         log = OUT / (name+".log")
         log.write_text(result.stdout+result.stderr, encoding="utf-8")
         status = status_for(name, result.returncode)
         results.append({"name": name, "command": command, "exit_code": result.returncode,
-            "status": status, "log": log.relative_to(ROOT).as_posix()})
+            "status": status, "log": log.relative_to(ROOT).as_posix(),
+            "duration_seconds": round(duration_seconds, 3)})
         print(f"{name}: {status} (exit {result.returncode})", flush=True)
         if result.returncode: print((result.stdout+result.stderr)[-2400:], flush=True)
     inputs = set((ROOT / "middleware/contracts").rglob("*.h"))
