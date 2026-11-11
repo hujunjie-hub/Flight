@@ -7,7 +7,7 @@
 输入基线：R20 代码 `173360d49882dd98cb2a11ac26d189fc0e2f57a4`；
 R20 归档 HEAD `8f62091996c4bd8da2e0f16378b1680b3a8f30da`。
 R21 validated code `0642bdaf9ba370c079b3b447a3d4acc4cd0bc514`；
-Remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；本地领先 53 commits；
+Remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；本地领先 55 commits；
 RUN_ID `M5-06-R21-20261111`。
 所有命令均从仓库根目录执行；Host/SIL 结果不构成 H723 实机、HIL 或飞行放行。
 
