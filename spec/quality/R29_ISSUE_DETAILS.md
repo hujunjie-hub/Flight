@@ -63,7 +63,7 @@ R28 detail file remains historical.
 - 预期结果: 11 条记录，PASS/FAIL/BLOCKED 均有真实日志与 SHA。
 - 实际结果: 已生成；等待独立复验。
 - 日志路径: `build/validation/regenerated/r29_test_results.json`。
-- 日志 SHA256: `7f12cac7b2e315e29518d93a6fac39430a868291df7fbe9bedca69c083e6ebb3`。
+- 日志 SHA256: `322513877bfc8d60cb9f431d65295536570c94f48770609d07de9ea59bad9084`。
 - 解除条件: 独立复跑或独立核对日志一致。
 - 下一检查点: R29 最终回归。
 
