@@ -863,9 +863,10 @@ static double consumer_eval_error_bound(
     double h = fabs((double)consumer[degree]);
     if (!isfinite(h)) return INFINITY;
     for (i = degree; i-- > 0u;) {
-      h = add_upper_nonnegative(fabs((double)consumer[i]),
-          multiply_upper_nonnegative(h, s_max));
-      if (!isfinite(h)) return INFINITY;
+      double product = multiply_upper_nonnegative(h, s_max);
+      if (!isfinite(product) || product > (double)FLT_MAX) return INFINITY;
+      h = add_upper_nonnegative(fabs((double)consumer[i]), product);
+      if (!isfinite(h) || h > (double)FLT_MAX) return INFINITY;
     }
   }
   if (magnitude_term > 0.0) {
