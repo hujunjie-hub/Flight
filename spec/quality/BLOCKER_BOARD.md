@@ -1,14 +1,14 @@
-# Flight M5-06 阻塞项视图（R21）
+# Flight M5-06 阻塞项视图（R22）
 
 本文件只做 Issue Register 的**派生视图**，不维护第二套状态。数据源：
 `spec/quality/ISSUE_REGISTER.md`。状态、严重度、责任方和复验结论以该登记为准。
 `GITHUB_PUBLICATION = PENDING`：Agent 无 GitHub 写权限，不虚构 Issue 编号或在线状态。
 
-输入基线：R20 代码 `173360d49882dd98cb2a11ac26d189fc0e2f57a4`；
-R20 归档 HEAD `8f62091996c4bd8da2e0f16378b1680b3a8f30da`。
-R21 validated code `0642bdaf9ba370c079b3b447a3d4acc4cd0bc514`；
-Remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；本地领先 55 commits；
-RUN_ID `M5-06-R21-20261111`。
+输入基线：R21 代码 `0642bdaf9ba370c079b3b447a3d4acc4cd0bc514`；
+R21 归档 HEAD `0279bea861e4975e938f8f71150b0cf286c29ee7`。
+R22 validated code `9e4f5eff5b7140815c09e0151e7f43ced128772f`；
+Remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；本地领先 57 commits；
+RUN_ID `M5-06-R22-20261111`。
 所有命令均从仓库根目录执行；Host/SIL 结果不构成 H723 实机、HIL 或飞行放行。
 
 ---
@@ -240,7 +240,15 @@ RUN_ID `M5-06-R21-20261111`。
 
 ### FLIGHT-LOCAL-36 归档元数据
 
-- S2；R21 0642bda；archive report 增加 archive_commit_sha/input baseline/remote/ahead。
+- S2；R21/R22；archive report 增加 archive_commit_sha/input baseline/remote/ahead。
+
+### FLIGHT-LOCAL-37 环境证据
+
+- S2；R22 `r22_environment.json` 记录 Host/ARM/Windows 完整工具链；旧 `environment.txt` 标 HISTORICAL。
+
+### FLIGHT-LOCAL-38 逐项测试证据
+
+- S2；R22 `r22_test_results.json` 逐项 RUN_ID/code/command/checks/failures/exit/seed/toolchain/log SHA。
 
 ## 派生规则
 

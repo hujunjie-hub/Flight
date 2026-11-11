@@ -57,7 +57,7 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-23 | S2 | R15 工具链 SHA/archive 字段不一致 | R16/R17 归档流程 | R16 manifest/bundle | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-24 | S1 | R16 选了 4,128 的短路径；R17 真实路径 4,232；R18 SP 修正 4,248 | R17 分析修正 | 本文件/analysis_p2 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-25 | S0 | H723 栈水位/WCET/RTA/HIL/实机避障 NOT_RUN | 无硬件；B07 | NOT_RUN | BLOCKED |
-| FLIGHT-LOCAL-26 | S1 | `roll_map_to_position` 栈拷贝 32,840 B，Planner 产品化阻断 | R18 7554b41 逐轴原地滚动 + 差分测试 | m5_map_roll_inplace_differential；roll 40 B + axis 64 B | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-26 | S1 | `roll_map_to_position` 旧栈拷贝 32,840 B，Planner 产品化阻断 | R18/R19 逐轴原地滚动；R22 完整 40+64+24=128 B | 1000-case random + deterministic；legacy 32,840 B Host-only | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-27 | S2 | ICD+M4 静态余量仅 232 B（48,920 / 49,152 B） | 未扩大预算；每次静态布局变更复算 | memory_budget PASS + WARN | OPEN / RISK |
 | FLIGHT-LOCAL-28 | S1 | S06-112 把所有 C API 拒绝都计为预期 fail-closed，可能掩盖合法样本意外拒绝 | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 状态码区分；次正规仅接受 NUMERIC | S06-112 140 legal/20 subnormal status=2 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-29 | S2 | R18 地图原地滚动报告 104 B，漏算 map_cell_at 24 B；真实 128 B | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 反汇编/.su 修正 | roll 40 + axis 64 + map_cell_at 24 | FIXED_WAITING_RETEST |
@@ -68,6 +68,8 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-34 | S2 | S06-112 证据索引绑定错误代码 SHA | R21 0642bdaf9ba370c079b3b447a3d4acc4cd0bc514 索引 | 索引/library/Manifest 一致 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-35 | S2 | analysis_p2 历史 32,840 B 与当前 128 B 描述冲突 | R21 0642bdaf9ba370c079b3b447a3d4acc4cd0bc514 | 文首摘要 + HISTORICAL 标记 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-36 | S2 | Manifest/Blocker Board/外部归档报告元数据定义不一致 | R21 0642bdaf9ba370c079b3b447a3d4acc4cd0bc514 | archive report 增加 commit/ahead/baseline | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-37 | S2 | Host/ARM 测试环境记录过期或缺少精确工具链绑定 | R22 9e4f5ef 环境证据 | r22_environment.json；旧 environment.txt 标 HISTORICAL | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-38 | S2 | 回归证据缺少逐项 RUN_ID 绑定，历史 Manifest 未标记 | R22 9e4f5ef | r22_test_results.json；历史 Manifest 索引 | FIXED_WAITING_RETEST |
 
 历史 draft 01–20 保留在 `build/validation/issue_drafts/`；本表按根因去重，不删除
 任何失败记录。
