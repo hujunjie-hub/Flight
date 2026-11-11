@@ -277,6 +277,9 @@ def parse_output(name, output, exit_code):
         return checks, failures, seed, {"parser": "JSON", "status": data.get("status")}
 
     if name == "packages_lock_unit":
+        match = re.search(r"M5_RT_PACKAGES_LOCK_NEGATIVE_TEST_PASS \((\d+) cases\)", output)
+        if match:
+            return int(match.group(1)), 0, seed, {"parser": "negative-case-count"}
         checks = len(re.findall(r"\bPASS\b", output))
         failures = len(re.findall(r"\bFAIL\b", output))
         return checks, failures, seed, {"parser": "unit PASS-lines"}

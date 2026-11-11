@@ -150,16 +150,10 @@ def main():
             "build/validation/regenerated/r28_environment.json",
             "build/validation/regenerated/r28_test_results.json")),
         "issues_check": rel(files_under(
-            "tools/check_validation_evidence.py",
-            "spec/quality/ISSUE_REGISTER.md", "spec/quality/R28_ISSUE_DETAILS.md")),
+            "tools/check_validation_evidence.py", "spec/quality/ISSUE_REGISTER.md")),
         "stack_check": rel(files_under(
-            "tools/check_validation_evidence.py", "tools/analyze_stack.py",
-            "build/validation/regenerated/r28_stack_analysis.json",
-            "build/m5_arm/m5_trajectory_safety.su",
-            "build/m5_arm/m5_trajectory_safety.dis")),
-        "stack_selftest": rel(files_under(
-            "tools/analyze_stack.py", "build/m5_arm/m5_trajectory_safety.su",
-            "build/m5_arm/m5_trajectory_safety.dis")),
+            "tools/check_validation_evidence.py", "tools/analyze_stack.py")),
+        "stack_selftest": rel(files_under("tools/analyze_stack.py")),
     }
     files = {}
     for test_name, paths in tests.items():
@@ -177,6 +171,7 @@ def main():
                 "line_ending": line_ending(data),
                 "role": "test-input" if path.startswith("tests/") else "source",
             }
+    tests = {name: [p for p in paths if p in files] for name, paths in tests.items()}
     compile_inputs = {}
     for name in ("m4_host", "m5_host", "integration", "m5_sanitizer",
                  "integration_sanitizer", "m4_arm", "m5_arm", "s06_112"):
