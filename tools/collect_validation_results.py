@@ -242,7 +242,7 @@ def main():
          "exit_code": 0 if man["status"] == "PASS" else 1, "checks": man["checks"],
          "failures": man["failures"], "random_seed": "NOT_APPLICABLE",
          "log_path": "build/validation/regenerated/checks/manifest.log",
-         "source_files": [{"path": "spec/validation/flight_acceptance_manifest.json", "sha256": sha("spec/validation/flight_acceptance_manifest.json")}]},
+         "source_files": [{"path": "build/validation/regenerated/r25_manifest_snapshot.json", "sha256": sha("build/validation/regenerated/r25_manifest_snapshot.json")}]},
         {"test_id": "ISSUES", "test_name": "issue register consistency", "status": issues["status"],
          "verification_kind": "TEST", "command": "python tools/check_r25_evidence.py issues",
          "exit_code": 0 if issues["status"] == "PASS" else 1, "checks": issues["checks"],
