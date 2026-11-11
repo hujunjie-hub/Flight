@@ -50,6 +50,15 @@ def validate(record, run_id, check_commit=False):
         errors.append("environment missing")
     elif record.get("environment_sha256") != sha(env):
         errors.append("environment SHA mismatch")
+    else:
+        try:
+            env_data = json.loads((ROOT / env).read_text())
+        except Exception:
+            env_data = {}
+        if env_data.get("run_id") != record.get("run_id"):
+            errors.append("environment RUN_ID mismatch")
+        if env_data.get("code_commit") != record.get("code_commit"):
+            errors.append("environment code_commit mismatch")
     if not record.get("random_seed"):
         errors.append("random_seed missing")
     status = record.get("status")
@@ -92,7 +101,8 @@ def validate(record, run_id, check_commit=False):
 def self_test():
     tmp = Path(tempfile.mkdtemp(prefix="collector_r25_"))
     log = tmp / "test.log"; log.write_text("checks=2 failures=0\n")
-    env = REGEN / "r25_environment.json"
+    env = tmp / "env.json"
+    env.write_text(json.dumps({"run_id": "SELFTEST", "code_commit": "0" * 40}))
     src = tmp / "test.c"; src.write_text("int main(void){return 0;}\n")
     base = {"run_id": "SELFTEST", "code_commit": "0" * 40, "command": "run test",
             "toolchain_version": "test-tool 1.0", "environment_path": str(env),
@@ -168,7 +178,7 @@ def main():
         raise SystemExit("code commit must be 40-hex")
     subprocess.check_call(["git", "-C", str(ROOT), "cat-file", "-e", a.code_commit])
     validation = json.loads((EVIDENCE / "validation.json").read_text())
-    env_path = "build/validation/regenerated/r25_environment.json"
+    env_path = "build/validation/regenerated/r27_environment.json"
     env_sha = sha(env_path)
     collector_sha = sha("tools/collect_validation_results.py")
     m5text = (EVIDENCE / "m5_host.log").read_text(errors="ignore")
@@ -181,7 +191,7 @@ def main():
                               if re.search(r"checks=(\d+) failures=(\d+)", m4text) else (None, None))
     s108 = re.search(r"S06_108_TIME_ERROR_DETECTION cases=(\d+) .*failures=(\d+)", m5text)
     mapm = re.search(r"M5_MAP_ROLL_RANDOM seed=(0x[0-9A-Fa-f]+) .*checked_cases=(\d+) failed_cases=(\d+)", m5text)
-    s112 = json.loads((REGEN / "s06_112_r25.json").read_text())
+    s112 = json.loads((REGEN / "s06_112_r27.json").read_text())
     manifest = json.loads((ROOT / "spec/validation/flight_acceptance_manifest.json").read_text())
     s113_match = re.search(r'\{\s*"test": "S06-113".*?\n\}', m5text, re.S)
     s113_json = json.loads(s113_match.group(0)) if s113_match else None
@@ -231,7 +241,9 @@ def main():
                       "toolchain_version": ("ARM " + (ROOT / "build/m5_arm/toolchain.txt").read_text().splitlines()[2]) if c["name"] in ("m4_arm", "m5_arm") else ("WSL gcc 16.2.0 / Python 3.14.10" if "wsl.exe" in c["command"] else "Windows Python 3.14.8 / PowerShell 7.6.9"),
                       "environment_path": env_path, "environment_sha256": env_sha,
                       "collector_sha256": collector_sha,
-                      "source_files": [{"path": src, "sha256": sha(src)}] if src else [],
+                      "source_files": ([{"path": src, "sha256": sha(src)},
+                                        {"path": "build/m4_m5_implementation/evidence/source_sha256.json",
+                                         "sha256": sha("build/m4_m5_implementation/evidence/source_sha256.json")}] if src else []),
                       "log_path": c["log"], "log_sha256": sha(c["log"]),
                       "duration_seconds": c.get("duration_seconds", "NOT_RECORDED"),
                       **({"not_run_reason": "command status BLOCKED; see log"} if c["status"] == "BLOCKED" else {})})
@@ -243,10 +255,10 @@ def main():
          "log_path": "build/m4_m5_implementation/evidence/m5_host.log",
          "source_files": [{"path": "middleware/guidance/trajectory_planning/m5_trajectory_safety.c", "sha256": sha("middleware/guidance/trajectory_planning/m5_trajectory_safety.c")}]},
         {"test_id": "S06-112", "test_name": "continuous jerk exact Fraction", "status": s112["status"],
-         "verification_kind": "TEST", "command": f"python3 tests/guidance/verify_jerk_continuous.py --library build/m5_host/libm5_safety_oracle.so --run-id {a.run_id} --code-commit {a.code_commit} --output build/validation/regenerated/s06_112_r25.json",
+         "verification_kind": "TEST", "command": f"python3 tests/guidance/verify_jerk_continuous.py --library build/m5_host/libm5_safety_oracle.so --run-id {a.run_id} --code-commit {a.code_commit} --output build/validation/regenerated/s06_112_r27.json",
          "exit_code": s112["exit_code"], "checks": s112["axis_cases_checked"],
          "failures": len(s112["failures"]), "random_seed": "NOT_APPLICABLE",
-         "log_path": "build/validation/regenerated/s06_112_r25.log",
+         "log_path": "build/validation/regenerated/s06_112_r27.log",
          "source_files": [{"path": "tests/guidance/verify_jerk_continuous.py", "sha256": sha("tests/guidance/verify_jerk_continuous.py")},
                           {"path": "middleware/guidance/trajectory_planning/m5_trajectory_safety.c", "sha256": sha("middleware/guidance/trajectory_planning/m5_trajectory_safety.c")}]},
         {"test_id": "S06-113", "test_name": "C time conversion injection", "status": "PASS",
@@ -273,7 +285,7 @@ def main():
          "exit_code": 0 if man["status"] == "PASS" else 1, "checks": man["checks"],
          "failures": man["failures"], "random_seed": "NOT_APPLICABLE",
          "log_path": "build/validation/regenerated/checks/manifest.log",
-         "source_files": [{"path": "build/validation/regenerated/r26_manifest_snapshot.json", "sha256": sha("build/validation/regenerated/r26_manifest_snapshot.json")}]},
+         "source_files": [{"path": "build/validation/regenerated/r27_manifest_snapshot.json", "sha256": sha("build/validation/regenerated/r27_manifest_snapshot.json")}]},
         {"test_id": "ISSUES", "test_name": "issue register consistency", "status": issues["status"],
          "verification_kind": "TEST", "command": "python tools/check_r25_evidence.py issues",
          "exit_code": 0 if issues["status"] == "PASS" else 1, "checks": issues["checks"],
