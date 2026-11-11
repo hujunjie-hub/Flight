@@ -2246,6 +2246,19 @@ uint8_t m5_trajectory_safety_test_curve_jerk(
 }
 
 
+void m5_trajectory_safety_test_jerk_status_values(
+    uint8_t *test_ok, uint8_t *test_invalid, uint8_t *test_build,
+    uint8_t *test_bounds, uint8_t *production_invalid,
+    uint8_t *production_numeric)
+{
+  if (test_ok != NULL) *test_ok = M5_TEST_JERK_STATUS_OK;
+  if (test_invalid != NULL) *test_invalid = M5_TEST_JERK_STATUS_INVALID_INPUT;
+  if (test_build != NULL) *test_build = M5_TEST_JERK_STATUS_BUILD_NUMERIC;
+  if (test_bounds != NULL) *test_bounds = M5_TEST_JERK_STATUS_BOUNDS_NUMERIC;
+  if (production_invalid != NULL) *production_invalid = M5_SAFETY_INVALID;
+  if (production_numeric != NULL) *production_numeric = M5_SAFETY_NUMERIC_FAILURE;
+}
+
 uint8_t m5_trajectory_safety_test_curve_jerk_components(
     const float start_position[3],
     const float start_velocity[3],

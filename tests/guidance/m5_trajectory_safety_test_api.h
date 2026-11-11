@@ -12,6 +12,12 @@ typedef enum {
   M5_TEST_JERK_STATUS_BOUNDS_NUMERIC = 3
 } M5SafetyTestJerkStatus;
 
+/* Read the actual C enum values; keeps Python from maintaining a second copy. */
+void m5_trajectory_safety_test_jerk_status_values(
+    uint8_t *test_ok, uint8_t *test_invalid, uint8_t *test_build,
+    uint8_t *test_bounds, uint8_t *production_invalid,
+    uint8_t *production_numeric);
+
 /* Test-only adapter for the private M5-06 Hermite -> Bernstein -> bounds path. */
 uint8_t m5_trajectory_safety_test_curve_bounds(
     const float start_position[3],

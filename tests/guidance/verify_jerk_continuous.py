@@ -10,9 +10,13 @@ from the power-basis coefficients and evaluates the old
 [1, u_tail] interval, including its stationary point.
 """
 import ctypes
+import hashlib
 import json
+import os
+import platform
 import struct
 import sys
+from pathlib import Path
 from fractions import Fraction
 from math import comb
 
@@ -22,10 +26,6 @@ from m5_product_envelope import exact_coefficients
 U = Fraction(1, 1 << 24)
 GAMMA2 = (2 * U) / (1 - 2 * U)
 STEPS = (20000, 40000)
-JERK_STATUS_OK = 0
-JERK_STATUS_INVALID_INPUT = 1
-JERK_STATUS_BUILD_NUMERIC = 2
-JERK_STATUS_BOUNDS_NUMERIC = 3
 U0S = (0.0, 0.25, 0.5, 0.75)
 U1S = (0.25, 0.5, 0.75, 1.0)
 
@@ -118,12 +118,23 @@ class Probes:
             ctypes.c_float, ctypes.c_float, ctypes.c_float,
             pointer, pointer, pointer, pointer, ctypes.POINTER(ctypes.c_uint8)]
         self.components.restype = ctypes.c_uint8
+        self.status_values = library.m5_trajectory_safety_test_jerk_status_values
+        self.status_values.argtypes = [ctypes.POINTER(ctypes.c_uint8)] * 6
+        self.status_values.restype = None
 
 
 def main():
     if len(sys.argv) < 2:
         raise SystemExit('usage: verify_jerk_continuous.py <libm5_safety_oracle.so>')
     probes = Probes(sys.argv[1])
+    raw = [ctypes.c_uint8() for _ in range(6)]
+    probes.status_values(*[ctypes.byref(v) for v in raw])
+    status_ok = raw[0].value
+    status_invalid = raw[1].value
+    status_build = raw[2].value
+    status_bounds = raw[3].value
+    production_invalid = raw[4].value
+    production_numeric = raw[5].value
     invalid_status = ctypes.c_uint8(0)
     invalid_arrays = [(ctypes.c_float * 3)(*values) for values in COUNTEREXAMPLE]
     invalid_ok = probes.components(
@@ -143,6 +154,7 @@ def main():
     total_checks = 0
     wrong_tail_checked = 0
     wrong_tail_underbound = 0
+    r14b_details = []
     coverage = {name: {'min_slack': None}
                 for name in ('bernstein', 'tail', 'consumer', 'total')}
     failures = []
@@ -178,7 +190,7 @@ def main():
                                              ctypes.c_float(u0), ctypes.c_float(u1),
                                              bernstein, tail_bound, consumer, total,
                                              ctypes.byref(status)):
-                        if state_name == 'subnormal' and status.value in (JERK_STATUS_BUILD_NUMERIC, JERK_STATUS_BOUNDS_NUMERIC):
+                        if state_name == 'subnormal' and status.value in (status_build, status_bounds):
                             fail_closed_cases += 1
                             fail_closed_statuses[status.value] =                                 fail_closed_statuses.get(status.value, 0) + 1
                             continue
@@ -229,18 +241,74 @@ def main():
                         wrong_max = polynomial_max_abs(jc, Fraction(1), u_tail)
                         true_tail = exact_tail
                         wrong_tail_checked += 1
-                        if wrong_max < true_tail:
+                        under = wrong_max < true_tail
+                        if under:
                             wrong_tail_underbound += 1
-    if invalid_ok != 0 or invalid_status.value != JERK_STATUS_INVALID_INPUT:
+                        if state_name == 'r14b_counterexample':
+                            endpoint0 = abs(sum(jc[k] for k in range(3)))
+                            endpoint1 = abs(sum(jc[k] * u_tail ** k
+                                               for k in range(3)))
+                            stationary = None
+                            if jc[2] != 0:
+                                u_star = -jc[1] / (2 * jc[2])
+                                if Fraction(1) <= u_star <= u_tail:
+                                    stationary = abs(sum(jc[k] * u_star ** k
+                                                         for k in range(3)))
+                            r14b_details.append({
+                                'step_us': step_us, 'u0': u0, 'u1': u1,
+                                'axis': axis, 'wrong_max': float(wrong_max),
+                                'wrong_max_fraction': str(wrong_max),
+                                'true_tail': float(true_tail),
+                                'true_tail_fraction': str(true_tail),
+                                'endpoint_u1': float(endpoint0),
+                                'endpoint_u_tail': float(endpoint1),
+                                'stationary': (float(stationary)
+                                               if stationary is not None else None),
+                                'underbound': under})
+    expected = {
+        'test_ok': 0, 'test_invalid': 1, 'test_build': 2, 'test_bounds': 3,
+        'production_invalid': 3, 'production_numeric': 11,
+        'candidate_cases': 160, 'legal_cases': 140, 'fail_closed_cases': 20,
+        'axis_cases_checked': 420, 'bernstein_checks': 420, 'tail_checks': 420,
+        'consumer_checks': 420, 'total_checks': 420,
+        'wrong_tail_checked': 420,
+    }
+    actual = {
+        'test_ok': status_ok, 'test_invalid': status_invalid,
+        'test_build': status_build, 'test_bounds': status_bounds,
+        'production_invalid': production_invalid,
+        'production_numeric': production_numeric,
+        'candidate_cases': candidate_cases, 'legal_cases': legal_cases,
+        'fail_closed_cases': fail_closed_cases,
+        'axis_cases_checked': axis_cases_checked,
+        'bernstein_checks': bernstein_checks, 'tail_checks': tail_checks,
+        'consumer_checks': consumer_checks, 'total_checks': total_checks,
+        'wrong_tail_checked': wrong_tail_checked,
+    }
+    for key, expected_value in expected.items():
+        if actual[key] != expected_value:
+            failures.append(
+                f'matrix {key}: expected {expected_value} got {actual[key]}')
+    if fail_closed_statuses != {status_build: 20}:
+        failures.append(
+            f'subnormal status matrix: expected {{{status_build}: 20}} '
+            f'got {fail_closed_statuses}')
+    if invalid_ok != 0 or invalid_status.value != status_invalid:
         failures.append(
             f'invalid input status mismatch ok={invalid_ok} '
             f'status={invalid_status.value}')
-    if fail_closed_cases == 0:
-        failures.append('subnormal fixture did not fail closed')
-    if wrong_tail_underbound == 0:
-        failures.append('old local Bernstein-as-power tail was never under-bound')
+    if not any(item['underbound'] for item in r14b_details):
+        failures.append('R14b counterexample has no under-bound axis')
     report = {
         'test': 'S06-112',
+        'run_id': 'M5-06-R21-20261111',
+        'code_commit': os.environ.get('FLIGHT_CODE_COMMIT', 'UNKNOWN'),
+        'library_sha256': hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest(),
+        'environment': {
+            'python': platform.python_version(),
+            'platform': platform.platform(),
+            'compiler': os.environ.get('CC', 'host gcc'),
+        },
         'seed': 'deterministic',
         'steps': list(STEPS),
         'u0s': list(U0S),
@@ -249,7 +317,7 @@ def main():
         'candidate_cases': candidate_cases,
         'legal_cases': legal_cases,
         'fail_closed_cases': fail_closed_cases,
-        'fail_closed_statuses': fail_closed_statuses,
+        'fail_closed_statuses': {str(k): v for k, v in fail_closed_statuses.items()},
         'invalid_input_status': invalid_status.value,
         'axis_cases_checked': axis_cases_checked,
         'bernstein_checks': bernstein_checks,
@@ -258,6 +326,9 @@ def main():
         'total_checks': total_checks,
         'wrong_tail_checked': wrong_tail_checked,
         'wrong_tail_underbound': wrong_tail_underbound,
+        'r14b_axis_checks': len(r14b_details),
+        'r14b_axis_underbound': sum(1 for item in r14b_details if item['underbound']),
+        'r14b_details': r14b_details,
         'coverage_slack': {name: {'min_slack': float(value['min_slack'])
                                   if value['min_slack'] is not None else None}
                            for name, value in coverage.items()},
