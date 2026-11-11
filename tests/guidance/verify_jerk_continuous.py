@@ -9,6 +9,7 @@ from the power-basis coefficients and evaluates the old
 "Bernstein controls used as power coefficients" formula over the whole
 [1, u_tail] interval, including its stationary point.
 """
+import argparse
 import ctypes
 import hashlib
 import json
@@ -139,9 +140,17 @@ class Probes:
 
 
 def main():
-    if len(sys.argv) < 2:
-        raise SystemExit('usage: verify_jerk_continuous.py <libm5_safety_oracle.so>')
-    probes = Probes(sys.argv[1])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("library", nargs="?")
+    parser.add_argument("--library", dest="library_opt")
+    parser.add_argument("--run-id", default="M5-06-R25-20261111")
+    parser.add_argument("--code-commit", default=os.environ.get("FLIGHT_CODE_COMMIT", "UNKNOWN"))
+    parser.add_argument("--output")
+    args = parser.parse_args()
+    library = args.library_opt or args.library
+    if not library:
+        raise SystemExit("usage: verify_jerk_continuous.py --library <so> [--run-id ...] [--code-commit ...] [--output ...]")
+    probes = Probes(library)
     raw = [ctypes.c_uint8() for _ in range(6)]
     probes.status_values(*[ctypes.byref(v) for v in raw])
     status_ok = raw[0].value
@@ -336,9 +345,9 @@ def main():
         'test': 'S06-112',
         'status': status,
         'exit_code': 1 if failures else 0,
-        'run_id': 'M5-06-R23-20261111',
-        'code_commit': os.environ.get('FLIGHT_CODE_COMMIT', 'UNKNOWN'),
-        'library_sha256': hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest(),
+        'run_id': args.run_id,
+        'code_commit': args.code_commit,
+        'library_sha256': hashlib.sha256(Path(library).read_bytes()).hexdigest(),
         'environment': {
             'python': platform.python_version(),
             'platform': platform.platform(),
@@ -369,7 +378,11 @@ def main():
                            for name, value in coverage.items()},
         'failures': failures[:10],
     }
-    print(json.dumps(report, indent=2))
+    text = json.dumps(report, indent=2)
+    if args.output:
+        Path(args.output).write_text(text + "\n", encoding="utf-8")
+    else:
+        print(text)
     if failures:
         print(f'M5_S06_112_CONTINUOUS_JERK_{status} '
               f'(local sub-interval Bernstein, three separate bounds, exact Fraction '

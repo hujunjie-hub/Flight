@@ -858,6 +858,16 @@ static double consumer_eval_error_bound(
   }
   if (!isfinite(coefficient_term) || !isfinite(magnitude_term))
     return INFINITY;
+  {
+    /* Horner intermediate H_k = |c_k| + s_max * H_(k+1), outward at every step. */
+    double h = fabs((double)consumer[degree]);
+    if (!isfinite(h)) return INFINITY;
+    for (i = degree; i-- > 0u;) {
+      h = add_upper_nonnegative(fabs((double)consumer[i]),
+          multiply_upper_nonnegative(h, s_max));
+      if (!isfinite(h)) return INFINITY;
+    }
+  }
   if (magnitude_term > 0.0) {
     /* Overflow risk in the Horner chain: the gamma model no longer applies. */
     if (magnitude_term > (double)FLT_MAX * 0.0625) return INFINITY;
