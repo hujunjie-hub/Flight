@@ -93,4 +93,13 @@ void m5_local_map_voxel_center(const M5LocalMap *map, uint16_t voxel,
 uint8_t m5_local_map_voxel_state(const M5LocalMap *map, uint16_t voxel,
                                  uint64_t now_us, uint8_t *state);
 
+#ifdef FLIGHT_M5_HOST_PLANNER
+/* Test-only differential hooks: legacy stack-copy reference and the in-place
+   implementation used by production. */
+void m5_local_map_test_roll_reference(M5LocalMap *map,
+                                      const float position_ned_m[3]);
+void m5_local_map_test_roll_inplace(M5LocalMap *map,
+                                    const float position_ned_m[3]);
+#endif
+
 #endif /* M5_LOCAL_MAP_H */

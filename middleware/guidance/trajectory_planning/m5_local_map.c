@@ -68,7 +68,83 @@ void m5_local_map_voxel_center(const M5LocalMap *map, uint16_t voxel, float p[3]
   p[2] = map->center_ned_m[2] - 3.75f + 0.5f * (float)iz;
 }
 
+static M5MapCell *map_cell_at(M5MapCell *cells, unsigned axis,
+                              unsigned line0, unsigned line1, unsigned pos)
+{
+  switch (axis) {
+    case 0u: return &cells[line0 * 256u + line1 * 16u + pos];
+    case 1u: return &cells[line0 * 256u + pos * 16u + line1];
+    default: return &cells[pos * 256u + line0 * 16u + line1];
+  }
+}
+
+/* One-axis in-place translation: destination = source - shift. Iterate in the
+   direction that has already consumed the destination slot, then clear the
+   vacated slice. No 4096-cell stack copy is needed. */
+static void roll_axis_inplace(M5MapCell *cells, unsigned axis, int shift)
+{
+  unsigned line0, line1, i;
+  if (shift == 0) return;
+  for (line0 = 0u; line0 < 16u; ++line0) {
+    for (line1 = 0u; line1 < 16u; ++line1) {
+      if (shift > 0) {
+        unsigned amount = (unsigned)shift;
+        for (i = 0u; i + amount < 16u; ++i)
+          *map_cell_at(cells, axis, line0, line1, i) =
+              *map_cell_at(cells, axis, line0, line1, i + amount);
+        for (i = 16u - amount; i < 16u; ++i)
+          memset(map_cell_at(cells, axis, line0, line1, i), 0,
+                 sizeof(M5MapCell));
+      } else {
+        unsigned amount = (unsigned)(-shift);
+        for (i = 15u; i >= amount; --i)
+          *map_cell_at(cells, axis, line0, line1, i) =
+              *map_cell_at(cells, axis, line0, line1, i - amount);
+        for (i = 0u; i < amount; ++i)
+          memset(map_cell_at(cells, axis, line0, line1, i), 0,
+                 sizeof(M5MapCell));
+      }
+    }
+  }
+}
+
 static void roll_map_to_position(M5LocalMap *map, const float position_ned_m[3])
+{
+  int shift[3];
+  unsigned axis;
+  uint8_t changed = 0u, clear_all = 0u;
+  for (axis = 0u; axis < 3u; ++axis) {
+    float delta = position_ned_m[axis] - map->center_ned_m[axis];
+    if (!isfinite(delta)) return;
+    if (fabsf(delta) >= (2.0f * M5_MAP_HALF_EXTENT_M)) {
+      clear_all = 1u;
+      shift[axis] = 0;
+    } else {
+      shift[axis] = (int)roundf(delta / M5_MAP_CELL_SIZE_M);
+      if (shift[axis] != 0) changed = 1u;
+    }
+  }
+  if (!changed && !clear_all) return;
+  if (clear_all || abs(shift[0]) >= 16 || abs(shift[1]) >= 16 || abs(shift[2]) >= 16) {
+    memset(map->cells, 0, sizeof(map->cells));
+    for (axis = 0u; axis < 3u; ++axis)
+      map->center_ned_m[axis] = roundf(position_ned_m[axis] / M5_MAP_CELL_SIZE_M) *
+                                M5_MAP_CELL_SIZE_M;
+  } else {
+    for (axis = 0u; axis < 3u; ++axis)
+      roll_axis_inplace(map->cells, axis, shift[axis]);
+    for (axis = 0u; axis < 3u; ++axis)
+      map->center_ned_m[axis] += (float)shift[axis] * M5_MAP_CELL_SIZE_M;
+  }
+  map->map_revision++;
+  if (map->map_revision == 0u) map->map_revision = 1u;
+}
+
+#if defined(FLIGHT_M5_HOST_PLANNER)
+/* Differential reference: the legacy stack-copy implementation. It is kept
+   test-only, never linked into the product path. */
+void m5_local_map_test_roll_reference(M5LocalMap *map,
+                                      const float position_ned_m[3])
 {
   M5MapCell shifted[M5_MAP_CELL_COUNT];
   int shift[3];
@@ -113,6 +189,13 @@ static void roll_map_to_position(M5LocalMap *map, const float position_ned_m[3])
   map->map_revision++;
   if (map->map_revision == 0u) map->map_revision = 1u;
 }
+
+void m5_local_map_test_roll_inplace(M5LocalMap *map,
+                                    const float position_ned_m[3])
+{
+  roll_map_to_position(map, position_ned_m);
+}
+#endif
 
 static uint8_t context_matches(const M5LocalMap *map, const NavigationSnapshot *nav)
 {

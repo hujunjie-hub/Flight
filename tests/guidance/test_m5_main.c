@@ -1169,6 +1169,55 @@ static void test_m5_map_roll_preserves_world_cells(void)
   CHECK(state == M5_MAP_CELL_FREE_CONFIRMED);
 }
 
+static void test_m5_map_roll_inplace_differential(void)
+{
+  M5LocalMap base, reference, inplace;
+  NavigationSnapshot nav;
+  const uint64_t t0 = 1600000u;
+  static const int shifts[] = {-16, -15, -8, -1, 0, 1, 7, 15, 16};
+  unsigned i, axis, s;
+
+  planner_nav_init(&nav, t0);
+  CHECK(m5_local_map_init(&base, &nav, t0, 0.25f, 0.30f, 2.0f,
+                          M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
+  for (i = 0u; i < M5_MAP_CELL_COUNT; ++i) {
+    base.cells[i].state = (uint8_t)(i % 5u);
+    base.cells[i].log_odds = (int8_t)((int)(i % 33u) - 16);
+    base.cells[i].source_mask = (uint8_t)(1u + (i % 3u));
+    base.cells[i].last_update_ms = (uint32_t)(t0 / 1000u + i);
+  }
+  base.map_revision = 77u;
+  for (axis = 0u; axis < 3u; ++axis) base.center_ned_m[axis] = 0.0f;
+
+  for (s = 0u; s < sizeof(shifts) / sizeof(shifts[0]); ++s) {
+    float target[3];
+    for (axis = 0u; axis < 3u; ++axis) {
+      target[axis] = (float)shifts[s] * M5_MAP_CELL_SIZE_M;
+      if (axis != 1u) target[axis] = 0.0f;
+    }
+    /* Exercise each axis separately and a combined shift. */
+    for (i = 0u; i < 4u; ++i) {
+      reference = base;
+      inplace = base;
+      if (i < 3u) {
+        target[0] = target[1] = target[2] = 0.0f;
+        target[i] = (float)shifts[s] * M5_MAP_CELL_SIZE_M;
+      } else {
+        target[0] = (float)shifts[s] * M5_MAP_CELL_SIZE_M;
+        target[1] = (float)shifts[s] * M5_MAP_CELL_SIZE_M;
+        target[2] = -(float)shifts[s] * M5_MAP_CELL_SIZE_M;
+      }
+      m5_local_map_test_roll_reference(&reference, target);
+      m5_local_map_test_roll_inplace(&inplace, target);
+      CHECK(memcmp(reference.cells, inplace.cells,
+                   sizeof(reference.cells)) == 0);
+      CHECK(reference.map_revision == inplace.map_revision);
+      for (axis = 0u; axis < 3u; ++axis)
+        CHECK(reference.center_ned_m[axis] == inplace.center_ned_m[axis]);
+    }
+  }
+}
+
 static void test_m5_map_free_ray_log_odds_and_stale(void)
 {
   M5LocalMap map;
@@ -5852,6 +5901,7 @@ int main(void)
     {"m5_map_fixed_grid_bounds", test_m5_map_fixed_grid_and_bounds},
     {"m5_map_origin_cell_aligned", test_m5_map_initial_origin_is_cell_aligned},
     {"m5_map_roll_preserves_world_cells", test_m5_map_roll_preserves_world_cells},
+    {"m5_map_roll_inplace_differential", test_m5_map_roll_inplace_differential},
     {"m5_map_free_ray_stale", test_m5_map_free_ray_log_odds_and_stale},
     {"m5_map_source_lease_refresh", test_m5_map_source_lease_refresh},
     {"m5_map_occupied_dynamic_track", test_m5_map_occupied_primitive_and_dynamic_track},
