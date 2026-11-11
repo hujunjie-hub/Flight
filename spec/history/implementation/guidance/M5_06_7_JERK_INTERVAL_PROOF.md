@@ -162,3 +162,11 @@ wrong_tail_checked=420, wrong_tail_underbound=122
 
 新增真正零 jerk 状态（位置/速度/加速度全零，X/Y/Z）和独立恒加速度非零状态。
 60/d³、position_low/high、正确 Bernstein-to-power 与 consumer binary32 上界保持。
+
+## 11. R20 测试状态与生产状态分离
+
+测试 API 使用 `M5_TEST_JERK_STATUS_*`（0 OK、1 INVALID_INPUT、2 BUILD_NUMERIC、
+3 BOUNDS_NUMERIC），不得与生产 `M5_SAFETY_INVALID=3`、`M5_SAFETY_NUMERIC_FAILURE=11`
+混用。合法样本要求 status=0；只有 subnormal 接受 2/3；invalid input 要求 1。
+生产路径另测：动态极端与 subnormal jerk 夹具均返回 `M5_SAFETY_NUMERIC_FAILURE`
+且 `reason_code=M5_SAFETY_REASON_NUMERIC`。

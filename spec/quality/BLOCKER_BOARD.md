@@ -1,11 +1,13 @@
-# Flight M5-06 阻塞项视图（R19）
+# Flight M5-06 阻塞项视图（R20）
 
 本文件只做 Issue Register 的**派生视图**，不维护第二套状态。数据源：
 `spec/quality/ISSUE_REGISTER.md`。状态、严重度、责任方和复验结论以该登记为准。
 `GITHUB_PUBLICATION = PENDING`：Agent 无 GitHub 写权限，不虚构 Issue 编号或在线状态。
 
-当前基线：代码 `fa1de8f78c2e29eda741ac32985fd38a8c4ee5de`（R16），
-R19 工作基线 `7554b41...`；RUN_ID `M5-06-R19-20261111`。
+当前基线：R19 代码 `8b112f0279735f4f9977f4314b81dccf203b14c3`；R19 归档 HEAD
+`5b87ff5f3cae98a5293a7a2fcdb9d0247da0f765`；Remote HEAD
+`51e7e923419733f5aa3b21efa1e46588629623ed`；本地领先 50 commits；
+RUN_ID `M5-06-R20-20261111`。
 所有命令均从仓库根目录执行；Host/SIL 结果不构成 H723 实机、HIL 或飞行放行。
 
 ---
@@ -210,8 +212,17 @@ R19 工作基线 `7554b41...`；RUN_ID `M5-06-R19-20261111`。
 
 ### FLIGHT-LOCAL-30 归档字段
 
-- S2；R19 archive script 生成外部 sidecar/report；正式 Manifest 不再用 PENDING 冒充完整值，
+- S2；R19/R20 archive script 生成外部 sidecar/report；正式 Manifest 不再用 PENDING 冒充完整值，
   ZIP 内不保存自身哈希。
+
+### FLIGHT-LOCAL-31 S06-112 历史证据
+
+- S2；R20 `S06_112_EVIDENCE_INDEX.md` 标记 R16/R18/R19 为 HISTORICAL/SUPERSEDED；
+  只有 `s06_112_r20.json` 是当前结果，旧文件 SHA256 保留。
+
+### FLIGHT-LOCAL-32 基线元数据
+
+- S2；R20 统一 BLOCKER_BOARD/Manifest/资源摘要到 R19 代码、归档 HEAD 和 50 commits。
 
 ## 派生规则
 

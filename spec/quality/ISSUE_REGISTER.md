@@ -62,6 +62,8 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-28 | S1 | S06-112 把所有 C API 拒绝都计为预期 fail-closed，可能掩盖合法样本意外拒绝 | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 状态码区分；次正规仅接受 NUMERIC | S06-112 140 legal/20 subnormal status=2 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-29 | S2 | R18 地图原地滚动报告 104 B，漏算 map_cell_at 24 B；真实 128 B | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 反汇编/.su 修正 | roll 40 + axis 64 + map_cell_at 24 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-30 | S2 | R18 Manifest 归档字段/外部 sidecar 未闭环 | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 archive script + external report | r19 archive report/sidecar | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-31 | S2 | S06-112 历史结果文件未明确标记过期，存在证据混用风险 | R20 173360d49882dd98cb2a11ac26d189fc0e2f57a4 证据索引/状态 | S06_112_EVIDENCE_INDEX.md；r20 唯一 current | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-32 | S2 | R19 阻塞视图、Manifest、资源摘要历史基线描述滞后 | R20 173360d49882dd98cb2a11ac26d189fc0e2f57a4 | 文档/Manifest 基线统一 | FIXED_WAITING_RETEST |
 
 历史 draft 01–20 保留在 `build/validation/issue_drafts/`；本表按根因去重，不删除
 任何失败记录。

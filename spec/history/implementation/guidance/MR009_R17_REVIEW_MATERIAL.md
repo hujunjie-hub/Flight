@@ -50,3 +50,9 @@ MR-009 status: APPROVED / REJECTED / NEEDS_INFO
 Reviewer: __________  Date: ______
 Scope: Host/SIL M5-06 only; excludes H723 runtime/WCET/HIL/flight
 ```
+
+## R20 状态码补充
+
+测试 API 状态与生产 `M5TrajectorySafetyStatus` 是两套命名空间；R20 用
+`M5_TEST_JERK_STATUS_*` 区分。合法样本全部 status=0，subnormal 仅接受 2/3，
+invalid 输入 status=1；生产路径另测 NUMERIC_FAILURE + reason_code。
