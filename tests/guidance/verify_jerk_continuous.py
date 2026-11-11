@@ -272,6 +272,7 @@ def main():
         'axis_cases_checked': 420, 'bernstein_checks': 420, 'tail_checks': 420,
         'consumer_checks': 420, 'total_checks': 420,
         'wrong_tail_checked': 420,
+        'r14b_axis_checks': 60, 'r14b_axis_underbound': 6,
     }
     actual = {
         'test_ok': status_ok, 'test_invalid': status_invalid,
@@ -284,6 +285,8 @@ def main():
         'bernstein_checks': bernstein_checks, 'tail_checks': tail_checks,
         'consumer_checks': consumer_checks, 'total_checks': total_checks,
         'wrong_tail_checked': wrong_tail_checked,
+        'r14b_axis_checks': len(r14b_details),
+        'r14b_axis_underbound': sum(1 for item in r14b_details if item['underbound']),
     }
     for key, expected_value in expected.items():
         if actual[key] != expected_value:
@@ -297,11 +300,15 @@ def main():
         failures.append(
             f'invalid input status mismatch ok={invalid_ok} '
             f'status={invalid_status.value}')
-    if not any(item['underbound'] for item in r14b_details):
-        failures.append('R14b counterexample has no under-bound axis')
+    r14b_under = [item for item in r14b_details if item['underbound']]
+    if len(r14b_under) != 6:
+        failures.append(f'R14b under-bound matrix: expected 6 got {len(r14b_under)}')
+    if not all(item.get('wrong_max_fraction') and item.get('true_tail_fraction')
+               for item in r14b_under):
+        failures.append('R14b under-bound record lacks exact Fraction')
     report = {
         'test': 'S06-112',
-        'run_id': 'M5-06-R21-20261111',
+        'run_id': 'M5-06-R22-20261111',
         'code_commit': os.environ.get('FLIGHT_CODE_COMMIT', 'UNKNOWN'),
         'library_sha256': hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest(),
         'environment': {
