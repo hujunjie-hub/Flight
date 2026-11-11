@@ -299,3 +299,25 @@ R16 将 validator 的 jerk 上界拆成 Bernstein 原区间、幂基尾段、con
 三类。S06-112 分别对 Fraction 连续最大值验证，组件检查 1080 次；总界为三者最大。
 S06-113 用 additive-seconds 参数注入 4×γ₂，实测 error/γ₂ 为 3.618–4.059，而不是
 整数微秒截断产生的 1 微秒误差。MR-009 仍未 APPROVED。
+
+## 22. R24：Horner 中间值上界（补充，不是 APPROVED）
+
+`consumer_eval_error_bound()` 旧量 `sum |c_i| s^i` 只约束输入幅度，不能单独证明
+Horner 每级中间值不溢出。R24 记录所需的逐级向外舍入上界（生产代码尚未实现，见“尚未证明”）：
+
+```text
+H_n = |c_n|
+H_k = |c_k| + s_max * H_(k+1)，k=n-1..0
+```
+
+对 position（5 次）、velocity（4 次）、acceleration（3 次）及导数缩放
+`3c3, 24c4, 60c5` 分别计算；任一级非有限即返回 INFINITY/NUMERIC_FAILURE。
+保留 gamma_n 误差项和次正规项，不改变 4,096 B 预算或安全阈值。
+
+分类：
+- 已证明：Bernstein jerk `60/d^3`、Bernstein-to-power、`u_tail`、六个 R14b Fraction 反例。
+- 已测试：S06-112 局部控制点/Fraction、S06-113 注入、生产 NUMERIC/reason 夹具。
+- 尚未证明/未实现：生产代码尚未加入逐级 H_k 检查；这是 MR-009 的未关闭缺口，需独立审查与实现评审。
+- 前置条件：`s_max` 上界、系数有限性、编译器 FP 环境（无 contraction、无 fast-math）。
+
+MR-009 仍为 **WAITING_INDEPENDENT_REVIEW**，Agent 不 APPROVE。

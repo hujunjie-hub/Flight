@@ -67,13 +67,15 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-33 | S1 | S06-112 次正规拒绝及旧公式负向断言不足，单个拒绝即可 PASS | R21 0642bdaf9ba370c079b3b447a3d4acc4cd0bc514 严格矩阵/R14b 细节 | 160/140/20 status2/420；R14b 6/60 underbound | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-34 | S2 | S06-112 证据索引绑定错误代码 SHA | R21 0642bdaf9ba370c079b3b447a3d4acc4cd0bc514 索引 | 索引/library/Manifest 一致 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-35 | S2 | analysis_p2 历史 32,840 B 与当前 128 B 描述冲突 | R21 0642bdaf9ba370c079b3b447a3d4acc4cd0bc514 | 文首摘要 + HISTORICAL 标记 | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-36 | S2 | Manifest/Blocker Board/外部归档报告元数据定义不一致 | R21 0642bdaf9ba370c079b3b447a3d4acc4cd0bc514 | archive report 增加 commit/ahead/baseline | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-36 | S2 | Manifest/Blocker Board/外部归档报告元数据定义不一致 | R21 0642bdaf9ba370c079b3b447a3d4acc4cd0bc514 | archive report 增加 commit/ahead/baseline | BLOCKED |
 | FLIGHT-LOCAL-37 | S2 | Host/ARM 测试环境记录过期或缺少精确工具链绑定 | R22 9e4f5ef 环境证据 | r22_environment.json；旧 environment.txt 标 HISTORICAL | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-38 | S2 | 回归证据缺少逐项 RUN_ID 绑定，历史 Manifest 未标记 | R22 9e4f5ef | r22_test_results.json；历史 Manifest 索引 | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-39 | S1 | S06-112 JSON 含 PASS 文本，无法 json.loads；需独立解析验证 | R23 e89cb7d JSON/log 分离 + 严格六记录 | JSON_OK；r14b 6/6 exact | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-40 | S1 | 测试结果收集器硬编码、逐项证据不完整 | R23 e89cb7d tools/collect_validation_results.py | 9 负向自测 + 逐项字段 | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-41 | S2 | R22 归档时工作区存在未提交工具修改及生成文件 | R23 e89cb7d 工具提交/证据路径/SHA | 工作区审查表 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-38 | S2 | 回归证据缺少逐项 RUN_ID 绑定，历史 Manifest 未标记 | R22 9e4f5ef | r22_test_results.json；历史 Manifest 索引 | BLOCKED |
+| FLIGHT-LOCAL-39 | S1 | S06-112 JSON 含 PASS 文本，无法 json.loads；需独立解析验证 | R23/R24 e89cb7d JSON/log 分离 + 严格六记录 | JSON_OK；r14b 6/6 exact | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-40 | S1 | 测试结果收集器硬编码、逐项证据不完整 | R23 e89cb7d tools/collect_validation_results.py | 9 负向自测 + 逐项字段 | BLOCKED |
+| FLIGHT-LOCAL-41 | S2 | R22 归档时工作区存在未提交工具修改及生成文件 | R23 e89cb7d 工具提交/证据路径/SHA | 工作区审查表 | BLOCKED |
 
 历史 draft 01–20 保留在 `build/validation/issue_drafts/`；本表按根因去重，不删除
 任何失败记录。
 
+
+详细记录：`spec/quality/R24_ISSUE_DETAILS.md`。
