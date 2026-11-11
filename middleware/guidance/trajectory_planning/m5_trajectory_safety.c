@@ -2278,7 +2278,7 @@ uint8_t m5_trajectory_safety_test_curve_jerk_components(
       !isfinite(duration_s) || duration_s <= 0.0f ||
       !isfinite(u0) || !isfinite(u1) || u0 < 0.0f ||
       u1 > 1.0f || u1 <= u0) {
-    if (status != NULL) *status = 1u;
+    if (status != NULL) *status = M5_TEST_JERK_STATUS_INVALID_INPUT;
     return 0u;
   }
 
@@ -2292,15 +2292,15 @@ uint8_t m5_trajectory_safety_test_curve_jerk_components(
     end.point.velocity_ned_mps[axis] = end_velocity[axis];
     end.point.acceleration_ned_mps2[axis] = end_acceleration[axis];
   }
-  *status = 0u;
+  *status = M5_TEST_JERK_STATUS_OK;
   if (!build_curve(&start, &end, (double)duration_s,
                    (float)u0, (float)u1, &bezier)) {
-    *status = 2u;
+    *status = M5_TEST_JERK_STATUS_BUILD_NUMERIC;
     return 0u;
   }
   local_duration = (double)duration_s * ((double)u1 - (double)u0);
   if (!curve_bounds(&bezier, local_duration, &bounds)) {
-    *status = 3u;
+    *status = M5_TEST_JERK_STATUS_BOUNDS_NUMERIC;
     return 0u;
   }
   for (axis = 0u; axis < 3u; ++axis) {

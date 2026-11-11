@@ -3,6 +3,15 @@
 
 #include <stdint.h>
 
+/* Test-API-only jerk status. These values must not be confused with the
+   production M5TrajectorySafetyStatus enum (INVALID=3, NUMERIC_FAILURE=11). */
+typedef enum {
+  M5_TEST_JERK_STATUS_OK = 0,
+  M5_TEST_JERK_STATUS_INVALID_INPUT = 1,
+  M5_TEST_JERK_STATUS_BUILD_NUMERIC = 2,
+  M5_TEST_JERK_STATUS_BOUNDS_NUMERIC = 3
+} M5SafetyTestJerkStatus;
+
 /* Test-only adapter for the private M5-06 Hermite -> Bernstein -> bounds path. */
 uint8_t m5_trajectory_safety_test_curve_bounds(
     const float start_position[3],

@@ -2550,6 +2550,7 @@ static void test_m5_safety_finite_numeric_extreme_rejected(void)
   CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
       &fx.result) == M5_SAFETY_NUMERIC_FAILURE);
   CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_NUMERIC);
 }
 
 static void test_m5_safety_deterministic_property_fuzz(void)
@@ -5121,6 +5122,37 @@ static void safety_generous_envelope(SafetyFx *fx, float speed, float accel)
   }
 }
 
+/* Production-path numeric failure with a subnormal jerk fixture. */
+static void test_m5_safety_subnormal_jerk_numeric_failure(void)
+{
+  SafetyFx fx;
+  static const float position[3] = {0.0f, 0.0f, -5.0f};
+  static const float velocity[3] = {0.0f, 0.0f, 0.0f};
+  static const float start_acceleration[3] = {1.17549435e-38f, 1.40129846e-45f, 0.0f};
+  static const float end_acceleration[3] = {-1.17549435e-38f, -1.40129846e-45f, 0.0f};
+  unsigned i;
+
+  safety_fx_init(&fx, 59000000u);
+  safety_generous_envelope(&fx, 1000.0f, 100000.0f);
+  for (i = 0u; i < 3u; ++i) {
+    fx.base.nav.core.position_ned_m[i] = position[i];
+    fx.base.nav.core.velocity_ned_mps[i] = velocity[i];
+    fx.base.nav.core.acceleration_ned_mps2[i] = start_acceleration[i];
+  }
+  safety_point_set_full(&fx.reference.anchor, position, velocity,
+                        start_acceleration);
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i)
+    safety_point_set_full(&fx.reference.points[i], position, velocity,
+                          end_acceleration);
+  safety_map_reset(&fx);
+  safety_zero_uncertainty(&fx);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_NUMERIC_FAILURE);
+  CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_NUMERIC);
+}
+
+
 static void safety_mark_occupied(SafetyFx *fx, float x, float y, float z)
 {
   const float point[3] = {x, y, z};
@@ -6046,6 +6078,7 @@ int main(void)
     {"m5_safety_geofence_height_margins", test_m5_safety_geofence_height_margins},
     {"m5_safety_preview_time_overflow", test_m5_safety_preview_time_overflow_rejected},
     {"m5_safety_numeric_finite_extreme", test_m5_safety_finite_numeric_extreme_rejected},
+    {"m5_safety_subnormal_jerk_numeric", test_m5_safety_subnormal_jerk_numeric_failure},
     {"m5_safety_property_fuzz", test_m5_safety_deterministic_property_fuzz},
     {"m5_safety_geometry_clearance_reference", test_m5_safety_geometry_clearance_reference},
     {"m5_safety_random_polygon_dynamic_track_fuzz", test_m5_safety_random_polygon_dynamic_track_fuzz},

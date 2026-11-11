@@ -22,6 +22,10 @@ from m5_product_envelope import exact_coefficients
 U = Fraction(1, 1 << 24)
 GAMMA2 = (2 * U) / (1 - 2 * U)
 STEPS = (20000, 40000)
+JERK_STATUS_OK = 0
+JERK_STATUS_INVALID_INPUT = 1
+JERK_STATUS_BUILD_NUMERIC = 2
+JERK_STATUS_BOUNDS_NUMERIC = 3
 U0S = (0.0, 0.25, 0.5, 0.75)
 U1S = (0.25, 0.5, 0.75, 1.0)
 
@@ -120,6 +124,14 @@ def main():
     if len(sys.argv) < 2:
         raise SystemExit('usage: verify_jerk_continuous.py <libm5_safety_oracle.so>')
     probes = Probes(sys.argv[1])
+    invalid_status = ctypes.c_uint8(0)
+    invalid_arrays = [(ctypes.c_float * 3)(*values) for values in COUNTEREXAMPLE]
+    invalid_ok = probes.components(
+        *invalid_arrays, ctypes.c_float(f32(20000 * f32(1e-6))),
+        ctypes.c_float(0.5), ctypes.c_float(0.5),
+        (ctypes.c_float * 3)(), (ctypes.c_float * 3)(),
+        (ctypes.c_float * 3)(), (ctypes.c_float * 3)(),
+        ctypes.byref(invalid_status))
     candidate_cases = 0
     legal_cases = 0
     fail_closed_cases = 0
@@ -166,7 +178,7 @@ def main():
                                              ctypes.c_float(u0), ctypes.c_float(u1),
                                              bernstein, tail_bound, consumer, total,
                                              ctypes.byref(status)):
-                        if state_name == 'subnormal' and status.value in (2, 3):
+                        if state_name == 'subnormal' and status.value in (JERK_STATUS_BUILD_NUMERIC, JERK_STATUS_BOUNDS_NUMERIC):
                             fail_closed_cases += 1
                             fail_closed_statuses[status.value] =                                 fail_closed_statuses.get(status.value, 0) + 1
                             continue
@@ -219,6 +231,10 @@ def main():
                         wrong_tail_checked += 1
                         if wrong_max < true_tail:
                             wrong_tail_underbound += 1
+    if invalid_ok != 0 or invalid_status.value != JERK_STATUS_INVALID_INPUT:
+        failures.append(
+            f'invalid input status mismatch ok={invalid_ok} '
+            f'status={invalid_status.value}')
     if fail_closed_cases == 0:
         failures.append('subnormal fixture did not fail closed')
     if wrong_tail_underbound == 0:
@@ -234,6 +250,7 @@ def main():
         'legal_cases': legal_cases,
         'fail_closed_cases': fail_closed_cases,
         'fail_closed_statuses': fail_closed_statuses,
+        'invalid_input_status': invalid_status.value,
         'axis_cases_checked': axis_cases_checked,
         'bernstein_checks': bernstein_checks,
         'tail_checks': tail_checks,
