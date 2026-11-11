@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import platform
+import random
 import struct
 import sys
 from pathlib import Path
@@ -145,8 +146,11 @@ def main():
     parser.add_argument("--library", dest="library_opt")
     parser.add_argument("--run-id", default="M5-06-R25-20261111")
     parser.add_argument("--code-commit", default=os.environ.get("FLIGHT_CODE_COMMIT", "UNKNOWN"))
+    parser.add_argument("--seed", default="0x53313632")
     parser.add_argument("--output")
     args = parser.parse_args()
+    seed = int(args.seed, 0)
+    rng = random.Random(seed)
     library = args.library_opt or args.library
     if not library:
         raise SystemExit("usage: verify_jerk_continuous.py --library <so> [--run-id ...] [--code-commit ...] [--output ...]")
@@ -182,7 +186,12 @@ def main():
     coverage = {name: {'min_slack': None}
                 for name in ('bernstein', 'tail', 'consumer', 'total')}
     failures = []
-    for step_us in STEPS:
+    step_order = list(STEPS)
+    u0_order = list(U0S)
+    u1_order = list(U1S)
+    for order in (step_order, u0_order, u1_order):
+        rng.shuffle(order)
+    for step_us in step_order:
         h = f32(step_us * f32(1e-6))
         states = [
             ('r14b_counterexample', COUNTEREXAMPLE),
@@ -194,14 +203,15 @@ def main():
             ('huge', HUGE),
             ('subnormal', SUBNORMAL),
         ]
+        rng.shuffle(states)
         for state_name, state in states:
             arrays = [(ctypes.c_float * 3)(*values) for values in state]
             coefficients = (ctypes.c_float * 18)()
             if not probes.coeff(step_us, 0, *arrays, coefficients):
                 failures.append(f'coefficient API failed {state_name}')
                 continue
-            for u0 in U0S:
-                for u1 in U1S:
+            for u0 in u0_order:
+                for u1 in u1_order:
                     if u1 <= u0:
                         continue
                     candidate_cases += 1
@@ -353,7 +363,7 @@ def main():
             'platform': platform.platform(),
             'compiler': os.environ.get('CC', 'host gcc'),
         },
-        'seed': 'deterministic',
+        'seed': hex(seed),
         'steps': list(STEPS),
         'u0s': list(U0S),
         'u1s': list(U1S),

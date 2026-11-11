@@ -5152,6 +5152,158 @@ static void test_m5_safety_subnormal_jerk_numeric_failure(void)
   CHECK(fx.result.reason_code == M5_SAFETY_REASON_NUMERIC);
 }
 
+/* MR-009 R28: exercise the production per-level Horner bound directly and
+   through the production validator with finite extreme coefficients. */
+static void test_m5_safety_mr009_horner_bound_extremes(void)
+{
+  double low[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+  double high[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+  float c[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+  double bound;
+
+  c[0] = 1.0f;
+  bound = m5_trajectory_safety_test_consumer_error_bound(
+      c, 5u, 10u, 0.02, low, high);
+  CHECK(isfinite(bound) && bound >= 0.0);
+
+  /* FLT_MAX near c0/c1: the H_k accumulation must overflow to +Inf. */
+  c[0] = FLT_MAX;
+  c[1] = FLT_MAX;
+  c[2] = FLT_MAX;
+  bound = m5_trajectory_safety_test_consumer_error_bound(
+      c, 5u, 10u, 1.0, low, high);
+  CHECK(isinf(bound));
+
+  /* Positive/negative cancellation cannot hide the magnitude term. */
+  c[0] = FLT_MAX;
+  c[1] = -FLT_MAX;
+  c[2] = FLT_MAX;
+  c[3] = -FLT_MAX;
+  c[4] = FLT_MAX;
+  c[5] = -FLT_MAX;
+  bound = m5_trajectory_safety_test_consumer_error_bound(
+      c, 5u, 10u, 1.0, low, high);
+  CHECK(isinf(bound));
+
+  /* Velocity coefficient scaling (5c5..2c2) with FLT_MAX. */
+  c[0] = 0.0f;
+  c[1] = FLT_MAX;
+  c[2] = FLT_MAX;
+  c[3] = FLT_MAX;
+  c[4] = FLT_MAX;
+  c[5] = 0.0f;
+  bound = m5_trajectory_safety_test_consumer_error_bound(
+      c, 4u, 12u, 1.0, low, high);
+  CHECK(isinf(bound));
+
+  /* Acceleration coefficient scaling (20c5..2c2) with FLT_MAX. */
+  c[0] = 0.0f;
+  c[1] = 0.0f;
+  c[2] = FLT_MAX;
+  c[3] = FLT_MAX;
+  c[4] = FLT_MAX;
+  c[5] = 0.0f;
+  bound = m5_trajectory_safety_test_consumer_error_bound(
+      c, 3u, 10u, 1.0, low, high);
+  CHECK(isinf(bound));
+
+  /* Subnormal-range magnitude is rejected by the cancellation guard. */
+  c[0] = nextafterf(0.0f, 1.0f);
+  c[1] = 0.0f;
+  c[2] = 0.0f;
+  c[3] = 0.0f;
+  c[4] = 0.0f;
+  c[5] = 0.0f;
+  bound = m5_trajectory_safety_test_consumer_error_bound(
+      c, 5u, 10u, 1.0, low, high);
+  CHECK(isinf(bound));
+
+  /* A non-finite coefficient is never accepted. */
+  c[0] = NAN;
+  bound = m5_trajectory_safety_test_consumer_error_bound(
+      c, 5u, 10u, 1.0, low, high);
+  CHECK(isinf(bound));
+
+  /* Extremely short interval: finite and non-negative, no silent NaN. */
+  c[0] = 1.0f;
+  c[1] = 0.0f;
+  bound = m5_trajectory_safety_test_consumer_error_bound(
+      c, 5u, 10u, nextafter(0.0, 1.0), low, high);
+  CHECK(isfinite(bound) && bound >= 0.0);
+}
+
+static void test_m5_safety_mr009_extreme_reference_rejected(void)
+{
+  SafetyFx fx;
+  unsigned axis, i;
+
+  safety_fx_init(&fx, 59100000u);
+  safety_generous_envelope(&fx, FLT_MAX, FLT_MAX);
+  safety_map_reset(&fx);
+  safety_zero_uncertainty(&fx);
+  for (axis = 0u; axis < 3u; ++axis) {
+    fx.base.nav.core.position_ned_m[axis] = FLT_MAX;
+    fx.base.nav.core.velocity_ned_mps[axis] = FLT_MAX;
+    fx.base.nav.core.acceleration_ned_mps2[axis] = FLT_MAX;
+    fx.reference.anchor.point.position_ned_m[axis] = FLT_MAX;
+    fx.reference.anchor.point.velocity_ned_mps[axis] = FLT_MAX;
+    fx.reference.anchor.point.acceleration_ned_mps2[axis] = FLT_MAX;
+  }
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    for (axis = 0u; axis < 3u; ++axis) {
+      fx.reference.points[i].point.position_ned_m[axis] = FLT_MAX;
+      fx.reference.points[i].point.velocity_ned_mps[axis] = FLT_MAX;
+      fx.reference.points[i].point.acceleration_ned_mps2[axis] = FLT_MAX;
+    }
+  }
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) != M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 0u);
+
+  /* Cancellation: equal-magnitude opposite signs at every knot. */
+  safety_fx_init(&fx, 59200000u);
+  safety_generous_envelope(&fx, FLT_MAX, FLT_MAX);
+  safety_map_reset(&fx);
+  safety_zero_uncertainty(&fx);
+  for (axis = 0u; axis < 3u; ++axis) {
+    float sign = ((axis + 0u) & 1u) ? -1.0f : 1.0f;
+    fx.base.nav.core.position_ned_m[axis] = sign * (FLT_MAX * 0.5f);
+    fx.base.nav.core.velocity_ned_mps[axis] = -sign * (FLT_MAX * 0.5f);
+    fx.base.nav.core.acceleration_ned_mps2[axis] = sign * (FLT_MAX * 0.5f);
+    fx.reference.anchor.point.position_ned_m[axis] = sign * (FLT_MAX * 0.5f);
+    fx.reference.anchor.point.velocity_ned_mps[axis] = -sign * (FLT_MAX * 0.5f);
+    fx.reference.anchor.point.acceleration_ned_mps2[axis] = sign * (FLT_MAX * 0.5f);
+  }
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i) {
+    for (axis = 0u; axis < 3u; ++axis) {
+      float sign = (((i + axis) & 1u) != 0u) ? -1.0f : 1.0f;
+      fx.reference.points[i].point.position_ned_m[axis] = sign * (FLT_MAX * 0.5f);
+      fx.reference.points[i].point.velocity_ned_mps[axis] = -sign * (FLT_MAX * 0.5f);
+      fx.reference.points[i].point.acceleration_ned_mps2[axis] = sign * (FLT_MAX * 0.5f);
+    }
+  }
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) != M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 0u);
+
+  /* Acceleration scaling: normal positions, FLT_MAX acceleration difference.
+     This drives 2c2/6c3/12c4/20c5 and the coefficient scaling past FLT_MAX. */
+  safety_fx_init(&fx, 59300000u);
+  safety_generous_envelope(&fx, 8.0f, FLT_MAX);
+  safety_map_reset(&fx);
+  safety_zero_uncertainty(&fx);
+  for (axis = 0u; axis < 3u; ++axis) {
+    fx.base.nav.core.acceleration_ned_mps2[axis] = FLT_MAX;
+    fx.reference.anchor.point.acceleration_ned_mps2[axis] = FLT_MAX;
+  }
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i)
+    for (axis = 0u; axis < 3u; ++axis)
+      fx.reference.points[i].point.acceleration_ned_mps2[axis] = -FLT_MAX;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) != M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 0u);
+}
+
 
 static void safety_mark_occupied(SafetyFx *fx, float x, float y, float z)
 {
@@ -6079,6 +6231,8 @@ int main(void)
     {"m5_safety_preview_time_overflow", test_m5_safety_preview_time_overflow_rejected},
     {"m5_safety_numeric_finite_extreme", test_m5_safety_finite_numeric_extreme_rejected},
     {"m5_safety_subnormal_jerk_numeric", test_m5_safety_subnormal_jerk_numeric_failure},
+    {"m5_safety_mr009_horner_bound_extremes", test_m5_safety_mr009_horner_bound_extremes},
+    {"m5_safety_mr009_extreme_reference", test_m5_safety_mr009_extreme_reference_rejected},
     {"m5_safety_property_fuzz", test_m5_safety_deterministic_property_fuzz},
     {"m5_safety_geometry_clearance_reference", test_m5_safety_geometry_clearance_reference},
     {"m5_safety_random_polygon_dynamic_track_fuzz", test_m5_safety_random_polygon_dynamic_track_fuzz},

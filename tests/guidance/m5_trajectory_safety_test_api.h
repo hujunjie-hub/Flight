@@ -96,6 +96,18 @@ uint8_t m5_trajectory_safety_test_curve_envelope(
     float *velocity_error_mps,
     float *acceleration_error_mps2);
 
+/* MR-009 unit-level access to the production per-level Horner bound.  This is
+   a test-only hook compiled under FLIGHT_M5_SAFETY_TEST_API; it does not alter
+   the production ABI or the product object.  The production-path tests still
+   call m5_trajectory_safety_validate(). */
+double m5_trajectory_safety_test_consumer_error_bound(
+    const float consumer[6],
+    unsigned degree,
+    unsigned rounding_count,
+    double s_max,
+    const double exact_low[6],
+    const double exact_high[6]);
+
 uint8_t m5_trajectory_safety_test_rounding_bounds(
     double value, float *lower, float *upper);
 float m5_trajectory_safety_test_norm_lower_bound(

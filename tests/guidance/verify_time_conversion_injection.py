@@ -103,13 +103,14 @@ def main():
                         bound = float(GAMMA2 * Fraction(true_seconds.value))
                         if error.value <= bound:
                             failures.append(f'mode=1 error <= gamma_2')
-    report = {'test': 'S06-113', 'seed': 'deterministic',
+    report = {'test': 'S06-113', 'seed': 'NOT_APPLICABLE',
               'steps': list(STEPS), 'intervals': list(INTERVALS),
               'checked': checked, 'actual_error_checks': actual_error_checks,
               'mode2_error_over_gamma2_min': mode2_ratio_min,
               'mode2_error_over_gamma2_max': mode2_ratio_max,
               'failures': failures[:10]}
     print(json.dumps(report, indent=2))
+    print(f"S06_113_TIME_CONVERSION_INJECTION checked={checked} failures={len(failures)}")
     if failures:
         return 1
     print('M5_S06_113_TIME_CONVERSION_INJECTION_PASS '

@@ -2471,6 +2471,28 @@ uint8_t m5_trajectory_safety_test_curve_envelope(
 }
 
 
+double m5_trajectory_safety_test_consumer_error_bound(
+    const float consumer[6],
+    unsigned degree,
+    unsigned rounding_count,
+    double s_max,
+    const double exact_low[6],
+    const double exact_high[6])
+{
+  M5SafetyInterval exact[6];
+  unsigned i;
+  if (consumer == NULL || exact_low == NULL || exact_high == NULL ||
+      degree > 5u) return INFINITY;
+  for (i = 0u; i < 6u; ++i) {
+    exact[i].low = exact_low[i];
+    exact[i].high = exact_high[i];
+    exact[i].valid = (uint8_t)(isfinite(exact_low[i]) && isfinite(exact_high[i]) &&
+                               exact_low[i] <= exact_high[i]);
+  }
+  return consumer_eval_error_bound(consumer, exact, degree, rounding_count, s_max);
+}
+
+
 uint8_t m5_trajectory_safety_test_rounding_bounds(
     double value, float *lower, float *upper)
 {

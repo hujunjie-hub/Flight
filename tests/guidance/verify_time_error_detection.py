@@ -10,7 +10,9 @@ check that the honest input satisfies:
  E. injected time error above gamma_2                        -> ratio > 1
  D. h-based reference: covered by gamma_2 (tolerance case, must stay inside)
 """
+import argparse
 import ctypes
+import random
 import struct
 import sys
 from fractions import Fraction
@@ -162,18 +164,30 @@ def segment_coefficients(probes, step_us, target_interval, base, state):
 
 
 def main():
-    if len(sys.argv) < 2:
-        raise SystemExit('usage: verify_time_error_detection.py <libm5_safety_oracle.so>')
-    probes = Probes(sys.argv[1])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("library")
+    parser.add_argument("--seed", default="0x53303631")
+    args = parser.parse_args()
+    seed = int(args.seed, 0)
+    rng = random.Random(seed)
+    # The case set is coverage-complete; the seed only fixes the traversal
+    # order so the recorded seed is real and the run is reproducible.
+    step_order = list(STEPS)
+    interval_order = list(INTERVALS)
+    base_order = list(BASES)
+    offset_order = list(OFFSETS)
+    for order in (step_order, interval_order, base_order, offset_order):
+        rng.shuffle(order)
+    probes = Probes(args.library)
     checked = 0
     coeff_mix_checked = 0
     coeff_mix_skipped = 0
     wrong_local_checked = 0
     failures = []
-    for step_us in STEPS:
-        for interval in INTERVALS:
-            for base in BASES:
-                for offset_name in OFFSETS:
+    for step_us in step_order:
+        for interval in interval_order:
+            for base in base_order:
+                for offset_name in offset_order:
                     offset_us = {"0": 0, "mid": step_us // 2,
                                  "step-1": step_us - 1, "step": step_us}[offset_name]
                     for state in STATES:
@@ -234,6 +248,7 @@ def main():
                                 failures.append(
                                     f"D h-based reference outside gamma_2 "
                                     f"{step_us}/{interval}/{offset_us}")
+    print(f"S06_108_SEED={hex(seed)}")
     print(f"M5_S06_108_TIME_ERROR_DETECTION cases={checked} "
           f"coeff_mix_checked={coeff_mix_checked} "
           f"coeff_mix_skipped={coeff_mix_skipped} "
