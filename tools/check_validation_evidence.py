@@ -109,7 +109,23 @@ def check_manifest(ctx):
         fails.append("manifest validated_code_commit mismatch")
     checks += 1
     if not ctx["head"] or lv.get("archive_head_sha") != ctx["head"]:
-        fails.append("manifest archive_head_sha is not current HEAD")
+        archive_head = lv.get("archive_head_sha")
+        # R27/R28 precedent: the archive is built at A, then a metadata-only
+        # commit B writes A's ZIP SHA/head back into the manifest. B is the
+        # current HEAD but is not inside A's ZIP. Accept only this exact shape.
+        allowed = False
+        if archive_head and len(str(archive_head)) == 40 and ctx["head"]:
+            exists = subprocess.run(
+                ["git", "-C", str(ROOT), "cat-file", "-e", str(archive_head)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+            ancestor = subprocess.run(
+                ["git", "-C", str(ROOT), "merge-base", "--is-ancestor",
+                 str(archive_head), ctx["head"]],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+            changed = git("diff", "--name-only", f"{archive_head}..{ctx['head']}")
+            allowed = exists and ancestor and changed == "spec/validation/flight_acceptance_manifest.json"
+        if not allowed:
+            fails.append("manifest archive_head_sha is not current HEAD and is not a metadata-only post-archive commit")
     checks += 1
     if lv.get("archive_commit_sha") != lv.get("archive_head_sha"):
         fails.append("archive_commit_sha != archive_head_sha")
@@ -177,8 +193,13 @@ def check_archive(ctx):
     if report.get("run_id") != ctx["run_id"]:
         fails.append("archive report RUN_ID mismatch")
     checks += 1
-    if report.get("archive_head_sha") != ctx["head"]:
-        fails.append("archive report head != current HEAD")
+    if report.get("archive_head_sha") != m.get("archive_head_sha"):
+        fails.append("archive report head != manifest archive head")
+    if report.get("archive_commit_sha") != report.get("archive_head_sha"):
+        fails.append("archive report commit != archive head")
+    checks += 1
+    if report.get("remote_head") != ctx["remote_head"]:
+        fails.append("archive report remote head != actual")
     checks += 1
     if report.get("validated_code_commit") != m.get("validated_code_commit"):
         fails.append("archive report code commit != manifest")

@@ -321,3 +321,57 @@ H_k = |c_k| + s_max * H_(k+1)，k=n-1..0
 - 前置条件：`s_max` 上界、系数有限性、编译器 FP 环境（无 contraction、无 fast-math）。
 
 MR-009 仍为 **WAITING_INDEPENDENT_REVIEW**，Agent 不 APPROVE。
+
+## 23. R27：逐级 Horner 上界落地（生产实现，未 APPROVE）
+
+R27 在 `consumer_eval_error_bound()` 中加入逐级 Horner 上界：
+
+```text
+H_n = |c_n|
+H_k = |c_k| + s_max * H_(k+1),  k = n-1..0
+```
+
+- 每一级 `multiply_upper_nonnegative()` 与 `add_upper_nonnegative()` 都向外取整。
+- 每级检查 `isfinite` 与 `> FLT_MAX`；任何非有限/超限返回 `INFINITY`。
+- 覆盖 position（5 次）、velocity（4 次，含 `5c5..2c2` 缩放）和 acceleration
+  （3 次，含 `20c5..2c2` 缩放）。
+- 该检查与 `gamma_n` 误差项、次正规项、时间项并存；不改变 4,096 B 预算或
+  安全阈值。
+- 仍未证明：独立审查签字、未来编译器重排/FMA、M6 区间外插值、Host FTZ/DAZ
+  与目标的完整等价性。
+
+R27 没有新增专用生产测试，这是 R28 的缺口。
+
+## 24. R28：专用生产测试与边界证据（未 APPROVE）
+
+R28 新增两个测试到 `tests/guidance/test_m5_main.c`，并加入 test-only
+`m5_trajectory_safety_test_consumer_error_bound()`（仅在
+`FLIGHT_M5_SAFETY_TEST_API` 下编译，不进入产品对象/ABI）：
+
+| 测试 | 覆盖 |
+|---|---|
+| `m5_safety_mr009_horner_bound_extremes` | FLT_MAX 附近系数；Horner 中间值超限；正负抵消；Position/Velocity/Acceleration 缩放；次正规；极短 `s_max`；NaN 系数 |
+| `m5_safety_mr009_extreme_reference` | 真实 `m5_trajectory_safety_validate()`：全 FLT_MAX 参考；±FLT_MAX/2 抵消；FLT_MAX 加速度差；危险输入不得 `M5_SAFETY_PASS` |
+
+测试结果（R28）：
+
+- M5 Host: `checks=320647 failures=0`（含新增 20 个检查）。
+- S06-112: 420 axis checks / 0 failures，真实 seed `0x53313632`。
+- S06-108: 96 cases / 0 failures，真实 seed `0x53303631`。
+- S06-113: 76 checks / 0 failures。
+- 普通与 `-O` 采集器自测：28/28 负向场景通过。
+- Stack: 4,248 B > 4,096 B，B06 BLOCKED；与 MR-009 数学结论独立。
+
+### 分类
+
+- **已证明**：Bernstein jerk `60/d^3`、Bernstein→power、`u_tail`、R14b 六个
+  Fraction 反例、逐级 Horner 上界公式与向外取整实现。
+- **已实现**：生产 `consumer_eval_error_bound()` 的 H_k 检查；test-only 边界钩子。
+- **已测试**：上述生产路径极端输入、S06-108/112/113、S06-105/107。
+- **尚未证明**：独立数学审查；编译器未来重排/FMA；M6 区间外插值；Host
+  FTZ/DAZ 对目标 FPSCR 的完全等价；产品包线外输入的数学可行性。
+- **依赖前置条件**：`s_max` 上界、系数有限、无 contraction/fast-math、
+  round-to-nearest、输入在产品包线内。
+
+**MR-009 继续 `WAITING_INDEPENDENT_REVIEW`。Agent 不自行 APPROVED。**
+

@@ -575,10 +575,10 @@
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
-      "R26 collector derives S06-108/S06-113/map metrics from logs and enforces numeric checks; 16 negative tests pass under -O.",
-      "R26 patch stdout/stderr separated and apply-checked; CRLF byte differences documented with raw copies.",
-      "Horner H_k implementation is present; dedicated FLT_MAX cancellation/velocity/acceleration tests remain incomplete.",
-      "B01-B07 remain blocked/open; S06-100..102 NOT_RUN; MR-009 not APPROVED."
+      "R28 collector requires wrapped logs, parsed counts, real toolchain, seed policy, source manifest and exact SHAs; 28 negative cases pass under normal and -O modes.",
+      "R28 unified evidence checker covers manifest, environment, archive, test results, issues, blocker board, product, stack and handover.",
+      "R28 dedicated MR-009 tests exercise FLT_MAX, Horner intermediate overflow, cancellation, velocity/acceleration scaling, subnormal, short-interval and non-finite paths; MR-009 remains WAITING_INDEPENDENT_REVIEW.",
+      "B01-B07 remain blocked/open; S06-100..102 NOT_RUN; B06 4,248 B > 4,096 B and callgraph has unknown external/indirect edges."
     ],
     "next_milestone": "M5-07 only after M5-06 acceptance and explicit independent mathematical approval."
   },
@@ -615,7 +615,14 @@
     "feasibility_threshold": "derived per channel from the float geometry chain (point/vertex ulp + margin ulp), not a fixed ulp count",
     "error_budget_evidence": "S06-105",
     "jerk_evidence": "S06-112 (160 candidates, 140 legal, 420 axis cases, separate 420 Bernstein/tail/consumer/total checks, 0 failures) + S06-110d analytic C coverage",
-    "jerk_proof_record": "spec/history/implementation/guidance/M5_06_7_JERK_INTERVAL_PROOF.md"
+    "jerk_proof_record": "spec/history/implementation/guidance/M5_06_7_JERK_INTERVAL_PROOF.md",
+    "horner_intermediate_bound": "IMPLEMENTED_AND_TESTED_R28",
+    "horner_product_sum_outward": "yes",
+    "r28_dedicated_tests": [
+      "m5_safety_mr009_horner_bound_extremes",
+      "m5_safety_mr009_extreme_reference"
+    ],
+    "r28_test_result": "build/validation/regenerated/r28_test_results.json"
   },
   "historical_ci_baseline": {
     "date": "2026-11-10",
@@ -674,16 +681,16 @@
   },
   "previous_commit_pass_inherited": false,
   "latest_local_validation": {
-    "run_id": "M5-06-R27-20261111",
-    "validated_code_commit": "b2a4c3779e9a2ccc22aebe209dce435b74ccc7d6",
-    "head": "b2a4c3779e9a2ccc22aebe209dce435b74ccc7d6",
-    "tooling_commit": "cf4b3e3b7d9c50abd019711725891a64c7b592fc",
-    "archive_head_sha": "753c45994cb9cba12d60ce58acb04a9dcaa9b97a",
-    "archive_commit_sha": "753c45994cb9cba12d60ce58acb04a9dcaa9b97a",
-    "archive_zip_sha256": "SEE_EXTERNAL_SHA256_SIDECAR",
-    "archive_zip_sidecar": "work/validation/archives/M5-06-R27-20261111.zip.sha256",
-    "archive_external_report": "work/validation/archives/M5-06-R27-20261111.archive_report.json",
-    "archive_zip_size_bytes": 36126455,
+    "run_id": "M5-06-R28-20261111",
+    "validated_code_commit": "31463cb351d2f55e5da978c75db64e9d25fc2523",
+    "head": "31463cb351d2f55e5da978c75db64e9d25fc2523",
+    "tooling_commit": "31463cb351d2f55e5da978c75db64e9d25fc2523",
+    "archive_head_sha": "PENDING_ARCHIVE_HEAD",
+    "archive_commit_sha": "PENDING_ARCHIVE_HEAD",
+    "archive_zip_sha256": "PENDING_ARCHIVE_ZIP",
+    "archive_zip_sidecar": "work/validation/archives/M5-06-R28-20261111.zip.sha256",
+    "archive_external_report": "work/validation/archives/M5-06-R28-20261111.archive_report.json",
+    "archive_zip_size_bytes": null,
     "branch": "opt/stage-02-m5-06-safety-validator",
     "scope": "LOCAL_EXECUTION_ONLY",
     "github_ci": "NOT_RUN_FOR_THIS_HEAD",
@@ -699,12 +706,12 @@
     "blocked_items": [
       "scons_link"
     ],
-    "input_baseline_code_commit": "cd8d4a15dc2c047e63692f74bfad2b612e991bcf",
-    "input_baseline_archive_head": "60764e992b03d4c2149a386d3c22333b4ef5fbb9",
+    "input_baseline_code_commit": "00baed0575e6db1212248315adf214853ecc62e3",
+    "input_baseline_archive_head": "753c45994cb9cba12d60ce58acb04a9dcaa9b97a",
     "remote_head": "51e7e923419733f5aa3b21efa1e46588629623ed",
-    "ahead_commit_count": 84,
-    "note": "validated_code_commit is the code commit; tooling_commit is tooling; archive metadata external.",
-    "collector_commit": "cf4b3e3b7d9c50abd019711725891a64c7b592fc",
+    "ahead_commit_count": 87,
+    "note": "validated_code_commit is the code/tooling commit; archive metadata is external and updated after the archive.",
+    "collector_commit": "31463cb351d2f55e5da978c75db64e9d25fc2523",
     "archive_script_commit": "bbf3e9205f2a764caaeb9e833c308c8069c6f7fb"
   },
   "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
@@ -716,7 +723,11 @@
     "roll_map_to_position_bytes": 128,
     "roll_map_reference_stack_only_bytes": 32840,
     "chain": "validate 1112 + build_curve 2824 + interval_scale 112 (SP) + interval_mul 88 (SP) + interval_bounds 64 + interval_invalid 48",
-    "record": "build/validation/analysis_p2.md"
+    "record": "build/validation/R28_B06_STACK_ANALYSIS.md",
+    "callgraph_status": "UNKNOWN",
+    "unknown_call_edges": "RECORDED_IN_r28_stack_analysis.json",
+    "analysis": "build/validation/regenerated/r28_stack_analysis.json",
+    "static_headroom_bytes": 232
   },
   "blocker_board": "spec/quality/BLOCKER_BOARD.md",
   "issue_register": "spec/quality/ISSUE_REGISTER.md",
@@ -756,5 +767,19 @@
   "r27_environment": "build/validation/regenerated/r27_environment.json",
   "r27_test_results": "build/validation/regenerated/r27_test_results.json",
   "r27_worktree_review": "build/validation/regenerated/R27_WORKTREE_REVIEW.md",
-  "r27_issue_details": "spec/quality/R27_ISSUE_DETAILS.md"
+  "r27_issue_details": "spec/quality/R27_ISSUE_DETAILS.md",
+  "product_config": {
+    "source": "middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c",
+    "vehicle": "QUAD_X4",
+    "mcu": "STM32H723ZGT6",
+    "obstacle_source_mode": "NONE",
+    "bench_mode": "BENCH_INHIBIT",
+    "default_max_speed_mps": 8.0,
+    "default_max_accel_mps2": 4.0,
+    "jerk_x_mps3": 16.0,
+    "jerk_y_mps3": 16.0,
+    "jerk_z_mps3": 8.0,
+    "valid_mask": "0x7F",
+    "online_obstacle_avoidance_authorized": false
+  }
 }

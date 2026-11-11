@@ -131,3 +131,21 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
   是同步后的在线入口。
 - 独立复验前，本地状态最多 `FIXED_WAITING_RETEST`；`VERIFIED/CLOSED` 只能由
   独立审查者确认。
+
+## 14. R28 严格证据与交接规则
+
+- Collector 只接受 `FLIGHT_VALIDATION_LOG_V1` wrapped log；PASS 的
+  checks/failures 必须从真实日志解析，不能由调用者填写。
+- 每个 PASS 必须绑定 RUN_ID、code commit、command、exit code、duration、
+  真实 toolchain、seed 策略、source manifest（git blob/worktree SHA/line
+  ending/size/role）和 log SHA。
+- `see r25_environment`、`see log`、`unknown`、`deterministic`、
+  `NOT_RECORDED` 不得作为工具链/seed/时长占位。
+- S06-108 与 S06-112 必须记录真实数字 seed；S06-112 JSON 与 test_results
+  必须一致。
+- Evidence checker 必须真实比较 Manifest/Environment/Test Results/Archive/
+  Issues/Blocker/Product/Stack/Handover；UNKNOWN 不得 PASS。
+- 交接按 `AGENT_SESSION_HANDOVER.md` 执行；新 Agent 必须独立核对 SHA 并生成
+  `TAKEOVER_ACK.md`，不得凭旧聊天记录接管。
+- 归档后的元数据提交必须单独记录，不得声称被旧 ZIP 包含；R22 原始字节仍为
+  `NOT_RECOVERABLE`。

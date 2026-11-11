@@ -234,5 +234,21 @@
   "blocker_view": "spec/quality/BLOCKER_BOARD.md",
   "publication_status": "PENDING",
   "authoritative_store_when_pending": "spec/quality/ISSUE_REGISTER.md",
-  "github_issue_number_policy": "Do not invent GitHub issue numbers before publication authorization."
+  "github_issue_number_policy": "Do not invent GitHub issue numbers before publication authorization.",
+  "r28": {
+    "run_id": "M5-06-R28-20261111",
+    "validated_code_commit": "31463cb351d2f55e5da978c75db64e9d25fc2523",
+    "collector": "tools/collect_validation_results.py",
+    "evidence_checker": "tools/check_validation_evidence.py",
+    "handover_protocol": "spec/quality/AGENT_SESSION_HANDOVER.md",
+    "rules": [
+      "wrapped log required",
+      "parsed checks/failures only",
+      "real toolchain required",
+      "real seed required for randomized tests",
+      "source manifest required",
+      "UNKNOWN never PASS",
+      "R22 bytes NOT_RECOVERABLE"
+    ]
+  }
 }
