@@ -555,7 +555,7 @@
       "cases": 76,
       "status_at_code_baseline": "PASS",
       "oracle": "production control_reference_convert_local_time_ex additive-seconds injection; C gamma_2 predicate; normal PASS, wrong local/4x gamma_2/wrong duration FAIL; actual error ratio recorded",
-      "local_run": "M5-06-R16-20261110",
+      "local_run": "M5-06-R18-20261111",
       "actual_error_checks": 18,
       "mode2_error_over_gamma2_min": 3.618080472981205,
       "mode2_error_over_gamma2_max": 4.059050992445377
@@ -685,7 +685,7 @@
     "blocked_items": [
       "scons_link"
     ],
-    "note": "validated_code_commit and archive_commit_sha are different commits; archive_head_sha/archive_zip_sha256 record the delivered ZIP SHA256 outside the ZIP; a ZIP cannot contain its own hash.",
+    "note": "validated_code_commit is the code commit; archive_head_sha and archive_commit_sha are the archive HEAD commit; archive_zip_sha256 is the ZIP SHA256 recorded outside the ZIP because a ZIP cannot contain its own hash.",
     "archive_zip_size_bytes": 35739511,
     "archive_external_report": "work/validation/archives/M5-06-R18-20261111.archive_report.json"
   },
