@@ -149,3 +149,13 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
   `TAKEOVER_ACK.md`，不得凭旧聊天记录接管。
 - 归档后的元数据提交必须单独记录，不得声称被旧 ZIP 包含；R22 原始字节仍为
   `NOT_RECOVERABLE`。
+
+
+## 15. R29 归档元数据与证据门禁
+
+- 新归档必须使用 `spec/quality/ARCHIVE_METADATA_PROTOCOL.md` 的 PREZIP + external digest 两阶段协议。
+- 禁止 `PENDING_ARCHIVE_*`、`ahead_commit_count: null` 和归档后元数据提交。
+- `prepare_archive_metadata.py` 在 ZIP 创建前从真实 Git 动态生成 archive head、remote、ahead、tooling/collector/script commits 和 tool source identity。
+- ZIP 自身 SHA256/size 只能写入外部 report 和 `.sha256` sidecar，不得嵌入 ZIP 内部 Manifest。
+- R29 checker 必须拒绝旧 R28 后置元数据模式；UNKNOWN/BLOCKED 不得 PASS。
+- B01/B02/B03 未经 OWNER 批准保持 FAIL；B05 未经独立审查保持 WAITING_INDEPENDENT_REVIEW。

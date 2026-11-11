@@ -1,10 +1,9 @@
-# Flight M5-06 阻塞项视图（R28）
+# Flight M5-06 阻塞项视图（R29）
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
-RUN_ID `M5-06-R28-20261111`；validated code/tooling
-`31463cb351d2f55e5da978c75db64e9d25fc2523`；
+RUN_ID `M5-06-R29-20261111`；validated code `fd8198d2ac216fef87dafba73c252bb254ea3dd3`；
 remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；
-ahead 87；branch `opt/stage-02-m5-06-safety-validator`。
+ahead 动态计算；branch `opt/stage-02-m5-06-safety-validator`。
 
 本文件所有结论均为本地 Host/SIL/Cortex-M7 编译证据，不是 H723 实机、HIL、
 WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
@@ -75,10 +74,10 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 | 字段 | 内容 |
 |---|---|
 | Issue | FLIGHT-LOCAL-22 / FLIGHT-LOCAL-24 |
-| 状态 | **BLOCKED**；已知下界 **4,248 B > 4,096 B**，超出 152 B。 |
+| 状态 | **BLOCKED**；已知下界 **4,248 B > 4,096 B**，超出 152 B；R29 设计评审见 `spec/quality/owner_approval/R29/04_B06_STACK_REMEDIATION_DESIGN.md`。 |
 | 当前链 | validate 1,112 + build_curve 2,824 + interval_scale 112 + interval_mul 88 + interval_bounds 64 + interval_invalid 48 = 4,248 B。 |
 | 第二/动态/静态 | 3,288 B / 1,944 B / 1,408 B（R16 链）；本轮未把它们相加。 |
-| 调用图 | `build/validation/regenerated/r28_stack_analysis.json`：状态 BLOCKED，callgraph_status UNKNOWN；libm `fmin/fmax/nextafter` 及动态/间接边显式记录，未知不得 PASS。 |
+| 调用图 | `build/validation/regenerated/r29_stack_analysis.json`：状态 BLOCKED，callgraph_status UNKNOWN；libm `fmin/fmax/nextafter` 及动态/间接边显式记录，未知不得 PASS。 |
 | 未计入 | 调用者、异常/中断上下文、libm 实际帧、尾调用变化、target runtime；4,248 B 仍是下界。 |
 | 静态余量 | ICD+M4 为 48,920 / 49,152 B，余量 **232 B**；任何静态增长必须重算，不得扩大 48 KiB 上限。 |
 | 方案 A | 单轴 helper 拆分：降低 build_curve 帧，但增加调用深度与 WCET；需真实 .su/objdump 重算。 |

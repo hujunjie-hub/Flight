@@ -375,3 +375,45 @@ R28 新增两个测试到 `tests/guidance/test_m5_main.c`，并加入 test-only
 
 **MR-009 继续 `WAITING_INDEPENDENT_REVIEW`。Agent 不自行 APPROVED。**
 
+
+
+## 25. R29：归档修复、精确状态断言与分支证据边界
+
+R29 应用 `R29_R28_REMEDIATION.patch`，新增/加强：
+
+- MR-009 focus runner：`bash tests/guidance/run_mr009_focus.sh`，
+  15 checks / 0 failures。
+- `test_m5_safety_mr009_extreme_reference_rejected()` 明确区分：
+  - 全 FLT_MAX 与正负抵消输入在 `validate_reference_shape()` 被
+    `M5_SAFETY_INVALID / M5_SAFETY_REASON_REFERENCE_INVALID` 拒绝；
+  - 正常位置 + `±FLT_MAX` 加速度差进入
+    `M5_SAFETY_NUMERIC_FAILURE / M5_SAFETY_REASON_NUMERIC`。
+- M5 Host R29：320,650 checks / 0 failures。
+
+### 25.1 分支证据状态（未完成，不得 APPROVED）
+
+R29 审查矩阵要求位置/速度/加速度 Horner、速度/加速度系数缩放的
+test-only trace/counter。当前补丁只完成精确状态/reason 断言，**没有**
+实现六类分支计数器，也没有合法 companion 的计数器零值断言。
+
+因此：
+
+- Position Horner 分支可达性：**NOT_PROVEN_IN_R29**
+- Velocity Horner 分支可达性：**NOT_PROVEN_IN_R29**
+- Acceleration Horner 分支可达性：**NOT_PROVEN_IN_R29**
+- Velocity coefficient scaling：**NOT_PROVEN_IN_R29**
+- Acceleration coefficient scaling：**NOT_PROVEN_IN_R29**
+- 合法 companion 计数器零值：**NOT_PROVEN_IN_R29**
+
+上述缺口已登记在
+`spec/quality/owner_approval/R29/05_MR009_INDEPENDENT_REVIEW_MATRIX.md`，
+不得用状态断言替代分支证据。
+
+### 25.2 分类
+
+- 数学证明：已有 Horner 上界推导；未变。
+- 生产实现：已有 H_k 检查；未变。
+- 生产路径测试：R29 精确状态断言通过；分支级 trace 未完成。
+- 独立审查：仍未完成。
+
+**MR-009 保持 WAITING_INDEPENDENT_REVIEW。Agent 不自行 APPROVED。**

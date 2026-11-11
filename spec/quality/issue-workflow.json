@@ -250,5 +250,20 @@
       "UNKNOWN never PASS",
       "R22 bytes NOT_RECOVERABLE"
     ]
+  },
+  "r29": {
+    "run_id": "M5-06-R29-20261111",
+    "validated_code_commit": "fd8198d2ac216fef87dafba73c252bb254ea3dd3",
+    "archive_protocol": "spec/quality/ARCHIVE_METADATA_PROTOCOL.md",
+    "prepare_tool": "tools/prepare_archive_metadata.py",
+    "checker": "tools/check_validation_evidence.py",
+    "status": "FIXED_WAITING_RETEST",
+    "rules": [
+      "prezip git metadata",
+      "external-only zip digest",
+      "no post-archive metadata commit",
+      "B01/B02/B03 OWNER approval required",
+      "MR-009 independent review required"
+    ]
   }
 }

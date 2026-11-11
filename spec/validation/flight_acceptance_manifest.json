@@ -575,10 +575,7 @@
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
-      "R28 collector requires wrapped logs, parsed counts, real toolchain, seed policy, source manifest and exact SHAs; 28 negative cases pass under normal and -O modes.",
-      "R28 unified evidence checker covers manifest, environment, archive, test results, issues, blocker board, product, stack and handover.",
-      "R28 dedicated MR-009 tests exercise FLT_MAX, Horner intermediate overflow, cancellation, velocity/acceleration scaling, subnormal, short-interval and non-finite paths; MR-009 remains WAITING_INDEPENDENT_REVIEW.",
-      "B01-B07 remain blocked/open; S06-100..102 NOT_RUN; B06 4,248 B > 4,096 B and callgraph has unknown external/indirect edges."
+      "R29 archive metadata protocol and 33 unit tests pass; B01/B02/B03 still require OWNER approval; B05 branch trace remains incomplete; B06 4,248 B > 4,096 B; B07 NOT_RUN."
     ],
     "next_milestone": "M5-07 only after M5-06 acceptance and explicit independent mathematical approval."
   },
@@ -681,8 +678,8 @@
   },
   "previous_commit_pass_inherited": false,
   "latest_local_validation": {
-    "run_id": "M5-06-R28-20261111",
-    "validated_code_commit": "31463cb351d2f55e5da978c75db64e9d25fc2523",
+    "run_id": "M5-06-R29-20261111",
+    "validated_code_commit": "fd8198d2ac216fef87dafba73c252bb254ea3dd3",
     "head": "31463cb351d2f55e5da978c75db64e9d25fc2523",
     "tooling_commit": "5e1b8e5d6ea10d0620004f23567b2502c8aae1c4",
     "archive_head_sha": "032d44a32c464a721dbc1ad2a4c62fe75fa3b1cd",
