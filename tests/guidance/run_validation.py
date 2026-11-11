@@ -56,6 +56,8 @@ def main():
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--code-commit", required=True)
     parser.add_argument("--output", default=str(OUT / "validation.json"))
+    parser.add_argument("--only", default="",
+                        help="comma-separated command names (default: all)")
     args = parser.parse_args()
     if not args.run_id.startswith("M5-06-"):
         raise SystemExit("unexpected RUN_ID")
@@ -114,7 +116,10 @@ def main():
         ("T27", "stack_selftest", [py, "tools/analyze_stack.py", "--self-test"], {}),
     ]
     results = []
+    selected = {x.strip() for x in args.only.split(",") if x.strip()}
     for test_id, name, command, additions in commands:
+        if selected and name not in selected:
+            continue
         env = os.environ.copy()
         env.update(additions)
         result, duration = run(command, env)
