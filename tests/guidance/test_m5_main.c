@@ -5256,11 +5256,15 @@ static void test_m5_safety_mr009_extreme_reference_rejected(void)
       fx.reference.points[i].point.acceleration_ned_mps2[axis] = FLT_MAX;
     }
   }
+  /* This fixture is rejected by reference-shape validation before build_curve;
+     it is a fail-closed input-boundary test, not a Horner branch test. */
   CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
-      &fx.result) != M5_SAFETY_PASS);
+      &fx.result) == M5_SAFETY_INVALID);
   CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_REFERENCE_INVALID);
 
-  /* Cancellation: equal-magnitude opposite signs at every knot. */
+  /* Cancellation: equal-magnitude opposite signs at every knot. This is also
+     rejected by reference-shape validation before the consumer polynomial. */
   safety_fx_init(&fx, 59200000u);
   safety_generous_envelope(&fx, FLT_MAX, FLT_MAX);
   safety_map_reset(&fx);
@@ -5283,11 +5287,14 @@ static void test_m5_safety_mr009_extreme_reference_rejected(void)
     }
   }
   CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
-      &fx.result) != M5_SAFETY_PASS);
+      &fx.result) == M5_SAFETY_INVALID);
   CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_REFERENCE_INVALID);
 
   /* Acceleration scaling: normal positions, FLT_MAX acceleration difference.
-     This drives 2c2/6c3/12c4/20c5 and the coefficient scaling past FLT_MAX. */
+     Unlike the two fixtures above, this reaches the validator's numeric
+     rejection path. A branch trace is still required to prove which internal
+     coefficient/consumer operation raised the numeric failure. */
   safety_fx_init(&fx, 59300000u);
   safety_generous_envelope(&fx, 8.0f, FLT_MAX);
   safety_map_reset(&fx);
@@ -5300,8 +5307,9 @@ static void test_m5_safety_mr009_extreme_reference_rejected(void)
     for (axis = 0u; axis < 3u; ++axis)
       fx.reference.points[i].point.acceleration_ned_mps2[axis] = -FLT_MAX;
   CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
-      &fx.result) != M5_SAFETY_PASS);
+      &fx.result) == M5_SAFETY_NUMERIC_FAILURE);
   CHECK(fx.result.passed == 0u);
+  CHECK(fx.result.reason_code == M5_SAFETY_REASON_NUMERIC);
 }
 
 

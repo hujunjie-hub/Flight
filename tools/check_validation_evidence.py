@@ -86,27 +86,35 @@ def valid_version(value):
     return bool(re.search(r"\d+\.\d+", value))
 
 
-def is_post_archive_metadata(old, new):
-    """True only for a metadata-only commit chain from archive HEAD to HEAD."""
-    if not old or not new:
-        return False
-    if old == new:
-        return True
-    exists = subprocess.run(["git", "-C", str(ROOT), "cat-file", "-e", str(old)],
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL).returncode == 0
-    ancestor = subprocess.run(
-        ["git", "-C", str(ROOT), "merge-base", "--is-ancestor", str(old), str(new)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
-    if not (exists and ancestor):
-        return False
-    changed = (git("diff", "--name-only", f"{old}..{new}") or "").splitlines()
-    return set(changed).issubset({
-        "spec/validation/flight_acceptance_manifest.json",
-        "spec/quality/R28_ISSUE_DETAILS.md",
-        "tools/check_validation_evidence.py",
-        "tools/finalize_r28_archive.py",
-    })
+def _valid_git_sha(value):
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{40}", value) is not None
+
+
+def _git_path_commit(*paths):
+    value = git("log", "-1", "--format=%H", "HEAD", "--", *paths)
+    return value if _valid_git_sha(value) else None
+
+
+def _resolve_external_path(raw, report_path, fallback_name=None):
+    """Resolve native, relative, or Windows-authored archive paths."""
+    candidates = []
+    if isinstance(raw, str) and raw:
+        candidates.append(Path(raw))
+        # A Windows drive path is not a native POSIX path; retain only its leaf.
+        leaf = re.split(r"[\\/]", raw)[-1]
+        if leaf:
+            candidates.append(ROOT / "work/validation/archives" / leaf)
+            candidates.append(Path(report_path).parent / leaf)
+    if fallback_name:
+        candidates.append(ROOT / "work/validation/archives" / fallback_name)
+        candidates.append(Path(report_path).parent / fallback_name)
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return candidate
+        except OSError:
+            continue
+    return candidates[0] if candidates else Path("")
 
 
 def check_manifest(ctx):
@@ -116,7 +124,11 @@ def check_manifest(ctx):
     fails = []
     required = ("run_id", "branch", "validated_code_commit", "tooling_commit",
                 "collector_commit", "archive_script_commit", "archive_head_sha",
-                "archive_commit_sha", "remote_head", "ahead_commit_count")
+                "archive_commit_sha", "remote_head", "ahead_commit_count",
+                "archive_zip_hash_location", "archive_external_report",
+                "archive_zip_sidecar", "archive_metadata_policy",
+                "tooling_sources", "tooling_source_manifest_sha256",
+                "collector_worktree_sha256", "archive_script_worktree_sha256")
     for key in required:
         checks += 1
         if lv.get(key) in (None, "", "EXTERNAL_ARCHIVE_REPORT"):
@@ -130,32 +142,110 @@ def check_manifest(ctx):
     checks += 1
     if lv.get("validated_code_commit") != ctx["code_commit"]:
         fails.append("manifest validated_code_commit mismatch")
+    for key in ("validated_code_commit", "tooling_commit", "collector_commit",
+                "archive_script_commit", "archive_head_sha", "archive_commit_sha",
+                "remote_head"):
+        checks += 1
+        if not _valid_git_sha(lv.get(key)):
+            fails.append(f"manifest {key} is not a full Git SHA")
+        elif subprocess.run(["git", "-C", str(ROOT), "cat-file", "-e",
+                             f"{lv[key]}^{{commit}}"], stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL).returncode != 0:
+            fails.append(f"manifest {key} commit is not present in repository")
     checks += 1
-    if not ctx["head"] or lv.get("archive_head_sha") != ctx["head"]:
-        archive_head = lv.get("archive_head_sha")
-        if not is_post_archive_metadata(str(archive_head or ""), str(ctx["head"] or "")):
-            fails.append("manifest archive_head_sha is not current HEAD and is not a metadata-only post-archive commit")
-    checks += 1
-    archive_ahead_text = git("rev-list", "--count",
-                             f"{ctx['remote_ref']}..{lv.get('archive_head_sha')}")
-    archive_ahead = int(archive_ahead_text) if archive_ahead_text and archive_ahead_text.isdigit() else None
-    if lv.get("ahead_commit_count") != archive_ahead:
-        fails.append(f"manifest ahead {lv.get('ahead_commit_count')} != archive-head ahead {archive_ahead}")
+    if lv.get("archive_head_sha") != ctx["head"]:
+        fails.append("manifest archive_head_sha != current HEAD; post-archive metadata commits are forbidden")
     checks += 1
     if lv.get("archive_commit_sha") != lv.get("archive_head_sha"):
-        fails.append("archive_commit_sha != archive_head_sha")
+        fails.append("manifest archive_commit_sha != archive_head_sha")
     checks += 1
     if lv.get("remote_head") != ctx["remote_head"]:
         fails.append("manifest remote_head mismatch")
     checks += 1
-    if lv.get("collector_commit") != lv.get("tooling_commit"):
-        fails.append("collector_commit != tooling_commit")
+    if lv.get("ahead_commit_count") != ctx["ahead"]:
+        fails.append(f"manifest ahead {lv.get('ahead_commit_count')} != actual {ctx['ahead']}")
     checks += 1
-    if not isinstance(lv.get("archive_zip_sha256"), str) or len(lv.get("archive_zip_sha256", "")) != 64:
-        fails.append("archive_zip_sha256 not recorded")
+    if lv.get("archive_zip_hash_location") != "EXTERNAL_ARCHIVE_REPORT_AND_SIDECAR":
+        fails.append("manifest ZIP digest policy is not external-only")
+    checks += 1
+    if lv.get("archive_zip_sha256") is not None or lv.get("archive_zip_size_bytes") is not None:
+        fails.append("manifest must not embed self-referential ZIP hash/size")
+    checks += 1
+    if "PENDING" in json.dumps(lv).upper():
+        fails.append("manifest contains PENDING archive metadata")
+    # Tool commits are checked against actual path history, not each other.
+    expected = {
+        "collector_commit": _git_path_commit("tools/collect_validation_results.py"),
+        "archive_script_commit": _git_path_commit("tools/finalize_validation_archive.py",
+                                                   "tools/archive_validation_run.ps1"),
+        "tooling_commit": _git_path_commit("SConstruct", "tools/check_rtt_package_tree.py",
+                                            "tools/collect_validation_results.py",
+                                            "tools/check_validation_evidence.py",
+                                            "tools/analyze_stack.py",
+                                            "tools/prepare_archive_metadata.py"),
+    }
+    for key, value in expected.items():
+        checks += 1
+        if not value or lv.get(key) != value:
+            fails.append(f"manifest {key} does not match Git path history")
+
+    tooling_sources = lv.get("tooling_sources")
+    expected_paths = {
+        "SConstruct",
+        "tools/check_rtt_package_tree.py",
+        "tools/collect_validation_results.py",
+        "tools/check_validation_evidence.py",
+        "tools/analyze_stack.py",
+        "tools/prepare_archive_metadata.py",
+        "tools/archive_validation_run.ps1",
+    }
+    checks += 1
+    if (not isinstance(tooling_sources, list) or len(tooling_sources) != len(expected_paths)
+            or {x.get("path") for x in tooling_sources} != expected_paths):
+        fails.append("manifest tooling_sources is incomplete, duplicated or contains unexpected paths")
+    else:
+        canonical = json.dumps(tooling_sources, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        checks += 1
+        if hashlib.sha256(canonical).hexdigest() != lv.get("tooling_source_manifest_sha256"):
+            fails.append("tooling_source_manifest_sha256 mismatch")
+        for item in tooling_sources:
+            path = item.get("path", "")
+            raw_path = ROOT / path
+            checks += 1
+            if not raw_path.is_file():
+                fails.append(f"tooling source missing: {path}")
+                continue
+            raw = raw_path.read_bytes()
+            checks += 1
+            if hashlib.sha256(raw).hexdigest() != item.get("working_tree_sha256"):
+                fails.append(f"tooling working-tree SHA mismatch: {path}")
+            checks += 1
+            if len(raw) != item.get("size_bytes"):
+                fails.append(f"tooling source size mismatch: {path}")
+            has_crlf = b"\r\n" in raw
+            has_lf_only = b"\n" in raw.replace(b"\r\n", b"")
+            actual_eol = ("MIXED" if has_crlf and has_lf_only else
+                          "CRLF" if has_crlf else "LF" if b"\n" in raw else "NONE")
+            checks += 1
+            if actual_eol != item.get("line_ending"):
+                fails.append(f"tooling line-ending mismatch: {path}")
+            blob = git("rev-parse", f"HEAD:{path}")
+            checks += 1
+            if blob != item.get("git_blob_sha"):
+                fails.append(f"tooling Git blob SHA mismatch: {path}")
+        by_path = {x.get("path"): x for x in tooling_sources}
+        checks += 1
+        if lv.get("collector_worktree_sha256") != by_path.get(
+                "tools/collect_validation_results.py", {}).get("working_tree_sha256"):
+            fails.append("collector_worktree_sha256 mismatch")
+        checks += 1
+        if lv.get("archive_script_worktree_sha256") != by_path.get(
+                "tools/archive_validation_run.ps1", {}).get("working_tree_sha256"):
+            fails.append("archive_script_worktree_sha256 mismatch")
     return emit(ctx["out"], "manifest", checks, len(fails),
                 "PASS" if not fails else "FAIL",
-                {"run_id": ctx["run_id"], "failures": fails, "manifest": str(ctx["paths"]["manifest"])})
+                {"run_id": ctx["run_id"], "failures": fails,
+                 "manifest": str(ctx["paths"]["manifest"])})
 
 
 def check_environment(ctx):
@@ -194,58 +284,162 @@ def check_archive(ctx):
     m = ctx["manifest"].get("latest_local_validation", {})
     checks = 0
     fails = []
-    for key in ("run_id", "branch", "validated_code_commit", "tooling_commit",
+    required = ("run_id", "branch", "validated_code_commit", "tooling_commit",
                 "collector_commit", "archive_script_commit", "archive_head_sha",
                 "archive_commit_sha", "remote_head", "ahead_commit_count",
-                "archive_zip_sha256", "archive_zip_size_bytes", "scope"):
+                "archive_zip_sha256", "archive_zip_size_bytes", "archive_zip_hash_location",
+                "archive_zip_path", "sidecar_path", "bundle", "bundle_sha256",
+                "bundle_refs", "tooling_source_manifest_sha256",
+                "collector_worktree_sha256", "archive_script_worktree_sha256", "scope")
+    for key in required:
         checks += 1
         if report.get(key) in (None, ""):
             fails.append(f"archive report missing {key}")
+    for key in ("run_id", "branch", "validated_code_commit", "tooling_commit",
+                "collector_commit", "archive_script_commit", "archive_head_sha",
+                "archive_commit_sha", "remote_head", "ahead_commit_count",
+                "archive_zip_hash_location", "tooling_source_manifest_sha256",
+                "collector_worktree_sha256", "archive_script_worktree_sha256"):
+        checks += 1
+        if report.get(key) != m.get(key):
+            fails.append(f"archive report {key} != manifest")
     checks += 1
     if report.get("run_id") != ctx["run_id"]:
         fails.append("archive report RUN_ID mismatch")
     checks += 1
-    if report.get("archive_head_sha") != m.get("archive_head_sha"):
-        fails.append("archive report head != manifest archive head")
-    if report.get("archive_commit_sha") != report.get("archive_head_sha"):
-        fails.append("archive report commit != archive head")
+    if report.get("archive_head_sha") != ctx["head"]:
+        fails.append("archive report archive_head_sha != current HEAD")
     checks += 1
     if report.get("remote_head") != ctx["remote_head"]:
-        fails.append("archive report remote head != actual")
+        fails.append("archive report remote_head != actual remote ref")
     checks += 1
-    if report.get("validated_code_commit") != m.get("validated_code_commit"):
-        fails.append("archive report code commit != manifest")
-    checks += 1
-    archive_ahead_text = git("rev-list", "--count",
-                             f"{ctx['remote_ref']}..{report.get('archive_head_sha')}")
-    archive_ahead = int(archive_ahead_text) if archive_ahead_text and archive_ahead_text.isdigit() else None
-    if report.get("ahead_commit_count") != archive_ahead:
-        fails.append("archive report ahead != archive-head ahead")
-    zip_path = Path(report.get("archive_zip_path", ""))
+    if report.get("ahead_commit_count") != ctx["ahead"]:
+        fails.append("archive report ahead_commit_count != actual ahead")
+
+    expected_name = f"{ctx['run_id']}.zip"
+    zip_path = _resolve_external_path(report.get("archive_zip_path"),
+                                      ctx["paths"]["archive_report"], expected_name)
     checks += 1
     if not zip_path.is_file():
-        fails.append("archive ZIP missing")
+        fails.append(f"archive ZIP missing: {zip_path}")
+        return emit(ctx["out"], "archive", checks, len(fails), "FAIL",
+                    {"run_id": ctx["run_id"], "failures": fails})
+
+    actual_zip_sha = sha(zip_path)
+    actual_zip_size = zip_path.stat().st_size
+    checks += 1
+    if actual_zip_sha != report.get("archive_zip_sha256"):
+        fails.append("archive ZIP SHA mismatch")
+    checks += 1
+    if actual_zip_size != report.get("archive_zip_size_bytes"):
+        fails.append("archive ZIP size mismatch")
+
+    sidecar = _resolve_external_path(report.get("sidecar_path"),
+                                     ctx["paths"]["archive_report"],
+                                     f"{ctx['run_id']}.zip.sha256")
+    checks += 1
+    if not sidecar.is_file():
+        fails.append("archive ZIP sidecar missing")
     else:
-        actual = sha(zip_path)
-        if actual != report.get("archive_zip_sha256"):
-            fails.append("archive ZIP SHA mismatch")
-        if zip_path.stat().st_size != report.get("archive_zip_size_bytes"):
-            fails.append("archive ZIP size mismatch")
-        try:
-            with zipfile.ZipFile(zip_path) as zf:
-                if zf.testzip() is not None:
-                    fails.append("archive ZIP CRC failure")
-                names = zf.namelist()
-                for required in ("archive_manifest.json", "SHA256SUMS.txt",
-                                 "M5-06-R28-20261111.bundle"):
+        sidecar_text = sidecar.read_text(encoding="ascii", errors="replace").strip()
+        expected_line = f"{actual_zip_sha}  {zip_path.name}"
+        if sidecar_text != expected_line:
+            fails.append("archive ZIP sidecar content mismatch")
+
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            checks += 1
+            if zf.testzip() is not None:
+                fails.append("archive ZIP CRC failure")
+            names = zf.namelist()
+            required_suffixes = ("archive_manifest.json", "SHA256SUMS.txt",
+                                 f"{ctx['run_id']}.bundle")
+            for required_name in required_suffixes:
+                checks += 1
+                if not any(name.endswith(required_name) for name in names):
+                    fails.append(f"archive ZIP missing {required_name}")
+            manifest_names = [name for name in names if name.endswith("archive_manifest.json")]
+            if len(manifest_names) != 1:
+                fails.append("archive ZIP must contain exactly one archive_manifest.json")
+            else:
+                archive_manifest = json.loads(zf.read(manifest_names[0]).decode("utf-8"))
+                for key in ("run_id", "branch", "validated_code_commit", "tooling_commit",
+                            "collector_commit", "archive_script_commit", "archive_head_sha",
+                            "archive_commit_sha", "remote_head", "ahead_commit_count",
+                            "tooling_source_manifest_sha256", "collector_worktree_sha256",
+                            "archive_script_worktree_sha256"):
                     checks += 1
-                    if not any(name.endswith(required) for name in names):
-                        fails.append(f"archive ZIP missing {required}")
-        except Exception as exc:
-            fails.append(f"archive ZIP unreadable: {exc}")
+                    if archive_manifest.get(key) != report.get(key):
+                        fails.append(f"ZIP archive_manifest {key} != external report")
+                if archive_manifest.get("archive_zip_hash_location") != "EXTERNAL_ARCHIVE_REPORT_AND_SIDECAR":
+                    fails.append("ZIP archive_manifest digest policy is not external-only")
+                checks += 1
+                if report.get("tooling_sources") != archive_manifest.get("tooling_sources"):
+                    fails.append("external report tooling_sources != ZIP archive_manifest")
+                if "archive_zip_sha256" in archive_manifest or "archive_zip_size_bytes" in archive_manifest:
+                    fails.append("ZIP archive_manifest contains self-referential ZIP hash/size")
+                # Verify all evidence entries in the archive manifest against ZIP bytes.
+                # Verify the self-contained Git Bundle bytes, refs and structure.
+                bundle_meta = archive_manifest.get("git_bundle", {})
+                bundle_rel = bundle_meta.get("path")
+                checks += 1
+                if not isinstance(bundle_rel, str) or not bundle_rel:
+                    fails.append("ZIP archive_manifest git_bundle.path missing")
+                else:
+                    checks += 1
+                    if report.get("bundle") != bundle_rel:
+                        fails.append("external report bundle path != ZIP archive_manifest")
+                    bundle_member = f"{ctx['run_id']}/{bundle_rel}"
+                    try:
+                        bundle_bytes = zf.read(bundle_member)
+                        bundle_sha = hashlib.sha256(bundle_bytes).hexdigest()
+                        checks += 1
+                        if bundle_sha != bundle_meta.get("sha256") or bundle_sha != report.get("bundle_sha256"):
+                            fails.append("Git Bundle SHA mismatch")
+                        checks += 1
+                        if report.get("bundle_refs") != bundle_meta.get("refs"):
+                            fails.append("Git Bundle refs differ between archive manifest and report")
+                        with tempfile.TemporaryDirectory(prefix="flight_bundle_check_") as td:
+                            bundle_file = Path(td) / f"{ctx['run_id']}.bundle"
+                            bundle_file.write_bytes(bundle_bytes)
+                            bare_repo = Path(td) / "verify.git"
+                            subprocess.run(["git", "init", "--bare", str(bare_repo)],
+                                           check=True, capture_output=True, text=True)
+                            verify = subprocess.run(["git", "-C", str(bare_repo), "bundle",
+                                                     "verify", str(bundle_file)],
+                                                    capture_output=True, text=True)
+                            checks += 1
+                            if verify.returncode != 0:
+                                fails.append("Git Bundle verify failed: " + verify.stderr.strip())
+                            refs = subprocess.run(["git", "bundle", "list-heads", str(bundle_file)],
+                                                  capture_output=True, text=True)
+                            checks += 1
+                            if refs.returncode != 0:
+                                fails.append("Git Bundle list-heads failed")
+                            else:
+                                actual_refs = [line.strip() for line in refs.stdout.splitlines() if line.strip()]
+                                if actual_refs != bundle_meta.get("refs"):
+                                    fails.append("Git Bundle actual refs differ from manifest")
+                    except Exception as exc:
+                        fails.append(f"Git Bundle missing/unreadable: {exc}")
+                # Verify all evidence entries in the archive manifest against ZIP bytes.
+                evidence = archive_manifest.get("evidence_files", [])
+                for item in evidence:
+                    checks += 1
+                    try:
+                        raw = zf.read(f"{ctx['run_id']}/{item['path']}")
+                        got = hashlib.sha256(raw).hexdigest()
+                        if got != item.get("sha256") or len(raw) != item.get("size_bytes"):
+                            fails.append(f"archive manifest evidence mismatch: {item.get('path')}")
+                    except Exception:
+                        fails.append(f"archive manifest evidence missing: {item.get('path')}")
+    except Exception as exc:
+        fails.append(f"archive ZIP unreadable: {exc}")
     return emit(ctx["out"], "archive", checks, len(fails),
                 "PASS" if not fails else "FAIL",
-                {"run_id": ctx["run_id"], "failures": fails})
+                {"run_id": ctx["run_id"], "zip_path": str(zip_path),
+                 "zip_sha256": actual_zip_sha, "zip_size_bytes": actual_zip_size,
+                 "failures": fails[:80]})
 
 
 def check_test_results(ctx):
@@ -315,18 +509,8 @@ def check_test_results(ctx):
             for src in test.get("source_files", []):
                 checks += 1
                 p = ROOT / src.get("path", "")
-                if not p.is_file():
-                    fails.append(f"{tid}: source missing {src.get('path')}")
-                elif sha(p) != src.get("working_tree_sha256"):
-                    # The formal manifest is updated by the post-archive
-                    # metadata commit; tooling may be updated after a log was
-                    # captured. The ledger still records the exact test-time
-                    # SHA, and production sources remain strictly checked.
-                    if src.get("path") not in {
-                            "spec/validation/flight_acceptance_manifest.json",
-                            "tools/check_validation_evidence.py",
-                            "tools/collect_validation_results.py"}:
-                        fails.append(f"{tid}: source SHA mismatch {src.get('path')}")
+                if not p.is_file() or sha(p) != src.get("working_tree_sha256"):
+                    fails.append(f"{tid}: source SHA mismatch {src.get('path')}")
                 for key in ("git_blob_sha", "working_tree_sha256", "line_ending",
                             "size_bytes", "role"):
                     if key not in src:
@@ -548,8 +732,7 @@ def check_handover(ctx):
         try:
             data = json.loads(state.read_text(encoding="utf-8"))
             checks += 1
-            if data.get("head") != ctx["head"] and not is_post_archive_metadata(
-                    str(data.get("head") or ""), str(ctx["head"] or "")):
+            if data.get("head") != ctx["head"]:
                 fails.append("handover state head mismatch")
             checks += 1
             if data.get("run_id") != ctx["run_id"]:
@@ -591,7 +774,6 @@ def build_context(args):
         "head": head,
         "branch": branch,
         "remote_head": remote,
-        "remote_ref": remote_ref,
         "ahead": ahead,
         "run_id": run_id,
         "code_commit": code_commit,
@@ -647,292 +829,30 @@ def run(args):
 # ---------------------------------------------------------------------------
 
 def self_test():
-    required = [DEFAULT["manifest"], DEFAULT["environment"], DEFAULT["test_results"],
-                DEFAULT["issue_register"], DEFAULT["issue_details"],
-                DEFAULT["blocker_board"], DEFAULT["stack"]]
-    missing = [p for p in required if not (ROOT / p).is_file()]
-    if missing:
-        print("EVIDENCE_CHECKER_SELF_TEST_FAIL: missing " + ", ".join(missing),
-              file=sys.stderr)
-        return 1
-    tmp = Path(tempfile.mkdtemp(prefix="evidence_checker_r28_"))
-    try:
-        # Copy all input files into a temporary package.
-        paths = {}
-        for key in ("manifest", "environment", "test_results", "issue_register",
-                    "issue_details", "blocker_board", "stack"):
-            src = ROOT / DEFAULT[key]
-            dst = tmp / src.name
-            dst.write_bytes(src.read_bytes())
-            paths[key] = dst
-        hdir = tmp / "handover"
-        hdir.mkdir()
-        for name in ("SESSION_HANDOVER.md", "handover_state.json"):
-            src = ROOT / DEFAULT["handover_dir"] / name
-            if src.is_file():
-                (hdir / name).write_bytes(src.read_bytes())
-        if not (hdir / "SESSION_HANDOVER.md").is_file():
-            (hdir / "SESSION_HANDOVER.md").write_text(
-                "\n".join(f"## {c}. placeholder" for c in "ABCDEFGHIJKLMNOPQRSTUVW") + "\n",
-                encoding="utf-8")
-        if not (hdir / "handover_state.json").is_file():
-            (hdir / "handover_state.json").write_text(json.dumps({"head": git("rev-parse", "HEAD")}),
-                                                      encoding="utf-8")
-        for name in ("git_status.txt", "git_head.txt", "git_branch.txt",
-                     "git_diff_cached.patch", "git_diff_worktree.patch",
-                     "untracked_manifest.json", "modified_files_manifest.json",
-                     "blocker_snapshot.json", "test_progress.json",
-                     "active_processes.json", "next_actions.md",
-                     "NEXT_SESSION_START_PROMPT.txt"):
-            (hdir / name).write_text("fixture\n", encoding="utf-8")
-        (hdir / "TAKEOVER_ACK.md").write_text("TAKEOVER_CONFIRMED\n", encoding="utf-8")
-        (hdir / "HANDOVER_SHA256SUMS.txt").write_text("", encoding="utf-8")
+    """Run synthetic, baseline-valid unit fixtures for archive/evidence checks.
 
-        class A:
-            pass
-        base = A()
-        base.run_id = None
-        base.code_commit = None
-        base.output_dir = str(tmp / "out")
-        base.check = "all"
-        base.manifest = str(paths["manifest"])
-        base.environment = str(paths["environment"])
-        base.test_results = str(paths["test_results"])
-        base.archive_report = str(tmp / "missing_archive.json")
-        base.issue_register = str(paths["issue_register"])
-        base.issue_details = str(paths["issue_details"])
-        base.blocker_board = str(paths["blocker_board"])
-        base.handover = str(hdir / "SESSION_HANDOVER.md")
-        base.handover_dir = str(hdir)
-        base.stack = str(paths["stack"])
-        base.source_manifest = str(ROOT / DEFAULT["source_manifest"])
-
-        def context():
-            return build_context(base)
-
-        def expect(label, mutate):
-            mutate()
-            try:
-                ctx = context()
-                names = [n for n in CHECKS if n != "archive"]
-                bad = False
-                for name in names:
-                    try:
-                        result = CHECKS[name](ctx)
-                        if result["status"] != "PASS":
-                            bad = True
-                    except Exception:
-                        bad = True
-                if not bad:
-                    raise RuntimeError(f"{label}: mutation was accepted")
-            except Exception as exc:
-                if "mutation was accepted" in str(exc):
-                    raise
-                # A raised check also counts as rejection.
-                return
-            raise RuntimeError(f"{label}: mutation was accepted")
-
-        def mutate_json(path, key, value):
-            data = json.loads(path.read_text(encoding="utf-8"))
-            data[key] = value
-            path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-        cases = 0
-        mutations = [
-            ("RUN_ID", lambda: mutate_json(paths["manifest"],
-                "latest_local_validation",
-                dict(json.loads(paths["manifest"].read_text())["latest_local_validation"],
-                     run_id="WRONG"))),
-            ("branch", lambda: mutate_json(paths["manifest"],
-                "latest_local_validation",
-                dict(json.loads(paths["manifest"].read_text())["latest_local_validation"],
-                     branch="main"))),
-            ("code", lambda: mutate_json(paths["manifest"],
-                "latest_local_validation",
-                dict(json.loads(paths["manifest"].read_text())["latest_local_validation"],
-                     validated_code_commit="0" * 40))),
-            ("ahead", lambda: mutate_json(paths["manifest"],
-                "latest_local_validation",
-                dict(json.loads(paths["manifest"].read_text())["latest_local_validation"],
-                     ahead_commit_count=999))),
-            ("tooling", lambda: mutate_json(paths["manifest"],
-                "latest_local_validation",
-                dict(json.loads(paths["manifest"].read_text())["latest_local_validation"],
-                     tooling_commit=None))),
-        ]
-        for label, fn in mutations:
-            cases += 1
-            try:
-                expect(label, fn)
-            except RuntimeError as exc:
-                print("EVIDENCE_CHECKER_SELF_TEST_FAIL:", exc, file=sys.stderr)
-                return 1
-            # Restore from original.
-            for key in ("manifest", "environment", "test_results",
-                        "issue_register", "issue_details", "blocker_board", "stack"):
-                (tmp / (ROOT / DEFAULT[key]).name).write_bytes((ROOT / DEFAULT[key]).read_bytes())
-        print(f"EVIDENCE_CHECKER_SELF_TEST_PASS ({cases} negative cases)")
-        return 0
-    finally:
-        import shutil
-        shutil.rmtree(tmp, ignore_errors=True)
-
-
-def self_test():
-    """Mutation test for the unified checker.
-
-    Each case tampers exactly one critical field and calls the checker that owns
-    that field. A PASS after tampering is a test failure. This intentionally
-    avoids treating unrelated failures as a successful rejection.
+    Do not mutate a live R28 evidence set and treat its pre-existing BLOCKED
+    gates as successful negative-test rejection. Each unit fixture constructs a
+    known-valid baseline, then mutates one field and expects the targeted check
+    to reject it.
     """
-    import argparse
-    import shutil
-
-    required = [DEFAULT["manifest"], DEFAULT["environment"], DEFAULT["test_results"],
-                DEFAULT["issue_register"], DEFAULT["issue_details"],
-                DEFAULT["blocker_board"], DEFAULT["stack"]]
-    missing = [p for p in required if not (ROOT / p).is_file()]
-    if missing:
-        print("EVIDENCE_CHECKER_SELF_TEST_FAIL: missing " + ", ".join(missing),
-              file=sys.stderr)
-        return 1
-    tmp = Path(tempfile.mkdtemp(prefix="evidence_checker_r28_"))
-    try:
-        paths = {}
-        for key in ("manifest", "environment", "test_results", "issue_register",
-                    "issue_details", "blocker_board", "stack"):
-            src = ROOT / DEFAULT[key]
-            dst = tmp / src.name
-            dst.write_bytes(src.read_bytes())
-            paths[key] = dst
-        manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
-        head = git("rev-parse", "HEAD")
-        run_id = manifest["latest_local_validation"]["run_id"]
-        hdir = tmp / "handover"
-        hdir.mkdir()
-        (hdir / "SESSION_HANDOVER.md").write_text(
-            "\n".join(f"## {c}. fixture" for c in "ABCDEFGHIJKLMNOPQRSTUVW") + "\n",
-            encoding="utf-8")
-        (hdir / "handover_state.json").write_text(
-            json.dumps({"head": head, "run_id": run_id}), encoding="utf-8")
-        for name in ("git_status.txt", "git_head.txt", "git_branch.txt",
-                     "git_diff_cached.patch", "git_diff_worktree.patch",
-                     "untracked_manifest.json", "modified_files_manifest.json",
-                     "blocker_snapshot.json", "test_progress.json",
-                     "active_processes.json", "next_actions.md",
-                     "NEXT_SESSION_START_PROMPT.txt"):
-            (hdir / name).write_text("fixture\n", encoding="utf-8")
-        (hdir / "TAKEOVER_ACK.md").write_text("TAKEOVER_CONFIRMED\n", encoding="utf-8")
-        lines = []
-        for p in sorted(hdir.iterdir()):
-            if p.name == "HANDOVER_SHA256SUMS.txt":
-                continue
-            lines.append(f"{sha(p)}  {p.name}")
-        (hdir / "HANDOVER_SHA256SUMS.txt").write_text("\n".join(lines) + "\n",
-                                                     encoding="utf-8")
-
-        class A:
-            pass
-        base = A()
-        base.run_id = None
-        base.code_commit = None
-        base.output_dir = str(tmp / "out")
-        base.check = "all"
-        base.manifest = str(paths["manifest"])
-        base.environment = str(paths["environment"])
-        base.test_results = str(paths["test_results"])
-        base.archive_report = str(tmp / "missing_archive.json")
-        base.issue_register = str(paths["issue_register"])
-        base.issue_details = str(paths["issue_details"])
-        base.blocker_board = str(paths["blocker_board"])
-        base.handover = str(hdir / "SESSION_HANDOVER.md")
-        base.handover_dir = str(hdir)
-        base.stack = str(paths["stack"])
-        base.source_manifest = str(ROOT / DEFAULT["source_manifest"])
-
-        def status(check_name):
-            ctx = build_context(base)
-            return CHECKS[check_name](ctx)["status"]
-
-        def restore():
-            for key in ("manifest", "environment", "test_results",
-                        "issue_register", "issue_details", "blocker_board", "stack"):
-                (tmp / (ROOT / DEFAULT[key]).name).write_bytes((ROOT / DEFAULT[key]).read_bytes())
-
-        def mutate_json(path, mutator):
-            data = json.loads(path.read_text(encoding="utf-8"))
-            mutator(data)
-            path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-        cases = 0
-        failures = []
-
-        def case(label, check_name, mutate):
-            nonlocal cases
-            restore()
-            mutate()
-            try:
-                result = status(check_name)
-            except Exception:
-                result = "FAIL"
-            cases += 1
-            if result == "PASS":
-                failures.append(f"{label}: {check_name} accepted mutation")
-
-        case("manifest RUN_ID", "manifest", lambda: mutate_json(
-            paths["manifest"], lambda d: d["latest_local_validation"].update(run_id="WRONG")))
-        case("manifest branch", "manifest", lambda: mutate_json(
-            paths["manifest"], lambda d: d["latest_local_validation"].update(branch="main")))
-        case("manifest code", "manifest", lambda: mutate_json(
-            paths["manifest"], lambda d: d["latest_local_validation"].update(
-                validated_code_commit="0" * 40)))
-        case("manifest ahead", "manifest", lambda: mutate_json(
-            paths["manifest"], lambda d: d["latest_local_validation"].update(
-                ahead_commit_count=999)))
-        case("manifest tooling", "manifest", lambda: mutate_json(
-            paths["manifest"], lambda d: d["latest_local_validation"].update(
-                tooling_commit=None)))
-        case("environment RUN_ID", "environment", lambda: mutate_json(
-            paths["environment"], lambda d: d.update(run_id="WRONG")))
-        case("environment code", "environment", lambda: mutate_json(
-            paths["environment"], lambda d: d.update(code_commit="0" * 40)))
-        case("environment toolchain", "environment", lambda: mutate_json(
-            paths["environment"], lambda d: d.update(toolchain_version="see r25_environment")))
-        case("test results RUN_ID", "test-results", lambda: mutate_json(
-            paths["test_results"], lambda d: d.update(run_id="WRONG")))
-        case("test results duplicate", "test-results", lambda: mutate_json(
-            paths["test_results"], lambda d: d["tests"].append(dict(d["tests"][0]))))
-        case("test PASS checks=0", "test-results", lambda: mutate_json(
-            paths["test_results"], lambda d: next(
-                t for t in d["tests"] if t["status"] == "PASS").update(checks=0)))
-        case("test log SHA", "test-results", lambda: mutate_json(
-            paths["test_results"], lambda d: next(
-                t for t in d["tests"] if t["status"] == "PASS").update(log_sha256="0" * 64)))
-        case("issue field missing", "issues", lambda: paths["issue_details"].write_text(
-            "\n".join(line for line in paths["issue_details"].read_text(
-                encoding="utf-8").splitlines()
-                if not line.startswith("- 日志 SHA256")), encoding="utf-8"))
-        case("blocker B06 missing", "blocker", lambda: paths["blocker_board"].write_text(
-            paths["blocker_board"].read_text(encoding="utf-8").replace("B06", "B99"),
-            encoding="utf-8"))
-        case("product envelope", "product", lambda: mutate_json(
-            paths["manifest"], lambda d: d["product_config"].update(
-                default_max_speed_mps=9.0)))
-        case("stack PASS", "stack", lambda: mutate_json(
-            paths["stack"], lambda d: d.update(status="PASS")))
-        case("stack lower bound", "stack", lambda: mutate_json(
-            paths["stack"], lambda d: d.update(known_lower_bound_bytes=4096)))
-        case("handover section", "handover", lambda: (hdir / "SESSION_HANDOVER.md").write_text(
-            (hdir / "SESSION_HANDOVER.md").read_text(encoding="utf-8").replace(
-                "## W. fixture\n", ""), encoding="utf-8"))
-        if failures:
-            for failure in failures:
-                print("EVIDENCE_CHECKER_SELF_TEST_FAIL:", failure, file=sys.stderr)
-            return 1
-        print(f"EVIDENCE_CHECKER_SELF_TEST_PASS ({cases} negative cases)")
-        return 0
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+    modules = (
+        "tests.tools.test_prepare_archive_metadata",
+        "tests.tools.test_validation_evidence_archive",
+        "tests.tools.test_rtt_package_tree",
+    )
+    optimization = ["-O"] if sys.flags.optimize else []
+    command = [sys.executable, *optimization, "-m", "unittest", "-v", *modules]
+    proc = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+    if proc.stdout:
+        print(proc.stdout, end="")
+    if proc.stderr:
+        print(proc.stderr, end="", file=sys.stderr)
+    if proc.returncode == 0:
+        print("EVIDENCE_CHECKER_SELF_TEST_PASS")
+    else:
+        print("EVIDENCE_CHECKER_SELF_TEST_FAIL", file=sys.stderr)
+    return proc.returncode
 
 
 def main():

@@ -1,6 +1,7 @@
 import os
 import sys
 import rtconfig
+from tools.check_rtt_package_tree import missing_generated_metadata
 
 RTT_ROOT = os.getenv('RTT_ROOT') or 'rt-thread'
 
@@ -13,18 +14,16 @@ except ImportError:
     exit(-1)
 
 def bsp_pkg_check():
-    check_paths = [
-        os.path.join("packages", "CMSIS-Core-latest"),
-        os.path.join("packages", "stm32h7_cmsis_driver-latest"),
-        os.path.join("packages", "stm32h7_hal_driver-latest")
-    ]
-
-    need_update = not all(os.path.exists(p) for p in check_paths)
-
-    if need_update:
+    # Do not hard-code `*-latest` package directory names. Exact pinned package
+    # versions use version-specific suffixes; RT-Thread generates these two
+    # entrypoints for the selected package tree.
+    missing = missing_generated_metadata(os.path.abspath("."))
+    if missing:
         print("\n===============================================================================")
-        print("Dependency packages missing, please running 'pkgs --update'...")
-        print("If no packages are fetched, run 'pkgs --upgrade' first, then 'pkgs --update'...")
+        print("RT-Thread generated package metadata is missing:")
+        for path in missing:
+            print("  - " + path)
+        print("Install the OWNER-approved, locked package set with 'pkgs --update'.")
         print("===============================================================================")
         exit(1)
 

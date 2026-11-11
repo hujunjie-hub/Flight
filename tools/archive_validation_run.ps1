@@ -30,8 +30,6 @@ $zipPath = Join-Path $archiveRoot ($RunId + ".zip")
 if (Test-Path -LiteralPath $runDir) { throw "Archive directory already exists: $runDir" }
 if (Test-Path -LiteralPath $zipPath) { throw "Archive ZIP already exists: $zipPath" }
 
-New-Item -ItemType Directory -Force -Path $runDir | Out-Null
-
 function Get-GitValue {
     param([string[]]$GitArgs)
     $output = & git -C $repoRoot @GitArgs 2>&1
@@ -40,6 +38,31 @@ function Get-GitValue {
     }
     return (($output | ForEach-Object { "$_" }) -join [Environment]::NewLine).Trim()
 }
+
+# Prepare the in-ZIP acceptance manifest before copying evidence. The ZIP digest
+# is intentionally external-only because a ZIP cannot contain its own SHA256.
+$branch = Get-GitValue -GitArgs @("branch", "--show-current")
+$head = Get-GitValue -GitArgs @("rev-parse", "HEAD")
+$remoteRef = "origin/$branch"
+$remoteHead = Get-GitValue -GitArgs @("rev-parse", $remoteRef)
+$aheadCountText = Get-GitValue -GitArgs @("rev-list", "--count", "$remoteRef..HEAD")
+if ($branch -ne "opt/stage-02-m5-06-safety-validator") { throw "Unexpected branch: $branch" }
+if ($head -notmatch '^[0-9a-f]{40}$') { throw "Unable to resolve HEAD: $head" }
+if ($remoteHead -notmatch '^[0-9a-f]{40}$') { throw "Unable to resolve remote HEAD: $remoteHead" }
+if ($aheadCountText -notmatch '^\d+$') { throw "Unable to compute ahead count: $aheadCountText" }
+$metadataArgs = @(
+    (Join-Path $repoRoot "tools/prepare_archive_metadata.py"),
+    "--repo", $repoRoot,
+    "--manifest", "spec/validation/flight_acceptance_manifest.json",
+    "--run-id", $RunId,
+    "--expected-branch", $branch
+)
+$metadataOutput = & python @metadataArgs 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "Archive metadata preparation failed: $($metadataOutput -join [Environment]::NewLine)"
+}
+
+New-Item -ItemType Directory -Force -Path $runDir | Out-Null
 
 $copyPaths = @(
     "build/m4_m5_implementation/evidence",
@@ -88,6 +111,30 @@ if ($LASTEXITCODE -eq 0 -and $patch.Count -gt 0) {
     Set-Content -LiteralPath $patchPath -Value "" -Encoding utf8NoBOM
 }
 
+# Every archive must carry a self-contained bundle with both HEAD and the
+# named working branch. Never silently reuse a bundle for a different HEAD.
+$bundleRelative = "build/validation/regenerated/$RunId.bundle"
+$bundlePath = Join-Path $runDir $bundleRelative
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $bundlePath) | Out-Null
+if (-not (Test-Path -LiteralPath $bundlePath)) {
+    $bundleOutput = & git -C $repoRoot bundle create $bundlePath HEAD "refs/heads/$branch" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git Bundle creation failed: $($bundleOutput -join [Environment]::NewLine)"
+    }
+}
+$bundleVerify = & git -C $repoRoot bundle verify $bundlePath 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "Git Bundle verification failed: $($bundleVerify -join [Environment]::NewLine)"
+}
+$bundleRefs = & git -C $repoRoot bundle list-heads $bundlePath 2>&1
+if ($LASTEXITCODE -ne 0) { throw "Git Bundle list-heads failed." }
+$headRef = "$head HEAD"
+$branchRef = "$head refs/heads/$branch"
+if (($bundleRefs -notcontains $headRef) -or ($bundleRefs -notcontains $branchRef)) {
+    throw "Git Bundle must contain exact refs: '$headRef' and '$branchRef'. Found: $($bundleRefs -join '; ')"
+}
+$bundleHash = (Get-FileHash -LiteralPath $bundlePath -Algorithm SHA256).Hash.ToLowerInvariant()
+
 $untracked = & git -C $repoRoot ls-files --others --exclude-standard 2>&1
 if ($LASTEXITCODE -eq 0) {
     $untrackedRoot = Join-Path $runDir "working_tree_untracked"
@@ -105,11 +152,8 @@ if ($LASTEXITCODE -eq 0) {
     }
 }
 
-$branch = Get-GitValue -GitArgs @("branch", "--show-current")
-$head = Get-GitValue -GitArgs @("rev-parse", "HEAD")
 $status = Get-GitValue -GitArgs @("status", "--short", "--branch")
 $commit = Get-GitValue -GitArgs @("show", "-s", "--format=%H%n%cs%n%s", "HEAD")
-$remoteHead = Get-GitValue -GitArgs @("rev-parse", "origin/opt/stage-02-m5-06-safety-validator")
 
 $pythonVersion = "NOT_AVAILABLE"
 $pythonOutput = & python --version 2>&1
@@ -133,16 +177,20 @@ Get-ChildItem -LiteralPath $runDir -Recurse -File | ForEach-Object {
 }
 
 $codeCommit = "NOT_RECORDED"
+$manifestJson = $null
 try {
     $manifestPath = Join-Path $repoRoot "spec/validation/flight_acceptance_manifest.json"
     if (Test-Path -LiteralPath $manifestPath) {
         $manifestJson = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
         $codeCommit = $manifestJson.latest_local_validation.validated_code_commit
     }
-} catch { $codeCommit = "NOT_RECORDED" }
+} catch { throw "Unable to read prepared acceptance manifest: $_" }
+if ($null -eq $manifestJson -or $codeCommit -notmatch '^[0-9a-f]{40}$') {
+    throw "Prepared acceptance manifest has no valid validated_code_commit."
+}
 
 $archiveManifest = [ordered]@{
-    schema_version = "1.0"
+    schema_version = "2.0"
     project = "Flight"
     run_id = $RunId
     created_utc = (Get-Date).ToUniversalTime().ToString("o")
@@ -150,9 +198,24 @@ $archiveManifest = [ordered]@{
     branch = $branch
     head_sha = $head
     code_commit = $codeCommit
+    validated_code_commit = $codeCommit
+    tooling_commit = $manifestJson.latest_local_validation.tooling_commit
+    collector_commit = $manifestJson.latest_local_validation.collector_commit
+    archive_script_commit = $manifestJson.latest_local_validation.archive_script_commit
+    collector_worktree_sha256 = $manifestJson.latest_local_validation.collector_worktree_sha256
+    archive_script_worktree_sha256 = $manifestJson.latest_local_validation.archive_script_worktree_sha256
+    tooling_source_manifest_sha256 = $manifestJson.latest_local_validation.tooling_source_manifest_sha256
+    tooling_sources = $manifestJson.latest_local_validation.tooling_sources
     archive_head_sha = $head
     archive_commit_sha = $head
-    validated_code_commit = $codeCommit
+    remote_head = $remoteHead
+    ahead_commit_count = [int]$aheadCountText
+    archive_zip_hash_location = "EXTERNAL_ARCHIVE_REPORT_AND_SIDECAR"
+    git_bundle = [ordered]@{
+        path = $bundleRelative.Replace([string][char]92, "/")
+        sha256 = $bundleHash
+        refs = @($bundleRefs | ForEach-Object { "$($_)".Trim() })
+    }
     input_baseline_code_commit = $InputBaselineCodeCommit
     input_baseline_archive_head = $InputBaselineArchiveHead
     remote_m5_branch_sha_at_archive_time = $remoteHead
@@ -199,12 +262,19 @@ $zipName = [IO.Path]::GetFileName($zipPath)
 $sidecarPath = $zipPath + ".sha256"
 "$zipHash  $zipName" | Set-Content -LiteralPath $sidecarPath -Encoding ascii
 
-$aheadCount = (& git -C $repoRoot rev-list --count "origin/opt/stage-02-m5-06-safety-validator..HEAD" 2>&1)
 $externalReport = [ordered]@{
-    schema_version = "1.0"
+    schema_version = "2.0"
     run_id = $RunId
+    branch = $branch
     code_commit = $codeCommit
     validated_code_commit = $codeCommit
+    tooling_commit = $manifestJson.latest_local_validation.tooling_commit
+    collector_commit = $manifestJson.latest_local_validation.collector_commit
+    archive_script_commit = $manifestJson.latest_local_validation.archive_script_commit
+    collector_worktree_sha256 = $manifestJson.latest_local_validation.collector_worktree_sha256
+    archive_script_worktree_sha256 = $manifestJson.latest_local_validation.archive_script_worktree_sha256
+    tooling_source_manifest_sha256 = $manifestJson.latest_local_validation.tooling_source_manifest_sha256
+    tooling_sources = $manifestJson.latest_local_validation.tooling_sources
     archive_head_sha = $head
     archive_commit_sha = $head
     archive_commit_sha_equals_archive_head_sha = $true
@@ -212,11 +282,17 @@ $externalReport = [ordered]@{
     input_baseline_code_commit = $InputBaselineCodeCommit
     input_baseline_archive_head = $InputBaselineArchiveHead
     remote_head = $remoteHead
-    ahead_commit_count = [int]("$aheadCount".Trim())
+    ahead_commit_count = [int]$aheadCountText
+    archive_zip_hash_location = "EXTERNAL_ARCHIVE_REPORT_AND_SIDECAR"
     archive_zip_sha256 = $zipHash
     archive_zip_path = $zipPath
     archive_zip_size_bytes = (Get-Item -LiteralPath $zipPath).Length
     sidecar_path = $sidecarPath
+    archive_manifest = (Join-Path $runDir "archive_manifest.json")
+    bundle = $bundleRelative.Replace([string][char]92, "/")
+    bundle_path = $bundlePath
+    bundle_sha256 = $bundleHash
+    bundle_refs = @($bundleRefs | ForEach-Object { "$($_)".Trim() })
     created_utc = (Get-Date).ToUniversalTime().ToString("o")
     scope = "LOCAL_EXECUTION_ONLY; not GitHub CI, H723 runtime, HIL or flight"
 }
