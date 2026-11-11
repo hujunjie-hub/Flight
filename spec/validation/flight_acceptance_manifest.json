@@ -674,16 +674,16 @@
   },
   "previous_commit_pass_inherited": false,
   "latest_local_validation": {
-    "run_id": "M5-06-R26-20261111",
-    "validated_code_commit": "cd8d4a15dc2c047e63692f74bfad2b612e991bcf",
-    "head": "cd8d4a15dc2c047e63692f74bfad2b612e991bcf",
-    "tooling_commit": "714f920b5cf2271d90a499b8a07e1ed5d139ff62",
-    "archive_head_sha": "60764e992b03d4c2149a386d3c22333b4ef5fbb9",
-    "archive_commit_sha": "60764e992b03d4c2149a386d3c22333b4ef5fbb9",
+    "run_id": "M5-06-R27-20261111",
+    "validated_code_commit": "b2a4c3779e9a2ccc22aebe209dce435b74ccc7d6",
+    "head": "b2a4c3779e9a2ccc22aebe209dce435b74ccc7d6",
+    "tooling_commit": "cf4b3e3b7d9c50abd019711725891a64c7b592fc",
+    "archive_head_sha": "EXTERNAL_ARCHIVE_REPORT",
+    "archive_commit_sha": "EXTERNAL_ARCHIVE_REPORT",
     "archive_zip_sha256": "SEE_EXTERNAL_SHA256_SIDECAR",
-    "archive_zip_sidecar": "work/validation/archives/M5-06-R26-20261111.zip.sha256",
-    "archive_external_report": "work/validation/archives/M5-06-R26-20261111.archive_report.json",
-    "archive_zip_size_bytes": 36053480,
+    "archive_zip_sidecar": "work/validation/archives/M5-06-R27-20261111.zip.sha256",
+    "archive_external_report": "work/validation/archives/M5-06-R27-20261111.archive_report.json",
+    "archive_zip_size_bytes": null,
     "branch": "opt/stage-02-m5-06-safety-validator",
     "scope": "LOCAL_EXECUTION_ONLY",
     "github_ci": "NOT_RUN_FOR_THIS_HEAD",
@@ -700,10 +700,10 @@
       "scons_link"
     ],
     "input_baseline_code_commit": "cd8d4a15dc2c047e63692f74bfad2b612e991bcf",
-    "input_baseline_archive_head": "4a66ac907c44036a353b5c7f42a36ac455de55f5",
+    "input_baseline_archive_head": "60764e992b03d4c2149a386d3c22333b4ef5fbb9",
     "remote_head": "51e7e923419733f5aa3b21efa1e46588629623ed",
-    "ahead_commit_count": 80,
-    "note": "validated_code_commit is the code commit; tooling_commit is the collector/checker commit; archive metadata is external."
+    "ahead_commit_count": null,
+    "note": "validated_code_commit is the code commit; tooling_commit is tooling; archive metadata external."
   },
   "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
   "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112 three separate bounds)",
@@ -750,5 +750,9 @@
   "r25_manifest_snapshot": "build/validation/regenerated/r25_manifest_snapshot.json",
   "r26_environment": "build/validation/regenerated/r26_environment.json",
   "r26_test_results": "build/validation/regenerated/r26_test_results.json",
-  "r26_worktree_review": "build/validation/regenerated/R26_WORKTREE_REVIEW.md"
+  "r26_worktree_review": "build/validation/regenerated/R26_WORKTREE_REVIEW.md",
+  "r27_environment": "build/validation/regenerated/r27_environment.json",
+  "r27_test_results": "build/validation/regenerated/r27_test_results.json",
+  "r27_worktree_review": "build/validation/regenerated/R27_WORKTREE_REVIEW.md",
+  "r27_issue_details": "spec/quality/R27_ISSUE_DETAILS.md"
 }

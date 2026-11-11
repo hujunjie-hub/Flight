@@ -78,4 +78,4 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 任何失败记录。
 
 
-详细记录：`spec/quality/R25_ISSUE_DETAILS.md`；R24 记录保留为历史。
+详细记录：`spec/quality/R27_ISSUE_DETAILS.md`；R25/R24 记录保留为历史。
