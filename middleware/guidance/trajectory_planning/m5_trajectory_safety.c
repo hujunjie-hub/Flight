@@ -2259,7 +2259,7 @@ uint8_t m5_trajectory_safety_test_curve_jerk_components(
     float bernstein_bound[3],
     float tail_bound[3],
     float consumer_bound[3],
-    float total_bound[3])
+    float total_bound[3], uint8_t *status)
 {
   MotionReferencePoint start, end;
   M5SafetyBezier bezier;
@@ -2271,13 +2271,16 @@ uint8_t m5_trajectory_safety_test_curve_jerk_components(
       start_acceleration == NULL || end_position == NULL ||
       end_velocity == NULL || end_acceleration == NULL ||
       bernstein_bound == NULL || tail_bound == NULL ||
-      consumer_bound == NULL || total_bound == NULL ||
+      consumer_bound == NULL || total_bound == NULL || status == NULL ||
       !finite3(start_position) || !finite3(start_velocity) ||
       !finite3(start_acceleration) || !finite3(end_position) ||
       !finite3(end_velocity) || !finite3(end_acceleration) ||
       !isfinite(duration_s) || duration_s <= 0.0f ||
       !isfinite(u0) || !isfinite(u1) || u0 < 0.0f ||
-      u1 > 1.0f || u1 <= u0) return 0u;
+      u1 > 1.0f || u1 <= u0) {
+    if (status != NULL) *status = 1u;
+    return 0u;
+  }
 
   memset(&start, 0, sizeof(start));
   memset(&end, 0, sizeof(end));
@@ -2289,10 +2292,17 @@ uint8_t m5_trajectory_safety_test_curve_jerk_components(
     end.point.velocity_ned_mps[axis] = end_velocity[axis];
     end.point.acceleration_ned_mps2[axis] = end_acceleration[axis];
   }
+  *status = 0u;
   if (!build_curve(&start, &end, (double)duration_s,
-                   (float)u0, (float)u1, &bezier)) return 0u;
+                   (float)u0, (float)u1, &bezier)) {
+    *status = 2u;
+    return 0u;
+  }
   local_duration = (double)duration_s * ((double)u1 - (double)u0);
-  if (!curve_bounds(&bezier, local_duration, &bounds)) return 0u;
+  if (!curve_bounds(&bezier, local_duration, &bounds)) {
+    *status = 3u;
+    return 0u;
+  }
   for (axis = 0u; axis < 3u; ++axis) {
     bernstein_bound[axis] = bounds.jerk_bernstein_bound[axis];
     tail_bound[axis] = bounds.jerk_tail_bound[axis];

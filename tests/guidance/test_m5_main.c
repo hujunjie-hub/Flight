@@ -37,6 +37,8 @@
 #define T_AUTH_EPOCH 5u
 #define T_DIR_EPOCH 9u
 
+static uint32_t safety_fuzz_next(uint32_t *state);
+
 static int g_failures;
 static int g_checks;
 
@@ -1216,6 +1218,76 @@ static void test_m5_map_roll_inplace_differential(void)
         CHECK(reference.center_ned_m[axis] == inplace.center_ned_m[axis]);
     }
   }
+}
+
+
+static void test_m5_map_roll_inplace_random(void)
+{
+  enum { RANDOM_CASES = 1000 };
+  M5LocalMap base, reference, inplace;
+  NavigationSnapshot nav;
+  uint32_t rng = 0x4D415052u;
+  const uint64_t t0 = 1700000u;
+  unsigned candidate = 0u, checked = 0u, failed = 0u;
+  unsigned positive = 0u, negative = 0u, zero = 0u;
+  unsigned single = 0u, dual = 0u, triple = 0u;
+  unsigned iter, axis, i;
+
+  planner_nav_init(&nav, t0);
+  CHECK(m5_local_map_init(&base, &nav, t0, 0.25f, 0.30f, 2.0f,
+                          M5_MAP_REQUIRED_DYNAMIC_PREDICTION_US) == STATUS_OK);
+  for (iter = 0u; iter < RANDOM_CASES; ++iter) {
+    float target[3];
+    unsigned axes = 1u + (safety_fuzz_next(&rng) % 7u);
+    unsigned selected = 0u;
+    base.map_revision = 1u + (safety_fuzz_next(&rng) % 100000u);
+    for (axis = 0u; axis < 3u; ++axis) {
+      int raw = (int)(safety_fuzz_next(&rng) % 2001u) - 1000;
+      base.center_ned_m[axis] = (float)raw * 0.001f;
+      target[axis] = base.center_ned_m[axis];
+    }
+    for (i = 0u; i < M5_MAP_CELL_COUNT; ++i) {
+      base.cells[i].state = (uint8_t)(safety_fuzz_next(&rng) % 5u);
+      base.cells[i].log_odds = (int8_t)((int)(safety_fuzz_next(&rng) % 65u) - 32);
+      base.cells[i].source_mask = (uint8_t)(safety_fuzz_next(&rng) & 0xFFu);
+      base.cells[i].last_update_ms = safety_fuzz_next(&rng);
+    }
+    for (axis = 0u; axis < 3u; ++axis) {
+      if ((axes & (1u << axis)) == 0u) continue;
+      int shift = (int)(safety_fuzz_next(&rng) % 33u) - 16;
+      target[axis] = base.center_ned_m[axis] +
+          (float)shift * M5_MAP_CELL_SIZE_M;
+      selected++;
+      if (shift > 0) positive++;
+      else if (shift < 0) negative++;
+      else zero++;
+    }
+    if (selected == 1u) single++;
+    else if (selected == 2u) dual++;
+    else triple++;
+    reference = base;
+    inplace = base;
+    m5_local_map_test_roll_reference(&reference, target);
+    m5_local_map_test_roll_inplace(&inplace, target);
+    candidate++;
+    checked++;
+    if (memcmp(reference.cells, inplace.cells,
+               sizeof(reference.cells)) != 0 ||
+        reference.map_revision != inplace.map_revision ||
+        reference.center_ned_m[0] != inplace.center_ned_m[0] ||
+        reference.center_ned_m[1] != inplace.center_ned_m[1] ||
+        reference.center_ned_m[2] != inplace.center_ned_m[2]) {
+      failed++;
+      CHECK(0);
+    } else {
+      CHECK(1);
+    }
+  }
+  printf("M5_MAP_ROLL_RANDOM seed=0x%08X candidate_cases=%u checked_cases=%u "
+         "failed_cases=%u positive=%u negative=%u zero=%u single=%u dual=%u "
+         "triple=%u\n", 0x4D415052u, candidate, checked, failed, positive,
+         negative, zero, single, dual, triple);
+  CHECK(failed == 0u);
 }
 
 static void test_m5_map_free_ray_log_odds_and_stale(void)
@@ -5902,6 +5974,7 @@ int main(void)
     {"m5_map_origin_cell_aligned", test_m5_map_initial_origin_is_cell_aligned},
     {"m5_map_roll_preserves_world_cells", test_m5_map_roll_preserves_world_cells},
     {"m5_map_roll_inplace_differential", test_m5_map_roll_inplace_differential},
+    {"m5_map_roll_inplace_random", test_m5_map_roll_inplace_random},
     {"m5_map_free_ray_stale", test_m5_map_free_ray_log_odds_and_stale},
     {"m5_map_source_lease_refresh", test_m5_map_source_lease_refresh},
     {"m5_map_occupied_dynamic_track", test_m5_map_occupied_primitive_and_dynamic_track},

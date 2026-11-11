@@ -112,7 +112,7 @@ class Probes:
         self.components = library.m5_trajectory_safety_test_curve_jerk_components
         self.components.argtypes = [pointer] * 6 + [
             ctypes.c_float, ctypes.c_float, ctypes.c_float,
-            pointer, pointer, pointer, pointer]
+            pointer, pointer, pointer, pointer, ctypes.POINTER(ctypes.c_uint8)]
         self.components.restype = ctypes.c_uint8
 
 
@@ -123,6 +123,7 @@ def main():
     candidate_cases = 0
     legal_cases = 0
     fail_closed_cases = 0
+    fail_closed_statuses = {}
     axis_cases_checked = 0
     bernstein_checks = 0
     tail_checks = 0
@@ -160,10 +161,18 @@ def main():
                     tail_bound = (ctypes.c_float * 3)()
                     consumer = (ctypes.c_float * 3)()
                     total = (ctypes.c_float * 3)()
+                    status = ctypes.c_uint8(0)
                     if not probes.components(*arrays, ctypes.c_float(h),
                                              ctypes.c_float(u0), ctypes.c_float(u1),
-                                             bernstein, tail_bound, consumer, total):
-                        fail_closed_cases += 1
+                                             bernstein, tail_bound, consumer, total,
+                                             ctypes.byref(status)):
+                        if state_name == 'subnormal' and status.value in (2, 3):
+                            fail_closed_cases += 1
+                            fail_closed_statuses[status.value] =                                 fail_closed_statuses.get(status.value, 0) + 1
+                            continue
+                        failures.append(
+                            f'unexpected C reject {state_name} {step_us} '
+                            f'u=({u0},{u1}) status={status.value}')
                         continue
                     legal_cases += 1
                     duration = Fraction(f32(h)) * (Fraction(f32(u1)) -
@@ -224,6 +233,7 @@ def main():
         'candidate_cases': candidate_cases,
         'legal_cases': legal_cases,
         'fail_closed_cases': fail_closed_cases,
+        'fail_closed_statuses': fail_closed_statuses,
         'axis_cases_checked': axis_cases_checked,
         'bernstein_checks': bernstein_checks,
         'tail_checks': tail_checks,

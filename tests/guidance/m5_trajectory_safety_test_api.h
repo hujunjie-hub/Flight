@@ -48,7 +48,7 @@ uint8_t m5_trajectory_safety_test_curve_jerk_components(
     float bernstein_bound[3],
     float tail_bound[3],
     float consumer_bound[3],
-    float total_bound[3]);
+    float total_bound[3], uint8_t *status);
 
 uint8_t m5_trajectory_safety_test_curve_eval(
     const float start_position[3],
