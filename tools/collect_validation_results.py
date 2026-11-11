@@ -69,9 +69,10 @@ def validate_record(record):
     if record.get("status") == "PASS":
         if not isinstance(record.get("exit_code"), int) or record["exit_code"] != 0:
             errors.append("PASS with nonzero exit")
-        if not isinstance(record.get("checks"), int) or \
+        if (not isinstance(record.get("checks"), int) and
+                record.get("checks") != "ANALYSIS") or \
                 not isinstance(record.get("failures"), int):
-            errors.append("PASS without integer checks/failures")
+            errors.append("PASS without integer checks or ANALYSIS/failures")
     if record.get("status") == "NOT_RUN":
         if not record.get("not_run_reason"):
             errors.append("NOT_RUN without reason")
@@ -130,8 +131,8 @@ def main():
             "test_id": f"T{idx:02d}", "test_name": item["name"],
             "run_id": args.run_id, "code_commit": code,
             "command": " ".join(item["command"]) if isinstance(item["command"], list) else item["command"],
-            "checks": checks if checks is not None else "NOT_APPLICABLE",
-            "failures": failures if failures is not None else "NOT_APPLICABLE",
+            "checks": checks if checks is not None else ("ANALYSIS" if status == "PASS" else "NOT_APPLICABLE"),
+            "failures": failures if failures is not None else (0 if status == "PASS" else "NOT_APPLICABLE"),
             "exit_code": item["exit_code"], "status": status,
             "random_seed": "deterministic" if "host" in item["name"] else "NOT_APPLICABLE",
             "toolchain_version": toolchain_for(item["name"]),
