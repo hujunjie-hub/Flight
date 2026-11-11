@@ -1,14 +1,15 @@
-# Flight M5-06 阻塞项视图（R23）
+# Flight M5-06 阻塞项视图（R25）
 
 本文件只做 Issue Register 的**派生视图**，不维护第二套状态。数据源：
 `spec/quality/ISSUE_REGISTER.md`。状态、严重度、责任方和复验结论以该登记为准。
 `GITHUB_PUBLICATION = PENDING`：Agent 无 GitHub 写权限，不虚构 Issue 编号或在线状态。
 
-输入基线：R22 代码 `9e4f5eff5b7140815c09e0151e7f43ced128772f`；
-R22 归档 HEAD `8fcd4eacda93bf953882f5bb079e891839a1f3da`。
-R23 validated code `e89cb7d94e6c992c8dfa71c3cb565ae4c5f6248a`；
+输入基线：R24 代码 `e89cb7d94e6c992c8dfa71c3cb565ae4c5f6248a`；
+R24 归档 HEAD `f3f709fbe8a432591a7360d40f298f6ce3b945f1`。
+R25 validated code `cd8d4a15dc2c047e63692f74bfad2b612e991bcf`；
+tooling `8b8204f1528b64f59144b16e842b3ee38e8001e7`；
 Remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；本地领先 74 commits；
-RUN_ID `M5-06-R23-20261111`。
+RUN_ID `M5-06-R25-20261111`。
 所有命令均从仓库根目录执行；Host/SIL 结果不构成 H723 实机、HIL 或飞行放行。
 
 ---
