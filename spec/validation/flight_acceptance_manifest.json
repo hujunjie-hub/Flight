@@ -677,7 +677,7 @@
     "run_id": "M5-06-R25-20261111",
     "validated_code_commit": "cd8d4a15dc2c047e63692f74bfad2b612e991bcf",
     "head": "cd8d4a15dc2c047e63692f74bfad2b612e991bcf",
-    "tooling_commit": "69b53f16ded0c3acf66e3547ccc8285c1a00643e",
+    "tooling_commit": "8b8204f1528b64f59144b16e842b3ee38e8001e7",
     "archive_head_sha": "EXTERNAL_ARCHIVE_REPORT",
     "archive_commit_sha": "EXTERNAL_ARCHIVE_REPORT",
     "archive_zip_sha256": "SEE_EXTERNAL_SHA256_SIDECAR",
@@ -746,5 +746,6 @@
   "s06_100_102_feasibility": "spec/validation/s06_100_102_r24_feasibility.md",
   "r25_environment": "build/validation/regenerated/r25_environment.json",
   "r25_test_results": "build/validation/regenerated/r25_test_results.json",
-  "r25_worktree_review": "build/validation/regenerated/R25_WORKTREE_REVIEW.md"
+  "r25_worktree_review": "build/validation/regenerated/R25_WORKTREE_REVIEW.md",
+  "r25_manifest_snapshot": "build/validation/regenerated/r25_manifest_snapshot.json"
 }
