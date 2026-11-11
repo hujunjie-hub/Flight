@@ -670,11 +670,11 @@
     "run_id": "M5-06-R19-20261111",
     "validated_code_commit": "8b112f0279735f4f9977f4314b81dccf203b14c3",
     "head": "8b112f0279735f4f9977f4314b81dccf203b14c3",
-    "archive_head_sha": "EXTERNAL_ARCHIVE_REPORT",
-    "archive_commit_sha": "EXTERNAL_ARCHIVE_REPORT",
+    "archive_head_sha": "5b87ff5f3cae98a5293a7a2fcdb9d0247da0f765",
+    "archive_commit_sha": "5b87ff5f3cae98a5293a7a2fcdb9d0247da0f765",
     "archive_zip_sha256": "SEE_EXTERNAL_SHA256_SIDECAR",
     "archive_external_report": "work/validation/archives/M5-06-R19-20261111.archive_report.json",
-    "archive_zip_size_bytes": null,
+    "archive_zip_size_bytes": 35751495,
     "branch": "opt/stage-02-m5-06-safety-validator",
     "scope": "LOCAL_EXECUTION_ONLY",
     "github_ci": "NOT_RUN_FOR_THIS_HEAD",
@@ -690,7 +690,8 @@
     "blocked_items": [
       "scons_link"
     ],
-    "note": "validated_code_commit is the code commit; archive HEAD and ZIP SHA256 are recorded in the external archive report and sidecar; the ZIP cannot contain its own hash."
+    "note": "validated_code_commit is the code commit; archive HEAD and ZIP SHA256 are recorded in the external archive report and sidecar; the ZIP cannot contain its own hash.",
+    "archive_zip_sidecar": "work/validation/archives/M5-06-R19-20261111.zip.sha256"
   },
   "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
   "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112 three separate bounds)",
