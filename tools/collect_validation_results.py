@@ -183,6 +183,8 @@ def main():
     mapm = re.search(r"M5_MAP_ROLL_RANDOM seed=(0x[0-9A-Fa-f]+) .*checked_cases=(\d+) failed_cases=(\d+)", m5text)
     s112 = json.loads((REGEN / "s06_112_r25.json").read_text())
     manifest = json.loads((ROOT / "spec/validation/flight_acceptance_manifest.json").read_text())
+    s113_match = re.search(r'\{\s*"test": "S06-113".*?\n\}', m5text, re.S)
+    s113_json = json.loads(s113_match.group(0)) if s113_match else None
     s113 = next(x for x in manifest["adversarial_tests"] if x["id"] == "S06-113")
     product = json.loads((REGEN / "checks/product.json").read_text())
     issues = json.loads((REGEN / "checks/issues.json").read_text())
@@ -192,15 +194,41 @@ def main():
     for idx, c in enumerate(validation["commands"], 1):
         text = (ROOT / c["log"]).read_text(errors="ignore")
         m = re.search(r"checks=(\d+) failures=(\d+)", text)
-        checks = int(m.group(1)) if m else (1 if c["status"] == "PASS" else None)
-        fails = int(m.group(2)) if m else (0 if c["status"] == "PASS" else None)
+        if m:
+            checks, fails = int(m.group(1)), int(m.group(2))
+        elif c["name"] == "line_endings":
+            checks, fails = len(re.findall(r"^PASS:", text, re.M)), 0
+        elif c["name"] == "python_o_negative":
+            checks, fails = len(re.findall(r"_PASS", text)), 0
+        elif c["name"] == "fp_model_selftest":
+            mm = re.search(r"(\d+) mutations detected", text)
+            checks, fails = (int(mm.group(1)) if mm else 0), 0
+        elif c["name"] == "memory_budget":
+            try:
+                checks, fails = len([v for v in json.loads(text).values() if isinstance(v, (int, float))]), 0
+            except Exception:
+                checks, fails = 0, 1
+        elif c["name"] in ("packages_lock_unit", "rebaseline_proposal"):
+            checks = len(re.findall(r"PASS", text))
+            fails = 0 if c["status"] == "PASS" else 1
+        elif c["name"] in ("m4_arm", "m5_arm"):
+            checks = len(re.findall(r"ARM_COMPILE_OK", text))
+            fails = 0 if c["status"] == "PASS" else 1
+        elif c["name"] == "consumer_fp":
+            try:
+                checks, fails = len(json.loads(text)), 0
+            except Exception:
+                checks, fails = 0, 1
+        else:
+            checks, fails = 0, 1
         src = source_for(c["name"])
         tests.append({"test_id": f"T{idx:02d}", "test_name": c["name"], "run_id": a.run_id,
                       "code_commit": a.code_commit, "verification_kind": "COMMAND" if m is None and c["status"] == "PASS" else "TEST",
                       "command": " ".join(c["command"]), "exit_code": c["exit_code"],
                       "checks": checks if checks is not None else 0,
                       "failures": fails if fails is not None else 0, "status": c["status"],
-                      "random_seed": "NOT_APPLICABLE", "toolchain_version": "git commit toolchain; see r25_environment",
+                      "random_seed": "NOT_APPLICABLE",
+                      "toolchain_version": ("ARM " + (ROOT / "build/m5_arm/toolchain.txt").read_text().splitlines()[2]) if c["name"] in ("m4_arm", "m5_arm") else ("WSL gcc 16.2.0 / Python 3.14.10" if "wsl.exe" in c["command"] else "Windows Python 3.14.8 / PowerShell 7.6.9"),
                       "environment_path": env_path, "environment_sha256": env_sha,
                       "collector_sha256": collector_sha,
                       "source_files": [{"path": src, "sha256": sha(src)}] if src else [],
@@ -210,7 +238,8 @@ def main():
     extras = [
         {"test_id": "S06-108", "test_name": "time error detection", "status": "PASS",
          "verification_kind": "TEST", "command": m5_cmd, "exit_code": m5_exit,
-         "checks": int(s108.group(1)), "failures": int(s108.group(2)), "random_seed": "0x6D350108",
+         "checks": int(s108.group(1)), "failures": int(s108.group(2)),
+         "random_seed": next((x.get("seed", "NOT_RECORDED") for x in manifest["adversarial_tests"] if x["id"] == "S06-108"), "NOT_RECORDED"),
          "log_path": "build/m4_m5_implementation/evidence/m5_host.log",
          "source_files": [{"path": "middleware/guidance/trajectory_planning/m5_trajectory_safety.c", "sha256": sha("middleware/guidance/trajectory_planning/m5_trajectory_safety.c")}]},
         {"test_id": "S06-112", "test_name": "continuous jerk exact Fraction", "status": s112["status"],
@@ -222,7 +251,9 @@ def main():
                           {"path": "middleware/guidance/trajectory_planning/m5_trajectory_safety.c", "sha256": sha("middleware/guidance/trajectory_planning/m5_trajectory_safety.c")}]},
         {"test_id": "S06-113", "test_name": "C time conversion injection", "status": "PASS",
          "verification_kind": "TEST", "command": m5_cmd, "exit_code": m5_exit,
-         "checks": s113["cases"], "failures": 0, "random_seed": "NOT_APPLICABLE",
+         "checks": s113_json["checked"] if s113_json else 0,
+         "failures": len(s113_json["failures"]) if s113_json else 1,
+         "random_seed": "NOT_APPLICABLE",
          "log_path": "build/m4_m5_implementation/evidence/m5_host.log",
          "source_files": [{"path": "middleware/guidance/trajectory_planning/m5_trajectory_safety.c", "sha256": sha("middleware/guidance/trajectory_planning/m5_trajectory_safety.c")}]},
         {"test_id": "MAP-RANDOM", "test_name": "map in-place random differential",
