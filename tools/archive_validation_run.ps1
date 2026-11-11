@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [string]$RunId = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ"),
-    [string]$CiRunUrl = ""
+    [string]$CiRunUrl = "",
+    [string]$InputBaselineCodeCommit = "",
+    [string]$InputBaselineArchiveHead = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -145,6 +147,10 @@ $archiveManifest = [ordered]@{
     head_sha = $head
     code_commit = $codeCommit
     archive_head_sha = $head
+    archive_commit_sha = $head
+    validated_code_commit = $codeCommit
+    input_baseline_code_commit = $InputBaselineCodeCommit
+    input_baseline_archive_head = $InputBaselineArchiveHead
     remote_m5_branch_sha_at_archive_time = $remoteHead
     head_commit = $commit
     git_status = $status
@@ -189,11 +195,18 @@ $zipName = [IO.Path]::GetFileName($zipPath)
 $sidecarPath = $zipPath + ".sha256"
 "$zipHash  $zipName" | Set-Content -LiteralPath $sidecarPath -Encoding ascii
 
+$aheadCount = (& git -C $repoRoot rev-list --count "origin/opt/stage-02-m5-06-safety-validator..HEAD" 2>&1)
 $externalReport = [ordered]@{
     schema_version = "1.0"
     run_id = $RunId
     code_commit = $codeCommit
+    validated_code_commit = $codeCommit
     archive_head_sha = $head
+    archive_commit_sha = $head
+    input_baseline_code_commit = $InputBaselineCodeCommit
+    input_baseline_archive_head = $InputBaselineArchiveHead
+    remote_head = $remoteHead
+    ahead_commit_count = ("$aheadCount".Trim())
     archive_zip_sha256 = $zipHash
     archive_zip_path = $zipPath
     archive_zip_size_bytes = (Get-Item -LiteralPath $zipPath).Length

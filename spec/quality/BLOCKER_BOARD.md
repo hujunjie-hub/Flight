@@ -1,13 +1,14 @@
-# Flight M5-06 阻塞项视图（R20）
+# Flight M5-06 阻塞项视图（R21）
 
 本文件只做 Issue Register 的**派生视图**，不维护第二套状态。数据源：
 `spec/quality/ISSUE_REGISTER.md`。状态、严重度、责任方和复验结论以该登记为准。
 `GITHUB_PUBLICATION = PENDING`：Agent 无 GitHub 写权限，不虚构 Issue 编号或在线状态。
 
-当前基线：R19 代码 `8b112f0279735f4f9977f4314b81dccf203b14c3`；R19 归档 HEAD
-`5b87ff5f3cae98a5293a7a2fcdb9d0247da0f765`；Remote HEAD
-`51e7e923419733f5aa3b21efa1e46588629623ed`；本地领先 50 commits；
-RUN_ID `M5-06-R20-20261111`。
+输入基线：R20 代码 `173360d49882dd98cb2a11ac26d189fc0e2f57a4`；
+R20 归档 HEAD `8f62091996c4bd8da2e0f16378b1680b3a8f30da`。
+R21 validated code `0642bdaf9ba370c079b3b447a3d4acc4cd0bc514`；
+Remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；本地领先 53 commits；
+RUN_ID `M5-06-R21-20261111`。
 所有命令均从仓库根目录执行；Host/SIL 结果不构成 H723 实机、HIL 或飞行放行。
 
 ---
@@ -223,6 +224,23 @@ RUN_ID `M5-06-R20-20261111`。
 ### FLIGHT-LOCAL-32 基线元数据
 
 - S2；R20 统一 BLOCKER_BOARD/Manifest/资源摘要到 R19 代码、归档 HEAD 和 50 commits。
+
+### FLIGHT-LOCAL-33 S06-112 严格断言
+
+- S1；R21 0642bda；160/140/20(status2)/420、R14b 6/60 underbound；0 failures。
+- 旧证据 HISTORICAL，R21 current。
+
+### FLIGHT-LOCAL-34 证据索引 SHA
+
+- S2；R21 0642bda；索引绑定 code/library/run/toolchain，R20 错误 SHA 修正。
+
+### FLIGHT-LOCAL-35 资源文档历史冲突
+
+- S2；R21 0642bda；analysis_p2 文首 R21 摘要，旧 32,840 B 标 HISTORICAL。
+
+### FLIGHT-LOCAL-36 归档元数据
+
+- S2；R21 0642bda；archive report 增加 archive_commit_sha/input baseline/remote/ahead。
 
 ## 派生规则
 

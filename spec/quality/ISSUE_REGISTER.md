@@ -64,6 +64,10 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-30 | S2 | R18 Manifest 归档字段/外部 sidecar 未闭环 | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 archive script + external report | r19 archive report/sidecar | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-31 | S2 | S06-112 历史结果文件未明确标记过期，存在证据混用风险 | R20 173360d49882dd98cb2a11ac26d189fc0e2f57a4 证据索引/状态 | S06_112_EVIDENCE_INDEX.md；r20 唯一 current | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-32 | S2 | R19 阻塞视图、Manifest、资源摘要历史基线描述滞后 | R20 173360d49882dd98cb2a11ac26d189fc0e2f57a4 | 文档/Manifest 基线统一 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-33 | S1 | S06-112 次正规拒绝及旧公式负向断言不足，单个拒绝即可 PASS | R21 0642bdaf9ba370c079b3b447a3d4acc4cd0bc514 严格矩阵/R14b 细节 | 160/140/20 status2/420；R14b 6/60 underbound | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-34 | S2 | S06-112 证据索引绑定错误代码 SHA | R21 0642bdaf9ba370c079b3b447a3d4acc4cd0bc514 索引 | 索引/library/Manifest 一致 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-35 | S2 | analysis_p2 历史 32,840 B 与当前 128 B 描述冲突 | R21 0642bdaf9ba370c079b3b447a3d4acc4cd0bc514 | 文首摘要 + HISTORICAL 标记 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-36 | S2 | Manifest/Blocker Board/外部归档报告元数据定义不一致 | R21 0642bdaf9ba370c079b3b447a3d4acc4cd0bc514 | archive report 增加 commit/ahead/baseline | FIXED_WAITING_RETEST |
 
 历史 draft 01–20 保留在 `build/validation/issue_drafts/`；本表按根因去重，不删除
 任何失败记录。
