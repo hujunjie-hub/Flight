@@ -139,10 +139,17 @@ def parse_disassembly(text):
             if regs:
                 word = 8 if mnemonic == "vpop" else 4
                 entry["sp"] = max(0, entry["sp"] - word * _reg_count(regs.group(1)))
-        elif mnemonic in ("sub", "subw") and re.search(r"\bsp\b", operands):
-            if re.search(r"\br\d+|\bip\b|\blr\b", operands):
-                entry["unknown_calls"].append("dynamic sp adjustment")
-                entry["dynamic_sp"] = True
+        elif mnemonic in ("str", "strd", "strh", "stm", "stmia") and \
+                re.search(r"\[sp,\s*#-\d+\]!", operands):
+            # Pre-indexed writeback store: strd ip, lr, [sp, #-16]! allocates.
+            value = int(re.search(r"\[sp,\s*#-(\d+)\]!", operands).group(1))
+            entry["sp"] += value
+            entry["max_sp"] = max(entry["max_sp"], entry["sp"])
+        elif mnemonic in ("ldr", "ldrd", "ldm", "ldmia") and \
+                re.search(r"\[sp\],\s*#\d+", operands):
+            # Post-indexed load writeback: ldr r0, [sp], #16 frees.
+            value = int(re.search(r"\[sp\],\s*#(\d+)", operands).group(1))
+            entry["sp"] = max(0, entry["sp"] - value)
         elif mnemonic in ("mov", "movw") and re.match(r"sp\s*,", operands):
             # Epilogue `mov sp, r7` is not a dynamic allocation; `mov sp, rX`
             # other than r7 is unresolved.
@@ -281,6 +288,26 @@ def run_files(su_path, dis_path, limit=LIMIT):
         return {"status": "UNKNOWN", "reason": f"missing .su: {su_path}"}
     if not dis_path.is_file():
         return {"status": "UNKNOWN", "reason": f"missing disassembly: {dis_path}"}
+    # A disassembly older than the object it claims to describe is not evidence.
+    # Regenerate it in the build step; a stale file must fail closed instead of
+    # silently shifting frame sizes (R29 shipped a .dis 10 h older than its .o).
+    obj = su_path.with_suffix(".o")
+    if obj.is_file():
+        newest = max(obj.stat().st_mtime, su_path.stat().st_mtime)
+        if dis_path.stat().st_mtime < newest:
+            return {
+                "status": "UNKNOWN",
+                "callgraph_status": "UNKNOWN",
+                "reason": (f"stale disassembly: {dis_path.name} is older than "
+                           f"{obj.name}/{su_path.name}; regenerate with "
+                           "arm-none-eabi-objdump -d -C in the same build step"),
+                "stale_disassembly": True,
+                "dis_mtime": dis_path.stat().st_mtime,
+                "object_mtime": obj.stat().st_mtime,
+                "su_mtime": su_path.stat().st_mtime,
+                "limit_bytes": limit,
+                "scope": "STATIC_OBJECT_ANALYSIS_ONLY; NOT_H723_STACK_WATERMARK",
+            }
     return analyze(su_path.read_text(errors="replace"),
                    dis_path.read_text(errors="replace"), limit=limit)
 
@@ -362,6 +389,42 @@ def self_test():
     cases += 1
     if b["status"] != "BLOCKED":
         failures.append("budget breach not BLOCKED")
+    # Writeback stores allocate stack; `sub ip, sp, #8` must not be mistaken
+    # for an SP modification (it computes an address in ip).
+    dis_wb = dis + (
+        "00000018 <wb>:\n"
+        "  18:\te92d 4800 \tpush\t{r11, lr}\n"
+        "  1c:\te96d ce04 \tstrd\tip, lr, [sp, #-16]!\n"
+        "  20:\tb004      \tadd\tsp, #16\n"
+        "  22:\te8bd 8800 \tpop\t{r11, pc}\n"
+        "00000024 <fp>:\n"
+        "  24:\tf1ad 0c08 \tsub.w\tip, sp, #8\n"
+        "  28:\t4770      \tbx\tlr\n"
+    )
+    su_wb = su + "x.c:4:1:wb 24 static\nx.c:5:1:fp 0 static\n"
+    wbres = analyze(su_wb, dis_wb, root_name="root")
+    cases += 1
+    if wbres["frames"].get("wb", {}).get("sp") != 24:
+        failures.append("writeback store not counted: " + str(wbres["frames"].get("wb")))
+    cases += 1
+    if any(u["caller"] == "fp" for u in wbres["unknown_edges"]):
+        failures.append("sub ip, sp misread as dynamic SP adjustment")
+    # A stale disassembly (older than its object) must fail closed.
+    import os as _os
+    import tempfile
+    import time as _time
+    with tempfile.TemporaryDirectory() as tmp:
+        tmpdir = Path(tmp)
+        (tmpdir / "x.su").write_text("x.c:1:1:root 100 static\n", encoding="utf-8")
+        (tmpdir / "x.o").write_text("object", encoding="utf-8")
+        stale_dis = tmpdir / "x.dis"
+        stale_dis.write_text(dis, encoding="utf-8")
+        old = _time.time() - 1000.0
+        _os.utime(stale_dis, (old, old))
+        stale = run_files(tmpdir / "x.su", stale_dis)
+        cases += 1
+        if not stale.get("stale_disassembly"):
+            failures.append("stale disassembly not rejected")
     if failures:
         for failure in failures:
             print("STACK_SELFTEST_FAIL:", failure, file=sys.stderr)

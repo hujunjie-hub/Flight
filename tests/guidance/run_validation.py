@@ -33,13 +33,15 @@ def run(command, env=None):
 def status_for(name, exit_code):
     if exit_code == 0:
         return "PASS"
-    if exit_code == 2 and name in ("scons_link", "stack_check"):
+    if exit_code == 2 and name in ("scons_link", "stack_check", "stack_image"):
         return "BLOCKED"
+    if exit_code == 3 and name == "stack_check":
+        return "UNKNOWN"
     return "FAIL"
 
 
 def toolchain_for(name):
-    if name in ("m4_arm", "m5_arm"):
+    if name in ("m4_arm", "m5_arm", "stack_image"):
         return "arm-none-eabi-gcc 14.3.1 (GNU Tools for STM32 14.3.rel1.20251027-0700)"
     if name.startswith("s06_") or name in ("m5_host", "m5_sanitizer", "integration",
                                            "integration_sanitizer"):
@@ -98,7 +100,8 @@ def main():
                                   "--run-id", args.run_id,
                                   "--code-commit", args.code_commit,
                                   "--seed", "0x53313632",
-                                  "--output", "build/validation/regenerated/s06_112_r28.json"], {}),
+                                  "--output",
+                                  f"build/validation/regenerated/s06_112_{args.run_id}.json"], {}),
         ("T20", "collector_selftest", [py, "tools/collect_validation_results.py",
                                        "--self-test"], {}),
         ("T21", "collector_selftest_opt", [py, "-O", "tools/collect_validation_results.py",
@@ -111,9 +114,15 @@ def main():
                                    "--check", "manifest"], {}),
         ("T25", "issues_check", [py, "tools/check_validation_evidence.py",
                                  "--check", "issues"], {}),
-        ("T26", "stack_check", [py, "tools/check_validation_evidence.py",
-                                "--check", "stack"], {}),
-        ("T27", "stack_selftest", [py, "tools/analyze_stack.py", "--self-test"], {}),
+        ("T26", "stack_image", ["pwsh", "-NoProfile", "-File",
+                                "tests/guidance/stack_image_check.ps1", "-OutJson",
+                                f"build/validation/regenerated/stack_image_{args.run_id}.json"], {}),
+        ("T27", "stack_check", [py, "tools/check_validation_evidence.py",
+                                 "--check", "stack", "--stack",
+                                 f"build/validation/regenerated/stack_image_{args.run_id}.json"], {}),
+        ("T28", "stack_selftest", [py, "tools/analyze_stack.py", "--self-test"], {}),
+        ("T29", "stack_image_selftest", [py, "tools/analyze_stack_image.py",
+                                         "--self-test"], {}),
     ]
     results = []
     selected = {x.strip() for x in args.only.split(",") if x.strip()}
