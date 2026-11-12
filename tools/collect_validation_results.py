@@ -304,8 +304,13 @@ def parse_output(name, output, exit_code):
     if name == "scons_link":
         data = _json_object(output) or {}
         checks = 1 if data else 0
-        failures = 0 if data.get("status") == "BLOCKED" else 1
-        return checks, failures, seed, {"parser": "JSON", "status": data.get("status")}
+        # exit_code 0 means the firmware linked; earlier rounds were always
+        # BLOCKED, so the old parser treated "not BLOCKED" as a failure.
+        linked = data.get("exit_code") == 0
+        failures = 0 if linked else 1
+        return checks, failures, seed, {
+            "parser": "JSON", "status": data.get("status") or (
+                "PASS" if linked else "FAIL"), "exit_code": data.get("exit_code")}
 
     if name == "s06_108":
         match = re.search(
