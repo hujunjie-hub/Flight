@@ -75,22 +75,38 @@ def verify(config_text, lock):
             problems.append(f"{symbol}: selected in .config but absent from the lock")
             continue
         pinned = entry.get("pinned_version")
-        if not pinned or pinned == "latest":
-            problems.append(f"{symbol}: lock has no exact pinned_version (selected={state})")
         commit = entry.get("pinned_commit")
-        if not commit or not COMMIT_RE.fullmatch(str(commit)):
+        commit_ok = bool(commit) and bool(COMMIT_RE.fullmatch(str(commit)))
+        commit_tag = None
+        if isinstance(pinned, str) and pinned.startswith("latest@"):
+            # The RT-Thread package index publishes only a `latest` site for some
+            # packages, so the reproducible identity is the installed commit.
+            # `latest@<12-hex>` binds that commit and is only valid while the
+            # .config selection is `latest`.
+            commit_tag = pinned.split("@", 1)[1]
+            if not re.fullmatch(r"[0-9a-f]{12}", commit_tag):
+                problems.append(f"{symbol}: latest@ tag is not 12 lowercase hex")
+            elif commit_ok and not str(commit).startswith(commit_tag):
+                problems.append(f"{symbol}: latest@ tag does not match pinned_commit")
+        elif not pinned or pinned == "latest":
+            problems.append(f"{symbol}: lock has no exact pinned_version (selected={state})")
+        if not commit_ok:
             problems.append(f"{symbol}: pinned_commit is not a 40-hex commit")
-        if state == "latest":
+        if state == "latest" and commit_tag is None:
             problems.append(
                 f"{symbol}: CONFIG_PKG_USING_{symbol}_LATEST_VERSION is still enabled")
+        if state != "latest" and commit_tag is not None:
+            problems.append(
+                f"{symbol}: latest@ pin but LATEST_VERSION is disabled")
         configured = re.search(
             rf'^CONFIG_PKG_{re.escape(symbol)}_VER="([^"]*)"', config_text, re.M)
         version = configured.group(1) if configured else None
+        expected = "latest" if commit_tag is not None else pinned
         if version is None:
             problems.append(f"{symbol}: CONFIG_PKG_{symbol}_VER is missing in .config")
-        elif pinned and version != pinned:
+        elif expected and version != expected:
             problems.append(
-                f"{symbol}: .config version {version!r} does not match pinned {pinned!r}")
+                f"{symbol}: .config version {version!r} does not match pinned {expected!r}")
     for symbol in sorted(locked):
         if symbol not in selection:
             problems.append(f"{symbol}: locked but no longer selected in .config")

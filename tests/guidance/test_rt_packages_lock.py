@@ -2,8 +2,9 @@
 
 The verifier is the gate that stops an unpinned RT-Thread package selection from
 being reported as reproducible. These cases feed synthetic (.config, lock)
-pairs and require the specific problem to be reported; the positive control
-shows a fully pinned pair is accepted.
+pairs and require the specific problem to be reported; positive controls cover
+both an exact-tag pin and a commit-pinned `latest` (the RT-Thread index only
+publishes a `latest` site for these packages).
 """
 from pathlib import Path
 import importlib.util
@@ -19,6 +20,11 @@ CONFIG_OK = (
     'CONFIG_PKG_USING_CMSIS_CORE=y\n'
     'CONFIG_PKG_CMSIS_CORE_VER="5.9.0"\n'
 )
+CONFIG_LATEST = (
+    'CONFIG_PKG_USING_CMSIS_CORE=y\n'
+    'CONFIG_PKG_USING_CMSIS_CORE_LATEST_VERSION=y\n'
+    'CONFIG_PKG_CMSIS_CORE_VER="latest"\n'
+)
 COMMIT = 'a' * 40
 LOCK_OK = {
     'status': 'RESOLVED',
@@ -27,6 +33,16 @@ LOCK_OK = {
     'packages': [{
         'symbol': 'CMSIS_CORE',
         'pinned_version': '5.9.0',
+        'pinned_commit': COMMIT,
+    }],
+}
+LOCK_LATEST = {
+    'status': 'RESOLVED',
+    'resolved_by': 'owner',
+    'resolved_at_utc': '2026-11-12T00:00:00Z',
+    'packages': [{
+        'symbol': 'CMSIS_CORE',
+        'pinned_version': 'latest@' + 'a' * 12,
         'pinned_commit': COMMIT,
     }],
 }
@@ -53,7 +69,9 @@ def check(name, config, lock, expected):
 
 def main():
     failures = 0
-    failures += check('positive', CONFIG_OK, clone(LOCK_OK), None)
+    failures += check('positive exact tag', CONFIG_OK, clone(LOCK_OK), None)
+    failures += check('positive commit-pinned latest', CONFIG_LATEST,
+                      clone(LOCK_LATEST), None)
 
     lock = clone(LOCK_OK)
     lock['status'] = 'UNRESOLVED'
@@ -94,10 +112,21 @@ def main():
                       'CONFIG_PKG_USING_CMSIS_CORE=y\n',
                       clone(LOCK_OK), 'VER is missing')
 
+    lock = clone(LOCK_LATEST)
+    lock['packages'][0]['pinned_version'] = 'latest@XYZ'
+    failures += check('bad latest tag', CONFIG_LATEST, lock, '12 lowercase hex')
+
+    lock = clone(LOCK_LATEST)
+    lock['packages'][0]['pinned_version'] = 'latest@' + 'b' * 12
+    failures += check('latest tag mismatch', CONFIG_LATEST, lock, 'does not match')
+
+    failures += check('latest pin without flag', CONFIG_OK, clone(LOCK_LATEST),
+                      'LATEST_VERSION is disabled')
+
     if failures:
         print(f'FAIL: {failures} negative control(s) failed')
         return 1
-    print('M5_RT_PACKAGES_LOCK_NEGATIVE_TEST_PASS (10 cases)')
+    print('M5_RT_PACKAGES_LOCK_NEGATIVE_TEST_PASS (14 cases)')
     return 0
 
 

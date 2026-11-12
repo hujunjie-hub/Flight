@@ -28,6 +28,14 @@ OSQP = 'model/control/outer_loop/quad_x4/mpc_solver/osqp'
 BACKENDS = (KF_GINS, OSQP)
 IMPORTED_TREES = (f'middleware/{KF_GINS}/upstream/', f'middleware/{OSQP}/generated/')
 SOURCE_SUFFIXES = {'.c', '.h', '.cpp', '.hpp', '.inc'}
+# The M5-06 validator is Host/SIL-only (compiled only with
+# FLIGHT_M5_HOST_PLANNER) and exists to validate the exact FMS contract input
+# consumed downstream, so it deliberately includes the FMS model headers and
+# names model types. It is not production model code and does not export model
+# APIs to the model layer.
+VALIDATOR_EXEMPT = {
+    'middleware/guidance/trajectory_planning/m5_trajectory_safety.c',
+}
 errors = []
 
 
@@ -158,13 +166,15 @@ for layer in LAYERS:
         code = re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)
         check(not prefix.search(code), f'legacy Flight prefix: {relative}')
         includes = {Path(name).name for name in re.findall(r'^\s*#include\s+[<"]([^>"]+)', code, re.M)}
-        if not relative.startswith('middleware/model/'):
+        if relative not in VALIDATOR_EXEMPT and not relative.startswith('middleware/model/'):
             check(not model_identifier.search(path.stem) and not model_identifier.search(code),
                   f'model-specific identifiers belong to the model implementation: {relative}')
         if relative.startswith('middleware/protocol/'):
             check(not (includes & (sensor_headers | app_headers | {'rtthread.h', 'rtdevice.h', 'sensor_sample.h'})),
                   f'protocol codecs must be independent of RT-Thread and sensor drivers: {relative}')
         for owner, private_headers in backend_headers.items():
+            if relative in VALIDATOR_EXEMPT:
+                continue
             if not relative.startswith(owner):
                 check(not (includes & private_headers),
                       f'backend headers are private to {owner}: {relative}')

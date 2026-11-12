@@ -8,7 +8,7 @@
   },
   "spec_layout_comparison": {
     "spec_file": "spec/validation/abi_layout.json",
-    "spec_sha256": "c607b059bed20efa6ae5ffba19aecf6556765a46029c9c79e5d9dff13248f504",
+    "spec_sha256": "a49633d8b9e83fbfcd7ec8beee6b4b93574f93288a58286780df24d319defcc5",
     "spec_compiler": "arm-none-eabi-gcc.exe (GNU Tools for STM32 14.3.rel1.20251027-0700) 14.3.1 20250623",
     "compared_types": 143,
     "compared_field_offsets": 981,
@@ -107,7 +107,7 @@
   },
   "message_registry_check": {
     "registry_file": "spec/contracts/message_registry.json",
-    "registry_sha256": "e2893aebd8c1121b1ede80591849730ec722c5f9e0616443507c2ff99179bf41",
+    "registry_sha256": "dd06554c240567d5f81b51e4aed39336ccf3e469c6c95a952d1a2d766bbc49e7",
     "registered_messages": 55,
     "macros_checked": 55,
     "problems": [],
@@ -140,7 +140,7 @@
     "status": "PASS",
     "problems": [],
     "lock_file": "middleware/contracts/product_contract/abi_lock.h",
-    "lock_sha256": "b62c5991b9fd91c6c5e0a6b236b2ad7ee4c371ea0eaaf14c145cc3b245d04321"
+    "lock_sha256": "3c91341263d86fb62394b004abc1d6856168346d0181b08f5fdc3f056503559f"
   },
   "private_types_excluded": [
     "MpcOutputSnapshot"
