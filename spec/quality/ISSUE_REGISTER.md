@@ -34,10 +34,10 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 |---|---|---|---|---|---|
 | FLIGHT-LOCAL-01 | S2 | Windows 检出把 *.sh 转 CRLF | R2 修复；`tools/check_line_endings.py` | line_endings PASS | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-02 | S2 | Cortex-M7 只编译 8/14 M5 源 | R2 补全 | M5 ARM 14 对象 | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-03 | S2 | packages/SConscript 缺失，链接 BLOCKED | 依赖 B03/B04 | check_target_build BLOCKED | BLOCKED |
+| FLIGHT-LOCAL-03 | S2 | packages/SConscript 缺失，链接 BLOCKED | R3 3d45132 安装并链接 | check_target_build PASS（Flight.elf) | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-04 | S2 | MR-009 消费曲线/验证曲线数值路径不一致 | 多轮修复；R16 三类 jerk | S06-085..093、112 | OPEN / WAITING_INDEPENDENT_REVIEW |
-| FLIGHT-LOCAL-05 | S2 | spec/ABI 证据钉住 CRLF 哈希 | 未修改；B01/B02 | audit/abi FAIL | BLOCKED |
-| FLIGHT-LOCAL-06 | S2 | RT-Thread 三个包均为 latest | 未修改；B03 | packages_lock FAIL | BLOCKED |
+| FLIGHT-LOCAL-05 | S2 | spec/ABI 证据钉住 CRLF 哈希 | R3 efc28d7 LF 重基线 | spec audit PASS；ABI PASS 143/0 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-06 | S2 | RT-Thread 三个包均为 latest | R3 efc28d7 commit 固定 | packages_lock PASS；14 负向用例 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-07 | S1 | 验收脚本 assert 可被 -O 剥离 | R2 修复 | test_audit_optimized PASS | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-08 | S1 | 围栏净空未减消费曲线误差 | R5 修复 | S06-097 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-09 | S2 | FP 圆整/环境假设缺运行时证据 | R5 修复 | S06-098 | FIXED_WAITING_RETEST |
