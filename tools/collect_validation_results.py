@@ -371,6 +371,23 @@ def parse_output(name, output, exit_code):
             fail("stack_selftest: PASS marker missing")
         return int(match.group(1)), 0, seed, {"parser": "stack-selftest"}
 
+    if name == "stack_image":
+        data = _json_object(output) or {}
+        if data.get("status") not in ("PASS", "BLOCKED", "UNKNOWN"):
+            fail("stack_image: analyzer JSON missing")
+        checks = int(data.get("function_count", 0) or 0)
+        failures = 0 if data.get("status") == "PASS" else 1
+        return checks, failures, seed, {
+            "parser": "stack-image", "status": data.get("status"),
+            "lower_bound": data.get("known_lower_bound_bytes"),
+            "callgraph_status": data.get("callgraph_status")}
+
+    if name == "stack_image_selftest":
+        match = re.search(r"STACK_IMAGE_SELF_TEST_PASS \((\d+) cases\)", output)
+        if not match:
+            fail("stack_image_selftest: PASS marker missing")
+        return int(match.group(1)), 0, seed, {"parser": "stack-image-selftest"}
+
     fail(f"no strict parser for command {name}")
 
 
