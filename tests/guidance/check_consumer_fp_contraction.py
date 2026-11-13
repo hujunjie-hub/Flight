@@ -172,6 +172,9 @@ CONSUMER_MODEL_TOKENS = {
 }
 
 VALIDATOR_REPLICA_TOKENS = {
+    "time_domain": [
+        "float h = (float)step_us * 1e-6f;",
+    ],
     "hermite_coefficients": [
         "float h2 = h * h;",
         "float h3 = h2 * h;",
