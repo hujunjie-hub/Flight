@@ -1032,10 +1032,9 @@ static void run_live_fms_first_reference_task_smoke(void)
   if (fms_output.state_snapshot.arm_state != ARM_STATE_ARMED)
     return;
 
-  /* Nine owner turns keep the first-reference window open. Discard any
-   * generated guidance after each turn to model a guidance publisher that has
-   * not yet delivered a usable reference to FMS. */
-  for (tick = 0u; tick < 9u; ++tick) {
+  /* Ten owner turns reach the 100 ms boundary. Discard generated guidance
+   * after each turn so FMS has not received a usable first reference. */
+  for (tick = 0u; tick < 10u; ++tick) {
     test_clock.monotonic_us += 10000u;
     sil_refresh_live_fms_inputs();
     memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
@@ -1045,7 +1044,8 @@ static void run_live_fms_first_reference_task_smoke(void)
   CHECK(fms_output.state_snapshot.arm_state == ARM_STATE_ARMED);
   CHECK((fms_output.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
 
-  /* The first valid reference is deliberately one full 100 ms window late. */
+  /* The timeout uses a strict > comparison; deliver at 110 ms, one 10 ms
+   * owner period after the 100 ms deadline. */
   test_clock.monotonic_us += 10000u;
   sil_refresh_live_fms_inputs();
   sil_publish_late_first_reference();
