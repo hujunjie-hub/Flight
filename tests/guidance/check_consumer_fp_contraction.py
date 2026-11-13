@@ -44,7 +44,14 @@ INCLUDES = [
     "-Imiddleware/contracts",
     "-Imiddleware/guidance",
 ]
-FUSED = ("vfma", "vfms", "vfnma", "vfnms", "vmla", "vmls")
+FUSED = ("vfma", "vfms", "vfnma", "vfnms")
+# Armv7-M VMLA/VMLS and their negated forms round the product and sum separately.
+NON_FUSED = ("vmla", "vmls", "vnmla", "vnmls")
+FP_INSTRUCTION = re.compile(
+    r"^\s*[0-9a-f]+:\s+[0-9a-f]{4}\s+[0-9a-f]{4}\s+"
+    r"(" + "|".join(FUSED + NON_FUSED) + r")[a-z]{0,2}\.f(?:16|32|64)\b",
+    re.IGNORECASE,
+)
 
 
 def find_tool(name):
@@ -72,6 +79,15 @@ def validator_flags():
     return flags
 
 
+def count_fp_instructions(disassembly):
+    counts = dict.fromkeys(FUSED + NON_FUSED, 0)
+    for line in disassembly.splitlines():
+        match = FP_INSTRUCTION.match(line)
+        if match:
+            counts[match.group(1).lower()] += 1
+    return counts
+
+
 def build_and_scan(gcc, objdump, source, flags, object_name):
     obj = OUT / object_name
     command = [str(gcc)] + flags + INCLUDES + [
@@ -82,18 +98,18 @@ def build_and_scan(gcc, objdump, source, flags, object_name):
         raise SystemExit(f"compile failed for {source.name}")
     disassembly = subprocess.run([str(objdump), "-d", str(obj)], cwd=ROOT,
                                  capture_output=True, text=True, check=True).stdout
-    counts = {mnemonic: 0 for mnemonic in FUSED}
-    for line in disassembly.splitlines():
-        for mnemonic in FUSED:
-            if ("\t" + mnemonic) in line or (" " + mnemonic + ".") in line:
-                counts[mnemonic] += 1
+    counts = count_fp_instructions(disassembly)
+    fused = {mnemonic: counts[mnemonic] for mnemonic in FUSED}
+    non_fused = {mnemonic: counts[mnemonic] for mnemonic in NON_FUSED}
     return {
         "source": str(source.relative_to(ROOT)).replace("\\", "/"),
         "object": str(obj.relative_to(ROOT)).replace("\\", "/"),
         "object_sha256": hashlib.sha256(obj.read_bytes()).hexdigest(),
         "flags": " ".join(flags),
-        "fused_operations": sum(counts.values()),
-        "mnemonics": counts,
+        "fused_operations": sum(fused.values()),
+        "mnemonics": fused,
+        "non_fused_operations": sum(non_fused.values()),
+        "non_fused_mnemonics": non_fused,
     }
 
 
@@ -296,6 +312,26 @@ CONSUMER_MUTATIONS = (
 
 def self_test():
     """Every deliberate mutation of either compiled source must be detected."""
+    disassembly = (
+        "   0:\teea1 0b02 \tvfma.f64\td0, d1, d2\n"
+        "   4:\teea1 0ac2 \tvfms.f32\ts0, s1, s2\n"
+        "   8:\tee91 0a82 \tvfnmaeq.f32\ts0, s1, s2\n"
+        "   c:\tee91 0b02 \tvfnms.f64\td0, d1, d2\n"
+        "  10:\tee01 0b02 \tvmla.f64\td0, d1, d2\n"
+        "  14:\tee01 0b42 \tvmls.f64\td0, d1, d2\n"
+        "  18:\tee11 0b42 \tvnmla.f64\td0, d1, d2\n"
+        "  1c:\tee11 0b02 \tvnmls.f64\td0, d1, d2\n"
+        "  20:\t4770      \tbx\tlr @ vfma.f64 is only a comment\n"
+    )
+    counts = count_fp_instructions(disassembly)
+    for mnemonic in ("vfma", "vfms", "vfnma", "vfnms", "vmla", "vmls", "vnmla", "vnmls"):
+        if counts.get(mnemonic) != 1:
+            print(f"FAIL: expected one {mnemonic} instruction, got {counts}")
+            return 1
+    if set(FUSED) != {"vfma", "vfms", "vfnma", "vfnms"}:
+        print(f"FAIL: incorrect fused instruction set: {FUSED}")
+        return 1
+    print("M5_FP_DISASSEMBLY_SELF_TEST_PASS (4 fused, 4 non-fused)")
     source = VALIDATOR.read_text(encoding="utf-8")
     consumer_source = CONSUMER.read_text(encoding="utf-8")
     good = check_model_against_source(source, consumer_source)
@@ -386,7 +422,8 @@ def main():
     for entry in report["objects"]:
         log_lines.append(
             f"object={entry['object']} sha256={entry['object_sha256']} "
-            f"fused={entry['fused_operations']} flags={entry['flags']}")
+            f"fused={entry['fused_operations']} non_fused={entry['non_fused_operations']} "
+            f"flags={entry['flags']}")
     (OUT / "consumer_fp.log").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
     print(payload)
     return 0 if report["status"] == "PASS" else 1
