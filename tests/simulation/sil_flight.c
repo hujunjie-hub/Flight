@@ -955,6 +955,126 @@ static void run_live_fms_ground_stop_task_smoke(void)
   printf("live_fms_ground_stop: landed/disarm certificate -> actuator zero receipt\n");
 }
 
+
+
+static void sil_publish_late_first_reference(void)
+{
+  const uint64_t now = test_clock.monotonic_us;
+  GuidanceStatus *guidance = &plan_bundle.guidance.guidance_status;
+  GuidanceFeasibility *feasibility = &plan_bundle.guidance.feasibility;
+  memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
+  guidance->header = h(22u, now + 100000u);
+  guidance->header.message_type = MSG_GUIDANCE_STATUS;
+  guidance->header.sequence = ++sil_requests;
+  guidance->reference_id = 772u;
+  guidance->reference_epoch = 72u;
+  guidance->state_epoch = runtime_data.nav.state_epoch;
+  guidance->origin_id = runtime_data.nav.origin_id;
+  guidance->authority_epoch = fms_output.state_snapshot.authority_epoch;
+  guidance->directive_epoch = fms_output.state_snapshot.directive_epoch;
+  guidance->mission_epoch = fms_output.mission_status.mission_epoch;
+  guidance->current_item_id = fms_output.mission_status.current_item_id;
+  guidance->execution_token = fms_output.mission_status.execution_token;
+  guidance->guidance_state = GUIDANCE_STATE_READY;
+  guidance->reference_kind = GUIDANCE_REFERENCE_TRAJECTORY;
+  guidance->reference_expires_at_us = now + 100000u;
+
+  feasibility->header = h(22u, now + 100000u);
+  feasibility->header.message_type = MSG_GUIDANCE_FEASIBILITY;
+  feasibility->header.sequence = ++sil_requests;
+  feasibility->reference_id = guidance->reference_id;
+  feasibility->reference_epoch = guidance->reference_epoch;
+  feasibility->feasible = 1u;
+  feasibility->reason_code = 0u;
+}
+
+/* Mirror the M4 first-reference timeout case through the actual mission owner:
+ * keep the vehicle on the ground, withhold every guidance reference for the
+ * absolute 100 ms window, then deliver a valid reference exactly at expiry.
+ * The late reference must not resurrect the permit; M4 must publish the
+ * ground-disarm certificate and the real M7 owner must consume it. */
+static void run_live_fms_first_reference_task_smoke(void)
+{
+  uint32_t arm_request;
+  unsigned tick;
+  const unsigned commits_before = commits;
+
+  CHECK(!runtime_bench_inhibit_active());
+  sil_seed_live_fms_inputs();
+  for (tick = 0u; tick < 430u; ++tick) {
+    test_clock.monotonic_us += 10000u;
+    sil_refresh_live_fms_inputs();
+    task_mission_step();
+  }
+  printf("live_first_reference_prearm: landed=%u prearm=%u\n",
+         fms_output.landed_state.state, fms_output.prearm_result.state);
+  CHECK(fms_output.landed_state.state == LANDED_STATE_LANDED);
+  CHECK(fms_output.prearm_result.state == PREARM_READY);
+  if (fms_output.prearm_result.state != PREARM_READY)
+    return;
+
+  sil_refresh_live_fms_inputs();
+  arm_request = submit_command_with_target(PRODUCT_CMD_ARM,
+      fms_output.prearm_result.check_epoch, 0.0f, NULL);
+  CHECK(arm_request != 0u);
+  test_clock.monotonic_us += 10000u;
+  sil_refresh_live_fms_inputs();
+  task_mission_step();
+  CHECK(sil_command_has_ack(arm_request, COMMAND_ACK_COMPLETED));
+  CHECK(fms_output.state_snapshot.arm_state == ARM_STATE_ARMED);
+  if (fms_output.state_snapshot.arm_state != ARM_STATE_ARMED)
+    return;
+
+  /* Nine owner turns keep the first-reference window open. Discard any
+   * generated guidance after each turn to model a guidance publisher that has
+   * not yet delivered a usable reference to FMS. */
+  for (tick = 0u; tick < 9u; ++tick) {
+    test_clock.monotonic_us += 10000u;
+    sil_refresh_live_fms_inputs();
+    memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
+    task_mission_step();
+    memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
+  }
+  CHECK(fms_output.state_snapshot.arm_state == ARM_STATE_ARMED);
+  CHECK((fms_output.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+
+  /* The first valid reference is deliberately one full 100 ms window late. */
+  test_clock.monotonic_us += 10000u;
+  sil_refresh_live_fms_inputs();
+  sil_publish_late_first_reference();
+  task_mission_step();
+
+  CHECK(fms_output.state_snapshot.arm_state == ARM_STATE_DISARMED);
+  CHECK(fms_output.landed_state.state == LANDED_STATE_LANDED);
+  CHECK(fms_output.actuation_permit.permit_flags == PERMIT_FLAG_REVOKED);
+  CHECK(fms_output.actuation_permit.reason_code ==
+        FMS_PERMIT_REVOKE_REASON_FIRST_REFERENCE_GROUND_DISARM);
+  CHECK(fms_output.decision_event.decision_code == DECISION_FORCE_SAFE_ACTION);
+  CHECK(fms_output.decision_event.reason_code ==
+        FMS_DECISION_REASON_FIRST_REFERENCE_GROUND_DISARM);
+  CHECK(runtime_data.bundle.ground_stop_certificate.header.message_type ==
+        MSG_GROUND_STOP_CERTIFICATE);
+  CHECK(runtime_data.bundle.ground_stop_certificate.lifecycle ==
+        ACTUATOR_GROUND_STOP_LIFECYCLE_LANDED);
+  CHECK(runtime_data.bundle.ground_stop_certificate.authority_epoch ==
+        fms_output.actuation_permit.authority_epoch);
+  CHECK(runtime_data.bundle.ground_stop_certificate.directive_epoch ==
+        fms_output.actuation_permit.directive_epoch);
+
+  for (tick = 0u; tick < 180u &&
+       runtime_data.receipt.result_code != ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED; ++tick) {
+    test_clock.monotonic_us += 1000u;
+    turn(task_actuator_entry);
+  }
+  CHECK(commits >= commits_before + 1u);
+  CHECK(actuator_guard_state() == ACTUATOR_GUARD_DISARMED);
+  CHECK(runtime_data.receipt.result_code == ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED);
+  CHECK(runtime_data.receipt.header.message_type == MSG_ACTUATOR_COMMIT_RECEIPT);
+  CHECK(runtime_data.receipt.committed_demand.motor_thrust_n[0] == 0.0f);
+  CHECK((runtime_data.receipt.limit_flags & ACTUATOR_GROUND_STOP_OVERRUN_FLAG) == 0u);
+  printf("live_fms_first_reference: late reference -> ground-disarm certificate -> actuator zero receipt\n");
+}
+
 static void run_ground_stop_task_smoke(void)
 {
   FmsOutputView output;
@@ -1129,7 +1249,10 @@ int main(int argc, char **argv)
   const int ground_stop_smoke = argc == 2 && !strcmp(argv[1], "--ground-stop-smoke");
   const int live_fms_ground_stop_smoke =
       argc == 2 && !strcmp(argv[1], "--live-fms-ground-stop-smoke");
-  if (argc != 1 && !ground_stop_smoke && !live_fms_ground_stop_smoke) {
+  const int live_fms_first_reference_ground_stop_smoke =
+      argc == 2 && !strcmp(argv[1], "--live-fms-first-reference-ground-stop-smoke");
+  if (argc != 1 && !ground_stop_smoke && !live_fms_ground_stop_smoke &&
+      !live_fms_first_reference_ground_stop_smoke) {
 #ifdef FLIGHT_GROUND_STATION
     if (argc == 6 && !strcmp(argv[3], "Ground")) {
       ground_online = 1;
@@ -1182,6 +1305,13 @@ int main(int argc, char **argv)
 #endif
     fmt_sim_host_close();
     return 1;
+  }
+  if (live_fms_first_reference_ground_stop_smoke) {
+    run_live_fms_first_reference_task_smoke();
+    runtime_shutdown();
+    printf("sil_live_fms_first_reference: %u checks, %u failures, commits=%u\\n",
+           checks, failures, commits);
+    return failures ? 1 : 0;
   }
   if (live_fms_ground_stop_smoke) {
     run_live_fms_ground_stop_task_smoke();
