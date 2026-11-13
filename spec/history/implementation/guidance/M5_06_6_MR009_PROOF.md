@@ -677,6 +677,9 @@ WCET/RTA、目标 RAM/stack watermark、HIL、飞行仍按各自门禁处理；M
 - `gamma_n`、`gamma_2` 的有向舍入、RN overflow midpoint、次正规残差
   传播和时间参数偏差均已逐项核对。次正规项的 `2^-149` 传播界已在 §7.1
   明确给出半最小次正规间距及后续相对放大的推导。
+- 复核发现 R30 的 velocity/acceleration 时间偏差曾分别使用 `cf` 的二阶/
+  三阶导数，未计入 `vf/af` 系数缩放舍入；R31 已改为对实际 rounded
+  consumer polynomials `V_c`、`A_c` 分别求一阶导数上界。
 - 结论：当前证明范围内通过；没有发现需要放宽阈值或改变安全判定的
   数学缺陷。
 
@@ -685,9 +688,11 @@ WCET/RTA、目标 RAM/stack watermark、HIL、飞行仍按各自门禁处理；M
 - 对照 M6 consumer 和 M5 validator 的系数构造、时间转换、三组 Horner
   表达式；新增双源 token 审计，要求实际 consumer 和 validator replica
   的运算顺序均与证明模型一致。
-- FP 审计自测由 9 个扩展为 13 个变异用例，覆盖 consumer 时间换算、
-  position/velocity/acceleration Horner 表达式，以及原有 gamma、区间、
-  次正规、圆整环境和舍入次数条件。
+- `consumer_eval_error_bound()` 的系数、Horner、溢出递推和次正规传播
+  全部使用扩大后的 `s_eval_max`；子区间 `s_max` 也显式向外计算。
+- FP 审计自测由 9 个扩展为 18 个变异用例，除 consumer 时间换算和三组
+  Horner 表达式外，还覆盖 expanded-time 区间及 `cf'`/rounded `vf'`/
+  rounded `af'` 时间导数，及原有 gamma、区间、次正规、圆整环境条件。
 - Cortex-M7 object audit 仍要求 consumer 与 validator 均无 FMA/MLA
   融合；运行时继续检查 RN、FZ、DN 条件，不满足时 fail-closed。
 - 结论：实现与证明模型的静态一致性检查已加强；没有发现需改动生产
@@ -698,9 +703,11 @@ WCET/RTA、目标 RAM/stack watermark、HIL、飞行仍按各自门禁处理；M
 - S06-099 仍穷举 20 ms/40 ms 的 60,002 个整数微秒偏移；新增对生产证明
   参数 `s_model=h*(offset_us/step_us)` 的精确 Fraction 比较，直接检查
   `|s_consumer-s_model|<=gamma_2*s_model`，并保留对物理微秒时间的检查。
-- 当前代码复核基线：`f21828c58a233903155006b0bf1da33db537da1e`。
-  该基线的 FP 审计 mutation gate 和 Cortex-M7 contraction audit 已通过；
-  最终文档提交后的全套 CI 结果将在对应提交记录中更新。
+- R31 生产数学修正：`79f23d0200c31ebe934bfc8793e65d7af1e6bdd4`；
+  S06-107 Fraction oracle 修正：`a55071966209a1af615ff6137963eab4631e8bae`；
+  双源/expanded-time 审计强化：`ad9df36687b68b43f9118ae6e26be8716d900c90`。
+  这几项分别覆盖生产误差公式、独立精确 oracle 和防回归审计；最终全套
+  CI 以最终文档提交对应的 HEAD 为准。
 - 三个 degree 5/4/3 Horner 拒绝分支仍由同一个生产 helper 直接测试；
   本结论不声称它们都能由合法产品包线输入经完整 validator 触发。
   完整 validator 的 coefficient/scaling fail-fast 路径有状态、reason、
