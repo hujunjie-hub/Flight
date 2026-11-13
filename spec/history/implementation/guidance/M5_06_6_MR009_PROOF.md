@@ -1,6 +1,6 @@
-# MR-009 独立数学推导：binary32 消费曲线误差包络
+# MR-009 数学推导：binary32 消费曲线误差包络
 
-状态：**PROOF_RECORD / WAITING_INDEPENDENT_REVIEW**。本文给出 `m5_trajectory_safety.c` 中误差包络的完整推导，并逐项核对源码中的实现。结论只有独立审查者 APPROVED 后才生效。
+状态：**INTERNAL_THREE_PASS_REVIEW_COMPLETE_WITH_LIMITATIONS**。项目所有者已明确取消外部独立审查要求，改由三轮内部复核；本文不声称获得独立第三方批准。
 
 ## 1. 被证明的对象
 
@@ -120,8 +120,11 @@ consumer 的 binary32 操作序列没有被融合改变。
 ## 6. 时间量化项
 
 M6 consumer 在一个有效 segment 内使用 binary32 局部时间参数。对验证器
-正在处理的子区间 `[u0,u1]`，`0<=u1<=1`，且消费端段时长为同一个
-binary32 值 `h`，因此精确局部参数满足 `s_exact<=s_max=h*u1`。
+正在处理的子区间 `[u0,u1]`，`0<=u1<=1`，消费端段时长 `h` 是 binary32
+值（进入 validator 后精确提升为 binary64），因此精确局部参数满足
+`s_exact<=s_max=h*u1`。实现通过 `multiply_upper_nonnegative(h,u1)`
+向外取得 `s_max`；即使当前两个 binary32 操作数的乘积可在 binary64 中
+精确表示，也保留显式 outward guard。
 
 时间转换最多涉及两次 round-to-nearest binary32 舍入。令
 `u=2^-24`、`gamma2=2u/(1-2u)`，使用定向舍入实现得到
@@ -134,12 +137,28 @@ s_eval_max = s_max + delta_s
 ```
 
 以上乘法与加法均通过 `multiply_upper_nonnegative()` /
-`add_upper_nonnegative()` 向外取整。位置、速度、加速度的时间偏差分别由
-对应多项式导数的上界覆盖：
+`add_upper_nonnegative()` 向外取整。注意时间偏差必须作用于**实际消费端
+对应输出的多项式**，不能把速度/加速度输出简单视为未舍入位置多项式的
+二阶/三阶导数。消费端系数定义为：
 
 ```
-E_time <= delta_s * sup_{s in [0, s_eval_max]} |q'(s)|
+P_c(s) = Σ cf[i] * s^i
+V_c(s) = Σ vf[i] * s^i,  vf[i] = RN((i+1) * cf[i+1])
+A_c(s) = Σ af[i] * s^i,  af[i] = RN((i+1)(i+2) * cf[i+2])
 ```
+
+其中 `RN` 是 binary32 round-to-nearest。因而三个时间偏差项分别为：
+
+```
+E_time,pos = delta_s * sup |P_c'(s)|
+E_time,vel = delta_s * sup |V_c'(s)|
+E_time,acc = delta_s * sup |A_c'(s)|
+```
+
+上确界均在 `s ∈ [0,s_eval_max]` 上计算。生产实现分别使用 `cf` 的一阶
+导数、实际 binary32 缩放后的 `vf` 的一阶导数、实际 binary32 缩放后的
+`af` 的一阶导数。此前以 `cf` 的二阶/三阶导数代替后两项，会漏掉
+`vf/af` 系数缩放舍入对导数上界的影响；R31 已修正。
 
 导数上界用绝对系数和计算，并在扩大后的区间 `[0,s_eval_max]` 上求值；
 系数差、Horner 舍入和次正规项也使用同一个扩大区间。
@@ -191,7 +210,7 @@ if (magnitude_term < (double)FLT_MIN * 1024.0) return INFINITY;    /* 抵消入�
 Host 负向测试覆盖 `FE_DOWNWARD`、`FE_UPWARD`、`FE_TOWARDZERO` 以及
 MXCSR FTZ/DAZ 注入；不满足条件时返回 `M5_SAFETY_NUMERIC_FAILURE`。
 Cortex-M7 FPSCR 路径已交叉编译并由源码审计，但尚无 H723 实机运行结果；
-该硬件等价性仍由独立审查者确认。
+该硬件等价性尚无 H723 实机运行证据，属于单独的目标验证门禁；内部数学复核不替代该证据。
 
 ## 8. 系数构造的运算顺序一致性
 
@@ -220,30 +239,33 @@ Cortex-M7 FPSCR 路径已交叉编译并由源码审计，但尚无 H723 实机�
 | `γ` 项 | `result = coefficient_term + γ·magnitude_term` | ✅ |
 | 绝对项 | `+ n·2^-149·max(1,s_eval_max)^n`，向外传播 | ✅ |
 | 溢出/次正规拒绝 | `FLT_MAX/16`、`FLT_MIN×1024` | ✅ |
-| 时间项 | `delta_s=gamma2_upper·s_max`；`s_eval_max=s_max+delta_s`；扩大区间导数上界 | ✅ |
+| 时间项 | `delta_s=gamma2_upper·s_max`；`s_eval_max=s_max+delta_s`；position 用 `cf'`、velocity 用 `vf'`、acceleration 用 `af'` | ✅ R31 修正并由 S06-107 oracle 复验 |
 | 圆整模式 | Host fenv+MXCSR；ARM FPSCR.RMode/FZ/DN | ✅ Host 负向测试；ARM 硬件运行未做 |
 
-## 10. 剩余风险（需独立审查确认）
+## 10. 剩余边界与目标验证门禁
 
 1. **编译器重排 / contraction**：当前 `rtconfig.py` 固定
    `-ffp-contract=off -frounding-math -fexcess-precision=standard`；
-   R30.3 ARM object audit 对 M6 consumer 与 validator 均报告
+   ARM object audit 对 M6 consumer 与 validator 均报告
    `fused_operations=0`。未来工具链或 flags 改动仍必须重跑
-   `check_consumer_fp_contraction.py` 并重新审查。
+   `check_consumer_fp_contraction.py`。
 2. **目标 FP 环境等价**：Host 已检查 x86 MXCSR 的 RC/FTZ/DAZ 并执行负向测试；
    Cortex-M7 源码读取 FPSCR.RMode/FZ/DN，已交叉编译，但没有 H723 硬件运行
-   证据。独立审查需确认 ARM 路径与 Host 证明假设等价。
+   证据。该项保持 NOT_RUN，不把交叉编译等同于实机验证。
 3. **M6 时间域**：M5-06 只验证 20 ms preview；M6 locator 不允许 horizon
    外外插值。M6 的 40 ms route preview 不属于 M5-06 当前证明域，不能混用。
 4. **NaN/Inf 输入**：由 `finite3` / `finite_motion_point` 在入口拒绝，不在
    误差模型范围内。
-5. **`velocity_mid_norm` 与 `speed_bound` 的组合**：两个 swept 候选各自
-   包含 `eval_velocity_error` 后才取 `fmin`；审查者仍需确认没有第三处使用
-   未修正的 `|v_mid|`。
+5. **`velocity_mid_norm` 与 `speed_bound` 的组合**：源码复核确认
+   `velocity_mid_abs` 先加入 `eval_velocity_error`，再向外求三维范数；
+   swept-radius 两个候选均使用已修正的 `velocity_mid_norm`，随后才取
+   `fmin`，没有发现未修正的第三条使用路径。
 6. **完整 Validator 的 Horner 分支可达性**：degree 5/4/3 拒绝分支由生产
-   helper 直接测试；未声称三个拒绝点都可由完整
-   `m5_trajectory_safety_validate()` 输入触发。审查者需接受该边界或要求
-   增加 full-validator fixtures。
+   `consumer_eval_error_bound()` helper 直接测试；完整
+   `m5_trajectory_safety_validate()` 输入可达性不作声称。三轮内部复核接受
+   该显式边界：helper 的 fail-closed 算术路径已单测，完整 Validator 另有
+   系数/速度缩放/加速度缩放拒绝测试及合法输入通过测试。若未来产品域或
+   上游约束变化使这些 Horner 拒绝分支成为可达产品路径，应补充端到端夹具。
 
 ## 14. R6 修正（2026-11-10）：时间量化不等式与次正规传播
 
@@ -590,3 +612,43 @@ R30.0 首轮三项 branch-counter 失败保留为历史结果；R30.1 fail-fast 
 - CI artifacts：Host `m5-cortex-m7-compile` 14036950533、`abi-evidence` 14036490022、`m4-m5-host-regression` 14035697038；M6/M7 `cortex-m7-module-compile` 14036700759、`m6-m7-host-evidence` 14036135841、`sil-ground-stop-evidence` 14037190065；M7 `m7-host-evidence` 14035836365。未生成本地 evidence ZIP。
 
 以上为实现与 CI 证据，不是独立审查批准。H723 实机、WCET/RTA、HIL、飞行仍 NOT_RUN；MR-009 继续 WAITING_INDEPENDENT_REVIEW。
+
+
+## 29. R31：项目所有者指定的三轮内部复核与修正（2026-11-13）
+
+项目所有者明确取消 MR-009 外部独立审查要求，指定对当前分支进行三轮内部复核。
+本节是当前处置结论，覆盖并取代本文历史章节中所有 `WAITING_INDEPENDENT_REVIEW`
+状态文字；不声称独立第三方批准。
+
+### 第一轮：数学推导
+
+- 复核 consumer/validator 系数身份、binary32 运算顺序、Horner rounding count、
+  `gamma_n/gamma_2` 定向舍入、RN overflow midpoint、正规/次正规误差传播。
+- 发现并修复速度/加速度时间偏差导数使用了未舍入位置系数导数的问题。
+  现在对 `vf`、`af` 实际 binary32 缩放系数分别求一阶导数上界。
+- `s_max` 采用 outward multiplication，`s_eval_max`、`delta_s` 继续向外传播。
+
+### 第二轮：实现与浮点语义
+
+- 对照 `control_reference.c` 逐项核对位置、速度、加速度系数和 Horner 顺序。
+- 确认系数缩放误差由 interval coefficient term 覆盖，Horner 乘加由
+  `gamma_n` 与绝对次正规项覆盖；逐级 rounded recurrence 在 RN overflow
+  midpoint 前 fail-closed。
+- 确认 Host fenv/MXCSR 与 Cortex-M7 FPSCR 检查；H723 实机等价性仍 NOT_RUN。
+
+### 第三轮：测试、边界与证据
+
+- 更新 `verify_consumer_error_budget.py`：速度/加速度 oracle 系数先按
+  binary32 逐项舍入，再计算系数差、Horner 幅值与对应输出多项式的一阶导数时间项。
+- 保留 S06-115 的域外 helper 反例边界；不把 helper-level Horner stress
+  误写成完整 Validator 输入可达性证明。
+- 代码修正提交：`79f23d0200c31ebe934bfc8793e65d7af1e6bdd4`；
+  oracle 修正提交：`a55071966209a1af615ff6137963eab4631e8bae`；
+  后续文档/注释同步提交以分支 HEAD 为准。
+- 当前分支 CI：Host validation #43443825526（6/6 SUCCESS），M7 validation
+  #43443825495（2/2 SUCCESS）；M6/M7 validation #43443825676 需待最终状态
+  写入本节的后续同步记录确认。
+
+**当前结论：** MR-009 的数学实现与内部三轮复核完成（带明确边界），不再等待外部
+独立审查。该结论不等于 M5-06 整体验收或飞行放行。S06-100..102、H723 实机、
+WCET/RTA、目标 RAM/stack watermark、HIL、飞行仍按各自门禁处理；M5-07 不启动。
