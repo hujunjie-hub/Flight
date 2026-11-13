@@ -476,13 +476,32 @@ static void case_ground_stop(void) {
     CHECK(actuator_guard_state() == ACTUATOR_GUARD_DISARMED,
           "state after the ramp is %u, expected DISARMED", actuator_guard_state());
     {
+        ActuatorStatus status;
+        ActuatorCapability capability;
+        set_now(t);
+        CHECK(actuator_poll(t, &status) == STATUS_OK,
+              "status polling failed after the zero-target receipt");
+        CHECK(actuator_guard_state() == ACTUATOR_GUARD_DISARMED,
+              "polling downgraded the terminal latch to state %u", actuator_guard_state());
+        CHECK(status.available_mask == 0u,
+              "a terminal ground stop still advertises available actuator channels");
+        CHECK(actuator_get_capability(&capability) == STATUS_OK,
+              "capability query failed after the zero-target receipt");
+        CHECK(capability.available_mask == 0u && capability.controllable_dof_mask == 0u,
+              "a terminal ground stop still advertises controllable actuator channels");
+    }
+    {
         unsigned commits_before = g_commit_calls;
         permit = make_permit(7u, 3u, t, t + 200000u, PERMIT_SCOPE_CONTROL_ACTIVE);
         demand = make_demand(&permit, 9u, t, 10.0f);
         CHECK(actuator_apply(&demand, &permit, &g_status) == STATUS_NOT_PERMITTED,
               "a demand was accepted after DISARMED");
+        set_now(t + 2500u);
         CHECK(actuator_guard_frame_boundary(t + 2500u) != STATUS_OK,
               "a frame was committed after DISARMED");
+        CHECK(actuator_guard_state() == ACTUATOR_GUARD_DISARMED,
+              "a post-stop frame boundary changed the terminal state to %u",
+              actuator_guard_state());
         CHECK(g_commit_calls == commits_before,
               "a post-ground-stop frame produced %u extra commits",
               g_commit_calls - commits_before);

@@ -104,12 +104,28 @@ M7 now rejects an epoch-matching ground-stop certificate while the CONTROL_ACTIV
 Host tests prove only the exercised software paths. They do not establish target WCET, board integration, DShot waveform timing, physical motor response, HIL acceptance, or flight readiness. The production H723 build remains `BENCH_INHIBIT`; `SIM_CONTROLLED_STOP` is enabled only for the host test build.
 
 
-## Remaining M7 end-to-end integration blocker
+## M4→M7 ground-stop integration status (2026-11-13)
 
-The ground-stop guard transaction is covered by Host tests, but the production call path is not yet connected:
+The production software path is now connected in this branch:
 
-- `fms_permit_tick()` revokes the permit / calls `fms_permit_ground_disarm()`, but no FMS output currently publishes a `GroundStopCertificate`.
-- `task_actuator_step()` consumes `ActuatorDemand`, polls status, and reads receipts; it does not consume a ground-stop certificate or call `actuator_guard_ground_stop()`.
-- `actuator_device_commit()` timestamps the write with `clock_now_us()` after `rt_device_write()`. That is a submission-return timestamp, not yet independently proven to be the physical DShot frame-application time.
+- `task_mission_step()` runs the FMS policy, translates an eligible ground-only disarm output with `fms_build_ground_stop_certificate()`, and publishes the certificate in `ControlBundle.ground_stop_certificate`.
+- `task_actuator_step()` consumes the certificate from the runtime bundle, suppresses queued M6 demands while the stop owns output, calls `actuator_guard_ground_stop()`, advances the frame-boundary owner, and publishes the resulting actuator receipt.
+- The `--ground-stop-smoke` SIL case exercises the real actuator task owner, guard and receipt path. Its fixture currently constructs a valid `FmsOutputView` and injects the adapter-produced certificate into the runtime bundle; it does **not** drive `task_mission_step()` with a live FMS input sequence. Full mission-task-to-actuator-owner integration coverage therefore remains incomplete.
 
-Therefore **FMS→M7 ground-stop integration = NOT_IMPLEMENTED / NOT_RUN**. The M7 Host test proves the guard API in isolation only. Do not claim that the FMS first-reference timeout or landed disarm path executes a bounded physical thrust ramp on H723. Before enabling physical output, add the certificate to the FMS/runtime contract, consume it in the actuator owner task, obtain a defensible driver-application timestamp (or explicitly redefine the evidence as enqueue time), and test the full revoked-permit→ramp→zero-receipt→DISARMED chain. Keep production `BENCH_INHIBIT` unchanged.
+### Driver apply-time evidence
+
+`actuator_device_commit()` now treats `rt_device_write()` as DMA submission only and returns no apply timestamp. `actuator_device_poll_apply()` waits until the DShot driver reports the submitted frame completed, then samples the monotonic clock. This is a conservative post-completion timestamp, not a hardware-captured timestamp of the exact DShot waveform edge. H723 runtime timing and waveform evidence remain NOT_RUN.
+
+### Latest integration regression — Run #19
+
+- Branch: `test/fmat-0012-m6-controller`
+- Base HEAD: `467c99904488943ba8861ae84cc75dc74a2b332a`
+- Workflow: [Run #19](https://github.com/hujunjie-hub/Flight/actions/runs/43369239983)
+- M4/M5 regression: PASS.
+- M6 MPC / M7 actuator Host tests: PASS.
+- M6/M7 ASan/UBSan: PASS.
+- Runtime task / ground-stop SIL: FAILED one assertion: the state was no longer `ACTUATOR_GUARD_DISARMED` after the zero-target receipt.
+
+Root cause: after the ground-stop zero frame was confirmed, `actuator_poll()` treated the expected revoked permit as an ordinary unbound permit and called `safe(..., ACTUATOR_GUARD_SAFE_ACTION)`. That downgraded the terminal DISARMED latch. The correction preserves DISARMED after `gs.latched`, clears demand ownership, and reports no actuator capability after the terminal stop. The M7 regression test now polls status and capability after the zero receipt and checks that subsequent frame boundaries cannot leave DISARMED or commit another frame.
+
+**Fix committed; CI revalidation pending.** Keep production `BENCH_INHIBIT` unchanged. Host/SIL evidence is not H723 target build, HIL, physical ESC response, or flight authorization.

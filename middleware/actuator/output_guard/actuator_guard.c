@@ -462,6 +462,7 @@ Status actuator_guard_frame_boundary(uint64_t now) {
 Status actuator_poll(uint64_t now,ActuatorStatus *s) {
   ActuationPermit p;
   ClockInstant clock;
+  uint8_t ground_stop_latched;
   if(!s) return STATUS_INVALID_ARGUMENT;
   memset(s,0,sizeof(*s)); if(!a.initialized) return STATUS_NOT_READY;
   header(&s->header,MSG_ACTUATOR_STATUS,now); s->actuator_layout_id=PRODUCT_ACTUATOR_LAYOUT_ID;
@@ -475,9 +476,22 @@ Status actuator_poll(uint64_t now,ActuatorStatus *s) {
     }
   }
   if(io.fault_count && io.fault_count()!=a.faults) { s->fault_mask=15; return safe(STATUS_NOT_READY,ACTUATOR_GUARD_FAULT_LATCHED); }
-  lock(); p=a.permit; unlock();
-  if(a.config.payload.output_policy_id==1) { inhibit(); a.state=ACTUATOR_GUARD_DISARMED; }
-  else {
+  lock();
+  p=a.permit;
+  ground_stop_latched=gs.latched;
+  unlock();
+  if(a.config.payload.output_policy_id==1) {
+    inhibit();
+    a.state=ACTUATOR_GUARD_DISARMED;
+  } else if(ground_stop_latched) {
+    /* A revoked permit is expected after a completed ground-stop transaction.
+     * Preserve its terminal DISARMED state instead of downgrading it to
+     * SAFE_ACTION as though this were an ordinary stale-demand condition. */
+    a.has_demand=0u;
+    a.state=ACTUATOR_GUARD_DISARMED;
+    a.health.health_state=MODULE_HEALTH_DEGRADED;
+    s->available_mask=0u;
+  } else {
     s->available_mask=15;
     if(!bound(&p,now) || (a.has_demand && !demand_valid(&a.latest,&p,now)))
       (void)safe(STATUS_STALE_DATA,ACTUATOR_GUARD_SAFE_ACTION);
@@ -486,10 +500,18 @@ Status actuator_poll(uint64_t now,ActuatorStatus *s) {
   return STATUS_OK;
 }
 Status actuator_get_capability(ActuatorCapability *c) {
-  ClockInstant now; if(!c) return STATUS_INVALID_ARGUMENT;
+  ClockInstant now;
+  uint8_t ground_stop_latched;
+  uint32_t state;
+  if(!c) return STATUS_INVALID_ARGUMENT;
   memset(c,0,sizeof(*c)); if(!a.initialized || clock_read(&now)) return STATUS_NOT_READY;
   header(&c->header,MSG_ACTUATOR_CAPABILITY,now.monotonic_us); c->actuator_layout_id=PRODUCT_ACTUATOR_LAYOUT_ID;
-  if(a.config.payload.output_policy_id!=1 && a.state!=ACTUATOR_GUARD_FAULT_LATCHED) {
+  lock();
+  ground_stop_latched=gs.latched;
+  state=a.state;
+  unlock();
+  if(a.config.payload.output_policy_id!=1 && !ground_stop_latched &&
+     state!=ACTUATOR_GUARD_FAULT_LATCHED) {
     c->available_mask=15; c->controllable_dof_mask=15;
     memcpy(&c->vehicle_extension.min_thrust_n,a.config.payload.min_thrust_n,sizeof(float)*4);
     memcpy(&c->vehicle_extension.max_thrust_n,a.config.payload.max_thrust_n,sizeof(float)*4);
