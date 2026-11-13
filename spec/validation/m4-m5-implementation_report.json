@@ -261,15 +261,15 @@
   ],
   "inputs_sha256": {
     "spec/00_工程基线与唯一权威规范.md": "fa434771b57c62e69e4b1a531df5600f57796d44605da1d66a0427d90045093e",
-    "spec/01_系统总体架构与设计决议.md": "8d0f53cee037bcc900ae4a9333ce919b925fa7b69602cf93f7bbc9d40fc209cb",
-    "spec/02_接口契约与公共数据规范.md": "7378687c2e9978ab21372dd8d1f05ea3eb63986b6211d41269511ee8460eeeef",
-    "spec/03_平台软件架构与驱动设计.md": "e54de59d66d0765d7910abadd9e9cd4313eaab4f3adc98aff9fbb0eaa8fd6f85",
-    "spec/04_飞控核心模块与控制系统设计.md": "cd47ec3e4404f57c9f29116f84362704456638fcdcbccc7bb43ba753be0ee693",
+    "spec/01_系统总体架构与设计决议.md": "8344ff9497e3b7ce7a98d286ee5c35bc5036498fe9dbbfda00f8e543bb19f0a8",
+    "spec/02_接口契约与公共数据规范.md": "bd76fa776c2620f6bbf6496d4551bae9fc14d8a370b4a4b6817489aac7ce59fc",
+    "spec/03_平台软件架构与驱动设计.md": "07ea0bbf1ee3856d40d79e15ab49d939b60100c554ba089665cce92bb4657fdd",
+    "spec/04_飞控核心模块与控制系统设计.md": "e6fde4fcbfdd26385e37af414ddad6d4724f95fef1e0e6fc96b7bf3467ad73c7",
     "spec/05_传感器采集时间基准与GNSS独立运行.md": "deaaf0de274e19de57e3688c2a4a4df8cf1cc52a1181fa43c7574336be6b6d2b",
-    "spec/06_FMS通信与系统安全设计.md": "5f54d22cc5c981d272846020083cb8e71ad05ca3f32f5c3bd052cbc11f1b952f",
-    "spec/07_实时调度与板级硬件资源设计.md": "4094ecf0945d00eaad3b1e5d135c29daa6a00298ccf021ace6756ac3edbf54ac",
+    "spec/06_FMS通信与系统安全设计.md": "ab98d34c9c95bb4eecf81bc7be1e894f2e90586a1483c567e245877e5ac71f76",
+    "spec/07_实时调度与板级硬件资源设计.md": "51dbdb9eb31236aab02ff4d3cb19254887cd4e84e6d064b2c35fc3b9f161d443",
     "spec/08_产品配置插件与参数管理.md": "eff26cfe3bb4e4e78dc9a2976c343a30097885f8a3a8656ca150ed6ca03d27f4",
-    "spec/09_需求验证实施与发布管理.md": "e8b68b3f892be389dc3d15702c81d2fa1b236d3b05b2eb7ddb1af6a716309dc3",
+    "spec/09_需求验证实施与发布管理.md": "3560725fd0f9db62ab5a90d83d17c6b2a084b0057ffdd0799141ff5dfd16b8e9",
     "spec/10_Agent分工与工程执行规范.md": "851a557db9476bcd86978dd3964aa80567df88db55d8f3a3d6b7efe829e321f3",
     "spec/11_审核问题闭环与变更追踪.md": "b11d05c5cf2a3f7eab14f30ca833d68f9f78f758c5e3c7a4a8f6d09e853ada03",
     "spec/12_全量审查问题清单与落地边界.md": "a161cc7bdedbca33f5d7c554f279e601662ea7b20f01f8533798ff809072e033",
@@ -282,7 +282,7 @@
     "spec/tools/check_dialect.py": "cb201938235cd8ec6d5387470d2f21f5dc4a91bd414a9cfafc940da49a7ca025",
     "spec/tools/check_reference_models.py": "116a1d95cc3b203b1567633a0a8dd85b5e6a2edb7f0dbc89ebf47ae820f38ad9"
   },
-  "abi_layout_sha256": "e0d51c7c7f4cea0e402dfca398a5f9bdb9f3573ce1f911640a14950b9cd539da",
+  "abi_layout_sha256": "62feb3f61cac685860cafa63df0792232a068e3a80d98482ded7fe750ac427de",
   "abi_artifact": "spec/validation/m4-m5-implementation_abi_layout.json",
   "resource_accounting_note": "The current ICD table now includes 2 x 112 B GroundStopCertificate copies. Run python tests/guidance/run_validation.py to regenerate this report and rerun the memory budget on the current worktree."
 }
