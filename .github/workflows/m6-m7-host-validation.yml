@@ -1,0 +1,62 @@
+name: M6/M7 host validation
+
+on:
+  push:
+    branches:
+      - test/fmat-0012-m6-controller
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  m4-m5-regression:
+    name: M4/M5 host and integration regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Run M4 host regression
+        run: bash tests/flight_management/run_host_tests.sh
+      - name: Run M5 host regression
+        run: bash tests/guidance/run_host_tests.sh
+      - name: Run M4/M5 integration regression
+        run: bash tests/guidance/run_integration_tests.sh
+
+  m6-m7-host:
+    name: M6 MPC and M7 actuator host tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Run M6 real-model host tests
+        run: bash tests/control/run_host_tests.sh
+      - name: Run M7 real-actuator-guard host tests
+        run: bash tests/actuation/run_host_tests.sh
+      - name: Upload M6/M7 host evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m6-m7-host-evidence
+          path: build/validation/
+
+  m6-m7-sanitizers:
+    name: M6/M7 AddressSanitizer and UndefinedBehaviorSanitizer
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Run M6 host tests with sanitizers
+        env:
+          EXTRA_CFLAGS: "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+        run: bash tests/control/run_host_tests.sh
+      - name: Run M7 host tests with sanitizers
+        env:
+          EXTRA_CFLAGS: "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+        run: bash tests/actuation/run_host_tests.sh

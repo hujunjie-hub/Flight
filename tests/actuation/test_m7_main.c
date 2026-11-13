@@ -9,9 +9,9 @@
  * revoked permit, ordering, expiry, and the separation between publishing a
  * demand and applying a frame at the 2.5 ms boundary.
  *
- * Ground stop is intentionally absent: the firmware has no
- * GroundStopCertificate, no thrust ramp and no ZERO_TARGET_APPLIED state, so it
- * cannot be tested here without inventing a parallel implementation.
+ * Ground stop is exercised by case_ground_stop(): certificate validation,
+ * permit-revoked handoff, bounded thrust ramp, ZERO_TARGET_APPLIED receipt and
+ * the post-stop DISARMED latch are driven through the real firmware guard.
  */
 #include <stdio.h>
 #include <string.h>
