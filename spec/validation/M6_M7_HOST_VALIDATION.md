@@ -61,6 +61,26 @@ M6 now verifies OSQP absolute termination is applied, reset clears run statistic
 
 M7 certificate epoch binding, in-flight permit blocking and late-apply overrun cases are added in the following commit; they remain pending until their own CI run.
 
+## Third CI run — M7 ground-stop transaction hardening
+
+- Commit: `d8e2d9afa7c070f72616f34d36764fcb2b215874`
+- Workflow run: [43363536926](https://github.com/hujunjie-hub/Flight/actions/runs/43363536926)
+- Overall result: **SUCCESS** (3/3 jobs)
+
+| Gate | Result | Checks | Failures |
+|---|---|---:|---:|
+| M4 host | PASS | 993 | 0 |
+| M5 host | PASS | 9,515 | 0 |
+| M4/M5 integration | PASS | 1,066 | 0 |
+| M6 MPC | PASS | 15 | 0 |
+| M6 input/time + outer lifecycle | PASS | 26 | 0 |
+| M7 actuator / ground stop | PASS | 254 | 0 |
+| M6/M7 ASan + UBSan | PASS | Re-ran M6/M7 suites | 0 |
+
+The third run verifies certificate authority/directive epoch binding, rejection of new permits and demands while the ramp owns output, actual driver-apply deadline reporting, and a late final zero frame that must retain the OVERRUN flag. The 11,869 unique Host checks pass; the sanitizer job repeats M6/M7 tests.
+
+A final concurrency audit then identified that the terminal ground-stop latch and lifecycle stop reset must use the same lock as concurrent permit publication. That lock-order follow-up is committed separately and remains pending its own CI run.
+
 ## Safety boundary
 
 Host tests prove only the exercised software paths. They do not establish target WCET, board integration, DShot waveform timing, physical motor response, HIL acceptance, or flight readiness. The production H723 build remains `BENCH_INHIBIT`; `SIM_CONTROLLED_STOP` is enabled only for the host test build.

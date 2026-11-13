@@ -100,7 +100,14 @@ Status actuator_init(const ProductActuatorConfig *c) {
   a.config=*c; a.initialized=1; a.state=ACTUATOR_GUARD_DISARMED;
   a.health.health_state=MODULE_HEALTH_DEGRADED; return STATUS_OK;
 }
-Status actuator_stop(void) { inhibit(); a.initialized=0; a.has_demand=0; a.state=ACTUATOR_GUARD_DISARMED; memset(&gs,0,sizeof(gs)); return STATUS_OK; }
+Status actuator_stop(void) {
+  inhibit();
+  lock();
+  a.initialized=0; a.has_demand=0; a.state=ACTUATOR_GUARD_DISARMED;
+  memset(&gs,0,sizeof(gs));
+  unlock();
+  return STATUS_OK;
+}
 Status actuator_update_permit(const ActuationPermit *p, uint64_t now) {
   ClockInstant clock;
   if(!a.initialized) return STATUS_NOT_READY;
@@ -108,6 +115,7 @@ Status actuator_update_permit(const ActuationPermit *p, uint64_t now) {
      p->header.source_id!=SOURCE_M4 || p->header.boot_id!=a.clock.boot_id ||
      p->header.time_epoch!=a.clock.time_epoch || !p->permit_epoch) return STATUS_NOT_PERMITTED;
   lock();
+  if(!a.initialized) { unlock(); return STATUS_NOT_READY; }
   /* A ground-stop transaction owns the output until zero is committed and
    * latched. A newer permit must not be able to replace that terminal action. */
   if(gs.active || gs.latched) { unlock(); return STATUS_NOT_PERMITTED; }
@@ -205,10 +213,15 @@ static Status ground_stop_frame(uint64_t now) {
   if(r) { a.receipt.result_code=ACTUATOR_RECEIPT_DRIVER_FAULT; return safe(r,ACTUATOR_GUARD_FAULT_LATCHED); }
   memcpy(a.last_thrust,applied,sizeof(applied)); a.last_commit=now; a.has_commit=1;
   if(zero) {
+    /* Permit publication may run concurrently with the actuator owner. Publish
+     * the terminal latch under the same lock used by permit updates. */
+    lock();
     gs.active=0; gs.latched=1;
-    a.receipt.result_code=ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED;
-    inhibit(); a.has_demand=0; a.state=ACTUATOR_GUARD_DISARMED;
+    a.has_demand=0; a.state=ACTUATOR_GUARD_DISARMED;
     a.health.health_state=MODULE_HEALTH_DEGRADED;
+    unlock();
+    a.receipt.result_code=ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED;
+    inhibit();
     return STATUS_OK;
   }
   a.receipt.result_code=ACTUATOR_RECEIPT_COMMITTED;
@@ -247,6 +260,7 @@ Status actuator_guard_ground_stop(const GroundStopCertificate *c,uint64_t now) {
    * used by permit updates, so no newer permit can slip between the check and
    * the ground-stop latch. */
   lock();
+  if(!a.initialized) { unlock(); return STATUS_NOT_READY; }
   current=a.permit;
   if(gs.latched) { unlock(); return STATUS_NOT_READY; }
   if(!current.permit_epoch || !c->authority_epoch || !c->directive_epoch ||
@@ -272,8 +286,20 @@ Status actuator_guard_ground_stop(const GroundStopCertificate *c,uint64_t now) {
   return STATUS_OK;
 }
 
-uint64_t actuator_guard_ground_stop_start_us(void) { return gs.active||gs.latched ? gs.start_us : 0u; }
-uint64_t actuator_guard_ground_stop_predicted_us(void) { return gs.predicted_us; }
+uint64_t actuator_guard_ground_stop_start_us(void) {
+  uint64_t value;
+  lock();
+  value=gs.active||gs.latched ? gs.start_us : 0u;
+  unlock();
+  return value;
+}
+uint64_t actuator_guard_ground_stop_predicted_us(void) {
+  uint64_t value;
+  lock();
+  value=gs.predicted_us;
+  unlock();
+  return value;
+}
 
 Status actuator_guard_frame_boundary(uint64_t now) {
   ActuationPermit p; float applied[4]; uint16_t commands[4]; unsigned m; uint32_t limits=0;
