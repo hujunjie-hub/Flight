@@ -1,8 +1,8 @@
 # Flight M5-06 阻塞项视图（R33）
 
-> **2026-11-13 MR-009 R31 三轮内部复核 CI 快照（代码/证明基线 8dcb60b3ac18e6a763c939d3e810984092cdd321）**：Host validation #43446380866（6/6）、M6/M7 #43446380836（5/5）、M7 #43446380724（2/2）全部 SUCCESS。M5 Host regression、M5 ASan/UBSan、MR-009 focused、S06-099/S06-107、Spec Audit、生产 ABI、18 mutation FP audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer 均 PASS。
+> **2026-11-13 MR-009 R31 内部预审 CI 快照（代码/证明基线 8dcb60b3ac18e6a763c939d3e810984092cdd321）**：Host validation #43446380866（6/6）、M6/M7 #43446380836（5/5）、M7 #43446380724（2/2）全部 SUCCESS。M5 Host regression、M5 ASan/UBSan、MR-009 focused、S06-099/S06-107、Spec Audit、生产 ABI、18 mutation FP audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer 均 PASS。
 
-> **当前阻塞状态**：B01/B02 当前 CI 通过；B03 包锁已固定但本轮未单独重跑 package-lock job；B04 完整 Release 产品链接/目标运行仍需确认；B05 MR-009 已完成三轮内部数学复核（外部独立审查由项目所有者豁免），不等于 M5-06 整体验收；B06 -O2 静态最坏链 3,864/4,096 B PASS、-O0 历史分析 UNKNOWN；B07 H723 实机、WCET/RTA、RAM/stack watermark、HIL 与飞行 NOT_RUN。S06-100..102 仍 NOT_RUN；M5-07 不启动。
+> **当前阻塞状态**：B01/B02 当前 CI 通过；B03 包锁已固定但本轮未单独重跑 package-lock job；B04 完整 Release 产品链接/目标运行仍需确认；B05 MR-009 内部预审与修正完成，但独立数学审查仍 WAITING，不等于 M5-06 整体验收；B06 -O2 静态最坏链 3,864/4,096 B PASS、-O0 历史分析 UNKNOWN；B07 H723 实机、WCET/RTA、RAM/stack watermark、HIL 与飞行 NOT_RUN。S06-100..102 仍 NOT_RUN；M5-07 不启动。
 
 > **资源更新**：ICD/M4 参考表已加入两个 `GroundStopCertificate` 快照（2×112 B）；按上轮 232 B 余量扣除 224 B 后估算仅余 8 B。FLIGHT-LOCAL-27 继续 OPEN / RISK，必须重跑 `tests/guidance/check_memory_budget.py` 和最终 map。下方 R29/B01–B06 细节保留为历史记录，不作为当前状态。
 
@@ -62,18 +62,18 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 | 解除条件 | B03 RESOLVED + 真实 package tree + link check exit 0。 |
 | 下一步 | 等 B03；保持对象编译证据，不冒充链接。 |
 
-## B05 MR-009 数学复核 CLOSED（内部三轮）
+## B05 MR-009 独立数学审查 WAITING
 
 | 字段 | 内容 |
 |---|---|
 | Issue | FLIGHT-LOCAL-04 |
-| 状态 | **CLOSED / TRIPLE_SELF_REVIEWED_WITH_SCOPE_LIMITATIONS**；项目所有者已豁免外部独立审查。本结论不是独立第三方认证。 |
+| 状态 | **WAITING_INDEPENDENT_REVIEW**；R31 三轮内部工作仅为作者侧预审，不替代独立审查。 |
 | 已实现 | R30.3 rounded Horner product/sum recurrence、RN overflow midpoint fail-closed、gamma 定向舍入、正规/次正规误差界、系数构造/速度缩放/加速度缩放首个非有限值短路；R31 修复 velocity/acceleration time-shift derivative 使用实际 rounded vf/af 系数。 |
 | 已测试 | Host #43446380866 6/6、M6/M7 #43446380836 5/5、M7 #43446380724 2/2；M5 Host/ASan、MR-009 focused、S06-099 60,002 offsets 双模型 Fraction、S06-107 rounded-derivative oracle、18 mutation FP audit、ARM 两对象无 FMA、Cortex-M7 模块编译均 PASS。 |
 | 尚未声称 | degree 5/4/3 Horner 拒绝点完整 validator 输入可达性不作声称；H723 FPSCR 实机等价仍 NOT_RUN；M6 40 ms route preview 不在 M5-06 20 ms 证明域。 |
 | 证据 | Proof：spec/history/implementation/guidance/M5_06_6_MR009_PROOF.md；Matrix：spec/quality/owner_approval/R30/05_MR009_INDEPENDENT_REVIEW_MATRIX.md；CI #43446380866 / #43446380836 / #43446380724。 |
-| 解除条件 | MR-009 内部三轮复核已完成；S06-100..102、B06/B07 等其余 M5-06 发布门禁仍须分别完成。 |
-| 下一步 | 不再等待外部 MR-009 审查；继续保持 M5-06 整体 BLOCKED，直到其他发布门禁满足；不推进 M5-07。 |
+| 解除条件 | 独立审查者逐项审查并签署 APPROVED；同时 S06-100..102、B06/B07 等其余 M5-06 发布门禁仍须分别完成。 |
+| 下一步 | 将 R30/R31 proof、矩阵、代码差异与 CI 证据交给独立审查者；审查完成前保持 WAITING_INDEPENDENT_REVIEW 和 M5-06 BLOCKED，不推进 M5-07。 |
 
 ## B06 Validator 栈预算
 
@@ -109,6 +109,6 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 ## 派生规则
 
 - 状态变化先改 `ISSUE_REGISTER.md`，再更新本视图。
-- `FIXED_WAITING_RETEST` 不等于 VERIFIED；`VERIFIED/CLOSED` 通常只能由独立审查者确认；仅可对项目所有者明确豁免的单项按登记的内部复核结果关闭。FLIGHT-LOCAL-04/MR-009 是当前唯一例外，状态为 `CLOSED / TRIPLE_SELF_REVIEWED_WITH_SCOPE_LIMITATIONS`，不代表独立第三方批准；其他问题仍遵循独立复验规则。
-- S06-100..102 保持 NOT_RUN；MR-009 已完成内部三轮复核，但 M5-06 仍受其他发布门禁阻塞；M5-07 不得启动。
+- `FIXED_WAITING_RETEST` 不等于 VERIFIED；安全/数学问题的 `VERIFIED/CLOSED` 必须由独立审查者依据证据确认。内部预审不能替代独立复验。
+- S06-100..102 保持 NOT_RUN；MR-009 的内部预审已完成但仍 WAITING_INDEPENDENT_REVIEW；M5-06 还受其他发布门禁阻塞；M5-07 不得启动。
 - R27 文档、R27 快照和 R22 原始字节保留为 HISTORICAL/NOT_RECOVERABLE，不得覆盖。
