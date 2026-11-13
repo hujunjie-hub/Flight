@@ -14,7 +14,7 @@ static MissionUploadCandidate plan_mission;
 extern uint8_t flight_sil_ground_contact(void);
 #endif
 
-static void task_mission_update_ground_stop_certificate(const FmsOutputView *output,
+static Status task_mission_update_ground_stop_certificate(const FmsOutputView *output,
                                                     uint64_t now, int output_current)
 {
   GroundStopCertificate certificate;
@@ -30,6 +30,7 @@ static void task_mission_update_ground_stop_certificate(const FmsOutputView *out
     memset(&plan_bundle.ground_stop_certificate, 0,
            sizeof(plan_bundle.ground_stop_certificate));
   }
+  return status;
 }
 
 static void task_mission_step(void) {

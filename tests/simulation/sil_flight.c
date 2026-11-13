@@ -836,19 +836,14 @@ static void run_ground_stop_task_smoke(void)
     const uint64_t certificate_expiry = certificate.certificate_expires_at_us;
     invalid_output.landed_state.state = LANDED_STATE_IN_AIR;
     CHECK(task_mission_update_ground_stop_certificate(&invalid_output, now + 1000u, 1) ==
-              STATUS_NOT_PERMITTED,
-          "an in-air FMS output was accepted by the mission certificate publisher");
+              STATUS_NOT_PERMITTED);
     CHECK(plan_bundle.ground_stop_certificate.header.sequence == certificate.header.sequence &&
-          plan_bundle.ground_stop_certificate.certificate_expires_at_us == certificate_expiry,
-          "an invalid FMS update replaced an unexpired ground-stop certificate");
+          plan_bundle.ground_stop_certificate.certificate_expires_at_us == certificate_expiry);
     CHECK(task_mission_update_ground_stop_certificate(NULL, certificate_expiry + 1u, 0) ==
-              STATUS_NOT_READY,
-          "an expired certificate without a current FMS output was not cleared");
+              STATUS_NOT_READY);
     CHECK(plan_bundle.ground_stop_certificate.header.message_type == 0u &&
-          plan_bundle.ground_stop_certificate.certificate_expires_at_us == 0u,
-          "an expired mission certificate remained published");
-    CHECK(task_mission_update_ground_stop_certificate(&output, now, 1) == STATUS_OK,
-          "a fresh landed FMS output did not republish its ground-stop certificate");
+          plan_bundle.ground_stop_certificate.certificate_expires_at_us == 0u);
+    CHECK(task_mission_update_ground_stop_certificate(&output, now, 1) == STATUS_OK);
     certificate = plan_bundle.ground_stop_certificate;
   }
 
