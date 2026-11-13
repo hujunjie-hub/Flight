@@ -1,4 +1,4 @@
-# MR-009 Review Matrix — R30 (internal three-pass disposition)
+# MR-009 Review Matrix — R31 (internal three-pass disposition)
 
 Status: **INTERNAL_THREE_PASS_REVIEW_COMPLETE_WITH_LIMITATIONS — EXTERNAL REVIEW WAIVED BY PROJECT OWNER**
 
@@ -48,9 +48,11 @@ eta = 2^-149
 ~~~
 
 The relative term covers normal results; the absolute term covers subnormal
-results. The propagated Horner bound, gamma_n term and separately propagated
-subnormal floor must be checked together. The existing conservative magnitude
-thresholds remain unchanged.
+results. Under RN, a subnormal rounding residual is at most 2^-150; its maximum
+propagation through up to n later relative roundings is absorbed by the factor
+2 in the implemented n*2^-149*max(1,s_eval_max)^n floor. The propagated Horner
+bound, gamma_n term and subnormal floor are checked together. Conservative
+magnitude thresholds remain unchanged.
 
 ## 4. Test evidence and interpretation
 
@@ -91,7 +93,7 @@ made that each branch is reachable through a complete product-domain validator
 input. Full-validator coefficient/scaling failure paths and a legal companion
 are tested separately. This limitation remains visible and must not be hidden.
 
-## 5. Independent proof checklist
+## 5. Internal three-pass proof checklist
 
 | Proof obligation | R30/R31 evidence | Evidence status | Internal three-pass outcome |
 |---|---|---|---|
@@ -100,10 +102,10 @@ are tested separately. This limitation remains visible and must not be hidden.
 | Velocity Horner | Degree-4 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PASS |
 | Acceleration Horner | Degree-3 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PASS |
 | Binary32 RN rounding | `u=2^-24`, `eta=2^-149`; normal/subnormal upward bound propagated after every product and sum | READY | PASS |
-| Gamma upper arithmetic | R30.3: for n=2/10/12, `nu` up, `1-nu` down, quotient up; non-positive denominator fails closed; source-token audit + 9 mutation tests PASS | READY | PASS |
+| Gamma upper arithmetic | R30.3: for n=2/10/12, `nu` up, `1-nu` down, quotient up; non-positive denominator fails closed; dual-source token audit + 18 mutation tests PASS | READY | PASS |
 | Intermediate overflow | Strict `P_k/A_k < T_RN=2^128-2^103` before capping a rounded upper bound at FLT_MAX | READY | PASS |
 | Coefficient scaling overflow | Full-validator coefficient/velocity-scaling/acceleration-scaling fail-fast traces; NUMERIC_FAILURE / NUMERIC / passed=0 | READY | PASS |
-| Time conversion | S06-099: 60,002 offsets, max ratio 4.897714e-08 < gamma2 1.192093e-07; S06-108/109/113: 96/96/76 checks; R31 time shift uses `cf'`, rounded `vf'`, rounded `af'`; S06-107 oracle updated | READY | PASS |
+| Time conversion | S06-099: 60,002 offsets; physical-time max ratio 4.897714e-08 and production h*offset/step max ratio 0.6601743 of gamma2; S06-108/109/113: 96/96/76 checks; R31 time shift uses cf', rounded vf', rounded af'; S06-107 oracle updated | READY | PASS |
 | FP contraction | R30.3 ARM audit: GCC 14.2.1; consumer/validator objects `fused_operations=0`; model_check MATCH; 9 mutation self-tests PASS. R31 CI re-runs this gate on the corrected source | READY | PASS |
 | Rounding mode / FTZ / DAZ | Host negative tests cover FE_DOWNWARD/UPWARD/TOWARDZERO and MXCSR FTZ/DAZ; ARM runtime gate reads FPSCR.RMode/FZ/DN; H723 runtime remains NOT_RUN | HOST_TESTED / ARM_RUNTIME_NOT_RUN | PARTIAL — target gate remains open |
 | M6 interval domain | M5-06 requires 20 ms intervals; `s_eval_max≈0.020000002`; M6 locator rejects offsets beyond the preview horizon; 40 ms route previews are outside M5-06 validation scope | READY | PASS — 20 ms claim only |
@@ -188,14 +190,13 @@ Validated code commit: 80670f118c5fdccce5a1f00f218a58a66c28bd5e.
 - Remote artifacts: `m4-m5-host-regression` ID `14032860881`, `m5-cortex-m7-compile` ID `14032780901`, `abi-evidence` ID `14032786372`. No local evidence ZIP is claimed.
 - R30.3 CI artifacts: Host `m5-cortex-m7-compile` ID `14036950533`, `abi-evidence` ID `14036490022`, `m4-m5-host-regression` ID `14035697038`; M6/M7 `cortex-m7-module-compile` ID `14036700759`, `m6-m7-host-evidence` ID `14036135841`, `sil-ground-stop-evidence` ID `14037190065`; M7 `m7-host-evidence` ID `14035836365`.
 
-### Review disposition
+### Historical R30.2 handoff state (superseded)
 
-Evidence state: **READY_FOR_INDEPENDENT_REVIEW**. Reviewer state: **NOT_ASSIGNED**. No PR review submission is recorded for PRs #1–#7; PR #2 remains CLOSED / DRAFT / UNMERGED. The reviewer must be independent of the code author and must fill every row in §5 with `APPROVED`, `REJECTED`, or `NEEDS_INFO`, including the explicit full-validator reachability limitation. CI PASS is not an approval.
-
-Reviewer GitHub login: `TBD`  
-Review date: `TBD`  
-Disposition: `APPROVED / REJECTED / NEEDS_INFO`  
-Assumptions and unresolved items: `TBD`
+The following was the R30.2 handoff state before the project owner waived external
+review. It is retained only as history and is not the current disposition:
+`READY_FOR_INDEPENDENT_REVIEW`, reviewer `NOT_ASSIGNED`, reviewer fields `TBD`.
+The current internal disposition is recorded in §11; no independent reviewer or
+third-party approval is claimed.
 
 
 ## 11. R31 owner-directed three-pass internal review (2026-11-13)
@@ -210,15 +211,22 @@ reviewer identity or third-party approval is claimed.
    outward `s_max`, `delta_s`, and `s_eval_max`.
 2. **Implementation pass:** rechecked coefficient operation order, 10/12/10
    rounding counts, gamma directed rounding, normal/subnormal bounds, strict
-   RN overflow midpoint rejection, runtime FP environment checks, and the
-   fail-fast behavior. No further production arithmetic defect found.
+   RN overflow midpoint rejection, runtime FP environment checks, expanded
+   `s_eval_max` propagation through coefficient/Horner/overflow/subnormal terms,
+   and fail-fast behavior. No further production arithmetic defect found.
 3. **Test/evidence pass:** updated S06-107 Python Fraction oracle to model
    binary32-rounded velocity/acceleration coefficients and their own derivative
-   polynomials. The focused C tests, Host validation, ARM FP mutation audit,
-   and M7 validation passed on the corrected branch tip.
+   polynomials; S06-099 now checks both physical time and the exact production
+   h*offset/step parameter. The dual-source FP audit checks 18 mutations.
 
 **Accepted explicit limitations:** degree-5/4/3 Horner rejection branches are
 tested through the production helper, not claimed reachable through a complete
 product-domain validator input; H723 FPSCR runtime equivalence remains NOT_RUN;
 40 ms M6 route preview is outside the 20 ms M5-06 proof domain.
 
+### R31 follow-up audit hardening
+
+The FP source audit now checks both compiled translation units and the validator
+replica, including the expanded s_eval_max use and the position/rounded-velocity/
+rounded-acceleration time derivatives. Its mutation suite contains 18 cases.
+The latest audit result is recorded against the final branch HEAD after CI.
