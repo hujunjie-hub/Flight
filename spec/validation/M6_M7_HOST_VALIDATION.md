@@ -153,6 +153,12 @@ The CI failure on Run #19 is closed for this Host/SIL path. This does not close 
 Production `BENCH_INHIBIT` remains unchanged. Host/SIL evidence is not H723 target build, HIL, physical ESC response, or flight authorization.
 
 
-### Mission certificate publication seam regression (CI pending)
+### Mission certificate publication seam regression — Run #23 PASS
 
-The SIL smoke now calls the same certificate-publication helper used by `task_mission_step()`. It verifies that a valid landed/disarmed FMS output publishes a certificate, an in-air update cannot replace an unexpired certificate, an expired certificate is cleared when no current FMS output exists, and a fresh valid output can republish it. This is stronger than directly assigning the certificate in the fixture, but it remains a seam test rather than a live `fms_policy_update()` command/lifecycle integration test. The updated workflow run is pending.
+The SIL smoke now calls the same certificate-publication helper used by `task_mission_step()`. It verifies that a valid landed/disarmed FMS output publishes a certificate, an in-air update cannot replace an unexpired certificate, an expired certificate is cleared when no current FMS output exists, and a fresh valid output can republish it. Run #22 initially failed to compile because the new helper was declared `void` while the test asserted its result, and the SIL `CHECK` macro accepts one argument only. Commit `a8f62f5b270355d699b8a42861198cfa93894337` corrected both issues.
+
+[Run #23](https://github.com/hujunjie-hub/Flight/actions/runs/43375102383), exact commit `a8f62f5b270355d699b8a42861198cfa93894337`: **4/4 jobs SUCCESS**. M4 Host 993/0, M5 Host 9,515/0, M4/M5 integration 1,066/0, M6 MPC 15/0, M6 guard 26/0, M7 guard 274/0, SIL publication/owner smoke 18/0, and ASan/UBSan PASS. This remains a seam test rather than a live `fms_policy_update()` command/lifecycle integration test.
+
+### Branch lineage / integration gate
+
+At the time of this check, M6 branch HEAD `a8f62f5b270355d699b8a42861198cfa93894337` and M5-06 branch HEAD `51e7e923419733f5aa3b21efa1e46588629623ed` are **diverged**, with common ancestor `edf32b4e39cdae014aa76870dc821882807a6905`. GitHub compare reports M6 ahead by 50 commits and behind M5-06 by 395 commits. The M6/M7 Host CI therefore validates this independent branch only; it does not contain or supersede the current M5-06 branch. Do not rebase, merge, or claim unified milestone acceptance without an explicit integration plan and independent M5-06 approval.
