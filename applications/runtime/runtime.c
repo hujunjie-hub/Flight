@@ -350,7 +350,12 @@ Status runtime_apply_controller_parameters(const ProductControllerConfigPayload 
 
 bool runtime_bench_inhibit_active(void)
 {
+#ifdef FLIGHT_HOST_SIL
+    /* Host/SIL explicitly overrides the product profile to SIM_CONTROLLED_STOP. */
+    return false;
+#else
     return FLIGHT_OUTPUT_POLICY_ID == 1u && runtime_running();
+#endif
 }
 
 #ifdef FLIGHT_NOR_LOG_ENABLE
@@ -455,6 +460,7 @@ int runtime_initialize(void)
         .unlock = permit_unlock,
         .inhibit = actuator_device_inhibit,
         .commit = actuator_device_commit,
+        .poll_apply = actuator_device_poll_apply,
         .fault_count = actuator_device_faults,
     };
     ClockInstant clock;

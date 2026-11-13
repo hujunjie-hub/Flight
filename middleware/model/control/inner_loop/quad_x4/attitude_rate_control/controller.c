@@ -71,6 +71,7 @@ static int derive_allocation(const ProductControllerConfigPayload *p,
 Status control_backend_init(const ProductControllerConfig *c) {
   ControllerState next;
   const ProductControllerConfigPayload *p;
+  Status reset_status;
   if (!c || !c->profile_hash || !c->parameter_hash || !c->config_version)
     return STATUS_INVALID_ARGUMENT;
   p = &c->payload;
@@ -84,7 +85,13 @@ Status control_backend_init(const ProductControllerConfig *c) {
   next.health.common.health_state = MODULE_HEALTH_INITIALIZING;
   m6 = next;
   position_control_reset();
-  mpc_reset();
+  mpc_consumer_reset();
+  reset_status = mpc_reset();
+  if (reset_status != STATUS_OK) {
+    m6.initialized = 0;
+    m6.health.common.health_state = MODULE_HEALTH_FAILED;
+    return reset_status;
+  }
   return STATUS_OK;
 }
 /* Apply a parameter edit while the vehicle is disarmed.  The controller reads
@@ -211,7 +218,8 @@ Status controller_validate_input(const ControllerInput *in, uint32_t *epoch,
                     NAV_VALID_VERTICAL_POSITION |
                     NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY;
     if ((n->core.valid_mask & need) != need ||
-        !finite_array(n->core.position_ned_m, 6))
+        !finite_array(n->core.position_ned_m, 3) ||
+        !finite_array(n->core.velocity_ned_mps, 3))
       return STATUS_NOT_READY;
     if (!r || !header_valid(&r->header, in->evaluation_time_us) ||
         !same_clock(h, &r->header) ||

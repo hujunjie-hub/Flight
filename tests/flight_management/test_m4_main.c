@@ -1171,6 +1171,7 @@ static void test_mission_epoch_required_and_not_stale(void)
 static void test_first_reference_window_expires_to_ground_stop(void)
 {
   Fx fx;
+  GroundStopCertificate certificate;
   uint32_t id;
 
   CHECK(fx_init(&fx));
@@ -1184,7 +1185,19 @@ static void test_first_reference_window_expires_to_ground_stop(void)
   CHECK(fx_step(&fx) == STATUS_OK); /* The first candidate arrives after the absolute deadline. */
   CHECK(fx.out.state_snapshot.arm_state == ARM_STATE_DISARMED);
   CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_NONE);
+  CHECK(fx.out.landed_state.state == LANDED_STATE_LANDED);
   CHECK(fx.out.actuation_permit.permit_flags & PERMIT_FLAG_REVOKED);
+  CHECK(fx.out.actuation_permit.reason_code ==
+        FMS_PERMIT_REVOKE_REASON_FIRST_REFERENCE_GROUND_DISARM);
+  CHECK(fx.out.decision_event.decision_code == DECISION_FORCE_SAFE_ACTION);
+  CHECK(fx.out.decision_event.reason_code ==
+        FMS_DECISION_REASON_FIRST_REFERENCE_GROUND_DISARM);
+  CHECK(fms_build_ground_stop_certificate(&fx.out, fx.now - STEP_US, &certificate) ==
+        STATUS_OK);
+  CHECK(certificate.header.message_type == MSG_GROUND_STOP_CERTIFICATE);
+  CHECK(certificate.lifecycle == ACTUATOR_GROUND_STOP_LIFECYCLE_LANDED);
+  CHECK(certificate.authority_epoch == fx.out.actuation_permit.authority_epoch);
+  CHECK(certificate.directive_epoch == fx.out.actuation_permit.directive_epoch);
   CHECK(fx_step(&fx) == STATUS_OK);
   CHECK(fx.out.actuation_permit.header.valid_until_us == 0u);
   CHECK(fms_policy_stop() == STATUS_OK);
@@ -1454,6 +1467,131 @@ static void test_real_mission_and_vertical_only_fallback(void)
 }
 #endif
 
+/* ------------------------------------------------------------------ */
+/* FMAT-0008: ARM initial control reference race                      */
+/* ------------------------------------------------------------------ */
+
+/* ARM hands control over before the first Control reference exists, so the
+ * first Control capability frames legitimately report a partial DOF mask.
+ * Landing evidence is deliberately left UNKNOWN to mirror the Host MIL, where
+ * the ground stop cannot rescue the ARM frame. */
+static void fx_arm_with_partial_control(Fx *fx)
+{
+  fx->ext.ground_contact_state = GROUND_CONTACT_UNKNOWN;
+  fx_run(fx, 4300000u);
+  CHECK(fx->out.prearm_result.state == PREARM_READY);
+  fx->control.controllable_dof_mask = 0x0u;
+  CHECK(fx_send(fx, PRODUCT_CMD_ARM, fx->next_request_id++,
+                PRODUCT_OPERATION_VALID_PREARM_EPOCH, 0u, 0u, 0u,
+                fx->out.prearm_result.check_epoch, 0.0f) == COMMAND_ACK_COMPLETED);
+  CHECK(fx->out.state_snapshot.arm_state == ARM_STATE_ARMED);
+}
+
+static void test_arm_first_reference_partial_dof_no_terminal(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx_arm_with_partial_control(&fx);
+  /* The ARM frame itself must not latch TERMINAL on a zero DOF mask. */
+  CHECK(fx.out.state_snapshot.failsafe_level != FAILSAFE_TERMINAL);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+  fx_run(&fx, 50000u); /* Still inside the absolute first-reference window. */
+  CHECK(fx.out.state_snapshot.failsafe_level != FAILSAFE_TERMINAL);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+  CHECK(fx.out.state_snapshot.arm_state == ARM_STATE_ARMED);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
+static void test_arm_first_reference_in_window_signs_permit(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx_arm_with_partial_control(&fx);
+  fx_run(&fx, 20000u);
+  /* The first real Control reference lands inside the configured window. */
+  fx.control.controllable_dof_mask = 0x0Fu;
+  fx_control_active(&fx, 71u);
+  CHECK(fx.out.state_snapshot.failsafe_level != FAILSAFE_TERMINAL);
+  CHECK(fx.out.state_snapshot.arm_state == ARM_STATE_ARMED);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
+static void test_arm_first_reference_window_expiry_inhibits_outputs(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx_arm_with_partial_control(&fx);
+  fx_run(&fx, 150000u); /* Past the absolute 100 ms window. */
+  CHECK(fx.out.state_snapshot.failsafe_level >= FAILSAFE_ACTION_REQUIRED);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+  /* A reference that arrives after the deadline may not resurrect a permit. */
+  fx.control.controllable_dof_mask = 0x0Fu;
+  fx_make_guidance(&fx, 72u, GUIDANCE_STATE_READY, GUIDANCE_REFERENCE_TRAJECTORY);
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
+static void test_established_control_link_loss_keeps_terminal(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx_arm(&fx);
+  fx_control_active(&fx, 73u);
+  fx_airborne(&fx);
+  /* Once the link is up a partial DOF mask is a real capability loss, not
+   * initialisation: the window must never soften the established rule. */
+  fx.control.controllable_dof_mask = 0x03u;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.state_snapshot.failsafe_level == FAILSAFE_TERMINAL);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+  fx_run(&fx, 50000u);
+  CHECK(fx.out.state_snapshot.failsafe_level == FAILSAFE_TERMINAL);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
+static void test_expired_reference_cannot_sign_in_window(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx_arm(&fx);
+  fx_make_guidance(&fx, 74u, GUIDANCE_STATE_READY, GUIDANCE_REFERENCE_TRAJECTORY);
+  fx.guidance_ttl_us = 0u; /* Expires at the same instant it is published. */
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+  /* Same reference, valid TTL: the rejection was freshness, not hidden state. */
+  fx.guidance_ttl_us = 100000u;
+  fx_control_active(&fx, 74u);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
+static void test_permit_rebind_keeps_revoked_watermark(void)
+{
+  Fx fx;
+  uint32_t active_epoch, revoked_epoch;
+
+  CHECK(fx_init(&fx));
+  fx_arm(&fx);
+  fx_control_active(&fx, 75u);
+  active_epoch = fx.out.actuation_permit.permit_epoch;
+  CHECK(active_epoch != 0u);
+
+  fx.feas.feasible = 0u;
+  fx.feas.reason_code = 2u;
+  fx.guidance.guidance_state = GUIDANCE_STATE_REJECTED;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.actuation_permit.permit_flags & PERMIT_FLAG_REVOKED);
+  revoked_epoch = fx.out.actuation_permit.permit_epoch;
+  CHECK(revoked_epoch > active_epoch);
+  CHECK(fx_step(&fx) == STATUS_OK); /* Revocation is published exactly once. */
+
+  /* Rebinding with a fresh reference must move forward, never reuse a watermark. */
+  fx_control_active(&fx, 76u);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) != 0u);
+  CHECK(fx.out.actuation_permit.permit_epoch > revoked_epoch);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
 int main(void)
 {
   struct {
@@ -1493,6 +1631,12 @@ int main(void)
     {"lost_contact_clears_landed", test_lost_contact_evidence_clears_landed},
     {"mission_arrival_3d", test_mission_arrival_requires_height_and_vertical_speed},
     {"takeoff_explicit_target", test_takeoff_publishes_explicit_home_relative_target},
+    {"arm_first_reference_partial_dof_no_terminal", test_arm_first_reference_partial_dof_no_terminal},
+    {"arm_first_reference_in_window_signs_permit", test_arm_first_reference_in_window_signs_permit},
+    {"arm_first_reference_window_expiry_inhibits_outputs", test_arm_first_reference_window_expiry_inhibits_outputs},
+    {"established_link_loss_keeps_terminal", test_established_control_link_loss_keeps_terminal},
+    {"expired_reference_cannot_sign_in_window", test_expired_reference_cannot_sign_in_window},
+    {"permit_rebind_keeps_revoked_watermark", test_permit_rebind_keeps_revoked_watermark},
 #ifdef M4_M5_INTEGRATION
     {"real_m4_m5_handshake_takeoff", test_real_m4_m5_ready_permit_active_takeoff},
     {"real_mission_vertical_fallback", test_real_mission_and_vertical_only_fallback},

@@ -80,7 +80,13 @@ Status guidance_build_vertical_land(GuidanceState *s, const GuidanceInput *in, G
         }
         if (!isfinite(a)) return STATUS_NUMERIC_ERROR;
         goal = d+1.0f;
-        if (guidance_home_ok(in)) goal = fmaxf(d, fminf(goal, in->directive->payload.home.position_ned_m[2]));
+        if (guidance_home_ok(in)) {
+            const float plane = in->directive->payload.home.position_ned_m[2];
+            const float floor_m = in->directive->operation_code == PRODUCT_OP_LAND
+                                      ? plane + GUIDANCE_LANDING_PROBE_M
+                                      : plane;
+            goal = fmaxf(d, fminf(goal, floor_m));
+        }
         if (in->landed_state && guidance_header_ok(&in->landed_state->header, &in->navigation->header,
             MSG_LANDED_STATE_SNAPSHOT, in->evaluation_time_us) &&
             in->landed_state->state == LANDED_STATE_LANDED) goal = d;

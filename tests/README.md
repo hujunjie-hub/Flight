@@ -21,6 +21,17 @@ UDP 桥的端到端转发（不需要硬件）。接线与边界见 `doc/simulat
 
 运行时和线协议校验开始时将本次结果标为 `INCOMPLETE`。运行时检查完成后记录测试日志 SHA256，线协议校验只接受与成功记录匹配的日志。生成发布清单时执行 `python tests/runtime/verify_firmware.py`，它以 GNU Arm Release 构建，并核对源码、配置、产物和已有测试结果的对应关系。
 
+## M6/M7 Host 回归
+
+从工程根运行真实 M6 MPC/输入时序测试和 M7 执行器事务测试：
+
+```bash
+bash tests/control/run_host_tests.sh
+bash tests/actuation/run_host_tests.sh
+```
+
+两项测试分别编译实际控制器/OSQP 工作区和实际 actuator output guard。GitHub Actions 在 `test/fmat-0012-m6-controller` 推送时执行 M4/M5、M6/M7 Host 回归及 M6/M7 ASan/UBSan；Host 通过不代表目标板、HIL 或飞行验收通过。
+
 ## 板上 utest
 
 当前配置启用 `FLIGHT_TARGET_UTEST`，由 RT-Thread 自带的 utest 注册

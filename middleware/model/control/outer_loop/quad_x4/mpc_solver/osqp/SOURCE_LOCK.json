@@ -5,5 +5,13 @@
   "commit": "236713ce9a56c182ac3230d52108f952afce1523",
   "archive_sha256": "dd6a1c2e7e921485697d5e7cdeeb043c712526c395b3700601f51d472a7d8e48",
   "license_sha256": "ae5e69b1fea4c316b80e4bc2cb49ac82c0e9b34785415e128e00c975bd10f687",
-  "source_scope": "Generated embedded runtime from Python osqp==1.0.0, upstream archive retained in build/dependency_cache"
+  "source_scope": "Generated embedded runtime from Python osqp==1.0.0, upstream archive retained in build/dependency_cache",
+  "transitive_sources": {
+    "qdldl": {
+      "url": "https://github.com/osqp/qdldl",
+      "tag": "v0.1.8",
+      "commit": "138fdac58b9cd1c4137ff1b99152c8108a6cff5b",
+      "generated_header_template": "configure/qdldl_version.h.in"
+    }
+  }
 }

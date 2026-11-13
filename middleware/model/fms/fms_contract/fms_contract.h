@@ -19,6 +19,12 @@ enum {
   ARM_STATE_DISARMING = 3
 };
 
+/* Stable reasons used to bind an M4 ground-stop certificate to the exact
+ * permit revocation that caused the safe ground disarm. */
+#define FMS_PERMIT_REVOKE_REASON_FIRST_REFERENCE_GROUND_DISARM 11u
+#define FMS_PERMIT_REVOKE_REASON_COMMAND_DISARM 20u
+#define FMS_DECISION_REASON_FIRST_REFERENCE_GROUND_DISARM 6u
+
 /* FlightMode (06 §7.1; NONE only while disarmed). */
 enum {
   FLIGHT_MODE_NONE = 0,

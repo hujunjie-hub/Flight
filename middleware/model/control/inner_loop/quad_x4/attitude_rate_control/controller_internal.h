@@ -2,7 +2,12 @@
 #define CONTROLLER_INTERNAL_H
 #include "contract_checks/algorithm_checks.h"
 #include "control_backend.h"
+#include "mpc_diagnostics.h"
 EXTERN_C_BEGIN
+/* MpcRunStats and its getter are declared in mpc_diagnostics.h: the Host SIL
+ * adapter that serializes the counters must include the producer's definition,
+ * not a copy. */
+void mpc_note_worker(uint64_t now_us, int ready);
 #define CONTROL_GRAVITY_MPS2 9.80665f
 #define MPC_VARIABLE_COUNT 15
 #define MPC_CONSTRAINT_COUNT 190
@@ -94,7 +99,7 @@ Status position_control_track(const ControllerInput *input, uint32_t reference_e
                               float dt, PositionControlOutput *out);
 Status position_control_altitude(const ControllerInput *input, float dt,
                                  float *acceleration_down);
-void mpc_reset(void);
+Status mpc_reset(void);
 int mpc_read(MpcSnapshot *out);
 void mpc_seed(const float a[3], uint32_t sequence);
 Status mpc_solve(const ControllerInput *in,

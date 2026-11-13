@@ -6,6 +6,10 @@
 EXTERN_C_BEGIN
 uint32_t fms_selected_policy_id(void);
 void fms_default_config(ProductFmsConfig *config);
+/* Convert an eligible, freshly published ground-disarm decision and revoked
+ * permit into the M7-specific bounded ground-stop certificate. */
+Status fms_build_ground_stop_certificate(const FmsOutputView *output, uint64_t now_us,
+                                         GroundStopCertificate *certificate);
 
 /* FMS owner only, after the ordinary update. */
 Status fms_authorize_origin_reset(const ContractHeader *candidate, uint32_t next_origin_id,
