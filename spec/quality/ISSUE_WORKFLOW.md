@@ -41,6 +41,7 @@
 | IN_PROGRESS | 已明确根因假设并开始修改 | FIXED_WAITING_RETEST / BLOCKED | Open |
 | FIXED_WAITING_RETEST | 修复 commit 已生成，回归测试已增加，但尚未复测 | RETESTING / BLOCKED | Open |
 | RETESTING | 在修复 commit 上执行原失败测试和回归集 | VERIFIED / IN_PROGRESS / REOPENED / BLOCKED | Open |
+| WAITING_INDEPENDENT_REVIEW | 修复与复测证据齐备，数学/安全证明已提交独立审查，但尚无独立审查签字 | VERIFIED（仅 APPROVED）/ IN_PROGRESS（需修正）/ NEEDS_INFO / BLOCKED | Open |
 | VERIFIED | 独立复测证据满足关闭条件，审查人确认 | CLOSED | Open |
 | CLOSED | 所有关闭条件满足，Issue 关闭 | REOPENED（如复发） | Closed |
 | BLOCKED | 受外部条件/决策/硬件/工具链阻塞，原因和解除条件明确 | 原状态恢复或 TRIAGED | Open |
@@ -49,6 +50,7 @@
 注意：
 - `FIXED_WAITING_RETEST` 只代表代码修改完成，不代表问题已解决。
 - `VERIFIED` 必须有复测 commit 和实际测试证据，不能由修复者仅凭代码审查自评。
+- `WAITING_INDEPENDENT_REVIEW` 表示作者侧实现/测试证据已准备好、独立审查仍未完成；它不是 APPROVED/VERIFIED，也不得据此关闭 Issue 或推进受阻里程碑。
 - `BLOCKED` 必须写 blocker、责任方、解除条件和下一次检查点；不得作为长期隐藏失败的状态。
 - `NEEDS_INFO` 不得被误写为 NOT_RUN 或 PASS。
 - GitHub closed 只允许在 CLOSED 状态。
