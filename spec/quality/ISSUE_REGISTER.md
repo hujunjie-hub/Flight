@@ -77,6 +77,7 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-52 | S1 | 静态栈分析会放过可达帧冲突或无界动态帧，递归会崩溃 | `36d7b7c` 对不完整帧证据返回 UNKNOWN | T26、T27、T29，8 项自测 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-53 | S1 | 固件验证链接前只核对包锁声明，安装源码可能偏离锁定 commit | `36d7b7c` 在链接前核对实际 HEAD 和跟踪源文件 | T14、T18、T22，HAL 头文件负向对照 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-54 | S2 | GNU ld 报告 32 位枚举对象与输出 enum-size 属性不一致 | 链接日志已保留，待 ABI 负责人核对边界和工具链库属性 | T18 链接 exit 0，T17 143 类型 / 981 偏移 / 0 mismatch | OPEN |
+| FLIGHT-LOCAL-55 | S1 | Ubuntu CI 的 spec/ABI 检查硬编码 Windows 编译器路径 | 使用平台工具链查找，CI 安装 ARM/Newlib 和 MinGW | WSL、Windows 和 Host validation 复验 | FIXED_WAITING_RETEST |
 
 历史 draft 01–20 保留在 `build/validation/issue_drafts/`；本表按根因去重，不删除
 任何失败记录。
@@ -85,4 +86,6 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 详细记录：`spec/quality/R29_ISSUE_DETAILS.md`；R28/R27/R25/R24 记录保留为历史。
 
 FLIGHT-LOCAL-51..54 的复现与复测见 `M5-06-TAKEOVER-20261113` 归档内 `build/validation/regenerated/baseline-reproduction`、`import-reproduction` 和逐项台账。
+
+FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o` 和 `Flight.elf` 的 `Tag_ABI_enum_size` 为 `small`，项目 `board.o` 为 `int`。ABI 负责人待确认跨对象接口影响，现有 `-fno-short-enums` 和 ABI 锁继续生效。
 

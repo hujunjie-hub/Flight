@@ -29,6 +29,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -622,25 +623,31 @@ def write_json(path: Path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def probe_tools(directory, prefix, option):
+    suffix = ".exe" if os.name == "nt" else ""
+    tools = []
+    for executable in ("gcc", "g++", "objcopy"):
+        name = prefix + executable + suffix
+        path = Path(directory) / name if directory else shutil.which(name)
+        if not path or not Path(path).is_file():
+            raise AbiError(f"toolchain not found: {path or name} (use {option})")
+        tools.append(Path(path).absolute())
+    return tools
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--emit-lock", action="store_true",
                         help="regenerate middleware/contracts/product_contract/abi_lock.h")
-    parser.add_argument("--arm-bin", default=os.environ.get("FLIGHT_ARM_BIN", str(DEFAULT_ARM_BIN)))
-    parser.add_argument("--host-bin", default=os.environ.get("FLIGHT_HOST_BIN", str(DEFAULT_HOST_BIN)))
+    parser.add_argument("--arm-bin", default=os.environ.get("FLIGHT_ARM_BIN"))
+    parser.add_argument("--host-bin", default=os.environ.get("FLIGHT_HOST_BIN"))
     args = parser.parse_args()
 
-    arm_bin = Path(args.arm_bin)
-    host_bin = Path(args.host_bin)
-    arm_cc = arm_bin / "arm-none-eabi-gcc.exe"
-    arm_cxx = arm_bin / "arm-none-eabi-g++.exe"
-    arm_objcopy = arm_bin / "arm-none-eabi-objcopy.exe"
-    host_cc = host_bin / "gcc.exe"
-    host_cxx = host_bin / "g++.exe"
-    host_objcopy = host_bin / "objcopy.exe"
-    for exe in (arm_cc, arm_cxx, arm_objcopy, host_cc, host_cxx, host_objcopy):
-        if not exe.is_file():
-            raise AbiError("toolchain not found: %s (use --arm-bin/--host-bin)" % exe)
+    arm_bin = args.arm_bin or (DEFAULT_ARM_BIN if DEFAULT_ARM_BIN.is_dir() else None)
+    host_bin = args.host_bin or (DEFAULT_HOST_BIN if DEFAULT_HOST_BIN.is_dir() else None)
+    host_prefix = "" if os.name == "nt" else "x86_64-w64-mingw32-"
+    arm_cc, arm_cxx, arm_objcopy = probe_tools(arm_bin, "arm-none-eabi-", "--arm-bin")
+    host_cc, host_cxx, host_objcopy = probe_tools(host_bin, host_prefix, "--host-bin")
 
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     types, aliases, order = parse_headers()

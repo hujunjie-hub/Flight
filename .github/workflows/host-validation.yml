@@ -40,6 +40,11 @@ jobs:
       - name: Check shell script line endings
         run: python tools/check_line_endings.py
 
+      - name: Install ARM embedded toolchain for audit controls
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi
+
       - name: Test python -O audit guard
         run: python tests/guidance/test_audit_optimized.py
 
@@ -70,7 +75,7 @@ jobs:
       - name: Install ARM embedded toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-dev
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-dev
 
       - name: Compile and inspect Cortex-M7 objects
         run: python tests/algorithms/run_tests.py --target arm
@@ -160,12 +165,6 @@ jobs:
   src-spec-audit:
     name: Spec audit
     runs-on: ubuntu-latest
-    # Transitional: spec/validation/dialect_report.json still pins the CRLF
-    # hash of FCU.xml, so round 3 fails on an LF checkout until the owner
-    # approves the re-baseline in spec/validation/eol_hash_rebaseline_analysis.md.
-    # Round 1 (document, registry, ABI compile) is independent and must not be
-    # skipped because of that. The job is blocking: a stale evidence baseline
-    # must make CI red, never disappear behind an overall SUCCESS.
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -178,17 +177,16 @@ jobs:
       - name: Install ARM embedded toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi
 
-      - name: Run spec audit (round 1)
-        run: python spec/tools/audit_spec.py --round 1 --label ci
+      - name: Run spec audit (round 3)
+        run: python spec/tools/audit_spec.py --round 3 --label ci
 
   src-abi-report:
     name: Production ABI report
     runs-on: ubuntu-latest
     # Separate job so a spec-audit failure can never skip the ABI evidence.
     # Blocking on purpose: the ABI evidence must be visible in CI status.
-    # The CRLF baseline is still awaiting owner re-baseline approval.
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -198,10 +196,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install ARM embedded toolchain
+      - name: Install ARM and MinGW toolchains
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi g++-mingw-w64-x86-64-posix
 
       - name: Run production ABI report
         run: python tests/abi/abi_report.py

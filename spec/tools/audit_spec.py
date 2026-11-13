@@ -10,6 +10,7 @@ import json
 import math
 from pathlib import Path
 import re
+import shutil
 import struct
 import sys
 sys.dont_write_bytecode = True
@@ -116,16 +117,20 @@ def compile_abi(cc):
                 keys.append((name, 'offset:' + m[1]))
                 expressions.append(f'offsetof({name}, {m[1]})')
     fixture = header + '\nconst uint32_t audit_values[] = {\n' + ',\n'.join(expressions) + '\n};\n'
-    adjacent = Path(cc).parent
-    cxx = adjacent / 'arm-none-eabi-g++.exe'
-    objcopy = adjacent / 'arm-none-eabi-objcopy.exe'
+    resolved = shutil.which(cc)
+    require(resolved, f'ARM compiler not found: {cc}')
+    cc = Path(resolved).absolute()
+    suffix = cc.suffix if cc.suffix.lower() == '.exe' else ''
+    cxx = cc.with_name('arm-none-eabi-g++' + suffix)
+    objcopy = cc.with_name('arm-none-eabi-objcopy' + suffix)
+    require(cxx.is_file() and objcopy.is_file(), f'ARM companion tools missing beside {cc}')
     flags = ['-mcpu=cortex-m7', '-mthumb', '-mfpu=fpv5-d16', '-mfloat-abi=hard', '-Wall', '-Wextra', '-Werror', '-fno-short-enums']
     with tempfile.TemporaryDirectory(prefix='flight-spec-abi-') as tmp:
         folder = Path(tmp)
         src = folder / 'contracts.c'
         src.write_text(fixture, encoding='utf-8')
         commands = []
-        for compiler, standard, suffix, extras in [(cc, 'c11', 'c', []), (str(cxx), 'c++14', 'cpp', ['-fno-exceptions', '-fno-rtti'])]:
+        for compiler, standard, suffix, extras in [(cc, 'c11', 'c', []), (cxx, 'c++14', 'cpp', ['-fno-exceptions', '-fno-rtti'])]:
             obj = folder / f'{suffix}.o'
             cmd = [str(compiler), *flags, f'-std={standard}', *extras, '-x', 'c++' if suffix == 'cpp' else 'c', '-c', str(src), '-o', str(obj)]
             result = subprocess.run(cmd, capture_output=True, text=True)
@@ -264,7 +269,8 @@ def write_outside_baseline(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--round', type=int, choices=(1,2,3), required=True)
-    parser.add_argument('--cc', default=r'D:\STM32CubeCLT\GNU-tools-for-STM32\bin\arm-none-eabi-gcc.exe')
+    cubeclt = Path(r'D:\STM32CubeCLT\GNU-tools-for-STM32\bin\arm-none-eabi-gcc.exe')
+    parser.add_argument('--cc', default=str(cubeclt) if cubeclt.is_file() else 'arm-none-eabi-gcc')
     parser.add_argument('--label', default=None, help='artifact label; defaults to roundN (keeps historical reports)')
     parser.add_argument('--outside-baseline', type=Path, default=None,
                         help='assert a frozen OUTSIDE_SPEC_INTEGRITY report; omitted means NOT_ENFORCED')
