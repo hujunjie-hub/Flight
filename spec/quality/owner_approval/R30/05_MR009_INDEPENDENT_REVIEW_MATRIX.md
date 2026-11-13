@@ -72,7 +72,7 @@ magnitude thresholds remain unchanged.
   reference tests, floating-environment tests and the real C time-conversion
   path.
 
-**Important limitations (must be reviewed explicitly):** the degree-5/4/3
+**Accepted explicit limitation:** the degree-5/4/3
 Horner branch tests call the production helper directly. They do not claim that
 all three Horner rejection sites have been reached through a complete
 m5_trajectory_safety_validate() input.
@@ -106,7 +106,7 @@ are tested separately. This limitation remains visible and must not be hidden.
 | Intermediate overflow | Strict `P_k/A_k < T_RN=2^128-2^103` before capping a rounded upper bound at FLT_MAX | READY | PASS |
 | Coefficient scaling overflow | Full-validator coefficient/velocity-scaling/acceleration-scaling fail-fast traces; NUMERIC_FAILURE / NUMERIC / passed=0 | READY | PASS |
 | Time conversion | S06-099: 60,002 offsets; physical-time max ratio 4.897714e-08 and production h*offset/step max ratio 0.6601743 of gamma2; S06-108/109/113: 96/96/76 checks; R31 time shift uses cf', rounded vf', rounded af'; S06-107 oracle updated | READY | PASS |
-| FP contraction | R30.3 ARM audit: GCC 14.2.1; consumer/validator objects `fused_operations=0`; model_check MATCH; 9 mutation self-tests PASS. R31 CI re-runs this gate on the corrected source | READY | PASS |
+| FP contraction | R30.3 ARM audit: GCC 14.2.1; consumer/validator objects `fused_operations=0`; consumer/validator source-token MATCH; 18 mutation self-tests PASS; both objects 0 fused operations | READY | PASS |
 | Rounding mode / FTZ / DAZ | Host negative tests cover FE_DOWNWARD/UPWARD/TOWARDZERO and MXCSR FTZ/DAZ; ARM runtime gate reads FPSCR.RMode/FZ/DN; H723 runtime remains NOT_RUN | HOST_TESTED / ARM_RUNTIME_NOT_RUN | PARTIAL — target gate remains open |
 | M6 interval domain | M5-06 requires 20 ms intervals; `s_eval_max≈0.020000002`; M6 locator rejects offsets beyond the preview horizon; 40 ms route previews are outside M5-06 validation scope | READY | PASS — 20 ms claim only |
 | Full-validator Horner reachability | Direct production-helper branches are tested; no full-validator reachability claim; full-validator coefficient/scaling status tests and legal companion pass | ACCEPTED_LIMITATION | ACCEPTED — no reachability claim |
