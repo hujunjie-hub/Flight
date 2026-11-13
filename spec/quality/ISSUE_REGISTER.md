@@ -22,13 +22,13 @@
 
 状态必须按 [Issue 工作流](ISSUE_WORKFLOW.md) 更新；关闭前必须完成 [Issue 关闭清单](ISSUE_CLOSURE_CHECKLIST.md)。
 
-GitHub 发布前，本地状态最多到 FIXED_WAITING_RETEST；未经独立复验不得标记 VERIFIED/CLOSED。BLOCKER_BOARD.md 只是本文件的派生视图，不得维护独立状态。
+GitHub 发布前，本地状态通常最多到 FIXED_WAITING_RETEST；未经独立复验不得标记 VERIFIED/CLOSED。仅当项目所有者对特定问题明确豁免外部独立审查并记录替代审查方案时，才可使用单项专用的内部复核关闭状态；当前仅 FLIGHT-LOCAL-04/MR-009 适用，状态为 CLOSED / TRIPLE_SELF_REVIEWED_WITH_SCOPE_LIMITATIONS，不表示独立第三方认证。BLOCKER_BOARD.md 只是本文件的派生视图，不得维护独立状态。
 
 ## 本地正式临时登记（GitHub 发布待授权）
 
 Agent 无 GitHub 写权限；以下条目是本轮唯一本地登记入口，保留 R1–R16 draft 的
-原编号与证据，`GITHUB_PUBLICATION = PENDING`。未完成独立复验前不得进入
-VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_BOARD.md)。
+原编号与证据，`GITHUB_PUBLICATION = PENDING`。除上文明确登记的 owner-authorized exception 外，未完成独立复验前不得进入
+VERIFIED/CLOSED；FLIGHT-LOCAL-04/MR-009 按三轮内部复核关闭，其他问题仍遵循独立复验规则。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_BOARD.md)。
 
 | ID | 严重度 | 根因 | 修复/基线 | 验证 | 状态 |
 |---|---|---|---|---|---|
