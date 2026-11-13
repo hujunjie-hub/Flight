@@ -200,7 +200,7 @@ static void fms_permit_sign(FmsEngine *e, const FmsInputs *in, uint8_t scope,
 
 static void fms_permit_ground_disarm(FmsEngine *e)
 {
-  fms_permit_revoke(e, 11u);
+  fms_permit_revoke(e, FMS_PERMIT_REVOKE_REASON_FIRST_REFERENCE_GROUND_DISARM);
   e->authority.owner = AUTHORITY_NONE;
   e->authority.latched = 0u;
   e->authority.source_id = 0u;
@@ -215,7 +215,8 @@ static void fms_permit_ground_disarm(FmsEngine *e)
     e->mission.result_code = MISSION_RESULT_ABORTED;
     e->mission.token = 0u;
   }
-  fms_record_decision(e, DECISION_FORCE_SAFE_ACTION, 6u, 0u);
+  fms_record_decision(e, DECISION_FORCE_SAFE_ACTION,
+                      FMS_DECISION_REASON_FIRST_REFERENCE_GROUND_DISARM, 0u);
 }
 
 void fms_permit_tick(FmsEngine *e, const FmsInputs *in)

@@ -607,7 +607,7 @@ static void fms_handle_request(FmsEngine *e, const FmsInputs *in,
       break;
     }
     e->flight.arm_state = ARM_STATE_DISARMING;
-    fms_permit_revoke(e, 20u /* CANCELLED */);
+    fms_permit_revoke(e, FMS_PERMIT_REVOKE_REASON_COMMAND_DISARM);
     e->authority.owner = AUTHORITY_NONE;
     e->authority.latched = 0u;
     e->authority.source_id = 0u;
