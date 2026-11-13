@@ -350,7 +350,40 @@ typedef struct {
 
 #define ACTUATOR_RECEIPT_COMMITTED    1u
 #define ACTUATOR_RECEIPT_REJECTED     2u
+#define ACTUATOR_RECEIPT_COMMITTED    1u
+#define ACTUATOR_RECEIPT_REJECTED     2u
 #define ACTUATOR_RECEIPT_DRIVER_FAULT 3u
+/* Ground stop reached exactly zero thrust on all four channels. */
+#define ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED 4u
+
+/* Ground stop: the only command that ramps thrust to zero and then DISARMS.
+ * It is deliberately not an ActuatorDemand. A ground stop has to work after the
+ * permit is revoked, so it carries no control sequence and is authorised by its
+ * own certificate instead of by a live permit. */
+#define ACTUATOR_GROUND_STOP_CODE_ZERO              0u
+/* Deliberately outside the LandedState value range: a certificate built from a
+ * LandedState constant must not accidentally satisfy the lifecycle gate. */
+#define ACTUATOR_GROUND_STOP_LIFECYCLE_LANDED       0x1001u
+#define ACTUATOR_GROUND_STOP_LIFECYCLE_DISARMING    0x1002u
+/* Hard limit on how fast the ramp may reduce thrust, in newtons per second. */
+#define ACTUATOR_GROUND_STOP_MAX_RAMP_NPS           100.0f
+/* Worst case from acceptance to confirmed zero thrust: the ramp time at the
+ * allowed rate, one 2.5 ms frame boundary, and the driver apply latency. */
+#define ACTUATOR_GROUND_STOP_MAX_APPLY_US           105500u
+#define ACTUATOR_GROUND_STOP_FRAME_US               2500u
+#define ACTUATOR_GROUND_STOP_APPLY_LATENCY_US       3000u
+/* Set in a receipt's limit_flags when the ramp missed the apply-time budget. */
+#define ACTUATOR_GROUND_STOP_OVERRUN_FLAG           0x80000000u
+
+typedef struct {
+  ContractHeader header;
+  uint16_t stop_code;   /* ACTUATOR_GROUND_STOP_CODE_ZERO only */
+  uint16_t lifecycle;   /* LANDED or DISARMING only */
+  float ramp_nps;       /* > 0 and <= ACTUATOR_GROUND_STOP_MAX_RAMP_NPS */
+  uint32_t authority_epoch;
+  uint32_t directive_epoch;
+  uint64_t certificate_expires_at_us;
+} GroundStopCertificate;
 
 typedef struct {
   ContractHeader header;

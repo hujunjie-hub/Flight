@@ -21,6 +21,16 @@ UDP 桥的端到端转发（不需要硬件）。接线与边界见 `doc/simulat
 
 运行时和线协议校验开始时将本次结果标为 `INCOMPLETE`。运行时检查完成后记录测试日志 SHA256，线协议校验只接受与成功记录匹配的日志。生成发布清单时执行 `python tests/runtime/verify_firmware.py`，它以 GNU Arm Release 构建，并核对源码、配置、产物和已有测试结果的对应关系。
 
+## M7 执行器 Host 回归
+
+从工程根运行实际 M7 output guard 测试：
+
+```bash
+bash tests/actuation/run_host_tests.sh
+```
+
+该测试直接编译 `middleware/actuator/output_guard/actuator_guard.c`，覆盖许可撤销、帧边界提交、地面停止证书、限速下降、零推力回执和 DISARMED 锁存。Host/Sanitizer 通过不代表 H723 实机、DShot 物理应用时刻或 FMS→M7 集成通过。
+
 ## 板上 utest
 
 当前配置启用 `FLIGHT_TARGET_UTEST`，由 RT-Thread 自带的 utest 注册

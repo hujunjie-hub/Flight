@@ -79,11 +79,22 @@ $report = [ordered]@{
         'M7-08 permits from another boot or time epoch are refused'
         'M7-09 an expired permit stops being bound'
         'M7-10 a demand older than 5 ms enters SAFE_ACTION'
+        'M7-11 only a well-formed ground stop certificate is accepted'
+        'M7-12 a ground stop is accepted after the permit is revoked'
+        'M7-13 the thrust ramp never exceeds 100 N/s and never jumps'
+        'M7-14 the completing receipt is ZERO_TARGET_APPLIED with zero thrust'
+        'M7-15 zero thrust is confirmed within 105.5 ms of acceptance'
+        'M7-16 DISARMED follows only the zero receipt and output stays zero'
+        'M7-17 repeated certificates are idempotent and cannot restart the ramp'
     )
     permit_lifecycle = if ($result -eq 'PASS') { 'PASS' } else { 'FAIL' }
     frame_apply_500us = if ($result -eq 'PASS') { 'PASS' } else { 'FAIL' }
-    ground_stop_transaction = 'NOT_RUN'
-    ground_stop_evidence = 'NOT_IMPLEMENTED_IN_FIRMWARE'
+    ground_stop_transaction = if ($result -eq 'PASS') { 'PASS' } else { 'FAIL' }
+    ground_stop_evidence = 'FIRMWARE_GROUND_STOP_CERTIFICATE'
+    ground_stop_max_apply_us = 105500
+    ground_stop_max_ramp_nps = 100.0
+    ground_stop_log = (Select-String -Path $log -Pattern 'ground stop:' |
+        Select-Object -Last 1).Line.Trim()
     log = $log
 }
 $report | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 (Join-Path $OutDir 'actuation_host_summary.json')

@@ -15,6 +15,15 @@ static struct {
   uint8_t initialized, has_demand, has_commit, has_frame;
 } a;
 static ActuatorDriver io;
+/* Ground stop transaction. `latched` survives until actuator_init(): once the
+ * ramp has confirmed zero thrust the output stays at zero and DISARMED, so a
+ * later demand cannot resurrect it without a fresh initialisation. */
+static struct {
+  uint8_t active, latched, overrun;
+  uint32_t stop_code;
+  float ramp_nps;
+  uint64_t start_us, predicted_us;
+} gs;
 static void lock(void) { if (io.lock) io.lock(); }
 static void unlock(void) { if (io.unlock) io.unlock(); }
 static void inhibit(void) { if (io.inhibit) io.inhibit(); }
@@ -58,7 +67,7 @@ Status actuator_validate(const ProductProfile *p) {
 Status actuator_init(const ProductActuatorConfig *c) {
   unsigned m,j,seen=0;
   if (!c || !c->profile_hash || !c->config_version) return STATUS_INVALID_ARGUMENT;
-  inhibit(); memset(&a,0,sizeof(a));
+  inhibit(); memset(&a,0,sizeof(a)); memset(&gs,0,sizeof(gs));
   if (clock_read(&a.clock)) return STATUS_NOT_READY;
   /* Registry: H723 supports only BENCH_INHIBIT. SIM_CONTROLLED_STOP is built
    * solely into tests, never selectable by a runtime command on the board. */
@@ -91,7 +100,14 @@ Status actuator_init(const ProductActuatorConfig *c) {
   a.config=*c; a.initialized=1; a.state=ACTUATOR_GUARD_DISARMED;
   a.health.health_state=MODULE_HEALTH_DEGRADED; return STATUS_OK;
 }
-Status actuator_stop(void) { inhibit(); a.initialized=0; a.has_demand=0; a.state=ACTUATOR_GUARD_DISARMED; return STATUS_OK; }
+Status actuator_stop(void) {
+  inhibit();
+  lock();
+  a.initialized=0; a.has_demand=0; a.state=ACTUATOR_GUARD_DISARMED;
+  memset(&gs,0,sizeof(gs));
+  unlock();
+  return STATUS_OK;
+}
 Status actuator_update_permit(const ActuationPermit *p, uint64_t now) {
   ClockInstant clock;
   if(!a.initialized) return STATUS_NOT_READY;
@@ -99,6 +115,10 @@ Status actuator_update_permit(const ActuationPermit *p, uint64_t now) {
      p->header.source_id!=SOURCE_M4 || p->header.boot_id!=a.clock.boot_id ||
      p->header.time_epoch!=a.clock.time_epoch || !p->permit_epoch) return STATUS_NOT_PERMITTED;
   lock();
+  if(!a.initialized) { unlock(); return STATUS_NOT_READY; }
+  /* A ground-stop transaction owns the output until zero is committed and
+   * latched. A newer permit must not be able to replace that terminal action. */
+  if(gs.active || gs.latched) { unlock(); return STATUS_NOT_PERMITTED; }
   if(a.watermark && p->permit_epoch!=a.watermark && !newer(p->permit_epoch,a.watermark)) {
     unlock(); return STATUS_STALE_DATA;
   }
@@ -132,6 +152,10 @@ static int demand_valid(const ActuatorDemand *d,const ActuationPermit *p,uint64_
 Status actuator_apply(const ActuatorDemand *d,const ActuationPermit *p,ActuatorStatus *s) {
   ClockInstant c; ActuationPermit current; Status r;
   if(!s || !d || !p) return STATUS_INVALID_ARGUMENT;
+  /* The ramp owns every frame once accepted; do not acknowledge new demands
+   * while it is in progress, and keep the completed zero latch terminal. */
+  if(gs.active) return STATUS_NOT_PERMITTED;
+  if(gs.latched) { a.has_demand=0; inhibit(); return STATUS_NOT_PERMITTED; }
   if(!a.initialized || a.state==ACTUATOR_GUARD_FAULT_LATCHED || clock_read(&c)) return STATUS_NOT_READY;
   r=actuator_update_permit(p,c.monotonic_us); if(r) return r;
   lock(); current=a.permit; unlock();
@@ -141,14 +165,155 @@ Status actuator_apply(const ActuatorDemand *d,const ActuationPermit *p,ActuatorS
   /* Publishing a demand is deliberately not a commit receipt. */
   return actuator_poll(c.monotonic_us,s);
 }
+/* Map one motor's thrust to its frame code through the configured curve. Shared
+ * by the demand path and the ground-stop ramp so there is exactly one mapping. */
+static uint16_t thrust_to_code(unsigned m,float thrust_n) {
+  const ProductActuatorConfigPayload *c=&a.config.payload;
+  unsigned j;
+  for(j=1;j<c->thrust_curve_count[m]-1u && thrust_n>c->thrust_curve_n[m][j];++j) {}
+  return (uint16_t)lroundf(c->dshot_curve_code[m][j-1]+(thrust_n-c->thrust_curve_n[m][j-1])/
+    (c->thrust_curve_n[m][j]-c->thrust_curve_n[m][j-1])*
+    (c->dshot_curve_code[m][j]-c->dshot_curve_code[m][j-1]));
+}
+
+/* One frame of the ground-stop ramp. Never jumps: every channel moves at most
+ * ramp_nps*elapsed toward zero, so the commanded thrust is monotone and the last
+ * frame is exactly zero. DISARMED is entered only after that frame commits. */
+static Status ground_stop_frame(uint64_t now) {
+  uint16_t commands[4]={0,0,0,0}; float applied[4]; uint64_t elapsed,actual; Status r;
+  unsigned m; int zero=1;
+  elapsed = (a.has_commit && now>=a.last_commit) ? now-a.last_commit : 0u;
+  {
+    float step = gs.ramp_nps*(float)elapsed*1e-6f;
+    for(m=0;m<4;++m) {
+      float prev = a.has_commit ? a.last_thrust[m] : 0.0f;
+      float next = prev-step;
+      if(next<0.0f) next=0.0f;
+      if(next>prev) next=prev;
+      applied[m]=next; if(next>0.0f) zero=0;
+      commands[a.config.payload.motor_to_timer_channel[m]-1]=thrust_to_code(m,next);
+    }
+  }
+  if(now < gs.start_us) return STATUS_STALE_DATA;
+  if(now-gs.start_us>ACTUATOR_GROUND_STOP_MAX_APPLY_US) gs.overrun=1;
+  lock();
+  actual=now; r=io.commit ? io.commit(commands,&actual) : STATUS_NOT_READY;
+  unlock();
+  /* The driver timestamp is the apply evidence, not the submission time. A
+   * late final zero frame is still a completed stop, but it must carry OVERRUN. */
+  if(actual < now) { gs.overrun=1; r=STATUS_STALE_DATA; }
+  else if(actual-gs.start_us>ACTUATOR_GROUND_STOP_MAX_APPLY_US) gs.overrun=1;
+  memset(&a.receipt,0,sizeof(a.receipt)); header(&a.receipt.header,MSG_ACTUATOR_COMMIT_RECEIPT,now);
+  a.receipt.commit_time_us=now; a.receipt.estimated_apply_time_us=actual;
+  a.receipt.receipt_expires_at_us=now+5000u;
+  a.receipt.output_policy_id=(uint16_t)a.config.payload.output_policy_id;
+  a.receipt.limit_flags=gs.overrun?ACTUATOR_GROUND_STOP_OVERRUN_FLAG:0u;
+  a.receipt.committed_demand.valid_mask=15u;
+  memcpy(a.receipt.committed_demand.motor_thrust_n,applied,sizeof(applied));
+  if(r) { a.receipt.result_code=ACTUATOR_RECEIPT_DRIVER_FAULT; return safe(r,ACTUATOR_GUARD_FAULT_LATCHED); }
+  memcpy(a.last_thrust,applied,sizeof(applied)); a.last_commit=now; a.has_commit=1;
+  if(zero) {
+    /* Permit publication may run concurrently with the actuator owner. Publish
+     * the terminal latch under the same lock used by permit updates. */
+    lock();
+    gs.active=0; gs.latched=1;
+    a.has_demand=0; a.state=ACTUATOR_GUARD_DISARMED;
+    a.health.health_state=MODULE_HEALTH_DEGRADED;
+    unlock();
+    a.receipt.result_code=ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED;
+    inhibit();
+    return STATUS_OK;
+  }
+  a.receipt.result_code=ACTUATOR_RECEIPT_COMMITTED;
+  a.state=ACTUATOR_GUARD_SAFE_ACTION; a.health.health_state=MODULE_HEALTH_DEGRADED;
+  return STATUS_OK;
+}
+
+Status actuator_guard_ground_stop(const GroundStopCertificate *c,uint64_t now) {
+  ClockInstant clock; ActuationPermit current;
+  float max_thrust=0.0f,worst_us; unsigned m;
+  if(!c) return STATUS_INVALID_ARGUMENT;
+  if(!a.initialized) return STATUS_NOT_READY;
+  if(!clock_at_or_after(now,&clock)) return STATUS_STALE_DATA;
+  if(!header_valid(&c->header,now) || c->header.message_type!=MSG_GROUND_STOP_CERTIFICATE ||
+     c->header.source_id!=SOURCE_M4 || c->header.boot_id!=a.clock.boot_id ||
+     c->header.time_epoch!=a.clock.time_epoch) return STATUS_NOT_PERMITTED;
+  /* The certificate is only meaningful while it is still current. */
+  if(c->certificate_expires_at_us<=now) return STATUS_STALE_DATA;
+  if(c->stop_code!=ACTUATOR_GROUND_STOP_CODE_ZERO) return STATUS_OUT_OF_RANGE;
+  if(!(c->ramp_nps>0.0f) || c->ramp_nps>ACTUATOR_GROUND_STOP_MAX_RAMP_NPS) return STATUS_OUT_OF_RANGE;
+  /* A stop that is not backed by a landed or disarming lifecycle is refused. */
+  if(c->lifecycle!=ACTUATOR_GROUND_STOP_LIFECYCLE_LANDED &&
+     c->lifecycle!=ACTUATOR_GROUND_STOP_LIFECYCLE_DISARMING) return STATUS_NOT_PERMITTED;
+  /* BENCH_INHIBIT has no driver, so there is nothing to ramp. */
+  if(a.config.payload.output_policy_id!=2u) return STATUS_NOT_PERMITTED;
+  for(m=0;m<4;++m) if(a.config.payload.max_thrust_n[m]>max_thrust) max_thrust=a.config.payload.max_thrust_n[m];
+  if(!(max_thrust>0.0f)) return STATUS_OUT_OF_RANGE;
+  worst_us=max_thrust/c->ramp_nps*1e6f+(float)ACTUATOR_GROUND_STOP_FRAME_US+
+           (float)ACTUATOR_GROUND_STOP_APPLY_LATENCY_US;
+  /* Refuse a rate that cannot meet the apply-time budget from the configured
+   * maximum thrust instead of silently overrunning it later. */
+  if(worst_us>(float)ACTUATOR_GROUND_STOP_MAX_APPLY_US) return STATUS_OUT_OF_RANGE;
+
+  /* Permit publication may run concurrently with the serialized actuator
+   * owner. Read the bound epochs and claim the transaction under the same lock
+   * used by permit updates, so no newer permit can slip between the check and
+   * the ground-stop latch. */
+  lock();
+  if(!a.initialized) { unlock(); return STATUS_NOT_READY; }
+  current=a.permit;
+  if(gs.latched) { unlock(); return STATUS_NOT_READY; }
+  if(!current.permit_epoch ||
+     (current.permit_flags & PERMIT_FLAG_REVOKED)==0u ||
+     !c->authority_epoch || !c->directive_epoch ||
+     c->authority_epoch!=current.authority_epoch ||
+     c->directive_epoch!=current.directive_epoch) {
+    unlock();
+    return STATUS_NOT_PERMITTED;
+  }
+  /* Publishers repeat their message every cycle. A repeat of the running
+   * transaction must not restart it: moving start_us forward would push the
+   * apply-time budget with it and hide an overrun. A different stop code or rate
+   * mid-ramp is a new transaction and is refused rather than silently applied. */
+  if(gs.active) {
+    int same = c->stop_code==gs.stop_code && c->ramp_nps==gs.ramp_nps;
+    unlock();
+    return same ? STATUS_OK : STATUS_NOT_PERMITTED;
+  }
+  gs.active=1; gs.latched=0; gs.overrun=0;
+  gs.stop_code=c->stop_code; gs.ramp_nps=c->ramp_nps;
+  gs.start_us=now; gs.predicted_us=(uint64_t)worst_us;
+  a.state=ACTUATOR_GUARD_SAFE_ACTION;
+  unlock();
+  return STATUS_OK;
+}
+
+uint64_t actuator_guard_ground_stop_start_us(void) {
+  uint64_t value;
+  lock();
+  value=gs.active||gs.latched ? gs.start_us : 0u;
+  unlock();
+  return value;
+}
+uint64_t actuator_guard_ground_stop_predicted_us(void) {
+  uint64_t value;
+  lock();
+  value=gs.predicted_us;
+  unlock();
+  return value;
+}
+
 Status actuator_guard_frame_boundary(uint64_t now) {
-  ActuationPermit p; float applied[4]; uint16_t commands[4]; unsigned m,j; uint32_t limits=0;
+  ActuationPermit p; float applied[4]; uint16_t commands[4]; unsigned m; uint32_t limits=0;
   ClockInstant clock;
   uint64_t actual; Status r;
   if(!a.initialized || a.state==ACTUATOR_GUARD_FAULT_LATCHED) return STATUS_NOT_READY;
   if(!clock_at_or_after(now,&clock)) return safe(STATUS_STALE_DATA,ACTUATOR_GUARD_FAULT_LATCHED);
   if(a.has_frame && (now<a.last_frame || now-a.last_frame<2500)) return STATUS_DEADLINE_MISSED;
   a.last_frame=now; a.has_frame=1;
+  /* A completed ground stop owns the output: nothing else may commit. */
+  if(gs.latched) return safe(STATUS_NOT_PERMITTED,ACTUATOR_GUARD_DISARMED);
+  if(gs.active) return ground_stop_frame(now);
   if(a.config.payload.output_policy_id==1) return safe(STATUS_NOT_PERMITTED,ACTUATOR_GUARD_DISARMED);
   if(io.fault_count && io.fault_count()!=a.faults) return safe(STATUS_NOT_READY,ACTUATOR_GUARD_FAULT_LATCHED);
   lock(); p=a.permit; unlock();
@@ -156,18 +321,14 @@ Status actuator_guard_frame_boundary(uint64_t now) {
     return safe(STATUS_STALE_DATA,ACTUATOR_GUARD_SAFE_ACTION);
   for(m=0;m<4;++m) {
     const ProductActuatorConfigPayload *c=&a.config.payload;
-    float lo=c->min_thrust_n[m],hi=c->max_thrust_n[m],x=a.latest.demand.motor_thrust_n[m],code;
+    float lo=c->min_thrust_n[m],hi=c->max_thrust_n[m],x=a.latest.demand.motor_thrust_n[m];
     if(a.has_commit) {
       const uint64_t elapsed=now>=a.last_commit ? now-a.last_commit : 0;
       float delta=c->max_slew_nps[m]*(float)elapsed*1e-6f;
       lo=fmaxf(lo,a.last_thrust[m]-delta); hi=fminf(hi,a.last_thrust[m]+delta);
     }
     applied[m]=clip(x,lo,hi); if(applied[m]!=x) limits|=1u<<m;
-    for(j=1;j<c->thrust_curve_count[m]-1u && applied[m]>c->thrust_curve_n[m][j];++j) {}
-    code=c->dshot_curve_code[m][j-1]+(applied[m]-c->thrust_curve_n[m][j-1])/
-      (c->thrust_curve_n[m][j]-c->thrust_curve_n[m][j-1])*
-      (c->dshot_curve_code[m][j]-c->dshot_curve_code[m][j-1]);
-    commands[c->motor_to_timer_channel[m]-1]=(uint16_t)lroundf(code);
+    commands[c->motor_to_timer_channel[m]-1]=thrust_to_code(m,applied[m]);
   }
   /* Recheck against the clock at submission, since frame preparation can
    * be preempted. Permit revocation and the nonblocking driver call serialize. */
