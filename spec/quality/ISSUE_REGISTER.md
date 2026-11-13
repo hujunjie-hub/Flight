@@ -73,10 +73,16 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-39 | S1 | S06-112 JSON 需按 R29 RUN_ID/code 重新绑定 | R29 real seed + JSON/log 分离 | S06-112 420/0 JSON_OK | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-40 | S1 | 测试结果收集器/证据检查器需 R29 严格复验 | R29 collector 28 + checker 33 负向 | collector/checker selftest normal/-O | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-41 | S2 | R22 原始工作区字节不可完整恢复 | R29 有范围搜索；保留 R27/R28 原始副本 | R27 worktree manifest SHA | BLOCKED |
+| FLIGHT-LOCAL-51 | S1 | 回归入口接受空选择、错误 SHA 或以 0 退出掩盖门禁失败 | `36d7b7c` 校验选择和 HEAD，传播结果，按 RUN_ID 准备清单 | T24、T30，本地 8 项通过 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-52 | S1 | 静态栈分析会放过可达帧冲突或无界动态帧，递归会崩溃 | `36d7b7c` 对不完整帧证据返回 UNKNOWN | T26、T27、T29，8 项自测 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-53 | S1 | 固件验证链接前只核对包锁声明，安装源码可能偏离锁定 commit | `36d7b7c` 在链接前核对实际 HEAD 和跟踪源文件 | T14、T18、T22，HAL 头文件负向对照 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-54 | S2 | GNU ld 报告 32 位枚举对象与输出 enum-size 属性不一致 | 链接日志已保留，待 ABI 负责人核对边界和工具链库属性 | T18 链接 exit 0，T17 143 类型 / 981 偏移 / 0 mismatch | OPEN |
 
 历史 draft 01–20 保留在 `build/validation/issue_drafts/`；本表按根因去重，不删除
 任何失败记录。
 
 
 详细记录：`spec/quality/R29_ISSUE_DETAILS.md`；R28/R27/R25/R24 记录保留为历史。
+
+FLIGHT-LOCAL-51..54 的复现与复测见 `M5-06-TAKEOVER-20261113` 归档内 `build/validation/regenerated/baseline-reproduction`、`import-reproduction` 和逐项台账。
 

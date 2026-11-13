@@ -1,5 +1,7 @@
 # Flight M5-06 阻塞项视图（R29）
 
+> **2026-11-13 接管复验**：B01–B04 和 B06 在 `36d7b7c` 上本地通过。B06 的 3,864 B 是 `-O2` 专用 Cortex-M7 镜像的静态分析结果。B05 等待独立审查，B07 与 S06-100..102 为 NOT_RUN。固件链接的 enum-size 警告见 FLIGHT-LOCAL-54。正式验收记录见 `spec/09_需求验证实施与发布管理.md`。
+
 > **R30 更新（2026-11-12，commit `efc28d7`）**：B01、B02、B03 经 OWNER 批准完成重基线后为 **PASS**；B04 固件链接 **PASS**（`Flight.elf` text 458,604 / data 15,732 / bss 267,656）；B06 为 **PASS**（3,864 B <= 4,096 B，调用图 COMPLETE）。下方 B01–B06 段落保留为历史描述。
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。

@@ -677,7 +677,7 @@
     "scope": "HISTORICAL GitHub Actions run; it does not apply to the current HEAD and must not be inherited."
   },
   "previous_commit_pass_inherited": false,
-  "latest_local_validation": {
+  "historical_r29_manifest_snapshot": {
     "run_id": "M5-06-R29-20261111",
     "validated_code_commit": "fd8198d2ac216fef87dafba73c252bb254ea3dd3",
     "head": "31463cb351d2f55e5da978c75db64e9d25fc2523",
@@ -710,6 +710,24 @@
     "note": "validated_code_commit is the code/tooling commit; archive metadata is external and updated after the archive.",
     "collector_commit": "5e1b8e5d6ea10d0620004f23567b2502c8aae1c4",
     "archive_script_commit": "bbf3e9205f2a764caaeb9e833c308c8069c6f7fb"
+  },
+  "latest_local_validation": {
+    "run_id": "M5-06-TAKEOVER-20261113",
+    "branch": "opt/stage-02-m5-06-safety-validator",
+    "validated_code_commit": "36d7b7ce9ed92a319b7112e9952acde6b1ebe5d1",
+    "scope": "LOCAL_EXECUTION_ONLY",
+    "status": "PASS",
+    "passed_commands": 30,
+    "gate_failures": 0,
+    "blocked_gates": 0,
+    "m5_06_acceptance": "BLOCKED",
+    "independent_math_review": "OPEN",
+    "not_run": [
+      "S06-100",
+      "S06-101",
+      "S06-102",
+      "B07"
+    ]
   },
   "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
   "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112 three separate bounds)",

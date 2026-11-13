@@ -1,6 +1,6 @@
 # 固件链接所需 RT-Thread packages：版本锁定与可重复安装流程
 
-状态：**BLOCKED / WAITING_OWNER**。锁定文件的**格式、校验器和流程**已落地；实际版本选择尚未批准，因此 `tools/rt_packages.lock.json` 仍为 `UNRESOLVED`，`python tools/check_rt_packages_lock.py` 返回 FAIL。
+状态：2026-11-12 批准的三项依赖按完整 Git commit 固定，锁文件为 `RESOLVED`。下方 1–7 节保留批准前的实施记录，当前安装及验证流程见第 8 节。
 
 ## 1. 为什么需要 packages/
 
@@ -100,3 +100,14 @@
   - 锁文件不得包含已取消选择的包。
 - 新增 `tests/guidance/test_rt_packages_lock.py`：10 个负向用例，覆盖上述每条规则。
 - 当前三个包仍为 `latest`，校验器按设计继续 FAIL；在所有者批准版本并完成真实 `pkgs --update` 前不得改为 RESOLVED。
+
+## 8. 当前安装与验证
+
+在 RT-Thread Env 4.x 中执行 `pkgs --update`，用 `tools/rt_packages.lock.json` 的 `installed_dir` 和 `pinned_commit` 核对各包。索引仍以 `latest` 选择包。若拉取的 HEAD 变化，在包自身的 Git 检出中取得并检出锁定 commit，然后运行：
+
+```powershell
+python tools/check_rt_packages_lock.py --installed
+python tests/guidance/check_target_build.py
+```
+
+验证入口会核对三个包的实际 HEAD 和跟踪文件状态，验证失败时链接步骤返回 BLOCKED。源目录检查允许 SCons 生成的未跟踪对象和 `.su` 文件。
