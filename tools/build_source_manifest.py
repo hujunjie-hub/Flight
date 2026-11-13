@@ -154,6 +154,14 @@ def main():
         "stack_check": rel(files_under(
             "tools/check_validation_evidence.py", "tools/analyze_stack.py")),
         "stack_selftest": rel(files_under("tools/analyze_stack.py")),
+        "stack_image": rel(files_under(
+            "tests/guidance/stack_image_check.ps1",
+            "tests/guidance/stack_image_stubs.c",
+            "tests/guidance/arm_build_check.ps1",
+            "tests/guidance/arm_build_check.sh",
+            "tools/analyze_stack_image.py",
+            "tools/analyze_stack.py")),
+        "stack_image_selftest": rel(files_under("tools/analyze_stack_image.py")),
     }
     files = {}
     for test_name, paths in tests.items():

@@ -17,8 +17,10 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-# Vendored third-party trees carry their own upstream .gitattributes.
-EXCLUDED_PREFIXES = ('doc/ADIS16505/no-OS/',)
+# Vendored third-party trees carry their own upstream .gitattributes. `build/`
+# is generated/scratch and may hold an external toolchain virtualenv (for
+# example the RT-Thread Env used by the firmware link), so it is not source.
+EXCLUDED_PREFIXES = ('doc/ADIS16505/no-OS/', 'build/')
 REPAIR = (
     'Repair without touching other files:\n'
     '  python tools/check_line_endings.py --fix\n'

@@ -501,6 +501,7 @@
 #define BSP_USING_SPI1
 #define BSP_SPI1_TX_USING_DMA
 #define BSP_SPI1_RX_USING_DMA
+#define RT_USING_PWM
 #define RT_USING_SPI
 #define RT_USING_I2C
 #define BSP_USING_HARD_I2C1

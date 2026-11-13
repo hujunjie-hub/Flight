@@ -133,7 +133,8 @@ def build_latest_local_validation(
 
 
 def prepare(repo: Path, manifest_path: Path, run_id: str,
-            expected_branch: str | None = None) -> dict[str, Any]:
+            expected_branch: str | None = None,
+            validated_code_override: str | None = None) -> dict[str, Any]:
     repo = repo.resolve()
     manifest_path = manifest_path.resolve()
     branch = git(repo, "branch", "--show-current")
@@ -151,6 +152,16 @@ def prepare(repo: Path, manifest_path: Path, run_id: str,
     validated_code = current.get("validated_code_commit")
     if not isinstance(validated_code, str) or not SHA40.fullmatch(validated_code):
         raise ValueError("manifest has no valid validated_code_commit")
+    # The record is inherited from whichever commit is checked out. When the
+    # archive is built from the validated-code commit (not the metadata commit),
+    # the inherited value still names the previous round's code. An explicit
+    # baseline lets the caller bind the commit that was actually tested; the
+    # commit must exist locally.
+    if validated_code_override:
+        if not SHA40.fullmatch(validated_code_override):
+            raise ValueError("validated_code override must be a full 40-character Git SHA")
+        git(repo, "cat-file", "-e", f"{validated_code_override}^{{commit}}")
+        validated_code = validated_code_override
     git(repo, "cat-file", "-e", f"{validated_code}^{{commit}}")
 
     collector_commit = latest_commit_for_paths(repo, "tools/collect_validation_results.py")
@@ -197,12 +208,16 @@ def main() -> int:
     ap.add_argument("--manifest", default="spec/validation/flight_acceptance_manifest.json")
     ap.add_argument("--run-id", required=True)
     ap.add_argument("--expected-branch", default="opt/stage-02-m5-06-safety-validator")
+    ap.add_argument("--validated-code", default="",
+                    help="bind this 40-hex commit as validated_code_commit instead of "
+                         "inheriting the previous round's value")
     args = ap.parse_args()
     repo = Path(args.repo).resolve()
     manifest = Path(args.manifest)
     if not manifest.is_absolute():
         manifest = repo / manifest
-    result = prepare(repo, manifest, args.run_id, args.expected_branch)
+    result = prepare(repo, manifest, args.run_id, args.expected_branch,
+                     args.validated_code or None)
     print(json.dumps(result, indent=2, ensure_ascii=False))
     print("ARCHIVE_METADATA_PREPARED")
     return 0

@@ -1,5 +1,7 @@
 # Flight M5-06 阻塞项视图（R29）
 
+> **R30 更新（2026-11-12，commit `efc28d7`）**：B01、B02、B03 经 OWNER 批准完成重基线后为 **PASS**；B04 固件链接 **PASS**（`Flight.elf` text 458,604 / data 15,732 / bss 267,656）；B06 为 **PASS**（3,864 B <= 4,096 B，调用图 COMPLETE）。下方 B01–B06 段落保留为历史描述。
+
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
 RUN_ID `M5-06-R29-20261111`；validated code `fd8198d2ac216fef87dafba73c252bb254ea3dd3`；
 remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；

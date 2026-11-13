@@ -654,35 +654,62 @@ def check_product(ctx):
 
 
 def check_stack(ctx):
+    """Validate the stack invariant, not a historical number.
+
+    The gate is: budget is 4096; a PASS requires a COMPLETE call graph, a known
+    lower bound within budget and no reachable unknown edge; a BLOCKED result
+    requires an actual breach; an UNKNOWN result requires an incomplete graph.
+    The historical R29 4,248 B figure stays in the acceptance record and the
+    blocker board, but it is not the invariant for later runs.
+    """
     data = ctx["stack"]
     checks = 0
     fails = []
+    lower = data.get("known_lower_bound_bytes")
+    limit = data.get("limit_bytes")
+    status = data.get("status")
+    callgraph = data.get("callgraph_status")
     checks += 1
-    if data.get("known_lower_bound_bytes") != 4248:
-        fails.append(f"known lower bound {data.get('known_lower_bound_bytes')} != 4248")
+    if not isinstance(lower, int) or lower <= 0:
+        fails.append("known lower bound missing")
     checks += 1
-    if data.get("limit_bytes") != 4096:
+    if limit != 4096:
         fails.append("budget limit is not 4096")
     checks += 1
-    if data.get("status") == "PASS":
-        fails.append("stack analysis PASS while unknown edges/budget exist")
+    if status not in ("PASS", "BLOCKED", "UNKNOWN"):
+        fails.append(f"stack status {status} is not fail-closed")
     checks += 1
-    if data.get("status") not in ("BLOCKED", "UNKNOWN"):
-        fails.append(f"stack status {data.get('status')} is not fail-closed")
-    checks += 1
-    if data.get("callgraph_status") not in ("UNKNOWN", "COMPLETE"):
+    if callgraph not in ("UNKNOWN", "COMPLETE"):
         fails.append("callgraph status missing")
     checks += 1
-    if not data.get("unknown_edges"):
+    if not isinstance(data.get("unknown_edges"), list):
         fails.append("unknown edges not recorded")
-    checks += 1
-    if data.get("known_lower_bound_bytes", 0) <= data.get("limit_bytes", 0):
-        fails.append("stack data does not show the known budget breach")
-    return emit(ctx["out"], "stack", checks, len(fails),
-                "BLOCKED" if "known lower bound exceeds" in str(data.get("reason")) else "UNKNOWN",
+    if status == "PASS":
+        checks += 1
+        if callgraph != "COMPLETE":
+            fails.append("PASS with incomplete call graph")
+        checks += 1
+        if isinstance(lower, int) and isinstance(limit, int) and lower > limit:
+            fails.append("PASS while the lower bound exceeds the budget")
+        checks += 1
+        if data.get("unknown_edges_reachable"):
+            fails.append("PASS with reachable unknown edges")
+    elif status == "BLOCKED":
+        checks += 1
+        if not (isinstance(lower, int) and isinstance(limit, int) and lower > limit):
+            fails.append("BLOCKED without a budget breach")
+    else:
+        checks += 1
+        if callgraph != "UNKNOWN":
+            fails.append("UNKNOWN status with a COMPLETE call graph")
+    final = ("PASS" if not fails and status == "PASS" else
+             "BLOCKED" if status == "BLOCKED" else
+             "UNKNOWN" if not fails else "FAIL")
+    return emit(ctx["out"], "stack", checks, len(fails), final,
                 {"run_id": ctx["run_id"], "failures": fails,
-                 "lower_bound": data.get("known_lower_bound_bytes"),
-                 "limit": data.get("limit_bytes")})
+                 "lower_bound": lower, "limit": limit,
+                 "callgraph_status": callgraph,
+                 "reachable_unknown_edges": len(data.get("unknown_edges_reachable") or [])})
 
 
 def check_handover(ctx):
@@ -849,7 +876,13 @@ def self_test():
     if proc.stderr:
         print(proc.stderr, end="", file=sys.stderr)
     if proc.returncode == 0:
-        print("EVIDENCE_CHECKER_SELF_TEST_PASS")
+        # The collector contract requires the count: it parses
+        # "EVIDENCE_CHECKER_SELF_TEST_PASS (<n> negative cases)".
+        # unittest writes "Ran N tests" to stderr.
+        combined = (proc.stdout or "") + (proc.stderr or "")
+        match = re.search(r"Ran (\d+) tests?", combined)
+        cases = int(match.group(1)) if match else 0
+        print(f"EVIDENCE_CHECKER_SELF_TEST_PASS ({cases} negative cases)")
     else:
         print("EVIDENCE_CHECKER_SELF_TEST_FAIL", file=sys.stderr)
     return proc.returncode

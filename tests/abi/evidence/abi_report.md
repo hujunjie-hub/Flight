@@ -88,7 +88,7 @@ process and have separate ARM and Host layouts.
 
 - Lock file: `middleware/contracts/product_contract/abi_lock.h`
 - Status: **PASS**
-- Message registry SHA256 bound by the lock: `e2893aebd8c1121b1ede80591849730ec722c5f9e0616443507c2ff99179bf41`
+- Message registry SHA256 bound by the lock: `dd06554c240567d5f81b51e4aed39336ccf3e469c6c95a952d1a2d766bbc49e7`
 
 ## Artifacts
 

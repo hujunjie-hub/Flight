@@ -53,6 +53,13 @@ if PLATFORM == 'gcc':
     # the production-header ABI lock assumes 4-byte enums; keep C and C++
     # layouts aligned with tests/abi.
     CFLAGS = DEVICE + ' -Dgcc -fno-short-enums -fstack-usage'
+    # MR-009: the binary32 consumer error model (validate_consumer_curve /
+    # consumer_eval_error_bound) assumes round-to-nearest, one rounding per
+    # multiply/add and no excess precision. GCC contracts a*b+c into FMA by
+    # default at -O2, which changes the operation sequence the bound was proved
+    # for. Pin the model in the shipped build; removing these flags invalidates
+    # the MR-009 rounding counts and requires a new proof.
+    CFLAGS += ' -ffp-contract=off -frounding-math -fexcess-precision=standard'
     AFLAGS = ' -c' + DEVICE + ' -x assembler-with-cpp -Wa,-mimplicit-it=thumb '
     LFLAGS = DEVICE + ' -Wl,--gc-sections,-Map=Flight.map,-cref,-u,Reset_Handler -T board/linker_scripts/link.lds'
 

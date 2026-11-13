@@ -304,8 +304,13 @@ def parse_output(name, output, exit_code):
     if name == "scons_link":
         data = _json_object(output) or {}
         checks = 1 if data else 0
-        failures = 0 if data.get("status") == "BLOCKED" else 1
-        return checks, failures, seed, {"parser": "JSON", "status": data.get("status")}
+        # exit_code 0 means the firmware linked; earlier rounds were always
+        # BLOCKED, so the old parser treated "not BLOCKED" as a failure.
+        linked = data.get("exit_code") == 0
+        failures = 0 if linked else 1
+        return checks, failures, seed, {
+            "parser": "JSON", "status": data.get("status") or (
+                "PASS" if linked else "FAIL"), "exit_code": data.get("exit_code")}
 
     if name == "s06_108":
         match = re.search(
@@ -370,6 +375,23 @@ def parse_output(name, output, exit_code):
         if not match:
             fail("stack_selftest: PASS marker missing")
         return int(match.group(1)), 0, seed, {"parser": "stack-selftest"}
+
+    if name == "stack_image":
+        data = _json_object(output) or {}
+        if data.get("status") not in ("PASS", "BLOCKED", "UNKNOWN"):
+            fail("stack_image: analyzer JSON missing")
+        checks = int(data.get("function_count", 0) or 0)
+        failures = 0 if data.get("status") == "PASS" else 1
+        return checks, failures, seed, {
+            "parser": "stack-image", "status": data.get("status"),
+            "lower_bound": data.get("known_lower_bound_bytes"),
+            "callgraph_status": data.get("callgraph_status")}
+
+    if name == "stack_image_selftest":
+        match = re.search(r"STACK_IMAGE_SELF_TEST_PASS \((\d+) cases\)", output)
+        if not match:
+            fail("stack_image_selftest: PASS marker missing")
+        return int(match.group(1)), 0, seed, {"parser": "stack-image-selftest"}
 
     fail(f"no strict parser for command {name}")
 

@@ -8,6 +8,18 @@ group = []
 src = ['drv_common.c']
 path = [cwd]
 
+# The RT-Thread HAL package wrapper does not list stm32h7xx_hal_ospi.c at any
+# version, but the W25Q64 driver calls HAL_OSPI_*. Compile the HAL module from
+# the installed package tree when present; the glob keeps the build valid for
+# both `latest` and pinned package directory names.
+import glob
+_hal_ospi = glob.glob(os.path.join(cwd, '..', '..', 'packages',
+                                   'stm32h7_hal_driver-*', 'Src',
+                                   'stm32h7xx_hal_ospi.c'))
+if _hal_ospi:
+    src += _hal_ospi
+    path += [os.path.join(os.path.dirname(_hal_ospi[0]), '..', 'Inc')]
+
 if not GetDepend('PKG_USING_CMSIS_CORE'):
     path += [os.path.join(cwd, 'CMSIS', 'Include')]
 
