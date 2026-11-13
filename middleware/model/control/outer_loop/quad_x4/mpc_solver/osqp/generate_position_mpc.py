@@ -93,6 +93,11 @@ lock = {'version': '1.0.0', 'generator': 'osqp Python 1.0.0',
         'bindings_template': 'https://github.com/osqp/osqp-python/blob/v1.0.0/src/osqp/codegen/pywrapper/bindings.cpp.jinja',
         'bindings_template_rendering': {'prefix': 'quad_', 'extension_name': 'emosqp', 'final_newline': False},
         'hash_newlines': 'canonical CRLF',
+        'qdldl_version_header': {
+            'source': 'https://github.com/osqp/qdldl/blob/v0.1.8/configure/qdldl_version.h.in',
+            'tag_commit': '138fdac58b9cd1c4137ff1b99152c8108a6cff5b',
+            'rendering': {'major': 0, 'minor': 1, 'patch': 8},
+        },
         'files': {p.relative_to(out).as_posix(): locked_file_sha256(p)
                   for p in sorted(out.rglob('*')) if p.is_file()
                   and p.suffix not in {'.o', '.su'}}}

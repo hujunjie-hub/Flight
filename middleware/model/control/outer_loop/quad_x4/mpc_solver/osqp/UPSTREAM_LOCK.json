@@ -33,7 +33,7 @@
     "inc/private/qdldl.h": "ba6a569c47e4d951ceb3eed7b9c0344b8ccb0e4913f535da2c86372ed654823d",
     "inc/private/qdldl_interface.h": "481622c847afe6caf1cb408ad5ed9115b0ea1383e64f466eb8d0761934cf80a1",
     "inc/private/qdldl_types.h": "dc21275dfb431c4712646d8c229ef9ce21ff7f08086aa721e8ff68596d7ab458",
-    "inc/private/qdldl_version.h": "144db8f98b3e5f5214ade27b7d1491c196620ff9e41d4af6a0a4b443f872c9f4",
+    "inc/private/qdldl_version.h": "a1ac068556ee8fc64a9ad0cf50ab9799daed62ce3e1115eb548a417e9d353ee6",
     "inc/private/scaling.h": "b8e66bdf9fbaff7520834575a2982ff5a980ed55ed17a6479208241d456249ff",
     "inc/private/timing.h": "ca252f4cc298ba3afeac1862a93b4cf28f2ef0d9b260b0dd3cb0af07444ddff7",
     "inc/private/types.h": "78723a6b220966c3e1b50c396989e368649136e0cb430c95a7a4a8a26d8a3d02",
@@ -69,5 +69,14 @@
     "extension_name": "emosqp",
     "final_newline": false
   },
-  "hash_newlines": "canonical CRLF"
+  "hash_newlines": "canonical CRLF",
+  "qdldl_version_header": {
+    "source": "https://github.com/osqp/qdldl/blob/v0.1.8/configure/qdldl_version.h.in",
+    "tag_commit": "138fdac58b9cd1c4137ff1b99152c8108a6cff5b",
+    "rendering": {
+      "major": 0,
+      "minor": 1,
+      "patch": 8
+    }
+  }
 }
