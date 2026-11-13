@@ -61,6 +61,42 @@ jobs:
           EXTRA_CFLAGS: "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
         run: bash tests/actuation/run_host_tests.sh
 
+  cortex-m7-compile:
+    name: Cortex-M7 M4/M5/M6/M7 production-module compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ARM embedded toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-dev
+      - name: Validate ARM runner syntax
+        run: python -m py_compile tests/algorithms/run_tests.py
+      - name: Compile and relocatably link M6 navigation/controller
+        run: python tests/algorithms/run_tests.py --target arm
+      - name: Compile M4 FMS and ground-stop adapter
+        run: bash tests/flight_management/arm_build_check.sh
+      - name: Compile M5 guidance
+        run: bash tests/guidance/arm_build_check.sh
+      - name: Compile M7 actuator guard
+        run: bash tests/actuation/arm_build_check.sh
+      - name: Upload Cortex-M7 compile evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cortex-m7-module-compile
+          path: |
+            build/validation/controller_navigation/arm/
+            build/m4_arm/
+            build/m5_arm/
+            build/m7_arm/
+
   sil-ground-stop-integration:
     name: Runtime task and M4-to-M7 ground-stop SIL integration
     runs-on: ubuntu-latest
