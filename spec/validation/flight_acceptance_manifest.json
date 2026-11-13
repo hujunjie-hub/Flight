@@ -874,27 +874,27 @@
   "latest_branch_ci": {
     "date": "2026-11-13",
     "branch": "opt/stage-02-m5-06-safety-validator",
-    "implementation_commit": "2a0237bf42963f5a4457af24da1b713cd6f957d1",
-    "post_spec_sync_ci_required": true,
+    "implementation_commit": "b6b2c8d1fbe2483ac76164993e7798a18af1e697",
+    "post_spec_sync_ci_required": false,
     "workflows": [
       {
         "name": "Host validation",
-        "run_id": 43400605776,
-        "url": "https://github.com/hujunjie-hub/Flight/actions/runs/43400605776",
+        "run_id": 43410120128,
+        "url": "https://github.com/hujunjie-hub/Flight/actions/runs/43410120128",
         "jobs": "6/6",
         "conclusion": "SUCCESS"
       },
       {
         "name": "M6/M7 host validation",
-        "run_id": 43400605749,
-        "url": "https://github.com/hujunjie-hub/Flight/actions/runs/43400605749",
+        "run_id": 43410120115,
+        "url": "https://github.com/hujunjie-hub/Flight/actions/runs/43410120115",
         "jobs": "5/5",
         "conclusion": "SUCCESS"
       },
       {
         "name": "M7 host validation",
-        "run_id": 43400605682,
-        "url": "https://github.com/hujunjie-hub/Flight/actions/runs/43400605682",
+        "run_id": 43410120239,
+        "url": "https://github.com/hujunjie-hub/Flight/actions/runs/43410120239",
         "jobs": "2/2",
         "conclusion": "SUCCESS"
       }
@@ -985,9 +985,14 @@
       "largest_static_frame_bytes": 2024
     },
     "scope_limits": [
-      "Results apply only to implementation commit 2a0237bf42963f5a4457af24da1b713cd6f957d1; the SPEC-only sync commit requires fresh CI.",
+      "Results apply to validated post-sync commit b6b2c8d1fbe2483ac76164993e7798a18af1e697; future commits require fresh CI.",
       "No H723 target runtime, full product firmware release-link, WCET/RTA, target RAM/stack watermark, physical DShot apply-time, ESC thrust response, physical HIL, calibration or flight evidence.",
-      "M5-06 remains BLOCKED pending independent mathematical review and S06-100..102; M5-07 must not start."
+      "M5-06 remains BLOCKED pending independent mathematical review and S06-100..102; M5-07 must not start.",
+      "FLIGHT-LOCAL-27 static headroom is estimated at 8 B after counting two GroundStopCertificate snapshots; memory-budget and final-map checks remain required."
+    ],
+    "spec_sync_commits": [
+      "a5effdefb35a688e638833524c586eaad56beb55",
+      "b6b2c8d1fbe2483ac76164993e7798a18af1e697"
     ]
   }
 }

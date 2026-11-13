@@ -1,14 +1,14 @@
-# Flight M5-06 阻塞项视图（R31）
+# Flight M5-06 阻塞项视图（R32）
 
-> **2026-11-13 当前分支 CI 快照（实现基线 `2a0237bf42963f5a4457af24da1b713cd6f957d1`）**：Host validation、M6/M7 host validation、M7 host validation 分别 6/6、5/5、2/2 jobs SUCCESS。Spec Audit 145 types / 8 checks PASS；生产 ABI 144 types / 0 spec mismatch / 0 unexpected Host/ARM PASS。M4/M5/M6/M7 Host、Sanitizer、runtime SIL 和 Cortex-M7 模块编译通过。该快照不代表本次文档提交的新 SHA 已通过 CI。
+> **2026-11-13 规范同步后 CI 快照（验证基线 `b6b2c8d1fbe2483ac76164993e7798a18af1e697`）**：Host validation、M6/M7 host validation、M7 host validation 分别 6/6、5/5、2/2 jobs SUCCESS。Spec Audit 145 types / 8 checks PASS；生产 ABI 144 types / 0 spec mismatch / 0 unexpected Host/ARM PASS；M4/M5/M6/M7 Host、Sanitizer、runtime SIL 和 Cortex-M7 模块编译通过。具体运行见 `spec/09_需求验证实施与发布管理.md`。
 
 > **当前阻塞状态**：B01 Spec Audit 与 B02 ABI 在当前实现基线通过；B03 包锁在 2026-11-12/13 接管复验中已固定并通过，但本轮三组 CI 未单独重跑 package-lock job；B04 的 M4/M5 测试配置链接在接管复验中通过，完整 Release 产品链接/目标运行仍需单独确认；B05 MR-009 独立数学审查仍 WAITING；B06 Release `-O2` 静态最坏链 3,864/4,096 B PASS，`-O0` 历史分析为 UNKNOWN；B07 H723 实机、WCET/RTA、RAM/stack watermark、HIL 与飞行 NOT_RUN。FLIGHT-LOCAL-54 enum-size 警告仍 OPEN。
 
 > **资源更新**：ICD/M4 参考表已加入两个 `GroundStopCertificate` 快照（2×112 B）；按上轮 232 B 余量扣除 224 B 后估算仅余 8 B。FLIGHT-LOCAL-27 继续 OPEN / RISK，必须重跑 `tests/guidance/check_memory_budget.py` 和最终 map。下方 R29/B01–B06 细节保留为历史记录，不作为当前状态。
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
-RUN_ID `M5-06-R29-20261111`；validated code `fd8198d2ac216fef87dafba73c252bb254ea3dd3`；
-remote HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`；
+RUN_ID `M5-06-R32-20261113`；validated code `b6b2c8d1fbe2483ac76164993e7798a18af1e697`；
+remote HEAD `b6b2c8d1fbe2483ac76164993e7798a18af1e697`；
 ahead 动态计算；branch `opt/stage-02-m5-06-safety-validator`。
 
 本文件所有结论均为本地 Host/SIL/Cortex-M7 编译证据，不是 H723 实机、HIL、

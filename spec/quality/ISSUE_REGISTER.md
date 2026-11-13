@@ -89,8 +89,14 @@ FLIGHT-LOCAL-51..54 的复现与复测见 `M5-06-TAKEOVER-20261113` 归档内 `b
 
 FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o` 和 `Flight.elf` 的 `Tag_ABI_enum_size` 为 `small`，项目 `board.o` 为 `int`。ABI 负责人待确认跨对象接口影响，现有 `-fno-short-enums` 和 ABI 锁继续生效。
 
-## 2026-11-13 当前分支 CI 复核
+## 2026-11-13 规范同步前 CI 复核（2a0237）
 
 当前实现基线 `2a0237bf42963f5a4457af24da1b713cd6f957d1`（`opt/stage-02-m5-06-safety-validator`）的 Host validation、M6/M7 host validation、M7 host validation 均 SUCCESS，详见 `spec/09_需求验证实施与发布管理.md`。CI 对 Spec Audit、生产 ABI、M4/M5/M6/M7 Host、Sanitizer、runtime SIL 和 Cortex-M7 模块编译提供当前基线证据。
 
 本轮 CI 不会自动关闭本地问题；`FIXED_WAITING_RETEST` 仍须独立复验。FLIGHT-LOCAL-27 因 GroundStopCertificate 双快照重新计入后只估算剩余 8 B，继续 OPEN / RISK。FLIGHT-LOCAL-54 的 enum-size 属性差异仍 OPEN。GitHub Issue 发布状态仍为 `GITHUB_PUBLICATION = PENDING`。本次 SPEC 同步 commit 的验证必须重新运行，不继承上述旧 SHA 的 PASS。
+
+## 2026-11-13 规范同步后 CI 复核（b6b2c8）
+
+验证基线 `b6b2c8d1fbe2483ac76164993e7798a18af1e697` 的三组工作流全部通过：[Host validation 6/6](https://github.com/hujunjie-hub/Flight/actions/runs/43410120128)、[M6/M7 host validation 5/5](https://github.com/hujunjie-hub/Flight/actions/runs/43410120115)、[M7 host validation 2/2](https://github.com/hujunjie-hub/Flight/actions/runs/43410120239)。生产 ABI 144 types / 0 mismatch / 0 unexpected Host/ARM；Spec Audit 145 types / 8 checks PASS；M4/M5/M6/M7 Cortex-M7 模块编译、M6/M7 Host/Sanitizer 和 M4→M7 runtime SIL 均 PASS。
+
+本轮通过不关闭尚需独立复验的问题。FLIGHT-LOCAL-27 因 GroundStopCertificate 双快照重新计入后只估算剩余 8 B，继续 OPEN / RISK；`check_memory_budget.py` 和最终 map 仍待复验。FLIGHT-LOCAL-54 的 enum-size 属性差异仍 OPEN。GitHub Issue 发布状态仍为 `GITHUB_PUBLICATION = PENDING`。M5-06 独立数学审查仍 BLOCKED，M5-07 不得启动。
