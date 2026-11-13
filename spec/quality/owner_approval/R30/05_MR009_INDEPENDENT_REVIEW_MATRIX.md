@@ -1,6 +1,6 @@
-# MR-009 Review Matrix — R31 (internal three-pass disposition)
+# MR-009 Review Matrix — R31 (independent review handoff)
 
-Status: **INTERNAL_THREE_PASS_REVIEW_COMPLETE_WITH_LIMITATIONS — EXTERNAL REVIEW WAIVED BY PROJECT OWNER**
+Status: **INTERNAL_PRE_REVIEW_COMPLETE / WAITING_INDEPENDENT_REVIEW**
 
 ## 1. Scope
 
@@ -87,15 +87,17 @@ are directly constructed and are not claimed to be reachable from a full
 validator input. The M6 locator also supports 40 ms route previews; M5-06
 does not claim to validate those 40 ms references.
 
-Internal three-pass review accepts the explicit boundary: the degree-5/4/3
-Horner rejection branches are tested through the production helper; no claim is
-made that each branch is reachable through a complete product-domain validator
-input. Full-validator coefficient/scaling failure paths and a legal companion
-are tested separately. This limitation remains visible and must not be hidden.
+Internal pre-review records the explicit boundary: the degree-5/4/3 Horner
+rejection branches are tested through the production helper; no claim is made
+that each branch is reachable through a complete product-domain validator input.
+Full-validator coefficient/scaling failure paths and a legal companion are
+tested separately. The independent reviewer must assess whether this limitation
+is acceptable for the stated proof claim; internal pre-review does not accept it
+on the reviewer's behalf.
 
-## 5. Internal three-pass proof checklist
+## 5. Independent reviewer checklist
 
-| Proof obligation | R30/R31 evidence | Evidence status | Internal three-pass outcome |
+| Proof obligation | R30/R31 evidence | Evidence status | Author pre-review (not approval) |
 |---|---|---|---|
 | Consumer coefficient identity | S06-086 real C `control_sample_reference()` differential (314,731/0); validator coefficient operation-order replica; consumer/validator source hashes recorded by FP audit | READY | PASS |
 | Position Horner | Degree-5 rounded recurrence; S06-115 exact-H counterexample; production-helper 0/1 counter | READY; S06-115 is outside product time domain | PASS |
@@ -126,13 +128,16 @@ For each helper-level Horner branch test:
 
 For the legal full-validator companion, status is PASS and every counter is 0.
 
-## 7. Review disposition rule
+## 7. Independent review disposition rule
 
-The project owner has waived the external independent-review requirement for
-MR-009 and replaced it with a three-pass internal review. This is an owner-directed
-process change, not an independent third-party approval. The matrix records the
-internal findings and explicit limitations; it must not be represented as an
-independent signature. H723 runtime, WCET/RTA, target RAM/stack watermark, HIL,
+The independent mathematical review remains REQUIRED. The internal three-pass
+work in §11 is author-side pre-review only and cannot be used as approval or as a
+substitute for an independent reviewer. The reviewer must be independent of the
+production changes and must complete every row in §5, identify assumptions and
+unresolved risks, explicitly assess the helper-level Horner reachability limit,
+and sign a final APPROVED, REJECTED, or NEEDS_INFO disposition. Until that
+record exists, MR-009 remains WAITING_INDEPENDENT_REVIEW, B05 remains open, and
+M5-06 cannot be accepted. H723 runtime, WCET/RTA, target RAM/stack watermark, HIL,
 flight, and S06-100..102 remain separate release gates.
 
 
@@ -199,11 +204,11 @@ The current internal disposition is recorded in §11; no independent reviewer or
 third-party approval is claimed.
 
 
-## 11. R31 owner-directed three-pass internal review (2026-11-13)
+## 11. R31 internal pre-review (2026-11-13; not an independent approval)
 
-**Disposition: INTERNAL_THREE_PASS_REVIEW_COMPLETE_WITH_LIMITATIONS.**
-External independent review is waived by the project owner. No independent
-reviewer identity or third-party approval is claimed.
+**Disposition: INTERNAL_PRE_REVIEW_COMPLETE / WAITING_INDEPENDENT_REVIEW.**
+No external-review waiver has been recorded. No independent reviewer has been
+assigned, and no third-party approval is claimed.
 
 1. **Mathematical pass:** corrected the time-shift derivative for velocity and
    acceleration to use the actual rounded consumer coefficient arrays `vf` and
@@ -245,3 +250,23 @@ Validated baseline: `8dcb60b3ac18e6a763c939d3e810984092cdd321`.
   consumer and validator objects both `fused_operations=0`.
 - H723 FPSCR runtime, WCET/RTA, target RAM/stack watermark, HIL and flight
   remain NOT_RUN and are not implied by these CI results.
+## 12. Independent reviewer handoff record
+
+- Review status: **WAITING_INDEPENDENT_REVIEW**.
+- Reviewer GitHub login / organization: **NOT_ASSIGNED**.
+- Reviewer independence confirmation: **PENDING**.
+- Review date: **PENDING**.
+- Final disposition: **PENDING** (APPROVED / REJECTED / NEEDS_INFO).
+- Review baseline: R31 production/math corrections at commits
+  `79f23d0200c31ebe934bfc8793e65d7af1e6bdd4`,
+  `a55071966209a1af615ff6137963eab4631e8bae`,
+  `ad9df36687b68b43f9118ae6e26be8716d900c90`; current branch tip and
+  documentation are identified by the GitHub issue handoff.
+- Required independent checks: coefficient identity and operation ordering;
+  gamma directed rounding; RN overflow midpoint; normal/subnormal error
+  propagation; expanded-time interval; rounded `vf`/`af` time derivatives;
+  FP environment/contraction assumptions; 20 ms proof domain; helper-level
+  Horner rejection reachability limitation; evidence-to-source SHA identity.
+- Required reviewer output: complete every row in §5, list assumptions and
+  limitations, record any requested corrections, and sign an explicit final
+  disposition. Internal pre-review PASS entries are evidence pointers only.
