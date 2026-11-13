@@ -161,7 +161,7 @@ Validated code commit: 80670f118c5fdccce5a1f00f218a58a66c28bd5e.
 - M7 host validation #43417452817: 2/2 jobs SUCCESS.
 - M5 Host 322,299/0; focused runner 430/0; M5 ASan/UBSan 322,299/0; focused ASan/UBSan 430/0; integration ASan/UBSan 1,075/0.
 - S06-115 deterministic no-seed exact-H counterexample passed.
-- Independent reviewer results remain PENDING; full-validator reachability for all three Horner rejection sites is not claimed.
+- At the historical R30.1 point, external reviewer results were still PENDING; that state was superseded by the owner-directed R31 three-pass disposition in §11. Full-validator reachability for all three Horner rejection sites is not claimed.
 
 
 ## 10. R30.2 review handoff packet
