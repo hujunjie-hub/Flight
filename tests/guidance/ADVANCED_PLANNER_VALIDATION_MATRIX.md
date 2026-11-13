@@ -245,5 +245,5 @@ Host/SIL 高级 A*/地图/动态障碍测试入口须随对应实现一并提交
 - **Oracle:** all ideal H_k < FLT_MAX, magnitude term < FLT_MAX/16, but the real separate binary32 multiply/add sequence reaches the round-to-nearest overflow midpoint at Horner stage k=3.
 - **Expected:** actual C sequence becomes non-finite; production consumer_eval_error_bound() returns +Inf; exactly one POSITION_HORNER test-only branch hit.
 - **Additional coverage:** 0/1 counters for all six consumer numerical rejection classes, full-validator status/reason checks for coefficient construction and derivative scaling, and a legal full-validator companion with all counters zero.
-- **Execution:** bash tests/guidance/run_mr009_focus.sh now runs five focused C groups. CI status is pending until the R30 commit completes.
+- **Execution:** bash tests/guidance/run_mr009_focus.sh runs five focused C groups; Host and ASan/UBSan each report 430 checks / 0 failures in Host validation #43417453111.
 - **Scope:** Host/SIL numerical evidence only. It is not independent mathematical approval, H723 runtime, HIL, or flight evidence.

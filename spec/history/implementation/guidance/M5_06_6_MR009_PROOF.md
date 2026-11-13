@@ -509,3 +509,10 @@ S06-115 同时断言：理想 H_k 均小于 FLT_MAX、幅度项小于 FLT_MAX/16
 ### R30.1：数值阶段短路（CI 首轮失败后的修复）
 
 首轮 CI 的三项失败来自计数语义而非数学反例：系数构造失败后仍继续计算 vf/af；速度缩放失败后仍继续计算 af。生产路径现改为每一阶段遇到首个非有限值即返回 NUMERIC_FAILURE，不继续执行下游数值阶段。这样六类 0/1 counter 互斥且与 first-stage enum 一致，不会把同一根因计成多个拒绝分支。该修改只提前拒绝，不放宽任何安全阈值。
+
+
+## 27. R30.1 CI 复验结果（代码基线 80670f）
+
+Host validation #43417453111：6/6 jobs SUCCESS；M6/M7 host validation #43417453109：5/5 jobs SUCCESS；M7 host validation #43417452817：2/2 jobs SUCCESS。M5 Host 322,299/0；MR-009 focused 430/0；M5 ASan/UBSan 322,299/0；focused ASan/UBSan 430/0；M4/M5 Integration ASan/UBSan 1,075/0。Spec Audit、生产 ABI、Cortex-M7 模块编译均 PASS。
+
+R30.0 首轮三项 branch-counter 失败保留为历史结果；R30.1 fail-fast 修正后所有上述检查通过。远程 CI 结果不等于本地 evidence ZIP，也不等于独立数学 APPROVED。H723 实机、WCET/RTA、HIL、飞行仍 NOT_RUN。

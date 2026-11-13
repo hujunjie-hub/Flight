@@ -130,3 +130,15 @@ the first failed numerical stage:
 This makes the six test-only 0/1 counters mutually exclusive and consistent
 with the first-stage enum. The change is fail-fast only; it does not relax a
 threshold or permit an invalid value.
+
+
+## 9. R30.1 CI evidence
+
+Validated code commit: 80670f118c5fdccce5a1f00f218a58a66c28bd5e.
+
+- Host validation #43417453111: 6/6 jobs SUCCESS.
+- M6/M7 host validation #43417453109: 5/5 jobs SUCCESS.
+- M7 host validation #43417452817: 2/2 jobs SUCCESS.
+- M5 Host 322,299/0; focused runner 430/0; M5 ASan/UBSan 322,299/0; focused ASan/UBSan 430/0; integration ASan/UBSan 1,075/0.
+- S06-115 deterministic no-seed exact-H counterexample passed.
+- Independent reviewer results remain PENDING; full-validator reachability for all three Horner rejection sites is not claimed.

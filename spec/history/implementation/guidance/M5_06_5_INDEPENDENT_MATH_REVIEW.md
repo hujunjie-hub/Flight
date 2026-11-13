@@ -466,3 +466,8 @@ R10 撤回 R9 的固定系数不可行结论：S06-104 现在只给出各通道�
 ### R30.1：分支计数互斥修正
 
 首轮 CI 的三个 branch-counter 断言失败后，生产构建路径增加系数构造、速度缩放和加速度缩放的阶段性 fail-fast。非有限值在本阶段立即返回，不再让下游缩放/误差估计产生次生 trace。六类计数仍是 test-only 0/1，安全拒绝行为保持 fail-closed。
+
+
+### R30.2：远程 CI 结果（代码基线 80670f）
+
+Host validation #43417453111 6/6、M6/M7 host validation #43417453109 5/5、M7 host validation #43417452817 2/2 jobs SUCCESS。M5 Host 322,299/0；MR-009 focused 430/0；M5 与 focused ASan/UBSan 322,299/0、430/0；M4/M5 Integration ASan/UBSan 1,075/0。S06-115 无随机 seed。状态仍 WAITING_INDEPENDENT_REVIEW。

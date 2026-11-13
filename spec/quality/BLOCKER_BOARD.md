@@ -1,14 +1,14 @@
-# Flight M5-06 阻塞项视图（R32）
+# Flight M5-06 阻塞项视图（R33）
 
-> **2026-11-13 规范同步后 CI 快照（验证基线 `b6b2c8d1fbe2483ac76164993e7798a18af1e697`）**：Host validation、M6/M7 host validation、M7 host validation 分别 6/6、5/5、2/2 jobs SUCCESS。Spec Audit 145 types / 8 checks PASS；生产 ABI 144 types / 0 spec mismatch / 0 unexpected Host/ARM PASS；M4/M5/M6/M7 Host、Sanitizer、runtime SIL 和 Cortex-M7 模块编译通过。具体运行见 `spec/09_需求验证实施与发布管理.md`。
+> **2026-11-13 MR-009 R30.1 CI 快照（代码验证基线 `80670f118c5fdccce5a1f00f218a58a66c28bd5e`）**：Host validation、M6/M7 host validation、M7 host validation 分别 6/6、5/5、2/2 jobs SUCCESS。M5 Host 322,299/0；MR-009 focused 430/0；M5 ASan/UBSan 322,299/0；M4/M5 Integration ASan/UBSan 1,075/0。Spec Audit 145 types / 8 checks PASS；生产 ABI 144 types / 0 mismatch PASS；Cortex-M7 M4/M5/M6/M7 模块编译 PASS。具体运行见 `spec/09_需求验证实施与发布管理.md`。
 
 > **当前阻塞状态**：B01 Spec Audit 与 B02 ABI 在当前实现基线通过；B03 包锁在 2026-11-12/13 接管复验中已固定并通过，但本轮三组 CI 未单独重跑 package-lock job；B04 的 M4/M5 测试配置链接在接管复验中通过，完整 Release 产品链接/目标运行仍需单独确认；B05 MR-009 独立数学审查仍 WAITING；B06 Release `-O2` 静态最坏链 3,864/4,096 B PASS，`-O0` 历史分析为 UNKNOWN；B07 H723 实机、WCET/RTA、RAM/stack watermark、HIL 与飞行 NOT_RUN。FLIGHT-LOCAL-54 enum-size 警告仍 OPEN。
 
 > **资源更新**：ICD/M4 参考表已加入两个 `GroundStopCertificate` 快照（2×112 B）；按上轮 232 B 余量扣除 224 B 后估算仅余 8 B。FLIGHT-LOCAL-27 继续 OPEN / RISK，必须重跑 `tests/guidance/check_memory_budget.py` 和最终 map。下方 R29/B01–B06 细节保留为历史记录，不作为当前状态。
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
-RUN_ID `M5-06-R32-20261113`；validated code `b6b2c8d1fbe2483ac76164993e7798a18af1e697`；
-remote HEAD `b6b2c8d1fbe2483ac76164993e7798a18af1e697`；
+RUN_ID `M5-06-R33-20261113`；validated code `80670f118c5fdccce5a1f00f218a58a66c28bd5e`；
+code-validation HEAD `80670f118c5fdccce5a1f00f218a58a66c28bd5e`；
 ahead 动态计算；branch `opt/stage-02-m5-06-safety-validator`。
 
 本文件所有结论均为本地 Host/SIL/Cortex-M7 编译证据，不是 H723 实机、HIL、
@@ -68,12 +68,12 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 |---|---|
 | Issue | FLIGHT-LOCAL-04 |
 | 状态 | **WAITING_INDEPENDENT_REVIEW**；未 APPROVED，Agent 不自行批准。 |
-| 已实现 | 逐级 Horner 上界 `H_n=|c_n|`、`H_k=|c_k|+s_max*H_(k+1)`；每级 product/sum 向外取整；isfinite/FLT_MAX 检查；Position/Velocity/Acceleration 及 vf/af 缩放路径。 |
-| 已测试 | R28 新增 `m5_safety_mr009_horner_bound_extremes`、`m5_safety_mr009_extreme_reference`；S06-112 420/0；S06-108 96/0；S06-113 76/0。 |
-| 尚未证明 | 独立审查签字；编译器未来重排/FMA 变化；M6 区间外插值；Host FTZ/DAZ 的完整目标等价性。 |
-| 前置条件 | `s_max` 上界、系数有限、无 contraction/fast-math、round-to-nearest、产品包线内输入。 |
-| 解除条件 | 独立数学审查逐项 APPROVED；S06-100..102 状态明确。 |
-| 下一步 | 提交证明文件、R28 测试日志和 B06 分析给审查者。 |
+| 已实现 | R30.1 逐级传播 binary32 rounded Horner product/sum 上界；对每一级乘法和加法按 RN ties-to-even overflow midpoint T_RN=2^128-2^103 严格 fail-closed；正规/次正规混合误差界；系数构造、速度缩放、加速度缩放遇首个非有限值即短路。 |
+| 已测试 | S06-115 固定 exact-H 漏洞反例；M5 Host 322,299/0；MR-009 focused 430/0；M5 ASan/UBSan 322,299/0；focused ASan/UBSan 430/0；Integration ASan/UBSan 1,075/0；Host/M6-M7/M7 三组 CI 6/6、5/5、2/2 SUCCESS。 |
+| 尚未证明 | 独立审查签字；degree 5/4/3 Horner 拒绝点完整 validator 可达性；M6 区间外插值；FP contraction/目标舍入环境等价。 |
+| 证据 | R30 matrix：spec/quality/owner_approval/R30/05_MR009_INDEPENDENT_REVIEW_MATRIX.md；Host validation #43417453111；M6/M7 #43417453109；M7 #43417452817。 |
+| 解除条件 | 独立数学审查逐项 APPROVED；S06-100..102 状态明确；其余实机门禁另行完成。 |
+| 下一步 | 交 R30 rounded recurrence、S06-115 反例、CI 日志和完整 validator reachability limitation 给独立审查者。 |
 
 ## B06 Validator 栈预算
 
