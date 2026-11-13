@@ -807,9 +807,13 @@ static double evaluate_bernstein(const double *control, unsigned degree, double 
  * consumer_power_coefficients() replicates the consumer's binary32 coefficient
  * computation operation for operation. consumer_eval_error_bound() then bounds
  *   (a) the difference between the consumer's coefficients and the exact ones,
- *   (b) the Horner evaluation rounding, and
- *   (c) up to four fused multiply-add operations that the production build may
- *       emit because -ffp-contract is not pinned there yet (MR-009 item 5).
+ *   (b) the separate binary32 Horner multiply/add roundings.
+ *
+ * The M6 production flags in rtconfig.py pin -ffp-contract=off,
+ * -frounding-math and -fexcess-precision=standard. The CI gate also compiles
+ * control_reference.c with those exact production flags and scans the emitted
+ * Cortex-M7 object for fused multiply/add instructions. A future toolchain or
+ * flag change that emits one fails the gate and requires a new proof review.
  * The bound is evaluated at s_max = h * u1 and is therefore valid for the whole
  * sub-interval; subdivision cannot reduce a systematic bias, which is why this
  * term must not be absorbed by clearance_margin_m.

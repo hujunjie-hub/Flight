@@ -488,6 +488,8 @@ c0 = c1 = c2 = 0
 
 S06-115 同时断言：理想 H_k 均小于 FLT_MAX、幅度项小于 FLT_MAX/16、真实 volatile binary32 Horner 在 k=3 发生非有限、生产 consumer_eval_error_bound() 返回 +Inf、对应 test-only branch counter 恰为 1。
 
+**产品域边界：** S06-115 的 `s=0x1.8f5c28p-2f` (~0.39) 是 helper 级对抗输入，不属于 M5-06 当前产品时间域。`PRODUCT_PREVIEW_STEP_US=20000u`，M5-06 仅接受 20 ms preview 间隔；在 `u1<=1` 下，生产调用的 `s_eval_max` 约为 0.020000002。S06-115 证明理想 H_k 递推不能普遍替代实际 rounded-intermediate 传播，但不声称旧漏洞反例可由当前产品域的完整 Validator 输入触发。degree 5/4/3 的 helper 拒绝测试另有 `s_max=0.02` 的测试路径；其系数仍是直接构造的 adversarial helper 输入，不代表已证明完整 Validator 可达。
+
 ### 26.4 分支证据与边界
 
 - Test-only 计数器对系数构造、速度缩放、加速度缩放、position/velocity/acceleration Horner 六类拒绝分别记录 0/1 命中；保留 first-stage enum。

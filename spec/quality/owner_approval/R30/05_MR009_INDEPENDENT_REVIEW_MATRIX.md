@@ -70,29 +70,41 @@ thresholds remain unchanged.
   reference tests, floating-environment tests and the real C time-conversion
   path.
 
-**Important limitation:** the degree-5/4/3 Horner branch tests use the production
-helper directly. They do not claim that all three Horner rejection sites have
-been reached through a complete m5_trajectory_safety_validate() input. The
-independent reviewer must decide whether the helper-level proof plus full
-validator status tests satisfy the production-path obligation, or request
-additional full-validator fixtures.
+**Important limitations (must be reviewed explicitly):** the degree-5/4/3
+Horner branch tests call the production helper directly. They do not claim that
+all three Horner rejection sites have been reached through a complete
+m5_trajectory_safety_validate() input.
+
+S06-115 uses `s=0x1.8f5c28p-2f` (~0.39), deliberately outside the current
+M5-06 product time domain. The product contract sets
+`PRODUCT_PREVIEW_STEP_US=20000u`; the M5-06 validator requires the 20 ms
+preview spacing and `u1<=1`, so production `s_eval_max` is approximately
+0.020000002. The degree-specific helper stress tests also include `s_max=1.0`
+cases and a separate `s_max=0.02` branch-stage case, but their coefficients
+are directly constructed and are not claimed to be reachable from a full
+validator input. The M6 locator also supports 40 ms route previews; M5-06
+does not claim to validate those 40 ms references.
+
+The independent reviewer must decide whether the production-helper tests plus
+full-validator coefficient/scaling status tests satisfy the production-path
+obligation, or request additional full-validator fixtures.
 
 ## 5. Independent proof checklist
 
-| Proof obligation | R30 evidence | Reviewer result |
-|---|---|---|
-| Consumer coefficient identity | Existing shared coefficient construction and consumer source comparison | PENDING |
-| Position Horner | Degree-5 rounded recurrence; S06-115 exact-H counterexample | PENDING |
-| Velocity Horner | Degree-4 rounded recurrence and stage counter | PENDING |
-| Acceleration Horner | Degree-3 rounded recurrence and stage counter | PENDING |
-| Binary32 RN rounding | u=2^-24, eta=2^-149, propagated rounded intermediate bounds | PENDING |
-| Intermediate overflow | Strict comparison against T_RN=2^128-2^103 for every product and sum | PENDING |
-| Coefficient scaling overflow | Full-validator trace for velocity and acceleration scaling | PENDING |
-| Time conversion | Existing gamma_2, enlarged s_eval_max, derivative shift evidence | PENDING |
-| FP contraction | Existing compile flags and object-code audit; re-run for R30 commit | PENDING |
-| Rounding mode / FTZ / DAZ | Focus runner includes existing Host negative tests; Cortex-M7/FPSCR equivalence review remains | PENDING |
-| M6 interval domain | No extrapolation outside validated s_eval_max | PENDING |
-| Full-validator Horner reachability | Helper-level branch counters only; full-validator reachability explicitly not claimed | PENDING |
+| Proof obligation | R30 evidence | Evidence status | Reviewer result |
+|---|---|---|---|
+| Consumer coefficient identity | S06-086 real C `control_sample_reference()` differential (314,731/0); validator coefficient operation-order replica; consumer/validator source hashes recorded by FP audit | READY | PENDING |
+| Position Horner | Degree-5 rounded recurrence; S06-115 exact-H counterexample; production-helper 0/1 counter | READY; S06-115 is outside product time domain | PENDING |
+| Velocity Horner | Degree-4 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PENDING |
+| Acceleration Horner | Degree-3 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PENDING |
+| Binary32 RN rounding | `u=2^-24`, `eta=2^-149`; normal/subnormal upward bound propagated after every product and sum | READY | PENDING |
+| Intermediate overflow | Strict `P_k/A_k < T_RN=2^128-2^103` before capping a rounded upper bound at FLT_MAX | READY | PENDING |
+| Coefficient scaling overflow | Full-validator coefficient/velocity-scaling/acceleration-scaling fail-fast traces; NUMERIC_FAILURE / NUMERIC / passed=0 | READY | PENDING |
+| Time conversion | S06-099: 60,002 offsets, max ratio 4.897714e-08 < gamma2 1.192093e-07; S06-108/109/113: 96/96/76 checks; derivative shift uses enlarged s_eval_max | READY | PENDING |
+| FP contraction | R30.1 ARM audit: GCC 14.2.1; production consumer object SHA256 `26966662352c95e8d63b9cefa1bd00300d807ab927bc9bcd5fd854f0539e729f`; validator object SHA256 `b001a3807a2cbb34607c3cc1d1e4b2332995225c54ffdcc42d60e9f64c87cb7d`; both report 0 fused operations and model_check MATCH | READY | PENDING |
+| Rounding mode / FTZ / DAZ | Host negative tests cover FE_DOWNWARD/UPWARD/TOWARDZERO and MXCSR FTZ/DAZ; ARM runtime gate reads FPSCR.RMode/FZ/DN; Cortex-M7 runtime equivalence remains review-only | HOST_TESTED / ARM_RUNTIME_NOT_RUN | PENDING |
+| M6 interval domain | M5-06 requires 20 ms intervals; `s_eval_max≈0.020000002`; M6 locator rejects offsets beyond the preview horizon; 40 ms route previews are outside M5-06 validation scope | READY | PENDING |
+| Full-validator Horner reachability | Direct production-helper branches are tested; no full-validator reachability claim; reviewer to accept this boundary or request fixtures | REVIEW_DECISION_REQUIRED | PENDING |
 
 ## 6. Required result semantics
 
@@ -142,3 +154,36 @@ Validated code commit: 80670f118c5fdccce5a1f00f218a58a66c28bd5e.
 - M5 Host 322,299/0; focused runner 430/0; M5 ASan/UBSan 322,299/0; focused ASan/UBSan 430/0; integration ASan/UBSan 1,075/0.
 - S06-115 deterministic no-seed exact-H counterexample passed.
 - Independent reviewer results remain PENDING; full-validator reachability for all three Horner rejection sites is not claimed.
+
+
+## 10. R30.2 review handoff packet
+
+### Code and review baselines
+
+- Branch: `opt/stage-02-m5-06-safety-validator`.
+- R30 rounded-intermediate implementation: `6dc0e5411409244a137f9b5663c5daea08b5f81e`.
+- R30.1 fail-fast code baseline: `80670f118c5fdccce5a1f00f218a58a66c28bd5e`.
+- R30 proof: `spec/history/implementation/guidance/M5_06_6_MR009_PROOF.md`.
+- Production validator: `middleware/guidance/trajectory_planning/m5_trajectory_safety.c`.
+- M6 consumer: `middleware/model/control/outer_loop/quad_x4/position_tracking/control_reference.c`.
+- Focused C tests/runner: `tests/guidance/test_m5_main.c`, `tests/guidance/mr009_focus_main.c`, `tests/guidance/run_mr009_focus.sh`.
+- FP build/object audit: `rtconfig.py`, `tests/guidance/check_consumer_fp_contraction.py`.
+
+### Reproducible remote evidence
+
+- Host validation #43417453111: 6/6 jobs SUCCESS; M5 Host 322,299/0; MR-009 focused 430/0; M5 ASan/UBSan 322,299/0; focused ASan/UBSan 430/0; integration ASan/UBSan 1,075/0.
+- M6/M7 host validation #43417453109: 5/5 jobs SUCCESS.
+- M7 host validation #43417452817: 2/2 jobs SUCCESS.
+- FP audit job 131858854716, within Host validation #43417453111: `model_check=MATCH`, compiler `arm-none-eabi-gcc 14.2.1 20241119`, production consumer and validator objects each `fused_operations=0`. The consumer object uses the exact `rtconfig.py` production flags including `-ffp-contract=off -frounding-math -fexcess-precision=standard`.
+- FP source SHA256: validator `0335e8322ae68a8ed244d845e5cf332ae90748be62aad8a6dc2a31e89b3c9300`; consumer `48fa1f629380ce354617af7082e7f19bd81974f00f9b9c126c9b4c690ff1c31b`.
+- Current branch HEAD at handoff preparation: `5c6de06aa29c2da419c55c44ebc5f840f428fe1b`; commits after code baseline `80670f` are documentation-only. Current-HEAD workflows #43418465763 (Host), #43418465852 (M6/M7), and #43418465793 (M7) also completed successfully.
+- Remote artifacts: `m4-m5-host-regression` ID `14032860881`, `m5-cortex-m7-compile` ID `14032780901`, `abi-evidence` ID `14032786372`. No local evidence ZIP is claimed.
+
+### Review disposition
+
+Evidence state: **READY_FOR_INDEPENDENT_REVIEW**. Reviewer state: **NOT_ASSIGNED**. No PR review submission is recorded for PRs #1–#7; PR #2 remains CLOSED / DRAFT / UNMERGED. The reviewer must be independent of the code author and must fill every row in §5 with `APPROVED`, `REJECTED`, or `NEEDS_INFO`, including the explicit full-validator reachability limitation. CI PASS is not an approval.
+
+Reviewer GitHub login: `TBD`  
+Review date: `TBD`  
+Disposition: `APPROVED / REJECTED / NEEDS_INFO`  
+Assumptions and unresolved items: `TBD`
