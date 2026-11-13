@@ -81,6 +81,24 @@ The third run verifies certificate authority/directive epoch binding, rejection 
 
 The concurrency follow-up is committed as `907ce7fac83f476fa0d840004a9559f220d7e9a7`; CI run [43363758248](https://github.com/hujunjie-hub/Flight/actions/runs/43363758248) completed SUCCESS (3/3 jobs). It serializes the terminal ground-stop latch, permit updates, and actuator stop/reset through the same lock.
 
+## Fifth CI run — require permit revocation before ground stop
+
+- Commit: `80510c7d6575ec728663118a3b9e403706e2c74f`
+- Workflow run: [43363924238](https://github.com/hujunjie-hub/Flight/actions/runs/43363924238)
+- Overall result: **SUCCESS** (3/3 jobs)
+
+| Gate | Result | Checks | Failures |
+|---|---|---:|---:|
+| M4 host | PASS | 993 | 0 |
+| M5 host | PASS | 9,515 | 0 |
+| M4/M5 integration | PASS | 1,066 | 0 |
+| M6 MPC | PASS | 15 | 0 |
+| M6 input/time + outer lifecycle | PASS | 26 | 0 |
+| M7 actuator / ground stop | PASS | 255 | 0 |
+| M6/M7 ASan + UBSan | PASS | Re-ran M6/M7 suites | 0 |
+
+M7 now rejects an epoch-matching ground-stop certificate while the CONTROL_ACTIVE permit is still live. The certificate must match the current permit's authority/directive epochs and the current permit must already carry `PERMIT_FLAG_REVOKED`. The 11,870 unique Host checks pass; Sanitizer repeats M6/M7 without failures.
+
 ## Safety boundary
 
 Host tests prove only the exercised software paths. They do not establish target WCET, board integration, DShot waveform timing, physical motor response, HIL acceptance, or flight readiness. The production H723 build remains `BENCH_INHIBIT`; `SIM_CONTROLLED_STOP` is enabled only for the host test build.
