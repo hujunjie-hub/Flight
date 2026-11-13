@@ -34,10 +34,10 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 |---|---|---|---|---|---|
 | FLIGHT-LOCAL-01 | S2 | Windows 检出把 *.sh 转 CRLF | R2 修复；`tools/check_line_endings.py` | line_endings PASS | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-02 | S2 | Cortex-M7 只编译 8/14 M5 源 | R2 补全 | M5 ARM 14 对象 | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-03 | S2 | packages/SConscript 缺失，链接 BLOCKED | R3 3d45132 安装并链接 | check_target_build PASS（Flight.elf) | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-03 | S2 | 历史 packages/SConscript 缺失导致链接阻塞 | R3 安装；2026-11-12/13 三包 commit 锁定并核对安装 HEAD | M5-06 接管复验：M4/M5 测试配置 Flight.elf 链接 PASS；完整 Release 产品链接/目标运行仍需复核 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-04 | S2 | MR-009 消费曲线/验证曲线数值路径不一致 | 多轮修复；R16 三类 jerk | S06-085..093、112 | OPEN / WAITING_INDEPENDENT_REVIEW |
-| FLIGHT-LOCAL-05 | S2 | spec/ABI 证据钉住 CRLF 哈希 | R3 efc28d7 LF 重基线 | spec audit PASS；ABI PASS 143/0 | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-06 | S2 | RT-Thread 三个包均为 latest | R3 efc28d7 commit 固定 | packages_lock PASS；14 负向用例 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-05 | S2 | spec/ABI 证据曾钉住 CRLF 哈希 | R3 efc28d7 LF 重基线 | 当前 CI：Spec Audit 145 types / 8 checks PASS；生产 ABI 144 types / 0 mismatch / 0 unexpected Host/ARM | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-06 | S2 | RT-Thread 三个包曾使用 latest，依赖不可复现 | OWNER 批准后固定三个 40-hex commit；跟踪源与锁文件一致 | `check_rt_packages_lock.py` PASS；14 个负向用例；当前 Host CI 未单独重跑此 job | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-07 | S1 | 验收脚本 assert 可被 -O 剥离 | R2 修复 | test_audit_optimized PASS | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-08 | S1 | 围栏净空未减消费曲线误差 | R5 修复 | S06-097 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-09 | S2 | FP 圆整/环境假设缺运行时证据 | R5 修复 | S06-098 | FIXED_WAITING_RETEST |
@@ -58,7 +58,7 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-24 | S1 | R16 选了 4,128 的短路径；R17 真实路径 4,232；R18 SP 修正 4,248 | R17 分析修正 | 本文件/analysis_p2 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-25 | S0 | H723 栈水位/WCET/RTA/HIL/实机避障 NOT_RUN | 无硬件；B07 | NOT_RUN | BLOCKED |
 | FLIGHT-LOCAL-26 | S1 | `roll_map_to_position` 旧栈拷贝 32,840 B，Planner 产品化阻断 | R18/R19 逐轴原地滚动；R22 完整 40+64+24=128 B | 1000-case random + deterministic；legacy 32,840 B Host-only | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-27 | S2 | ICD+M4 静态余量仅 232 B（48,920 / 49,152 B） | 未扩大预算；每次静态布局变更复算 | memory_budget PASS + WARN | OPEN / RISK |
+| FLIGHT-LOCAL-27 | S2 | ICD+M4 静态余量在加入 GroundStopCertificate 双快照后估算仅 8 B | 不扩大 48 KiB 上限；当前表已计入 2×112 B，必须重跑预算与最终 map | 旧基线 232 B；扣除新增 224 B 后估算 8 B；本轮待重新执行 `check_memory_budget.py` | OPEN / RISK |
 | FLIGHT-LOCAL-28 | S1 | S06-112 把所有 C API 拒绝都计为预期 fail-closed，可能掩盖合法样本意外拒绝 | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 状态码区分；次正规仅接受 NUMERIC | S06-112 140 legal/20 subnormal status=2 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-29 | S2 | R18 地图原地滚动报告 104 B，漏算 map_cell_at 24 B；真实 128 B | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 反汇编/.su 修正 | roll 40 + axis 64 + map_cell_at 24 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-30 | S2 | R18 Manifest 归档字段/外部 sidecar 未闭环 | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 archive script + external report | r19 archive report/sidecar | FIXED_WAITING_RETEST |
@@ -76,7 +76,7 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-51 | S1 | 回归入口接受空选择、错误 SHA 或以 0 退出掩盖门禁失败 | `36d7b7c` 校验选择和 HEAD，传播结果，按 RUN_ID 准备清单 | T24、T30，本地 8 项通过 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-52 | S1 | 静态栈分析会放过可达帧冲突或无界动态帧，递归会崩溃 | `36d7b7c` 对不完整帧证据返回 UNKNOWN | T26、T27、T29，8 项自测 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-53 | S1 | 固件验证链接前只核对包锁声明，安装源码可能偏离锁定 commit | `36d7b7c` 在链接前核对实际 HEAD 和跟踪源文件 | T14、T18、T22，HAL 头文件负向对照 | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-54 | S2 | GNU ld 报告 32 位枚举对象与输出 enum-size 属性不一致 | 链接日志已保留，待 ABI 负责人核对边界和工具链库属性 | T18 链接 exit 0，T17 143 类型 / 981 偏移 / 0 mismatch | OPEN |
+| FLIGHT-LOCAL-54 | S2 | GNU ld 报告 32 位枚举对象与输出 enum-size 属性不一致 | 链接日志已保留，待 ABI 负责人核对边界和工具链库属性 | T18 链接 exit 0；当前生产 ABI CI 144 types / 0 spec mismatch，但 Tag_ABI_enum_size 警告仍待 ABI 负责人确认 | OPEN |
 | FLIGHT-LOCAL-55 | S1 | Ubuntu CI 的 spec/ABI 检查硬编码 Windows 编译器路径 | 使用平台工具链查找，CI 安装 ARM/Newlib 和 MinGW | WSL、Windows 和 Host validation 复验 | FIXED_WAITING_RETEST |
 
 历史 draft 01–20 保留在 `build/validation/issue_drafts/`；本表按根因去重，不删除
@@ -89,3 +89,8 @@ FLIGHT-LOCAL-51..54 的复现与复测见 `M5-06-TAKEOVER-20261113` 归档内 `b
 
 FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o` 和 `Flight.elf` 的 `Tag_ABI_enum_size` 为 `small`，项目 `board.o` 为 `int`。ABI 负责人待确认跨对象接口影响，现有 `-fno-short-enums` 和 ABI 锁继续生效。
 
+## 2026-11-13 当前分支 CI 复核
+
+当前实现基线 `2a0237bf42963f5a4457af24da1b713cd6f957d1`（`opt/stage-02-m5-06-safety-validator`）的 Host validation、M6/M7 host validation、M7 host validation 均 SUCCESS，详见 `spec/09_需求验证实施与发布管理.md`。CI 对 Spec Audit、生产 ABI、M4/M5/M6/M7 Host、Sanitizer、runtime SIL 和 Cortex-M7 模块编译提供当前基线证据。
+
+本轮 CI 不会自动关闭本地问题；`FIXED_WAITING_RETEST` 仍须独立复验。FLIGHT-LOCAL-27 因 GroundStopCertificate 双快照重新计入后只估算剩余 8 B，继续 OPEN / RISK。FLIGHT-LOCAL-54 的 enum-size 属性差异仍 OPEN。GitHub Issue 发布状态仍为 `GITHUB_PUBLICATION = PENDING`。本次 SPEC 同步 commit 的验证必须重新运行，不继承上述旧 SHA 的 PASS。

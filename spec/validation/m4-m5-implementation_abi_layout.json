@@ -2,11 +2,11 @@
   "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
   "scope": "SPEC_ARM_ABI_COMPILE",
   "production_firmware_validation": "NOT_RUN",
-  "icd_sha256": "cf00fcc6b1d7081d07f6af85f29bc0b585c3d42fee5c44cfea269aa40a9edd98",
-  "private_control_spec_sha256": "5270517b172179674e390cccc00fcffa8208ea6484d4a315d9995aff4bb34ef2",
-  "compiler": "arm-none-eabi-gcc.exe (GNU Tools for STM32 14.3.rel1.20251027-0700) 14.3.1 20250623",
-  "c_blocks_total": 42,
-  "quad_c_blocks": 40,
+  "icd_sha256": "7378687c2e9978ab21372dd8d1f05ea3eb63986b6211d41269511ee8460eeeef",
+  "private_control_spec_sha256": "cd47ec3e4404f57c9f29116f84362704456638fcdcbccc7bb43ba753be0ee693",
+  "compiler": "arm-none-eabi-gcc (15:14.2.rel1-1) 14.2.1 20241119",
+  "c_blocks_total": 43,
+  "quad_c_blocks": 41,
   "commands": [
     {
       "language": "c11",
@@ -20,7 +20,7 @@
         "-Werror",
         "-fno-short-enums"
       ],
-      "values_sha256": "cfc3ce9d3195a3177d9e3091ed07238cfeb8fec19efb4a213d0b4664a6f2eda3"
+      "values_sha256": "d902717def64b37a973d24854c2c11facc60b65d071c0e5ae0e0bb9ef668c1f4"
     },
     {
       "language": "c++14",
@@ -36,7 +36,7 @@
         "-fno-exceptions",
         "-fno-rtti"
       ],
-      "values_sha256": "cfc3ce9d3195a3177d9e3091ed07238cfeb8fec19efb4a213d0b4664a6f2eda3"
+      "values_sha256": "d902717def64b37a973d24854c2c11facc60b65d071c0e5ae0e0bb9ef668c1f4"
     }
   ],
   "layouts": {
@@ -81,36 +81,6 @@
       "offset:timer_instance": 40,
       "offset:channel": 42,
       "offset:flags": 43
-    },
-    "RawIngressBatchDescriptor": {
-      "size": 88,
-      "alignment": 8,
-      "offset:boot_id": 0,
-      "offset:time_epoch": 8,
-      "offset:source_mapping_epoch": 12,
-      "offset:capture_ticks64": 16,
-      "offset:capture_time_us": 24,
-      "offset:dma_start_time_us": 32,
-      "offset:dma_complete_time_us": 40,
-      "offset:spi_eot_time_us": 48,
-      "offset:event_sequence": 56,
-      "offset:sensor_instance_id": 60,
-      "offset:generation": 64,
-      "offset:clock_domain_id": 68,
-      "offset:acquisition_flags": 72,
-      "offset:event_time_uncertainty_us": 76,
-      "offset:payload_length_bytes": 80,
-      "offset:sample_count": 82,
-      "offset:timestamp_quality": 84,
-      "offset:reserved": 85
-    },
-    "RawIngressLease": {
-      "size": 104,
-      "alignment": 8,
-      "offset:descriptor": 0,
-      "offset:payload_bytes": 88,
-      "offset:lease_id": 92,
-      "offset:generation": 96
     },
     "TimeQuality": {
       "size": 4,
@@ -1639,6 +1609,17 @@
       "offset:seed_position_ned_m": 172,
       "offset:seed_velocity_ned_mps": 184,
       "offset:solver_status": 196
+    },
+    "GroundStopCertificate": {
+      "size": 112,
+      "alignment": 8,
+      "offset:header": 0,
+      "offset:stop_code": 88,
+      "offset:lifecycle": 90,
+      "offset:ramp_nps": 92,
+      "offset:authority_epoch": 96,
+      "offset:directive_epoch": 100,
+      "offset:certificate_expires_at_us": 104
     }
   }
 }

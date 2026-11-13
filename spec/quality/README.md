@@ -60,4 +60,4 @@ GitHub 自动生成的 Issue number 是唯一编号。项目内引用统一写�
 
 ## 当前约束
 
-M5-06 当前仍是 Host/SIL 独立验证阶段。S06 测试 CI 通过不等于 MR-001..MR-008 全部数学审查通过；M5-06 独立审查未 APPROVED 前，不得开始 M5-07。H723/NONE 不具备在线避障放行。
+M5-06 仍处于 Host/SIL 独立安全验证阶段；MR-009 独立数学审查未 APPROVED、S06-100..102 未完成、B07 未通过前，不得开始 M5-07。当前 stage-02 分支已集成 M4→M7 GroundStopCertificate runtime handoff，并通过 Host/SIL 显式 DISARM、first-reference timeout 和 ground-stop ramp 测试；这只证明软件路径，不证明 H723 实机输出或 ESC 推力响应。H723 仍为 `OBSTACLE_SOURCE_MODE=NONE / BENCH_INHIBIT`，不具备在线避障或实机受控停机放行。

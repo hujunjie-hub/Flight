@@ -28,9 +28,10 @@ UDP 桥的端到端转发（不需要硬件）。接线与边界见 `doc/simulat
 ```bash
 bash tests/control/run_host_tests.sh
 bash tests/actuation/run_host_tests.sh
+bash tests/simulation/run_sil.sh
 ```
 
-两项测试分别编译实际控制器/OSQP 工作区和实际 actuator output guard。GitHub Actions 在 `test/fmat-0012-m6-controller` 推送时执行 M4/M5、M6/M7 Host 回归及 M6/M7 ASan/UBSan；Host 通过不代表目标板、HIL 或飞行验收通过。
+前两项分别编译实际控制器/OSQP 工作区和实际 actuator output guard；`tests/simulation/run_sil.sh` 编译真实 runtime owner，覆盖 M4→M7 ground-stop handoff、显式 DISARM 和 first-reference timeout。GitHub Actions 在 `test/fmat-0012-m6-controller` 与 `opt/**` 分支推送时执行 M4/M5、M6/M7 Host 回归、M6/M7 ASan/UBSan、Cortex-M7 模块编译和 SIL。Host/SIL 通过不代表 H723 目标板、物理 ESC、HIL 或飞行验收通过。
 
 ## 板上 utest
 

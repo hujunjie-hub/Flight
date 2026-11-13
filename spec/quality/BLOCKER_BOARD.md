@@ -1,8 +1,10 @@
-# Flight M5-06 阻塞项视图（R29）
+# Flight M5-06 阻塞项视图（R31）
 
-> **2026-11-13 接管复验**：B01–B04 和 B06 在 `36d7b7c` 上本地通过。B06 的 3,864 B 是 `-O2` 专用 Cortex-M7 镜像的静态分析结果。B05 等待独立审查，B07 与 S06-100..102 为 NOT_RUN。固件链接的 enum-size 警告见 FLIGHT-LOCAL-54。正式验收记录见 `spec/09_需求验证实施与发布管理.md`。
+> **2026-11-13 当前分支 CI 快照（实现基线 `2a0237bf42963f5a4457af24da1b713cd6f957d1`）**：Host validation、M6/M7 host validation、M7 host validation 分别 6/6、5/5、2/2 jobs SUCCESS。Spec Audit 145 types / 8 checks PASS；生产 ABI 144 types / 0 spec mismatch / 0 unexpected Host/ARM PASS。M4/M5/M6/M7 Host、Sanitizer、runtime SIL 和 Cortex-M7 模块编译通过。该快照不代表本次文档提交的新 SHA 已通过 CI。
 
-> **R30 更新（2026-11-12，commit `efc28d7`）**：B01、B02、B03 经 OWNER 批准完成重基线后为 **PASS**；B04 固件链接 **PASS**（`Flight.elf` text 458,604 / data 15,732 / bss 267,656）；B06 为 **PASS**（3,864 B <= 4,096 B，调用图 COMPLETE）。下方 B01–B06 段落保留为历史描述。
+> **当前阻塞状态**：B01 Spec Audit 与 B02 ABI 在当前实现基线通过；B03 包锁在 2026-11-12/13 接管复验中已固定并通过，但本轮三组 CI 未单独重跑 package-lock job；B04 的 M4/M5 测试配置链接在接管复验中通过，完整 Release 产品链接/目标运行仍需单独确认；B05 MR-009 独立数学审查仍 WAITING；B06 Release `-O2` 静态最坏链 3,864/4,096 B PASS，`-O0` 历史分析为 UNKNOWN；B07 H723 实机、WCET/RTA、RAM/stack watermark、HIL 与飞行 NOT_RUN。FLIGHT-LOCAL-54 enum-size 警告仍 OPEN。
+
+> **资源更新**：ICD/M4 参考表已加入两个 `GroundStopCertificate` 快照（2×112 B）；按上轮 232 B 余量扣除 224 B 后估算仅余 8 B。FLIGHT-LOCAL-27 继续 OPEN / RISK，必须重跑 `tests/guidance/check_memory_budget.py` 和最终 map。下方 R29/B01–B06 细节保留为历史记录，不作为当前状态。
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
 RUN_ID `M5-06-R29-20261111`；validated code `fd8198d2ac216fef87dafba73c252bb254ea3dd3`；
@@ -85,7 +87,7 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 | 第二/动态/静态 | 3,288 B / 1,944 B / 1,408 B（R16 链）；本轮未把它们相加。 |
 | 调用图 | `build/validation/regenerated/r29_stack_analysis.json`：状态 BLOCKED，callgraph_status UNKNOWN；libm `fmin/fmax/nextafter` 及动态/间接边显式记录，未知不得 PASS。 |
 | 未计入 | 调用者、异常/中断上下文、libm 实际帧、尾调用变化、target runtime；4,248 B 仍是下界。 |
-| 静态余量 | ICD+M4 为 48,920 / 49,152 B，余量 **232 B**；任何静态增长必须重算，不得扩大 48 KiB 上限。 |
+| 静态余量 | 历史基线为 48,920 / 49,152 B；加入 2×112 B GroundStopCertificate 后估算余量 **8 B**，需重跑 memory-budget 与最终 map；任何静态增长必须重算，不得扩大 48 KiB 上限。 |
 | 方案 A | 单轴 helper 拆分：降低 build_curve 帧，但增加调用深度与 WCET；需真实 .su/objdump 重算。 |
 | 方案 B | 区间数组复用：降低帧但增加生命周期/重入风险，需 ABI 与并发评审。 |
 | 方案 C | 固定 workspace：把临时数组移出栈，增加静态 RAM；与 232 B 余量冲突，必须 OWNER 批准。 |

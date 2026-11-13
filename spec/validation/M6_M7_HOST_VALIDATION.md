@@ -1,5 +1,7 @@
 # M6/M7 Host validation record
 
+> Historical sections below describe the earlier standalone `test/fmat-0012-m6-controller` branch at the time of each recorded run. Their branch-lineage and PR-state statements are historical snapshots. The current integrated stage-02 branch result is recorded in the final section below.
+
 ## Baseline
 
 - Repository: `hujunjie-hub/Flight`
@@ -267,3 +269,28 @@ No flight-readiness claim is made from this Host/SIL result. The zero-target rec
 - No merge/rebase performed. PRs #1–#4 remain Draft and branch-specific.
 
 Host/SIL now covers both explicit ground DISARM and first-reference-timeout task-to-actuator software paths. It does not establish physical output timing, ESC response, target timing or flight readiness.
+
+## Current integrated stage-02 branch — 2026-11-13
+
+- Repository: `hujunjie-hub/Flight`
+- Branch: `opt/stage-02-m5-06-safety-validator`
+- Implementation baseline: `2a0237bf42963f5a4457af24da1b713cd6f957d1`
+- [Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/43400605776): 6/6 jobs SUCCESS.
+- [M6/M7 host validation](https://github.com/hujunjie-hub/Flight/actions/runs/43400605749): 5/5 jobs SUCCESS.
+- [M7 host validation](https://github.com/hujunjie-hub/Flight/actions/runs/43400605682): 2/2 jobs SUCCESS.
+
+| Test | Checks / failures |
+|---|---:|
+| M4 Host | 1,002 / 0 |
+| M5 Host | 322,179 / 0 |
+| M4/M5 Integration | 1,075 / 0 |
+| M6 MPC | 15 / 0 |
+| M6 guard/input lifecycle | 26 / 0 |
+| M7 actuator guard | 274 / 0 |
+| Live FMS→M7 explicit DISARM SIL | 455 / 0 |
+| Live first-reference timeout SIL | 467 / 0 |
+| Ground-stop ramp SIL | 27 / 0 (18 frame commits, 58 inhibits) |
+
+M5 and M4/M5 integration ASan/UBSan each completed with 0 failures (322,179 and 1,075 checks). M6/M7 ASan/UBSan reran the 15-check MPC, 26-check M6 guard and 274-check M7 guard suites with 0 failures. Cortex-M7 M4/M5/M6/M7 module compile passed; MPC RAM 29,400 B, worker stack 8,192 B, largest static frame 2,024 B.
+
+**Remaining gates:** physical DShot apply-time/ESC response characterization, H723 product runtime, WCET/RTA, target RAM/stack watermark, physical HIL, calibration and staged flight remain NOT_RUN. H723 remains `BENCH_INHIBIT`. M5-06 independent mathematical approval remains BLOCKED; the M6/M7 software integration does not authorize M5-07 or flight. These results apply only to the implementation baseline above; a new SPEC-only commit requires fresh CI.
