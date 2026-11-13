@@ -243,3 +243,27 @@ The M7 PR #4 remains Draft on its own branch and its stated integration blockers
 5. **M5-06 independent safety approval: BLOCKED (P1).** The separate branch's mathematical and dynamic-uncertainty review remains outstanding; M6/M4/M5 Host regression is not a substitute.
 
 No flight-readiness claim is made from this Host/SIL result. The zero-target receipt is a software/bench contract result, not proof of physical motor response.
+
+
+## First-reference timeout task integration — Run #38
+
+- Tested code: `a314458f4ea35e06ed6145124ba63b1010d0b833`.
+- [CI #38](https://github.com/hujunjie-hub/Flight/actions/runs/43382987050): **4/4 jobs SUCCESS**.
+- Live first-reference scenario: **467 checks / 0 failures**. The test uses the real request queue and `task_mission_step()`; it withholds guidance through pre-arm and the first-reference grace period, then injects a valid reference at 110 ms. The production timeout uses strict `>` against 100 ms, so 100 ms exactly is still inside the window. FMS ground-disarms, publishes a matching certificate, and the real actuator owner produces `ZERO_TARGET_APPLIED`.
+- Live explicit DISARM scenario: **455 / 0**. Existing non-zero-to-zero ramp scenario: **27 / 0**, 18 commits, 58 inhibits.
+- Regression: M4 Host 1,002/0; M5 Host 9,515/0; M4/M5 integration 1,075/0; M6 MPC 15/0; M6 guard 26/0; M7 guard 274/0; ASan/UBSan PASS.
+- Runs #35–#37 were failed attempts at the new test fixture; the final correction removed pre-arm guidance and moved the late candidate beyond the strict timeout boundary. Do not count those runs as passing.
+
+### Current remaining acceptance gates
+
+1. **P0 — DShot physical apply-time characterization: PARTIAL.** Host/SIL observes software completion; H723 waveform capture and a bounded ESC application-time result are still required.
+2. **P1 — Target/physical validation: NOT_RUN.** H723 product build, WCET/RTA, RAM/stack, ESC response, HIL, calibration and staged flight remain outstanding. Keep `BENCH_INHIBIT`.
+3. **P1 — M5-06 independent safety approval: BLOCKED.** Independent review of Hermite→Bernstein conversion, derivative convex-hull bounds, outward interval assumptions and dynamic uncertainty proof coverage remains outstanding on the separate branch.
+
+### Branch lineage at tested code HEAD
+
+- M6 vs M5-06 HEAD `51e7e923419733f5aa3b21efa1e46588629623ed`: diverged, **65 ahead / 395 behind**, merge base `edf32b4e39cdae014aa76870dc821882807a6905`.
+- M6 vs M7 HEAD `24eee8acb3c10b79b8e306b00b1725d3fbc2614f`: diverged, **59 ahead / 2 behind**, merge base `b4ce6d0b3a2429d186fd5ec0563453322731db9b`.
+- No merge/rebase performed. PRs #1–#4 remain Draft and branch-specific.
+
+Host/SIL now covers both explicit ground DISARM and first-reference-timeout task-to-actuator software paths. It does not establish physical output timing, ESC response, target timing or flight readiness.
