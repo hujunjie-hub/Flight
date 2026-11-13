@@ -98,7 +98,7 @@ obligation, or request additional full-validator fixtures.
 | Velocity Horner | Degree-4 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PENDING |
 | Acceleration Horner | Degree-3 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PENDING |
 | Binary32 RN rounding | `u=2^-24`, `eta=2^-149`; normal/subnormal upward bound propagated after every product and sum | READY | PENDING |
-| Gamma upper arithmetic | For n=2/10/12: `nu` up, `1-nu` down, quotient up; non-positive denominator fails closed | READY | PENDING |
+| Gamma upper arithmetic | R30.3: for n=2/10/12, `nu` up, `1-nu` down, quotient up; non-positive denominator fails closed; source-token audit and mutation tests | CI_REVALIDATION_PENDING | PENDING |
 | Intermediate overflow | Strict `P_k/A_k < T_RN=2^128-2^103` before capping a rounded upper bound at FLT_MAX | READY | PENDING |
 | Coefficient scaling overflow | Full-validator coefficient/velocity-scaling/acceleration-scaling fail-fast traces; NUMERIC_FAILURE / NUMERIC / passed=0 | READY | PENDING |
 | Time conversion | S06-099: 60,002 offsets, max ratio 4.897714e-08 < gamma2 1.192093e-07; S06-108/109/113: 96/96/76 checks; derivative shift uses enlarged s_eval_max | READY | PENDING |
@@ -164,7 +164,7 @@ Validated code commit: 80670f118c5fdccce5a1f00f218a58a66c28bd5e.
 - Branch: `opt/stage-02-m5-06-safety-validator`.
 - R30 rounded-intermediate implementation: `6dc0e5411409244a137f9b5663c5daea08b5f81e`.
 - R30.1 fail-fast code baseline: `80670f118c5fdccce5a1f00f218a58a66c28bd5e`.
-- R30.3 gamma-factor directed-rounding hardening: current branch commit after the review-packet baseline; exact SHA and CI are recorded in the next evidence update.
+- R30.3 gamma-factor directed-rounding hardening: implementation commit `9af2d4864dfcc8bd4b9434749b67f3e5c2fd4e5a`; FP audit source-token/mutation-gate correction: `882028c6771180dbd997bcff19de48c88b617307`.
 - R30 proof: `spec/history/implementation/guidance/M5_06_6_MR009_PROOF.md`.
 - Production validator: `middleware/guidance/trajectory_planning/m5_trajectory_safety.c`.
 - M6 consumer: `middleware/model/control/outer_loop/quad_x4/position_tracking/control_reference.c`.
@@ -178,7 +178,7 @@ Validated code commit: 80670f118c5fdccce5a1f00f218a58a66c28bd5e.
 - M7 host validation #43417452817: 2/2 jobs SUCCESS.
 - FP audit job 131858854716, within Host validation #43417453111: `model_check=MATCH`, compiler `arm-none-eabi-gcc 14.2.1 20241119`, production consumer and validator objects each `fused_operations=0`. The consumer object uses the exact `rtconfig.py` production flags including `-ffp-contract=off -frounding-math -fexcess-precision=standard`.
 - FP source SHA256: validator `0335e8322ae68a8ed244d845e5cf332ae90748be62aad8a6dc2a31e89b3c9300`; consumer `48fa1f629380ce354617af7082e7f19bd81974f00f9b9c126c9b4c690ff1c31b`.
-- Current branch HEAD at handoff preparation: `5c6de06aa29c2da419c55c44ebc5f840f428fe1b`; commits after code baseline `80670f` are documentation-only. Current-HEAD workflows #43418465763 (Host), #43418465852 (M6/M7), and #43418465793 (M7) also completed successfully.
+- R30.3 first CI on `9af2d4864dfcc8bd4b9434749b67f3e5c2fd4e5a`: Host run #43423720582 failed only at the source-token audit (the two ARM objects both reported 0 fused operations); M6/M7 run #43423721073 (5/5) and M7 run #43423720587 (2/2) succeeded. The source-token gate was updated in `882028c6771180dbd997bcff19de48c88b617307`; its Host #43424213976, M6/M7 #43424213948, and M7 #43424213999 runs were in progress at the time this packet update was prepared.
 - Remote artifacts: `m4-m5-host-regression` ID `14032860881`, `m5-cortex-m7-compile` ID `14032780901`, `abi-evidence` ID `14032786372`. No local evidence ZIP is claimed.
 
 ### Review disposition

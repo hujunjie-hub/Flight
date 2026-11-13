@@ -86,18 +86,36 @@ position 不需要缩放，n = 10 与 Horner 次数完全一致。
 
 **结论**：三项计数与源码一致；velocity/acceleration 的 n 比严格需要多 4，属于保守冗余。
 
-## 5. γ_n 的向外取整
+## 5. γ_n 与 γ₂ 的向外取整
 
-`γ_n = n·u/(1−n·u)` 在 binary64 中计算时，`n·u`、`1−n·u`、除法都可能向下舍入，导致 γ 偏小。源码现在：
+令 `ν = n·u`，其中 `u = 2^-24`、`n ∈ {10,12}`。误差因子
+`γ_n = ν/(1−ν)` 在 `0 ≤ ν < 1` 上单调递增。要得到可证明的上界，
+分子必须不小于精确 `ν`，分母必须不大于精确 `1−ν`，最后的商再向上取整。
+仅对分子和商调用 `nextafter(+Inf)` 不足以证明分母方向，因此 R30.3
+显式把分母向下取整：
 
 ```c
 double nu = (double)rounding_count * unit;
 nu = nextafter(nu, INFINITY);
-gamma = nu / (1.0 - nu);
+denominator = nextafter(1.0 - nu, -INFINITY);
+if (!(denominator > 0.0) || !isfinite(denominator)) return INFINITY;
+gamma = nu / denominator;
 gamma = nextafter(gamma, INFINITY);
 ```
 
-`n ≤ 12` 且 `u = 2^-24`，`n·u` 本身就是 2 的幂缩放、binary64 精确；两次 `nextafter` 保证即使后续实现改变也不会低估。最终 `E_coef + γ·Σ` 与绝对项都用 `add_upper_nonnegative` / `multiply_upper_nonnegative` 向外。
+在 round-to-nearest 环境下，第一次 `nextafter` 给出
+`nu_hi ≥ ν`；对 binary64 计算结果 `fl(1−nu_hi)` 再向负无穷移动一格，
+得到 `den_lo ≤ 1−nu_hi ≤ 1−ν`。分母正值时，
+`nu_hi/den_lo ≥ ν/(1−ν)`；商向正无穷移动一格，得到最终上界。
+若分母非正或非有限，直接返回 `INFINITY`，不继续计算。
+
+`gamma2_upper()` 对 `n=2` 使用同一方向：`nu2` 向上、`1−nu2`
+向下、商向上，并对分母做正值/有限性检查。运行时浮点环境检查保证
+round-to-nearest；Host 与 Cortex-M7 对 FMA / contraction 的构建审计则保证
+consumer 的 binary32 操作序列没有被融合改变。
+
+最终 `E_coef + γ·Σ` 与绝对项仍通过 `add_upper_nonnegative` /
+`multiply_upper_nonnegative` 向外传播。
 
 ## 6. 时间量化项
 
@@ -180,7 +198,7 @@ if (magnitude_term < (double)FLT_MIN * 1024.0) return INFINITY;    /* 抵消入�
 |---|---|---|
 | `Δ_i` 用区间 | `consumer_eval_error_bound()` 的 `exact[i].low/high` | ✅ 传入 `c_i` / `vc` / `ac` 区间 |
 | `E_coef` 向外 | `coefficient_term` + `multiply_upper_nonnegative` | ✅ |
-| `γ_n` 向外 | `nu/gamma` 两次 `nextafter` | ✅ |
+| `γ_n` / `γ₂` 向外 | 分子向上、分母向下、商向上；分母正值检查；Host/ARM source audit token gate | ✅（公式已修正；CI 复验待完成） |
 | `γ` 项 | `result = coefficient_term + γ·magnitude_term` | ✅ |
 | 绝对项 | `+ n·2^-149` | ✅ |
 | 溢出/次正规拒绝 | `FLT_MAX/16`、`FLT_MIN×1024` | ✅ |

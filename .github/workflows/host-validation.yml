@@ -83,6 +83,8 @@ jobs:
       - name: Compile M4/M5 production sources for Cortex-M7
         run: bash tests/guidance/arm_build_check.sh
 
+      - name: Check FP model audit mutation guards
+        run: python tests/guidance/check_consumer_fp_contraction.py --self-test
       - name: Check consumer floating-point contraction
         run: python tests/guidance/check_consumer_fp_contraction.py
 
