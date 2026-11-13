@@ -128,4 +128,25 @@ The production software path is now connected in this branch:
 
 Root cause: after the ground-stop zero frame was confirmed, `actuator_poll()` treated the expected revoked permit as an ordinary unbound permit and called `safe(..., ACTUATOR_GUARD_SAFE_ACTION)`. That downgraded the terminal DISARMED latch. The correction preserves DISARMED after `gs.latched`, clears demand ownership, and reports no actuator capability after the terminal stop. The M7 regression test now polls status and capability after the zero receipt and checks that subsequent frame boundaries cannot leave DISARMED or commit another frame.
 
-**Fix committed; CI revalidation pending.** Keep production `BENCH_INHIBIT` unchanged. Host/SIL evidence is not H723 target build, HIL, physical ESC response, or flight authorization.
+**Status: FIXED / CI_PASS.**
+
+- Fix commit: `764493751290d0cad56897e1a4dcee0f3ee54755`.
+- Revalidation: [Run #20](https://github.com/hujunjie-hub/Flight/actions/runs/43374017388), exact fix commit, **4/4 jobs SUCCESS**.
+- M4 Host: 993 checks / 0 failures.
+- M5 Host: 9,515 checks / 0 failures.
+- M4/M5 Integration: 1,066 checks / 0 failures.
+- M6 MPC: 15 checks / 0 failures; M6 guard/lifecycle: 26 checks / 0 failures.
+- M7 actuator guard: 274 checks / 0 failures, including post-receipt polling and capability-latch regressions.
+- Runtime task ground-stop SIL: 13 checks / 0 failures; one frame commit, zero-target receipt, terminal DISARMED state and apply-time budget all passed.
+- M6/M7 ASan + UBSan: PASS, reran M6/M7 suites with 0 failures.
+
+The CI failure on Run #19 is closed for this Host/SIL path. This does not close the remaining acceptance gates below.
+
+## Remaining acceptance gates (not implied by Run #20)
+
+1. **Live FMS-task integration coverage — OPEN.** The production `task_mission_step()` code creates and publishes the certificate into the runtime bundle, and `task_actuator_step()` consumes it. The current SIL smoke fixture still constructs a valid `FmsOutputView` and injects the adapter-produced certificate directly into the runtime bundle; it does not drive the live `task_mission_step()` input/output path. Add a test that exercises that publication seam before treating the full FMS-task-to-actuator-owner path as end-to-end verified.
+2. **DShot apply-time characterization — PARTIAL.** `actuator_device_commit()` treats `rt_device_write()` as DMA submission. `actuator_device_poll_apply()` waits until the driver reports the submitted frame completed, then samples the monotonic clock. This is a conservative post-completion timestamp, not a hardware-captured timestamp of the exact DShot waveform edge. Validate the bound on H723 or document the approved timing semantics in the interface contract.
+3. **Target and physical validation — NOT_RUN.** Cortex-M7/H723 target build, H723 WCET/RTA, target RAM/stack watermark, DShot waveform timing, physical ESC response, HIL, sensor calibration and staged flight validation remain outstanding.
+4. **Separate M5-06 acceptance gate — BLOCKED.** The M5-06 PR #2 still requires independent mathematical review of Hermite→Bernstein conversion, derivative convex-hull bounds and outward interval assumptions, plus broader randomized dynamic uncertainty/acceleration-bound proof coverage. The M4/M5 regression passing here is not independent M5-06 approval; M5-07/physical release must not be inferred from this Host/SIL result.
+
+Production `BENCH_INHIBIT` remains unchanged. Host/SIL evidence is not H723 target build, HIL, physical ESC response, or flight authorization.
