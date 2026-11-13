@@ -33,7 +33,9 @@ Status fms_build_ground_stop_certificate(const FmsOutputView *out, uint64_t now_
         decision->header.boot_id != permit->header.boot_id ||
         decision->header.time_epoch != permit->header.time_epoch ||
         !header_valid(&out->landed_state.header, now_us) ||
+        out->landed_state.header.message_type != MSG_LANDED_STATE_SNAPSHOT ||
         !header_valid(&out->state_snapshot.header, now_us) ||
+        out->state_snapshot.header.message_type != MSG_FMS_STATE_SNAPSHOT ||
         out->landed_state.header.boot_id != permit->header.boot_id ||
         out->state_snapshot.header.boot_id != permit->header.boot_id ||
         out->landed_state.header.time_epoch != permit->header.time_epoch ||

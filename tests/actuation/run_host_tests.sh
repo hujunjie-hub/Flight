@@ -25,8 +25,10 @@ if ! "$cc" -std=c11 -O2 -Wall -Wextra -Wconversion \
     -I"$root/middleware/actuator" \
     -I"$root/middleware/contracts" \
     -I"$root/middleware" \
+    -I"$root/middleware/model/fms" \
     "$root/tests/actuation/test_m7_main.c" \
     "$root/middleware/actuator/output_guard/actuator_guard.c" \
+    "$root/middleware/model/fms/quad_x4/flight_safety/ground_stop_adapter.c" \
     -lm -o "$exe" >>"$log" 2>&1; then
   cat "$log"
   echo "M7 host BUILD_FAILED"

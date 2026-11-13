@@ -18,6 +18,7 @@
 #include <math.h>
 #include "output_guard/actuator_guard.h"
 #include "contract_checks/algorithm_checks.h"
+#include "fms_interface.h"
 
 #define CHECKS 1
 static int checks = 0;
@@ -545,6 +546,71 @@ static void case_ground_stop_overrun(void) {
           "late final zero frame hid its apply-time overrun");
 }
 
+/* M4→M7 integration seam: a fresh ground-only FMS disarm output is
+ * translated into the dedicated certificate and accepted by the real M7 guard. */
+static void case_fms_ground_stop_certificate(void) {
+    ProductActuatorConfig config = make_config();
+    FmsOutputView output;
+    GroundStopCertificate certificate;
+    ActuationPermit permit;
+    uint64_t t;
+
+    printf("M7-20..23 FMS ground-disarm certificate adapter\n");
+    fresh_guard(&config);
+    t = arm_full_thrust(&config, 11000000u);
+    permit = make_permit(6u, 2u, t, t + 200000u, PERMIT_FLAG_REVOKED);
+    permit.reason_code = FMS_PERMIT_REVOKE_REASON_FIRST_REFERENCE_GROUND_DISARM;
+    CHECK(actuator_update_permit(&permit, t) == STATUS_OK,
+          "FMS integration: revoked permit rejected");
+
+    memset(&output, 0, sizeof(output));
+    output.actuation_permit = permit;
+    make_header(&output.decision_event.header, MSG_DECISION_EVENT, SOURCE_M4, 2u, t);
+    output.decision_event.decision_code = DECISION_FORCE_SAFE_ACTION;
+    output.decision_event.reason_code = FMS_DECISION_REASON_FIRST_REFERENCE_GROUND_DISARM;
+    make_header(&output.landed_state.header, MSG_LANDED_STATE_SNAPSHOT, SOURCE_M4, 2u, t);
+    output.landed_state.state = LANDED_STATE_LANDED;
+    make_header(&output.state_snapshot.header, MSG_FMS_STATE_SNAPSHOT, SOURCE_M4, 2u, t);
+    output.state_snapshot.arm_state = ARM_STATE_DISARMED;
+
+    CHECK(fms_build_ground_stop_certificate(&output, t, &certificate) == STATUS_OK,
+          "eligible first-reference ground disarm did not produce a certificate");
+    CHECK(certificate.header.message_type == MSG_GROUND_STOP_CERTIFICATE &&
+          certificate.header.source_id == SOURCE_M4 &&
+          certificate.authority_epoch == permit.authority_epoch &&
+          certificate.directive_epoch == permit.directive_epoch,
+          "certificate identity/epoch binding is incorrect");
+    CHECK(certificate.lifecycle == ACTUATOR_GROUND_STOP_LIFECYCLE_LANDED &&
+          certificate.stop_code == ACTUATOR_GROUND_STOP_CODE_ZERO &&
+          certificate.ramp_nps == ACTUATOR_GROUND_STOP_MAX_RAMP_NPS &&
+          certificate.certificate_expires_at_us > t,
+          "certificate lifecycle/ramp/expiry is incorrect");
+    CHECK(actuator_guard_ground_stop(&certificate, t) == STATUS_OK,
+          "M7 rejected the certificate produced from the FMS output");
+
+    output.landed_state.state = LANDED_STATE_IN_AIR;
+    CHECK(fms_build_ground_stop_certificate(&output, t, &certificate) == STATUS_NOT_PERMITTED,
+          "airborne state produced a ground-stop certificate");
+    output.landed_state.state = LANDED_STATE_LANDED;
+    output.state_snapshot.arm_state = ARM_STATE_ARMED;
+    CHECK(fms_build_ground_stop_certificate(&output, t, &certificate) == STATUS_NOT_PERMITTED,
+          "armed state produced a ground-stop certificate");
+
+    output.state_snapshot.arm_state = ARM_STATE_DISARMED;
+    output.actuation_permit.reason_code = FMS_PERMIT_REVOKE_REASON_COMMAND_DISARM;
+    output.decision_event.decision_code = DECISION_ACCEPT;
+    output.decision_event.reason_code = 0u;
+    CHECK(fms_build_ground_stop_certificate(&output, t, &certificate) == STATUS_OK,
+          "landed DISARM command did not produce a ground-stop certificate");
+
+    output.actuation_permit.reason_code = 21u;
+    output.decision_event.decision_code = DECISION_FORCE_SAFE_ACTION;
+    output.decision_event.reason_code = FMS_DECISION_REASON_FIRST_REFERENCE_GROUND_DISARM;
+    CHECK(fms_build_ground_stop_certificate(&output, t, &certificate) == STATUS_NOT_PERMITTED,
+          "airborne failsafe revocation was translated into a ground stop");
+    (void)actuator_stop();
+}
+
 int main(void) {
     ActuatorDriver driver;
     memset(&driver, 0, sizeof(driver));
@@ -562,6 +628,7 @@ int main(void) {
     case_binding_and_expiry();
     case_ground_stop();
     case_ground_stop_overrun();
+    case_fms_ground_stop_certificate();
     printf("M7 checks=%d failures=%d\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }

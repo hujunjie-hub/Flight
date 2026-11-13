@@ -29,6 +29,7 @@ $work = Join-Path $OutDir 'obj'
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 
 $guardSource = Join-Path $repoRoot 'middleware\actuator\output_guard\actuator_guard.c'
+$fmsAdapterSource = Join-Path $repoRoot 'middleware\model\fms\quad_x4\flight_safety\ground_stop_adapter.c'
 $testSource = Join-Path $PSScriptRoot 'test_m7_main.c'
 $includes = @('-I', (Join-Path $repoRoot 'middleware\actuator'),
               '-I', (Join-Path $repoRoot 'middleware\contracts'),
@@ -37,7 +38,7 @@ $includes = @('-I', (Join-Path $repoRoot 'middleware\actuator'),
 $exe = Join-Path $work 'test_m7.exe'
 $log = Join-Path $OutDir 'test_m7.log'
 $arguments = @('-std=c11', '-O2', '-Wall', '-Wextra', '-Wconversion', '-static', '-DFLIGHT_HOST_TEST') +
-             $includes + @($testSource, $guardSource, '-lm', '-o', $exe)
+             $includes + @($testSource, $guardSource, $fmsAdapterSource, '-lm', '-o', $exe)
 $lines = @('# test: test_m7', "# compiler: $Gcc", "# command: `"$Gcc`" " + ($arguments -join ' '))
 $build = & $Gcc @arguments 2>&1
 $lines += "# build exit: $LASTEXITCODE"
@@ -86,6 +87,12 @@ $report = [ordered]@{
         'M7-15 zero thrust is confirmed within 105.5 ms of acceptance'
         'M7-16 DISARMED follows only the zero receipt and output stays zero'
         'M7-17 repeated certificates are idempotent and cannot restart the ramp'
+        'M7-18 driver apply-time overruns are reported'
+        'M7-19 a delayed final zero frame reports its physical apply overrun'
+        'M7-20 first-reference ground disarm maps to a certificate'
+        'M7-21 airborne or armed state cannot issue a ground-stop certificate'
+        'M7-22 normal landed DISARM maps to a certificate'
+        'M7-23 FMS certificate is accepted by the real M7 guard'
     )
     permit_lifecycle = if ($result -eq 'PASS') { 'PASS' } else { 'FAIL' }
     frame_apply_500us = if ($result -eq 'PASS') { 'PASS' } else { 'FAIL' }
