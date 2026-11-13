@@ -11,7 +11,7 @@ RUN_ID `M5-06-R33-20261113`；validated code `80670f118c5fdccce5a1f00f218a58a66c
 code-validation HEAD `80670f118c5fdccce5a1f00f218a58a66c28bd5e`；
 ahead 动态计算；branch `opt/stage-02-m5-06-safety-validator`。
 
-本文件所有结论均为本地 Host/SIL/Cortex-M7 编译证据，不是 H723 实机、HIL、
+本文件结论来自历史本地验证记录与本轮 GitHub Actions 远程 Host/SIL/Cortex-M7 编译证据；均不是 H723 实机、HIL、
 WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 
 ## B01 Spec Audit FAIL
