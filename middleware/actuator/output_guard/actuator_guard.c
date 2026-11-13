@@ -68,23 +68,41 @@ static Status safe(Status s, uint32_t state) {
 static Status complete_pending_commit(uint64_t now) {
   uint64_t actual = a.pending_apply_time_us;
   Status r = STATUS_OK;
-  uint8_t ground_stop, zero;
-  if (!a.commit_pending) return STATUS_OK;
+  uint8_t ground_stop, zero, latch_zero = 0u;
+
+  lock();
+  if (!a.commit_pending) {
+    unlock();
+    return STATUS_OK;
+  }
+  unlock();
+
+  /* Poll the physical frame outside the permit lock. This callback is nonblocking. */
   if (io.poll_apply) {
     r = io.poll_apply(&actual);
     if (r == STATUS_NOT_READY) return STATUS_NOT_READY;
     if (r != STATUS_OK) {
+      lock();
       a.commit_pending = 0u;
+      unlock();
       return safe(r, ACTUATOR_GUARD_FAULT_LATCHED);
     }
   }
   if (actual < a.pending_commit_time_us) {
+    lock();
     a.commit_pending = 0u;
+    unlock();
     return safe(STATUS_STALE_DATA, ACTUATOR_GUARD_FAULT_LATCHED);
   }
 
   ground_stop = a.pending_ground_stop;
   zero = a.pending_zero;
+  lock();
+  /* actuator_stop() may have cancelled the pending owner while polling. */
+  if (!a.commit_pending) {
+    unlock();
+    return STATUS_NOT_READY;
+  }
   if (ground_stop &&
       (actual < gs.start_us ||
        actual - gs.start_us > ACTUATOR_GROUND_STOP_MAX_APPLY_US))
@@ -122,14 +140,12 @@ static Status complete_pending_commit(uint64_t now) {
   a.pending_zero = 0u;
 
   if (ground_stop && zero) {
-    lock();
     gs.active = 0u;
     gs.latched = 1u;
     a.has_demand = 0u;
     a.state = ACTUATOR_GUARD_DISARMED;
     a.health.health_state = MODULE_HEALTH_DEGRADED;
-    unlock();
-    inhibit();
+    latch_zero = 1u;
   } else if (ground_stop) {
     a.state = ACTUATOR_GUARD_SAFE_ACTION;
     a.health.health_state = MODULE_HEALTH_DEGRADED;
@@ -137,6 +153,10 @@ static Status complete_pending_commit(uint64_t now) {
     a.state = ACTUATOR_GUARD_ACTIVE;
     a.health.health_state = MODULE_HEALTH_HEALTHY;
   }
+  unlock();
+
+  if (latch_zero)
+    inhibit();
   return STATUS_OK;
 }
 Status actuator_guard_set_driver(const ActuatorDriver *d) {
@@ -186,7 +206,8 @@ Status actuator_init(const ProductActuatorConfig *c) {
 Status actuator_stop(void) {
   inhibit();
   lock();
-  a.initialized=0; a.has_demand=0; a.state=ACTUATOR_GUARD_DISARMED;
+  a.initialized=0; a.has_demand=0; a.commit_pending=0u;
+  a.state=ACTUATOR_GUARD_DISARMED;
   memset(&gs,0,sizeof(gs));
   unlock();
   return STATUS_OK;

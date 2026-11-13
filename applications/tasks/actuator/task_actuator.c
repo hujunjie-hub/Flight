@@ -50,7 +50,12 @@ static void task_actuator_step(void)
         (void)actuator_apply(&demand, &permit, &status);
     }
 
-    /* This wake polls status. A receipt requires a physical frame boundary. */
+    /* The 1 ms owner wake drives the M7 frame gate; the guard enforces the
+     * minimum 2.5 ms inter-frame interval. BENCH_INHIBIT never reaches a driver. */
+    if (!runtime_bench_inhibit_active())
+        (void)actuator_guard_frame_boundary(runtime_now_us());
+
+    /* Poll completes an asynchronous DMA frame before publishing receipt evidence. */
     (void)actuator_poll(runtime_now_us(), &status);
     (void)actuator_get_capability(&capability);
     (void)actuator_get_commit_receipt(&receipt);

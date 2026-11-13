@@ -835,17 +835,17 @@ static void run_ground_stop_task_smoke(void)
   runtime_data.have_demand = 0u;
   runtime_data_unlock();
 
-  /* Exercise the real task owner: it must consume the certificate before any
-   * queued demand and hand the transaction to the production M7 output guard. */
-  turn(task_actuator_entry);
-  test_clock.monotonic_us += ACTUATOR_GROUND_STOP_FRAME_US;
-  CHECK(actuator_guard_frame_boundary(test_clock.monotonic_us) == STATUS_OK);
+  /* Exercise the real task owner end-to-end: it consumes the certificate,
+   * calls the M7 frame gate, and polls the DMA-completion receipt. No test-side
+   * direct call to actuator_guard_frame_boundary is permitted here. */
   turn(task_actuator_entry);
 
   CHECK(commits > commits_before);
   CHECK(actuator_guard_state() == ACTUATOR_GUARD_DISARMED);
   CHECK(runtime_data.receipt.result_code == ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED);
   CHECK(runtime_data.receipt.header.message_type == MSG_ACTUATOR_COMMIT_RECEIPT);
+  CHECK(runtime_data.receipt.estimated_apply_time_us >=
+        runtime_data.receipt.commit_time_us);
 }
 
 int main(int argc, char **argv)
