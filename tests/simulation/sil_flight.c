@@ -1004,7 +1004,10 @@ static void run_live_fms_first_reference_task_smoke(void)
   for (tick = 0u; tick < 430u; ++tick) {
     test_clock.monotonic_us += 10000u;
     sil_refresh_live_fms_inputs();
+    /* Match the FMS unit fixture: no reference is available before ARM. */
+    memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
     task_mission_step();
+    memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
   }
   printf("live_first_reference_prearm: landed=%u prearm=%u\n",
          fms_output.landed_state.state, fms_output.prearm_result.state);
