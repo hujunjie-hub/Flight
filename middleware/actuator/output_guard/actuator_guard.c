@@ -10,7 +10,7 @@ static struct {
   ActuatorHealth health;
   ClockInstant clock;
   float last_thrust[4];
-  uint64_t last_commit, last_frame, last_demand;
+  uint64_t last_commit, last_submit_us, last_frame, last_demand;
   uint32_t state, sequence, watermark, demand_sequence, faults;
   uint8_t initialized, has_demand, has_commit, has_frame;
   uint8_t commit_pending, pending_ground_stop, pending_zero;
@@ -113,6 +113,9 @@ static Status complete_pending_commit(uint64_t now) {
 
   memcpy(a.last_thrust, a.pending_thrust, sizeof(a.last_thrust));
   a.last_commit = actual;
+  /* Slew is bounded per commanded frame interval. The separate actual apply
+   * timestamp remains authoritative for receipts and ground-stop deadlines. */
+  a.last_submit_us = a.pending_commit_time_us;
   a.has_commit = 1u;
   a.commit_pending = 0u;
   a.pending_ground_stop = 0u;
@@ -263,7 +266,7 @@ static Status ground_stop_frame(uint64_t now) {
   uint16_t commands[4]={0,0,0,0}; float applied[4]; uint64_t elapsed,actual; Status r;
   unsigned m; int zero=1;
   if (a.commit_pending) return STATUS_NOT_READY;
-  elapsed = (a.has_commit && now>=a.last_commit) ? now-a.last_commit : 0u;
+  elapsed = (a.has_commit && now>=a.last_submit_us) ? now-a.last_submit_us : 0u;
   {
     float step = gs.ramp_nps*(float)elapsed*1e-6f;
     for(m=0;m<4;++m) {
@@ -398,7 +401,7 @@ Status actuator_guard_frame_boundary(uint64_t now) {
     const ProductActuatorConfigPayload *c=&a.config.payload;
     float lo=c->min_thrust_n[m],hi=c->max_thrust_n[m],x=a.latest.demand.motor_thrust_n[m];
     if(a.has_commit) {
-      const uint64_t elapsed=now>=a.last_commit ? now-a.last_commit : 0;
+      const uint64_t elapsed=now>=a.last_submit_us ? now-a.last_submit_us : 0;
       float delta=c->max_slew_nps[m]*(float)elapsed*1e-6f;
       lo=fmaxf(lo,a.last_thrust[m]-delta); hi=fminf(hi,a.last_thrust[m]+delta);
     }
