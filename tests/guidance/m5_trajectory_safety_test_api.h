@@ -108,6 +108,20 @@ double m5_trajectory_safety_test_consumer_error_bound(
     const double exact_low[6],
     const double exact_high[6]);
 
+typedef enum {
+  M5_TEST_CONSUMER_REJECT_NONE = 0,
+  M5_TEST_CONSUMER_REJECT_COEFFICIENTS,
+  M5_TEST_CONSUMER_REJECT_VELOCITY_SCALING,
+  M5_TEST_CONSUMER_REJECT_ACCELERATION_SCALING,
+  M5_TEST_CONSUMER_REJECT_POSITION_HORNER,
+  M5_TEST_CONSUMER_REJECT_VELOCITY_HORNER,
+  M5_TEST_CONSUMER_REJECT_ACCELERATION_HORNER
+} M5SafetyTestConsumerRejectStage;
+
+/* Reset or read the first consumer numerical rejection in the calling thread. */
+void m5_trajectory_safety_test_reset_consumer_rejection(void);
+M5SafetyTestConsumerRejectStage m5_trajectory_safety_test_consumer_rejection(void);
+
 uint8_t m5_trajectory_safety_test_rounding_bounds(
     double value, float *lower, float *upper);
 float m5_trajectory_safety_test_norm_lower_bound(

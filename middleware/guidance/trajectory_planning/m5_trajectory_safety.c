@@ -48,6 +48,31 @@ _Static_assert(sizeof(double) == sizeof(uint64_t),
    the validator into the H723 product image. */
 #include "fms_contract/fms_model.h"
 #include "flight_policy/fms_policy.h"
+#include "m5_trajectory_safety_test_api.h"
+
+static _Thread_local M5SafetyTestConsumerRejectStage consumer_rejection;
+
+static void trace_consumer_rejection(M5SafetyTestConsumerRejectStage stage)
+{
+  if (consumer_rejection == M5_TEST_CONSUMER_REJECT_NONE)
+    consumer_rejection = stage;
+}
+
+#define M5_TRACE_NONFINITE(value, stage) \
+  do { if (!isfinite(value)) trace_consumer_rejection(stage); } while (0)
+static void trace_consumer_horner_rejection(unsigned degree)
+{
+  switch (degree) {
+    case 5u: trace_consumer_rejection(M5_TEST_CONSUMER_REJECT_POSITION_HORNER); break;
+    case 4u: trace_consumer_rejection(M5_TEST_CONSUMER_REJECT_VELOCITY_HORNER); break;
+    case 3u: trace_consumer_rejection(M5_TEST_CONSUMER_REJECT_ACCELERATION_HORNER); break;
+    default: break;
+  }
+}
+#define M5_TRACE_HORNER(degree) trace_consumer_horner_rejection(degree)
+#else
+#define M5_TRACE_NONFINITE(value, stage) ((void)0)
+#define M5_TRACE_HORNER(degree) ((void)0)
 #endif
 
 _Static_assert(PRODUCT_PREVIEW_STEP_US <= 1000000u,
@@ -787,6 +812,10 @@ static void consumer_power_coefficients(
   c[3] = 10 * d / h3 - 4 * dv / h2 + da / (2 * h);
   c[4] = -15 * d / h4 + 7 * dv / h3 - da / h2;
   c[5] = 6 * d / h5 - 3 * dv / h4 + da / (2 * h3);
+#if defined(FLIGHT_M5_SAFETY_TEST_API)
+  for (unsigned i = 0u; i < 6u; ++i)
+    M5_TRACE_NONFINITE(c[i], M5_TEST_CONSUMER_REJECT_COEFFICIENTS);
+#endif
 }
 
 /*
@@ -864,9 +893,15 @@ static double consumer_eval_error_bound(
     if (!isfinite(h)) return INFINITY;
     for (i = degree; i-- > 0u;) {
       double product = multiply_upper_nonnegative(h, s_max);
-      if (!isfinite(product) || product > (double)FLT_MAX) return INFINITY;
+      if (!isfinite(product) || product > (double)FLT_MAX) {
+        M5_TRACE_HORNER(degree);
+        return INFINITY;
+      }
       h = add_upper_nonnegative(fabs((double)consumer[i]), product);
-      if (!isfinite(h) || h > (double)FLT_MAX) return INFINITY;
+      if (!isfinite(h) || h > (double)FLT_MAX) {
+        M5_TRACE_HORNER(degree);
+        return INFINITY;
+      }
     }
   }
   if (magnitude_term > 0.0) {
@@ -1121,10 +1156,12 @@ static uint8_t build_curve(
         }
         for (k = 0u; k < 5u; ++k) {
           vf[k] = (float)(k + 1u) * cf[k + 1u];
+          M5_TRACE_NONFINITE(vf[k], M5_TEST_CONSUMER_REJECT_VELOCITY_SCALING);
           vc[k] = interval_scale(c_i[k + 1u], (double)(k + 1u));
         }
         for (k = 0u; k < 4u; ++k) {
           af[k] = (float)((k + 1u) * (k + 2u)) * cf[k + 2u];
+          M5_TRACE_NONFINITE(af[k], M5_TEST_CONSUMER_REJECT_ACCELERATION_SCALING);
           ac[k] = interval_scale(c_i[k + 2u],
                                  (double)((k + 1u) * (k + 2u)));
         }
@@ -2147,7 +2184,15 @@ M5TrajectorySafetyStatus m5_trajectory_safety_validate(
 
 
 #if defined(FLIGHT_M5_SAFETY_TEST_API)
-#include "m5_trajectory_safety_test_api.h"
+void m5_trajectory_safety_test_reset_consumer_rejection(void)
+{
+  consumer_rejection = M5_TEST_CONSUMER_REJECT_NONE;
+}
+
+M5SafetyTestConsumerRejectStage m5_trajectory_safety_test_consumer_rejection(void)
+{
+  return consumer_rejection;
+}
 
 uint8_t m5_trajectory_safety_test_curve_bounds(
     const float start_position[3],

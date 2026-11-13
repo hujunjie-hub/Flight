@@ -570,6 +570,16 @@
       "actual_error_checks": 18,
       "mode2_error_over_gamma2_min": 3.618080472981205,
       "mode2_error_over_gamma2_max": 4.059050992445377
+    },
+    {
+      "id": "S06-114",
+      "name": "MR-009 first consumer numerical rejection stage",
+      "seed": "NOT_APPLICABLE",
+      "cases": 7,
+      "checks": 25,
+      "oracle": "Three full-validator numerical rejections, three Horner helper rejections and one full-validator legal companion",
+      "source": "tests/guidance/test_m5_main.c",
+      "full_validator_horner_reachability": "PENDING_INDEPENDENT_REVIEW"
     }
   ],
   "overall_m5_06_status": {

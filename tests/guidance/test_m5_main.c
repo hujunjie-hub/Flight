@@ -5232,6 +5232,60 @@ static void test_m5_safety_mr009_horner_bound_extremes(void)
   CHECK(isfinite(bound) && bound >= 0.0);
 }
 
+static void test_m5_safety_mr009_consumer_rejection_stages(void)
+{
+  const double h = (double)((float)PRODUCT_PREVIEW_STEP_US * 1e-6f);
+  const double position_for_max_c5 = (double)FLT_MAX * h * h * h * h * h / 6.0;
+  const struct {
+    float end_position;
+    M5SafetyTestConsumerRejectStage stage;
+  } cases[] = {
+    {FLT_MAX, M5_TEST_CONSUMER_REJECT_COEFFICIENTS},
+    {(float)(0.25 * position_for_max_c5), M5_TEST_CONSUMER_REJECT_VELOCITY_SCALING},
+    {(float)(0.10 * position_for_max_c5), M5_TEST_CONSUMER_REJECT_ACCELERATION_SCALING},
+  };
+  const double exact[6] = {0};
+  const M5SafetyTestConsumerRejectStage horner_stages[] = {
+    M5_TEST_CONSUMER_REJECT_ACCELERATION_HORNER,
+    M5_TEST_CONSUMER_REJECT_VELOCITY_HORNER,
+    M5_TEST_CONSUMER_REJECT_POSITION_HORNER,
+  };
+  const unsigned roundings[] = {10u, 12u, 10u};
+  SafetyFx fx;
+  unsigned i;
+
+  for (i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+    safety_fx_init(&fx, 59400000u);
+    safety_zero_uncertainty(&fx);
+    fx.reference.points[0].point.position_ned_m[0] = cases[i].end_position;
+    m5_trajectory_safety_test_reset_consumer_rejection();
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+        &fx.result) == M5_SAFETY_NUMERIC_FAILURE);
+    CHECK(fx.result.reason_code == M5_SAFETY_REASON_NUMERIC);
+    CHECK(fx.result.passed == 0u);
+    CHECK(m5_trajectory_safety_test_consumer_rejection() == cases[i].stage);
+  }
+
+  for (i = 0u; i < sizeof(horner_stages) / sizeof(horner_stages[0]); ++i) {
+    unsigned degree = i + 3u;
+    float c[6] = {0};
+    c[degree] = FLT_MAX;
+    c[degree - 1u] = FLT_MAX;
+    m5_trajectory_safety_test_reset_consumer_rejection();
+    CHECK(isinf(m5_trajectory_safety_test_consumer_error_bound(
+        c, degree, roundings[i], 0.02, exact, exact)));
+    CHECK(m5_trajectory_safety_test_consumer_rejection() == horner_stages[i]);
+  }
+
+  safety_fx_init(&fx, 59400000u);
+  safety_zero_uncertainty(&fx);
+  m5_trajectory_safety_test_reset_consumer_rejection();
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 1u);
+  CHECK(m5_trajectory_safety_test_consumer_rejection() == M5_TEST_CONSUMER_REJECT_NONE);
+}
+
 static void test_m5_safety_mr009_extreme_reference_rejected(void)
 {
   SafetyFx fx;
@@ -6240,6 +6294,7 @@ int main(void)
     {"m5_safety_numeric_finite_extreme", test_m5_safety_finite_numeric_extreme_rejected},
     {"m5_safety_subnormal_jerk_numeric", test_m5_safety_subnormal_jerk_numeric_failure},
     {"m5_safety_mr009_horner_bound_extremes", test_m5_safety_mr009_horner_bound_extremes},
+    {"m5_safety_mr009_consumer_rejection_stages", test_m5_safety_mr009_consumer_rejection_stages},
     {"m5_safety_mr009_extreme_reference", test_m5_safety_mr009_extreme_reference_rejected},
     {"m5_safety_property_fuzz", test_m5_safety_deterministic_property_fuzz},
     {"m5_safety_geometry_clearance_reference", test_m5_safety_geometry_clearance_reference},
