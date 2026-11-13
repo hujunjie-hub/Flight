@@ -98,11 +98,11 @@ obligation, or request additional full-validator fixtures.
 | Velocity Horner | Degree-4 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PENDING |
 | Acceleration Horner | Degree-3 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PENDING |
 | Binary32 RN rounding | `u=2^-24`, `eta=2^-149`; normal/subnormal upward bound propagated after every product and sum | READY | PENDING |
-| Gamma upper arithmetic | R30.3: for n=2/10/12, `nu` up, `1-nu` down, quotient up; non-positive denominator fails closed; source-token audit and mutation tests | CI_REVALIDATION_PENDING | PENDING |
+| Gamma upper arithmetic | R30.3: for n=2/10/12, `nu` up, `1-nu` down, quotient up; non-positive denominator fails closed; source-token audit + 9 mutation tests PASS | READY | PENDING |
 | Intermediate overflow | Strict `P_k/A_k < T_RN=2^128-2^103` before capping a rounded upper bound at FLT_MAX | READY | PENDING |
 | Coefficient scaling overflow | Full-validator coefficient/velocity-scaling/acceleration-scaling fail-fast traces; NUMERIC_FAILURE / NUMERIC / passed=0 | READY | PENDING |
 | Time conversion | S06-099: 60,002 offsets, max ratio 4.897714e-08 < gamma2 1.192093e-07; S06-108/109/113: 96/96/76 checks; derivative shift uses enlarged s_eval_max | READY | PENDING |
-| FP contraction | R30.1 ARM audit: GCC 14.2.1; production consumer object SHA256 `26966662352c95e8d63b9cefa1bd00300d807ab927bc9bcd5fd854f0539e729f`; validator object SHA256 `b001a3807a2cbb34607c3cc1d1e4b2332995225c54ffdcc42d60e9f64c87cb7d`; both report 0 fused operations and model_check MATCH | READY | PENDING |
+| FP contraction | R30.3 ARM audit: GCC 14.2.1; consumer source SHA256 `48fa1f629380ce354617af7082e7f19bd81974f00f9b9c126c9b4c690ff1c31b`, validator source SHA256 `fe63488b3d3dbf164d8de7281dac682818484198bc0c43d363b27bce0ae03aae`; consumer object SHA256 `26966662352c95e8d63b9cefa1bd00300d807ab927bc9bcd5fd854f0539e729f`, validator object SHA256 `67e3e9824142585b8f4be3a2ed97573b22eaaba8f8ebdd155d1fe63d9dbf3a0d`; model_check MATCH, self-test 9 mutations PASS, both objects 0 fused operations | READY | PENDING |
 | Rounding mode / FTZ / DAZ | Host negative tests cover FE_DOWNWARD/UPWARD/TOWARDZERO and MXCSR FTZ/DAZ; ARM runtime gate reads FPSCR.RMode/FZ/DN; Cortex-M7 runtime equivalence remains review-only | HOST_TESTED / ARM_RUNTIME_NOT_RUN | PENDING |
 | M6 interval domain | M5-06 requires 20 ms intervals; `s_eval_max≈0.020000002`; M6 locator rejects offsets beyond the preview horizon; 40 ms route previews are outside M5-06 validation scope | READY | PENDING |
 | Full-validator Horner reachability | Direct production-helper branches are tested; no full-validator reachability claim; reviewer to accept this boundary or request fixtures | REVIEW_DECISION_REQUIRED | PENDING |
@@ -164,7 +164,7 @@ Validated code commit: 80670f118c5fdccce5a1f00f218a58a66c28bd5e.
 - Branch: `opt/stage-02-m5-06-safety-validator`.
 - R30 rounded-intermediate implementation: `6dc0e5411409244a137f9b5663c5daea08b5f81e`.
 - R30.1 fail-fast code baseline: `80670f118c5fdccce5a1f00f218a58a66c28bd5e`.
-- R30.3 gamma-factor directed-rounding hardening: implementation commit `9af2d4864dfcc8bd4b9434749b67f3e5c2fd4e5a`; FP audit source-token/mutation-gate correction: `882028c6771180dbd997bcff19de48c88b617307`.
+- R30.3 gamma-factor directed-rounding hardening: implementation commit `9af2d4864dfcc8bd4b9434749b67f3e5c2fd4e5a`; FP audit source-token/mutation-gate correction: `882028c6771180dbd997bcff19de48c88b617307`; proof, matrix and CI self-test wiring: `00339febd045a85285a3df571268f3333c867aae`.
 - R30 proof: `spec/history/implementation/guidance/M5_06_6_MR009_PROOF.md`.
 - Production validator: `middleware/guidance/trajectory_planning/m5_trajectory_safety.c`.
 - M6 consumer: `middleware/model/control/outer_loop/quad_x4/position_tracking/control_reference.c`.
@@ -178,8 +178,9 @@ Validated code commit: 80670f118c5fdccce5a1f00f218a58a66c28bd5e.
 - M7 host validation #43417452817: 2/2 jobs SUCCESS.
 - FP audit job 131858854716, within Host validation #43417453111: `model_check=MATCH`, compiler `arm-none-eabi-gcc 14.2.1 20241119`, production consumer and validator objects each `fused_operations=0`. The consumer object uses the exact `rtconfig.py` production flags including `-ffp-contract=off -frounding-math -fexcess-precision=standard`.
 - FP source SHA256: validator `0335e8322ae68a8ed244d845e5cf332ae90748be62aad8a6dc2a31e89b3c9300`; consumer `48fa1f629380ce354617af7082e7f19bd81974f00f9b9c126c9b4c690ff1c31b`.
-- R30.3 first CI on `9af2d4864dfcc8bd4b9434749b67f3e5c2fd4e5a`: Host run #43423720582 failed only at the source-token audit (the two ARM objects both reported 0 fused operations); M6/M7 run #43423721073 (5/5) and M7 run #43423720587 (2/2) succeeded. The source-token gate was updated in `882028c6771180dbd997bcff19de48c88b617307`; its Host #43424213976, M6/M7 #43424213948, and M7 #43424213999 runs were in progress at the time this packet update was prepared.
+- R30.3 validation on proof/audit commit `00339febd045a85285a3df571268f3333c867aae`: Host #43424620489 (6/6 jobs SUCCESS), M6/M7 #43424620578 (5/5 SUCCESS), M7 #43424620424 (2/2 SUCCESS). Host M5 regression 322,299/0; MR-009 focused 430/0; M4/M5 integration 1,075/0; S06-099 60,002 offsets/0 failures; S06-108/109/113 96/96/76 checks with 0 failures. FP audit job 131882878679: `M5_FP_MODEL_SELF_TEST_PASS (9 mutations detected)`, `model_check=MATCH`, both objects `fused_operations=0`.
 - Remote artifacts: `m4-m5-host-regression` ID `14032860881`, `m5-cortex-m7-compile` ID `14032780901`, `abi-evidence` ID `14032786372`. No local evidence ZIP is claimed.
+- R30.3 CI artifacts: Host `m5-cortex-m7-compile` ID `14036950533`, `abi-evidence` ID `14036490022`, `m4-m5-host-regression` ID `14035697038`; M6/M7 `cortex-m7-module-compile` ID `14036700759`, `m6-m7-host-evidence` ID `14036135841`, `sil-ground-stop-evidence` ID `14037190065`; M7 `m7-host-evidence` ID `14035836365`.
 
 ### Review disposition
 

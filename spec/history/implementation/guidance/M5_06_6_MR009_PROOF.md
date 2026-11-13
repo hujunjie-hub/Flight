@@ -198,7 +198,7 @@ if (magnitude_term < (double)FLT_MIN * 1024.0) return INFINITY;    /* 抵消入�
 |---|---|---|
 | `Δ_i` 用区间 | `consumer_eval_error_bound()` 的 `exact[i].low/high` | ✅ 传入 `c_i` / `vc` / `ac` 区间 |
 | `E_coef` 向外 | `coefficient_term` + `multiply_upper_nonnegative` | ✅ |
-| `γ_n` / `γ₂` 向外 | 分子向上、分母向下、商向上；分母正值检查；Host/ARM source audit token gate | ✅（公式已修正；CI 复验待完成） |
+| `γ_n` / `γ₂` 向外 | 分子向上、分母向下、商向上；分母正值检查；Host/ARM source audit token gate | ✅（Host #43424620489；ARM audit PASS） |
 | `γ` 项 | `result = coefficient_term + γ·magnitude_term` | ✅ |
 | 绝对项 | `+ n·2^-149` | ✅ |
 | 溢出/次正规拒绝 | `FLT_MAX/16`、`FLT_MIN×1024` | ✅ |
