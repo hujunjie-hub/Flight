@@ -120,6 +120,22 @@ MODEL_TOKENS = {
         "s_eval_max = add_upper_nonnegative(s_max, delta_s);",
         "multiply_upper_nonnegative(delta_s,",
     ],
+    "expanded_consumer_interval": [
+        "double s_max = multiply_upper_nonnegative(h, (double)u1);",
+        "consumer_eval_error_bound(cf, c_i, 5u,",
+        "consumer_eval_error_bound(vf, vc, 4u,",
+        "consumer_eval_error_bound(af, ac, 3u,",
+        "polynomial_derivative_magnitude(cf, 5u, 1u, s_eval_max)",
+        "polynomial_derivative_magnitude(vf, 4u, 1u, s_eval_max)",
+        "polynomial_derivative_magnitude(af, 3u, 1u, s_eval_max)",
+    ],
+    "horner_uses_expanded_interval": [
+        "double s_eval_max)",
+        "if (!(s_eval_max >= 0.0) || !isfinite(s_eval_max) || rounding_count == 0u)",
+        "power = multiply_upper_nonnegative(power, s_eval_max);",
+        "product_exact = multiply_upper_nonnegative(rounded_h, s_eval_max);",
+        "double scale = s_eval_max > 1.0 ? s_eval_max : 1.0;",
+    ],
     "interval_coefficients": [
         "low_distance = fabs(cf - exact[i].low);",
         "high_distance = fabs(cf - exact[i].high);",
@@ -250,6 +266,16 @@ MUTATIONS = (
     ("fp_environment", "vmrs %0, fpscr", "vmrs %0, /* removed */"),
     ("rounding_count", "#define M5_CONSUMER_POSITION_ROUNDINGS 10u",
      "#define M5_CONSUMER_POSITION_ROUNDINGS 9u"),
+    ("horner_expanded_power", "power = multiply_upper_nonnegative(power, s_eval_max);",
+     "power = multiply_upper_nonnegative(power, s_max);"),
+    ("horner_expanded_overflow", "product_exact = multiply_upper_nonnegative(rounded_h, s_eval_max);",
+     "product_exact = multiply_upper_nonnegative(rounded_h, s_max);"),
+    ("position_time_derivative", "polynomial_derivative_magnitude(cf, 5u, 1u, s_eval_max)",
+     "polynomial_derivative_magnitude(cf, 5u, 2u, s_eval_max)"),
+    ("velocity_time_derivative", "polynomial_derivative_magnitude(vf, 4u, 1u, s_eval_max)",
+     "polynomial_derivative_magnitude(cf, 5u, 2u, s_eval_max)"),
+    ("acceleration_time_derivative", "polynomial_derivative_magnitude(af, 3u, 1u, s_eval_max)",
+     "polynomial_derivative_magnitude(cf, 5u, 3u, s_eval_max)"),
 )
 
 
