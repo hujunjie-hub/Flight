@@ -201,6 +201,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi g++-mingw-w64-x86-64-posix
 
+      - name: Regenerate additive M7 ABI lock for review
+        run: |
+          python spec/tools/audit_spec.py --round 3 --label ci
+          python tests/abi/abi_report.py --emit-lock
+
       - name: Run production ABI report
         run: python tests/abi/abi_report.py
 
@@ -209,5 +214,8 @@ jobs:
         if: always()
         with:
           name: abi-evidence
-          path: tests/abi/evidence/
+          path: |
+            tests/abi/evidence/
+            middleware/contracts/product_contract/abi_lock.h
+            spec/validation/abi_layout.json
 
