@@ -68,10 +68,10 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 |---|---|
 | Issue | FLIGHT-LOCAL-04 |
 | 状态 | **WAITING_INDEPENDENT_REVIEW**；未 APPROVED，Agent 不自行批准。 |
-| 已实现 | R30.1 逐级传播 binary32 rounded Horner product/sum 上界；对每一级乘法和加法按 RN ties-to-even overflow midpoint T_RN=2^128-2^103 严格 fail-closed；正规/次正规混合误差界；系数构造、速度缩放、加速度缩放遇首个非有限值即短路。 |
-| 已测试 | S06-115 固定 exact-H 漏洞反例；M5 Host 322,299/0；MR-009 focused 430/0；M5 ASan/UBSan 322,299/0；focused ASan/UBSan 430/0；Integration ASan/UBSan 1,075/0；Host/M6-M7/M7 三组 CI 6/6、5/5、2/2 SUCCESS。 |
-| 尚未证明 | 独立审查签字；degree 5/4/3 Horner 拒绝点完整 validator 可达性；M6 区间外插值；FP contraction/目标舍入环境等价。 |
-| 证据 | R30 matrix：spec/quality/owner_approval/R30/05_MR009_INDEPENDENT_REVIEW_MATRIX.md；Host validation #43417453111；M6/M7 #43417453109；M7 #43417452817。 |
+| 已实现 | R30.3 逐级传播 binary32 rounded Horner product/sum 上界；每级按 RN ties-to-even overflow midpoint T_RN=2^128-2^103 严格 fail-closed；gamma_n/gamma_2 分子上、分母下、商上；正规/次正规误差界；系数构造、速度缩放、加速度缩放遇首个非有限值即短路。 |
+| 已测试 | S06-115 固定 exact-H 漏洞反例；Host #43424620489 6/6、M6/M7 #43424620578 5/5、M7 #43424620424 2/2；M5 Host 322,299/0；focused 430/0；ASan/UBSan 322,299/0、430/0；integration 1,075/0；FP audit 9 mutations PASS、model MATCH、ARM 两对象 FMA=0。 |
+| 尚未证明 | 独立审查签字；degree 5/4/3 Horner 拒绝点完整 validator 可达性；H723 FPSCR 实机运行等价；M6 40 ms route preview 不在 M5-06 证明域。M6 locator 不允许 horizon 外外插值；FP contraction 对象审计已通过。 |
+| 证据 | R30 matrix：spec/quality/owner_approval/R30/05_MR009_INDEPENDENT_REVIEW_MATRIX.md；Host #43424620489；M6/M7 #43424620578；M7 #43424620424；FP audit job 131882878679。 |
 | 解除条件 | 独立数学审查逐项 APPROVED；S06-100..102 状态明确；其余实机门禁另行完成。 |
 | 下一步 | 交 R30 rounded recurrence、S06-115 反例、CI 日志和完整 validator reachability limitation 给独立审查者。 |
 

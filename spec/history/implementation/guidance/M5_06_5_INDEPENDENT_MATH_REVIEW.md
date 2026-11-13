@@ -471,3 +471,13 @@ R10 撤回 R9 的固定系数不可行结论：S06-104 现在只给出各通道�
 ### R30.2：远程 CI 结果（代码基线 80670f）
 
 Host validation #43417453111 6/6、M6/M7 host validation #43417453109 5/5、M7 host validation #43417452817 2/2 jobs SUCCESS。M5 Host 322,299/0；MR-009 focused 430/0；M5 与 focused ASan/UBSan 322,299/0、430/0；M4/M5 Integration ASan/UBSan 1,075/0。S06-115 无随机 seed。状态仍 WAITING_INDEPENDENT_REVIEW。
+
+
+### R30.3：gamma 上界定向舍入与最终复验（2026-11-13）
+
+- 将 `gamma_n=nu/(1-nu)` 与 `gamma_2` 的计算固定为分子向上、分母向下、商向上；分母非正/非有限时 fail-closed。该修正不放宽任何误差阈值。
+- source-token 审计器增加方向性 mutation targets；R30.3 FP self-test 检出全部 9 项 mutation。最终 CI：Host #43424620489（6/6）、M6/M7 #43424620578（5/5）、M7 #43424620424（2/2）全部成功。
+- FP audit job 131882878679：`M5_FP_MODEL_SELF_TEST_PASS`、`model_check=MATCH`、compiler GCC 14.2.1 20241119；consumer object SHA256 `26966662352c95e8d63b9cefa1bd00300d807ab927bc9bcd5fd854f0539e729f`；validator object SHA256 `67e3e9824142585b8f4be3a2ed97573b22eaaba8f8ebdd155d1fe63d9dbf3a0d`；两对象 fused_operations=0。
+- M5 Host 322,299/0；MR-009 focused 430/0；M5 ASan/UBSan 322,299/0；focused ASan/UBSan 430/0；integration 1,075/0。
+- 文档同步 HEAD `241784357e7a8f3b92514612307df66a13d51fe9` 的 Host/M6-M7/M7 CI 也全部通过（6/6、5/5、2/2）。
+- 证据状态：READY_FOR_INDEPENDENT_REVIEW；审查结果仍 PENDING。H723、WCET/RTA、HIL、飞行 NOT_RUN；M5-07 不得启动。

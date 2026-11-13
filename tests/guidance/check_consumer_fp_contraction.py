@@ -238,14 +238,15 @@ def main():
                    else "REVIEW_REQUIRED"),
         "compiler": compiler,
         "error_model": {
+            "gamma_rounding_direction": "nu upward; denominator 1-nu downward; quotient upward",
             "coefficient_term": "outward interval coefficients [low, high], "
-                                "max(|cf - low|, |cf - high|) * s^i",
-            "horner_term": "gamma_n * sum |cf_i| * s^i with gamma_n = n*u/(1-n*u)",
+                                "max(|cf - low|, |cf - high|) * s_eval_max^i",
+            "horner_term": "gamma_n * sum |cf_i| * s_eval_max^i with gamma_n = n*u/(1-n*u)",
             "horner_roundings": {"position": 10, "velocity": 12,
                                  "acceleration": 10},
-            "time_term": "gamma_2 * t_max * |d^k p/ds^k|(s_eval_max) with "
-                         "gamma_2 = 2u/(1-2u), s_exact = local_us/1e6, t_max = step_us/1e6",
-            "evaluation_interval": "s_eval_max = max(t_max, h) + gamma_2*t_max",
+            "time_term": "delta_s * |d^k p/ds^k|(s_eval_max), delta_s = gamma_2_upper*s_max, "
+                         "s_exact = h*local_us/step_us",
+            "evaluation_interval": "s_max = h*u1; s_eval_max = s_max + delta_s; 0 <= u1 <= 1",
             "subnormal_term": "n * 2^-149 * max(1, s_eval_max)^n",
         },
         "model_check": model,

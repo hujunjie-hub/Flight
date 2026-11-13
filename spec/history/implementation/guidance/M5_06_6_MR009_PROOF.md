@@ -119,41 +119,53 @@ consumer 的 binary32 操作序列没有被融合改变。
 
 ## 6. 时间量化项
 
-消费端时间参数：
+M6 consumer 在一个有效 segment 内使用 binary32 局部时间参数。对验证器
+正在处理的子区间 `[u0,u1]`，`0<=u1<=1`，且消费端段时长为同一个
+binary32 值 `h`，因此精确局部参数满足 `s_exact<=s_max=h*u1`。
+
+时间转换最多涉及两次 round-to-nearest binary32 舍入。令
+`u=2^-24`、`gamma2=2u/(1-2u)`，使用定向舍入实现得到
+`gamma2_upper>=gamma2`，则
 
 ```
-s_c = fl( fl(Δµs) · fl(1e-6) ),   Δµs ∈ [0, 20000]
+delta_s = gamma2_upper * s_max
+s_eval_max = s_max + delta_s
+|s_consumer - s_exact| <= delta_s
 ```
 
-`Δµs` 是整数且 `≤ 20000 < 2^24`，到 binary32 的转换为零误差。`fl(1e-6) = 1e-6(1+δ1)`，乘法再引入 `δ2`：
+以上乘法与加法均通过 `multiply_upper_nonnegative()` /
+`add_upper_nonnegative()` 向外取整。位置、速度、加速度的时间偏差分别由
+对应多项式导数的上界覆盖：
 
 ```
-s_c = Δµs·1e-6·(1+δ1)(1+δ2),   |δ1|,|δ2| ≤ u
-|s_c − s| ≤ (2u + u²)·s ≤ 2u·s_max     （s ≤ s_max）
+E_time <= delta_s * sup_{s in [0, s_eval_max]} |q'(s)|
 ```
 
-验证器在精确时间 `s` 上求值，因此位置差至多 `|p'|·2u·s_max`；速度差至多 `|p''|·2u·s_max`；加速度差至多 `|p'''|·2u·s_max`。源码：
+导数上界用绝对系数和计算，并在扩大后的区间 `[0,s_eval_max]` 上求值；
+系数差、Horner 舍入和次正规项也使用同一个扩大区间。
 
-```c
-double time_scale = multiply_upper_nonnegative(2.0 * 0x1p-24, s_max);
-... + time_scale * polynomial_derivative_magnitude(cf, 5u, k, s_max)
-```
-
-`polynomial_derivative_magnitude` 用 `Σ i(i−1)…|c_i| s^{i−k}` 的向外和，覆盖整个 `[0, s_max]`。
-
-**s_max 覆盖性**：验证器在子区间 `[u0,u1]` 上的所有求值点满足 `s ≤ h·u1 = s_max`（`u1 ≤ 1`，`h` 为消费端同一个 float 时长）。因此 `s_max` 严格覆盖消费端在本子区间内的所有时间参数；细分时 `u1` 减小，界随之收紧。
+M5-06 的输入形状要求 `PRODUCT_PREVIEW_STEP_US=20000u`，故当前产品域为
+20 ms segment，`s_eval_max≈0.020000002`。M6 locator 拒绝超出 preview
+horizon 的 offset，不做区间外外插值。M6 另支持 40 ms route preview，但
+M5-06 validator 不接受该 40 ms 输入；本证明不声称覆盖该路径。
 
 ## 7. 次正规、溢出与圆整模式
 
 ### 7.1 次正规绝对项
 
-若某次运算的结果落在次正规区，单次舍入误差不超过半个最小次正规 `2^-150`。`n` 次运算总计不超过 `n·2^-149`（两倍余量）。源码加
+单次 binary32 运算在次正规区的绝对舍入误差不超过
+`eta=2^-149`（以一个最小次正规数作保守上界）。该误差会被后续 Horner
+乘法继续传播，因此不能在所有 `s_max` 下简单地只加 `n*eta`。对至多
+`n` 次舍入，源码使用保守上界
 
-```c
-add_upper_nonnegative(result, (double)rounding_count * 0x1p-149)
+```
+n * eta * max(1, s_eval_max)^n
 ```
 
-该项**不依赖 `s_max ≤ 1`**：它是每次舍入的绝对上界，与时间尺度无关。`s_max` 只出现在系数项与 γ 项里。
+其中 `s_eval_max` 是扩大后的实际求值区间上界。实现通过
+`multiply_upper_nonnegative()` 传播放大因子，再用
+`add_upper_nonnegative()` 加入总误差。仅当 `s_eval_max<=1` 时，该项才
+退化为 `n*eta`。
 
 ### 7.2 正规范围前提的显式拒绝
 
@@ -166,14 +178,20 @@ if (magnitude_term < (double)FLT_MIN * 1024.0) return INFINITY;    /* 抵消入�
 
 `+Inf` 在调用处被判定为失败（`build_curve` 返回 0 → `NUMERIC_FAILURE`），不会退化成点估计。完全零曲线 `magnitude_term = 0` 不触发拒绝（`E = 0 + 0 + n·2^-149`）。
 
-### 7.3 圆整模式
+### 7.3 圆整模式与次正规环境
 
-`γ_n` 与"半个 ulp"都假设 round-to-nearest。R5 之前只有编译期假设；现在验证器在入口读取运行时状态：
+`gamma_n`、`gamma_2` 与 RN overflow midpoint 均假设 round-to-nearest。
+验证器入口执行运行时环境检查：
 
-- Cortex-M7：`FPSCR.RMode[23:22] == 00b`、`FZ[24] == 0`、`DN[25] == 0`；
-- Host/SIL：`fegetround() == FE_TONEAREST`。
+- Host/SIL：`fegetround()==FE_TONEAREST`；x86 额外读取 MXCSR，要求 RC 为
+  nearest 且 FTZ/DAZ 位清零；
+- Cortex-M7：读取 `FPSCR.RMode[23:22]`、`FZ[24]`、`DN[25]`，要求 RN、
+  FZ=0、DN=0。
 
-任一条件不满足返回 `M5_SAFETY_NUMERIC_FAILURE`。回归用例 `m5_safety_floating_environment` 把 host 圆整模式改成 `FE_DOWNWARD`，要求必须拒绝，恢复 RN 后必须通过。
+Host 负向测试覆盖 `FE_DOWNWARD`、`FE_UPWARD`、`FE_TOWARDZERO` 以及
+MXCSR FTZ/DAZ 注入；不满足条件时返回 `M5_SAFETY_NUMERIC_FAILURE`。
+Cortex-M7 FPSCR 路径已交叉编译并由源码审计，但尚无 H723 实机运行结果；
+该硬件等价性仍由独立审查者确认。
 
 ## 8. 系数构造的运算顺序一致性
 
@@ -200,20 +218,33 @@ if (magnitude_term < (double)FLT_MIN * 1024.0) return INFINITY;    /* 抵消入�
 | `E_coef` 向外 | `coefficient_term` + `multiply_upper_nonnegative` | ✅ |
 | `γ_n` / `γ₂` 向外 | 分子向上、分母向下、商向上；分母正值检查；Host/ARM source audit token gate | ✅（Host #43424620489；ARM audit PASS） |
 | `γ` 项 | `result = coefficient_term + γ·magnitude_term` | ✅ |
-| 绝对项 | `+ n·2^-149` | ✅ |
+| 绝对项 | `+ n·2^-149·max(1,s_eval_max)^n`，向外传播 | ✅ |
 | 溢出/次正规拒绝 | `FLT_MAX/16`、`FLT_MIN×1024` | ✅ |
-| 时间项 | `time_scale = 2u·s_max` 向外 + 导数上界 | ✅ |
-| 圆整模式 | `floating_environment_is_supported()` | ✅ 运行时读取 |
+| 时间项 | `delta_s=gamma2_upper·s_max`；`s_eval_max=s_max+delta_s`；扩大区间导数上界 | ✅ |
+| 圆整模式 | Host fenv+MXCSR；ARM FPSCR.RMode/FZ/DN | ✅ Host 负向测试；ARM 硬件运行未做 |
 
 ## 10. 剩余风险（需独立审查确认）
 
-1. **编译器重排**：GCC 在 `-O2` 下未观察到 FMA/MLA，但如果未来工具链改变行为，`γ` 计数与系数复刻都要重算；门禁是 `check_consumer_fp_contraction.py`。
-2. **Host 的 FTZ/DAZ**：x86 MXCSR 的 flush-to-zero / denormals-are-zero 不在 `fenv.h` 暴露范围内；Host/SIL 测试默认未开启，目标端由 `FPSCR.FZ == 0` 检查覆盖。
-3. **`s_max` 与消费端时间参数**：依赖消费端在子区间内只用 `s ≤ h·u1`；若 M6 未来在区间外插值，本推导不适用。
-4. **NaN/Inf 输入**：由 `finite3` / `finite_motion_point` 在入口拒绝，不在误差模型范围内。
-5. **`velocity_mid_norm` 与 `speed_bound` 的组合**：两个 swept 候选各自包含 `eval_velocity_error` 后才取 `fmin`；这一点由源码结构保证，但需要审查者确认没有第三处使用未修正的 `|v_mid|`。
+1. **编译器重排 / contraction**：当前 `rtconfig.py` 固定
+   `-ffp-contract=off -frounding-math -fexcess-precision=standard`；
+   R30.3 ARM object audit 对 M6 consumer 与 validator 均报告
+   `fused_operations=0`。未来工具链或 flags 改动仍必须重跑
+   `check_consumer_fp_contraction.py` 并重新审查。
+2. **目标 FP 环境等价**：Host 已检查 x86 MXCSR 的 RC/FTZ/DAZ 并执行负向测试；
+   Cortex-M7 源码读取 FPSCR.RMode/FZ/DN，已交叉编译，但没有 H723 硬件运行
+   证据。独立审查需确认 ARM 路径与 Host 证明假设等价。
+3. **M6 时间域**：M5-06 只验证 20 ms preview；M6 locator 不允许 horizon
+   外外插值。M6 的 40 ms route preview 不属于 M5-06 当前证明域，不能混用。
+4. **NaN/Inf 输入**：由 `finite3` / `finite_motion_point` 在入口拒绝，不在
+   误差模型范围内。
+5. **`velocity_mid_norm` 与 `speed_bound` 的组合**：两个 swept 候选各自
+   包含 `eval_velocity_error` 后才取 `fmin`；审查者仍需确认没有第三处使用
+   未修正的 `|v_mid|`。
+6. **完整 Validator 的 Horner 分支可达性**：degree 5/4/3 拒绝分支由生产
+   helper 直接测试；未声称三个拒绝点都可由完整
+   `m5_trajectory_safety_validate()` 输入触发。审查者需接受该边界或要求
+   增加 full-validator fixtures。
 
- 
 ## 14. R6 修正（2026-11-10）：时间量化不等式与次正规传播
 
 ### 14.1 R5 的不等式错误
@@ -382,14 +413,19 @@ R28 新增两个测试到 `tests/guidance/test_m5_main.c`，并加入 test-only
 
 ### 分类
 
-- **已证明**：Bernstein jerk `60/d^3`、Bernstein→power、`u_tail`、R14b 六个
-  Fraction 反例、逐级 Horner 上界公式与向外取整实现。
-- **已实现**：生产 `consumer_eval_error_bound()` 的 H_k 检查；test-only 边界钩子。
-- **已测试**：上述生产路径极端输入、S06-108/112/113、S06-105/107。
-- **尚未证明**：独立数学审查；编译器未来重排/FMA；M6 区间外插值；Host
-  FTZ/DAZ 对目标 FPSCR 的完全等价；产品包线外输入的数学可行性。
-- **依赖前置条件**：`s_max` 上界、系数有限、无 contraction/fast-math、
-  round-to-nearest、输入在产品包线内。
+- **已证明**：Bernstein jerk `60/d^3`、Bernstein→power、`u_tail`、R14b
+  六个 Fraction 反例、逐级 rounded Horner 上界公式、RN overflow midpoint
+  与向外取整实现；`gamma_n/gamma_2` 的分子上/分母下/商上方向。
+- **已实现**：生产 `consumer_eval_error_bound()` 的逐级 rounded product/sum
+  检查；每一级均按 `T_RN=2^128-2^103` fail-closed；test-only 0/1 branch
+  counters 与阶段性 fail-fast。
+- **已测试**：S06-115、S06-108/112/113；R30.3 Host 6/6、M6/M7 5/5、
+  M7 2/2；FP audit `M5_FP_MODEL_SELF_TEST_PASS`（9 mutations detected）、
+  `model_check=MATCH` 且两个 ARM object 均为 `fused_operations=0`。
+- **尚未完成**：独立数学审查签字；degree 5/4/3 Horner 拒绝点的完整
+  Validator 可达性决定；H723 FPSCR 硬件运行、WCET/RTA、HIL 与飞行验证。
+- **依赖前置条件**：当前 M5-06 20 ms 时间域、系数有限、无 contraction /
+  fast-math、round-to-nearest、Host/M7 浮点环境满足检查条件、输入在产品包线内。
 
 **MR-009 继续 `WAITING_INDEPENDENT_REVIEW`。Agent 不自行 APPROVED。**
 
@@ -540,3 +576,17 @@ S06-115 同时断言：理想 H_k 均小于 FLT_MAX、幅度项小于 FLT_MAX/16
 Host validation #43417453111：6/6 jobs SUCCESS；M6/M7 host validation #43417453109：5/5 jobs SUCCESS；M7 host validation #43417452817：2/2 jobs SUCCESS。M5 Host 322,299/0；MR-009 focused 430/0；M5 ASan/UBSan 322,299/0；focused ASan/UBSan 430/0；M4/M5 Integration ASan/UBSan 1,075/0。Spec Audit、生产 ABI、Cortex-M7 模块编译均 PASS。
 
 R30.0 首轮三项 branch-counter 失败保留为历史结果；R30.1 fail-fast 修正后所有上述检查通过。远程 CI 结果不等于本地 evidence ZIP，也不等于独立数学 APPROVED。H723 实机、WCET/RTA、HIL、飞行仍 NOT_RUN。
+
+
+## 28. R30.3 gamma 定向舍入与最终 CI 复验
+
+- 数学实现提交：`9af2d4864dfcc8bd4b9434749b67f3e5c2fd4e5a`；浮点 source-token 审计更新：`882028c6771180dbd997bcff19de48c88b617307`；proof/matrix/9-mutation self-test wiring：`00339febd045a85285a3df571268f3333c867aae`。
+- Host validation #43424620489：6/6 jobs SUCCESS；M6/M7 host validation #43424620578：5/5 SUCCESS；M7 host validation #43424620424：2/2 SUCCESS。
+- M5 Host 322,299/0；MR-009 focused 430/0；M4/M5 integration 1,075/0；S06-099 60,002 offsets/0 failures；S06-108/109/113 96/96/76 checks with 0 failures。
+- ARM FP audit job 131882878679：`M5_FP_MODEL_SELF_TEST_PASS`（9 mutations detected）、`model_check=MATCH`、`missing_tokens=[]`、compiler `arm-none-eabi-gcc 14.2.1 20241119`，consumer 与 validator objects 均 `fused_operations=0`。
+- Consumer object SHA256：`26966662352c95e8d63b9cefa1bd00300d807ab927bc9bcd5fd854f0539e729f`；validator object SHA256：`67e3e9824142585b8f4be3a2ed97573b22eaaba8f8ebdd155d1fe63d9dbf3a0d`。
+- Validator source SHA256：`fe63488b3d3dbf164d8de7281dac682818484198bc0c43d363b27bce0ae03aae`；consumer source SHA256：`48fa1f629380ce354617af7082e7f19bd81974f00f9b9c126c9b4c690ff1c31b`。
+- 当前文档同步 HEAD `241784357e7a8f3b92514612307df66a13d51fe9` 的 Host #43425062263（6/6）、M6/M7 #43425062339（5/5）、M7 #43425062346（2/2）也全部 SUCCESS。
+- CI artifacts：Host `m5-cortex-m7-compile` 14036950533、`abi-evidence` 14036490022、`m4-m5-host-regression` 14035697038；M6/M7 `cortex-m7-module-compile` 14036700759、`m6-m7-host-evidence` 14036135841、`sil-ground-stop-evidence` 14037190065；M7 `m7-host-evidence` 14035836365。未生成本地 evidence ZIP。
+
+以上为实现与 CI 证据，不是独立审查批准。H723 实机、WCET/RTA、HIL、飞行仍 NOT_RUN；MR-009 继续 WAITING_INDEPENDENT_REVIEW。

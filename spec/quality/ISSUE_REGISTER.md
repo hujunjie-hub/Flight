@@ -35,7 +35,7 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-01 | S2 | Windows 检出把 *.sh 转 CRLF | R2 修复；`tools/check_line_endings.py` | line_endings PASS | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-02 | S2 | Cortex-M7 只编译 8/14 M5 源 | R2 补全 | M5 ARM 14 对象 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-03 | S2 | 历史 packages/SConscript 缺失导致链接阻塞 | R3 安装；2026-11-12/13 三包 commit 锁定并核对安装 HEAD | M5-06 接管复验：M4/M5 测试配置 Flight.elf 链接 PASS；完整 Release 产品链接/目标运行仍需复核 | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-04 | S2 | MR-009 消费曲线/验证曲线数值路径缺少 binary32 rounded Horner 中间值溢出证明 | R30.1 `80670f118c5fdccce5a1f00f218a58a66c28bd5e`：逐级 rounded product/sum 上界、RN overflow midpoint、数值阶段 fail-fast | S06-115；M5 Host 322,299/0；MR-009 focused 430/0；M5 ASan/UBSan 322,299/0；三组 CI 6/6、5/5、2/2 SUCCESS | OPEN / WAITING_INDEPENDENT_REVIEW |
+| FLIGHT-LOCAL-04 | S2 | MR-009 消费曲线/验证曲线数值路径的 binary32 rounded Horner 溢出证明待独立审查 | R30.3 proof/audit `00339febd045a85285a3df571268f3333c867aae`；逐级 rounded product/sum、RN midpoint、gamma 分子上/分母下/商上、阶段 fail-fast、9 mutation audit self-test | S06-115；Host 6/6、M6/M7 5/5、M7 2/2；M5 Host 322,299/0、focused 430/0；FP model MATCH、ARM 两对象 FMA=0 | OPEN / WAITING_INDEPENDENT_REVIEW |
 | FLIGHT-LOCAL-05 | S2 | spec/ABI 证据曾钉住 CRLF 哈希 | R3 efc28d7 LF 重基线 | 当前 CI：Spec Audit 145 types / 8 checks PASS；生产 ABI 144 types / 0 mismatch / 0 unexpected Host/ARM | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-06 | S2 | RT-Thread 三个包曾使用 latest，依赖不可复现 | OWNER 批准后固定三个 40-hex commit；跟踪源与锁文件一致 | `check_rt_packages_lock.py` PASS；14 个负向用例；当前 Host CI 未单独重跑此 job | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-07 | S1 | 验收脚本 assert 可被 -O 剥离 | R2 修复 | test_audit_optimized PASS | FIXED_WAITING_RETEST |
