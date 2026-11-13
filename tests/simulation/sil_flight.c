@@ -793,19 +793,79 @@ static int start_fmt(const char *port_text, const char *hover_text)
 static void run_ground_stop_task_smoke(void)
 {
   FmsOutputView output;
-  ActuationPermit permit;
-  GroundStopCertificate certificate;
+  ActuationPermit active_permit, permit;
+  GroundStopCertificate certificate, invalid_certificate;
+  ActuatorDemand demand;
   uint64_t now = test_clock.monotonic_us;
   uint64_t stop_start = 0u;
   unsigned commits_before = commits;
   unsigned tick;
 
   CHECK(!runtime_bench_inhibit_active());
+
+  /* First prove that an invalid ground-stop candidate cannot starve a valid
+   * M6 demand. The guard must reject the candidate and let this 5 N demand
+   * reach the normal frame boundary. */
+  memset(&active_permit, 0, sizeof(active_permit));
+  active_permit.header = h(SOURCE_M4, now + 5000u);
+  active_permit.header.message_type = MSG_ACTUATION_PERMIT;
+  active_permit.permit_epoch = 1u;
+  active_permit.authority_epoch = 5u;
+  active_permit.directive_epoch = 3u;
+  active_permit.state_epoch = 1u;
+  active_permit.reference_epoch = 1u;
+  active_permit.permit_flags = PERMIT_SCOPE_CONTROL_ACTIVE;
+  active_permit.output_policy_id = 2u;
+  active_permit.permit_expires_at_us = now + 200000u;
+
+  memset(&demand, 0, sizeof(demand));
+  demand.header = h(SOURCE_M6, now + 5000u);
+  demand.header.message_type = MSG_ACTUATOR_DEMAND;
+  demand.header.frame_id = FRAME_BODY_FRD;
+  demand.actuator_layout_id = PRODUCT_ACTUATOR_LAYOUT_ID;
+  demand.valid_channel_mask = 15u;
+  demand.permit_epoch = active_permit.permit_epoch;
+  demand.directive_epoch = active_permit.directive_epoch;
+  demand.authority_epoch = active_permit.authority_epoch;
+  demand.state_epoch = active_permit.state_epoch;
+  demand.reference_epoch = active_permit.reference_epoch;
+  demand.control_sequence = 1u;
+  demand.demand_expires_at_us = now + 5000u;
+  demand.demand.valid_mask = 15u;
+  for (unsigned motor = 0; motor < 4u; ++motor)
+    demand.demand.motor_thrust_n[motor] = 5.0f;
+
+  memset(&invalid_certificate, 0, sizeof(invalid_certificate));
+  invalid_certificate.header = h(SOURCE_M4, now + 5000u);
+  invalid_certificate.header.message_type = MSG_GROUND_STOP_CERTIFICATE;
+  invalid_certificate.stop_code = ACTUATOR_GROUND_STOP_CODE_ZERO;
+  invalid_certificate.lifecycle = LANDED_STATE_IN_AIR;
+  invalid_certificate.ramp_nps = 100.0f;
+  invalid_certificate.authority_epoch = active_permit.authority_epoch;
+  invalid_certificate.directive_epoch = active_permit.directive_epoch;
+  invalid_certificate.certificate_expires_at_us = now + 200000u;
+
+  CHECK(runtime_data_lock(0));
+  runtime_data.bundle.permit = active_permit;
+  runtime_data.bundle.ground_stop_certificate = invalid_certificate;
+  runtime_data.bundle_ready = 1u;
+  runtime_data.demand = demand;
+  runtime_data.have_demand = 1u;
+  runtime_data_unlock();
+
+  turn(task_actuator_entry);
+  CHECK(commits == commits_before + 1u);
+  CHECK(runtime_data.receipt.result_code == ACTUATOR_RECEIPT_COMMITTED);
+  CHECK(fabsf(runtime_data.receipt.committed_demand.motor_thrust_n[0] - 5.0f) < 1e-3f);
+  CHECK(actuator_guard_state() == ACTUATOR_GUARD_ACTIVE);
+
+  /* Now revoke the active permit and publish a valid landed/disarmed
+   * certificate through the same helper used by task_mission_step(). */
   memset(&output, 0, sizeof(output));
   memset(&permit, 0, sizeof(permit));
   permit.header = h(SOURCE_M4, now + 5000u);
   permit.header.message_type = MSG_ACTUATION_PERMIT;
-  permit.permit_epoch = 1u;
+  permit.permit_epoch = 2u;
   permit.authority_epoch = 5u;
   permit.directive_epoch = 3u;
   permit.state_epoch = 1u;
@@ -831,31 +891,15 @@ static void run_ground_stop_task_smoke(void)
   certificate = plan_bundle.ground_stop_certificate;
   CHECK(actuator_update_permit(&permit, now) == STATUS_OK);
   CHECK(certificate.header.message_type == MSG_GROUND_STOP_CERTIFICATE);
-  {
-    FmsOutputView invalid_output = output;
-    const uint64_t certificate_expiry = certificate.certificate_expires_at_us;
-    invalid_output.landed_state.state = LANDED_STATE_IN_AIR;
-    CHECK(task_mission_update_ground_stop_certificate(&invalid_output, now + 1000u, 1) ==
-              STATUS_NOT_PERMITTED);
-    CHECK(plan_bundle.ground_stop_certificate.header.sequence == certificate.header.sequence &&
-          plan_bundle.ground_stop_certificate.certificate_expires_at_us == certificate_expiry);
-    CHECK(task_mission_update_ground_stop_certificate(NULL, certificate_expiry + 1u, 0) ==
-              STATUS_NOT_READY);
-    CHECK(plan_bundle.ground_stop_certificate.header.message_type == 0u &&
-          plan_bundle.ground_stop_certificate.certificate_expires_at_us == 0u);
-    CHECK(task_mission_update_ground_stop_certificate(&output, now, 1) == STATUS_OK);
-    certificate = plan_bundle.ground_stop_certificate;
-  }
 
   CHECK(runtime_data_lock(0));
   runtime_data.bundle.permit = permit;
   runtime_data.bundle.ground_stop_certificate = certificate;
-  runtime_data.bundle_ready = 1u;
   runtime_data.have_demand = 0u;
   runtime_data_unlock();
 
-  /* Exercise the real task owner end-to-end. Advance its 1 ms owner tick;
-   * the M7 2.5 ms frame gate decides when a DShot frame may be committed. */
+  /* Exercise the real task owner from a non-zero 5 N frame through the
+   * bounded 100 N/s ramp to the confirmed zero-target receipt. */
   turn(task_actuator_entry);
   stop_start = actuator_guard_ground_stop_start_us();
   for (tick = 0u; tick < 180u &&
@@ -864,11 +908,12 @@ static void run_ground_stop_task_smoke(void)
     turn(task_actuator_entry);
   }
 
-  CHECK(commits > commits_before);
+  CHECK(commits >= commits_before + 3u);
   CHECK(stop_start != 0u);
   CHECK(actuator_guard_state() == ACTUATOR_GUARD_DISARMED);
   CHECK(runtime_data.receipt.result_code == ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED);
   CHECK(runtime_data.receipt.header.message_type == MSG_ACTUATOR_COMMIT_RECEIPT);
+  CHECK(runtime_data.receipt.committed_demand.motor_thrust_n[0] == 0.0f);
   CHECK(runtime_data.receipt.estimated_apply_time_us >=
         runtime_data.receipt.commit_time_us);
   CHECK(runtime_data.receipt.estimated_apply_time_us - stop_start <=

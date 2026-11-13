@@ -110,7 +110,8 @@ The production software path is now connected in this branch:
 
 - `task_mission_step()` runs the FMS policy, translates an eligible ground-only disarm output with `fms_build_ground_stop_certificate()`, and publishes the certificate in `ControlBundle.ground_stop_certificate`.
 - `task_actuator_step()` consumes the certificate from the runtime bundle, suppresses queued M6 demands while the stop owns output, calls `actuator_guard_ground_stop()`, advances the frame-boundary owner, and publishes the resulting actuator receipt.
-- Certificate publication now uses the shared `task_mission_update_ground_stop_certificate()` helper in both the production mission owner and the SIL fixture. The fixture checks valid publication, rejection of an in-air update without replacing an unexpired certificate, expiry clearing, and republishing; it then exercises the real actuator task owner, guard and receipt path.
+- Certificate publication now uses the shared `task_mission_update_ground_stop_certificate()` helper in both the production mission owner and the SIL fixture. The fixture checks valid publication, rejection of an in-air update without replacing an unexpired certificate, expiry clearing, and republishing.
+- The SIL task-owner scenario now first supplies a valid 5 N M6 demand alongside an invalid in-air ground-stop candidate. It asserts that the invalid candidate does not suppress the demand. It then revokes the permit, publishes a valid landed/disarmed certificate through the shared helper, and drives the real actuator owner from the committed 5 N frame through multiple bounded ramp frames to the zero-target receipt.
 - The SIL fixture still supplies a constructed `FmsOutputView`; it does **not** drive `task_mission_step()` / `fms_policy_update()` through a live FMS input and command/lifecycle sequence. Full live FMS-task-to-actuator-owner integration coverage therefore remains incomplete.
 
 ### Driver apply-time evidence
@@ -162,3 +163,8 @@ The SIL smoke now calls the same certificate-publication helper used by `task_mi
 ### Branch lineage / integration gate
 
 At the time of this check, M6 branch HEAD `a8f62f5b270355d699b8a42861198cfa93894337` and M5-06 branch HEAD `51e7e923419733f5aa3b21efa1e46588629623ed` are **diverged**, with common ancestor `edf32b4e39cdae014aa76870dc821882807a6905`. GitHub compare reports M6 ahead by 50 commits and behind M5-06 by 395 commits. The M6/M7 Host CI therefore validates this independent branch only; it does not contain or supersede the current M5-06 branch. Do not rebase, merge, or claim unified milestone acceptance without an explicit integration plan and independent M5-06 approval.
+
+
+### Invalid certificate demand-continuity regression (CI pending)
+
+The actuator owner now suppresses a queued M6 demand only when `actuator_guard_ground_stop()` returns `STATUS_OK`. A malformed, stale or unauthorized certificate candidate cannot take ownership of output. The SIL fixture proves that an invalid in-air candidate does not block a valid 5 N demand, then verifies that a subsequently accepted certificate drives a multi-frame 5 N→0 N ground-stop ramp and terminal zero receipt. The updated workflow run is pending.

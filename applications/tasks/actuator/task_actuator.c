@@ -42,8 +42,14 @@ static void task_actuator_step(void)
      * the bounded ramp. Repeated copies are idempotent in the M7 guard. */
     if (have_ground_stop)
     {
-        (void)actuator_guard_ground_stop(&ground_stop, runtime_now_us());
-        have_demand = 0;
+        /* Only an accepted certificate owns output. A malformed, stale or
+         * unauthorized candidate must not starve a valid M6 demand. Once the
+         * guard accepts the certificate, its active/latched state rejects any
+         * racing demand until the zero-target receipt is latched. */
+        const Status stop_status =
+            actuator_guard_ground_stop(&ground_stop, runtime_now_us());
+        if (stop_status == STATUS_OK)
+            have_demand = 0;
     }
     if (have_demand)
     {
