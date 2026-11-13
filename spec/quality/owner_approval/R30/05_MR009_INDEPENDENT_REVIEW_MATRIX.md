@@ -98,6 +98,7 @@ obligation, or request additional full-validator fixtures.
 | Velocity Horner | Degree-4 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PENDING |
 | Acceleration Horner | Degree-3 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PENDING |
 | Binary32 RN rounding | `u=2^-24`, `eta=2^-149`; normal/subnormal upward bound propagated after every product and sum | READY | PENDING |
+| Gamma upper arithmetic | For n=2/10/12: `nu` up, `1-nu` down, quotient up; non-positive denominator fails closed | READY | PENDING |
 | Intermediate overflow | Strict `P_k/A_k < T_RN=2^128-2^103` before capping a rounded upper bound at FLT_MAX | READY | PENDING |
 | Coefficient scaling overflow | Full-validator coefficient/velocity-scaling/acceleration-scaling fail-fast traces; NUMERIC_FAILURE / NUMERIC / passed=0 | READY | PENDING |
 | Time conversion | S06-099: 60,002 offsets, max ratio 4.897714e-08 < gamma2 1.192093e-07; S06-108/109/113: 96/96/76 checks; derivative shift uses enlarged s_eval_max | READY | PENDING |
@@ -163,6 +164,7 @@ Validated code commit: 80670f118c5fdccce5a1f00f218a58a66c28bd5e.
 - Branch: `opt/stage-02-m5-06-safety-validator`.
 - R30 rounded-intermediate implementation: `6dc0e5411409244a137f9b5663c5daea08b5f81e`.
 - R30.1 fail-fast code baseline: `80670f118c5fdccce5a1f00f218a58a66c28bd5e`.
+- R30.3 gamma-factor directed-rounding hardening: current branch commit after the review-packet baseline; exact SHA and CI are recorded in the next evidence update.
 - R30 proof: `spec/history/implementation/guidance/M5_06_6_MR009_PROOF.md`.
 - Production validator: `middleware/guidance/trajectory_planning/m5_trajectory_safety.c`.
 - M6 consumer: `middleware/model/control/outer_loop/quad_x4/position_tracking/control_reference.c`.

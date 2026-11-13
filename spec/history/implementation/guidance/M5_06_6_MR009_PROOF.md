@@ -498,6 +498,10 @@ S06-115 同时断言：理想 H_k 均小于 FLT_MAX、幅度项小于 FLT_MAX/16
 - 三个 Horner 度数通过同一个生产 consumer_eval_error_bound() helper 逐项命中；S06-115 另外给出实际 binary32 溢出反例。这不冒充三个 Horner 分支均已由完整 validator 输入可达；完整 validator 可达性仍交由独立审查人判断。
 - 专用 runner bash tests/guidance/run_mr009_focus.sh 现在运行 Horner、六阶段追踪、极端参考、浮点环境和真实 C 时间转换五组测试。
 
+### 26.5 gamma 上界的定向舍入
+
+`gamma_n = nu/(1-nu)` 在 `0<=nu<1` 上单调递增。为保证上界，当前实现对 `nu` 使用 `nextafter(+Inf)`，对分母 `1-nu` 使用 `nextafter(-Inf)`，对最终商使用 `nextafter(+Inf)`；`gamma_2_upper()` 与 `gamma_n` 采用同一方向。不得把分母也写成向上舍入。支持的 `n=10/12` 和时间项 `n=2` 均远小于 1，分母正值检查失败时返回 `INFINITY` 并 fail-closed。
+
 ### 分类
 
 - 已实现：逐级 rounded product/sum 上界和 RN overflow-midpoint 拒绝。

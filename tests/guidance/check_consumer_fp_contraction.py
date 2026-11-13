@@ -2,9 +2,9 @@
 
 The validator replicates `control_sample_reference()`'s binary32 Horner chain.
 That replication is only meaningful if neither translation unit contracts
-`a*b + c` into a fused multiply-add with a different rounding sequence. The
-production build takes its flags from rtconfig.py, which pins -ffp-contract=off,
-this check compiles with the production M6 consumer flags and the Cortex-M7 validator check flags:
+`a*b + c` into a fused multiply-add with a different rounding sequence. The production build takes its flags from rtconfig.py, which pins
+-ffp-contract=off, -frounding-math and -fexcess-precision=standard. This check
+compiles:
 
 * the M6 consumer with the production flags;
 * the M5-06 validator with the Cortex-M7 check flags from

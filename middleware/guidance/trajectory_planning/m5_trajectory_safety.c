@@ -327,16 +327,18 @@ static double binary32_rounded_upper_nonnegative(double exact_upper)
       ? (double)FLT_MAX : rounded_upper;
 }
 
-/* gamma_2 = 2u/(1-2u), u = 2^-24, rounded upward. One definition so the
-   time-evaluation model has a single source. */
+/* gamma_2 = 2u/(1-2u), u = 2^-24, evaluated outward:
+   numerator up, denominator down, quotient up. */
 static double gamma2_upper(void)
 {
   double nu2 = 2.0 * 0x1p-24;
+  double denominator;
   double gamma2;
   nu2 = nextafter(nu2, INFINITY);
-  gamma2 = nu2 / (1.0 - nu2);
-  gamma2 = nextafter(gamma2, INFINITY);
-  return gamma2;
+  denominator = nextafter(1.0 - nu2, -INFINITY);
+  if (!(denominator > 0.0) || !isfinite(denominator)) return INFINITY;
+  gamma2 = nu2 / denominator;
+  return nextafter(gamma2, INFINITY);
 }
 
 static double sum_square_upper(double sum, double value)
@@ -975,12 +977,15 @@ static double consumer_eval_error_bound(
     if (magnitude_term < (double)FLT_MIN * 1024.0) return INFINITY;
   }
   {
-    /* nu, 1 - nu and the quotient must all round upward: a downward-rounded
-       gamma would under-state the bound. n is exact in binary64 (n <= 12), and
-       the extra nextafter calls make the whole expression outward. */
+    /* gamma_n = nu/(1-nu) is increasing for 0 <= nu < 1. Round nu upward,
+       the denominator downward, and the quotient upward. n is exact in
+       binary64 for the supported counts (10 or 12). */
     double nu = (double)rounding_count * unit;
+    double denominator;
     nu = nextafter(nu, INFINITY);
-    gamma = nu / (1.0 - nu);
+    denominator = nextafter(1.0 - nu, -INFINITY);
+    if (!(denominator > 0.0) || !isfinite(denominator)) return INFINITY;
+    gamma = nu / denominator;
     gamma = nextafter(gamma, INFINITY);
   }
   result = add_upper_nonnegative(coefficient_term,
