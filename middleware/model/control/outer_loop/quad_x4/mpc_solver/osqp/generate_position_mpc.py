@@ -83,6 +83,8 @@ lock = {'version': '1.0.0', 'generator': 'osqp Python 1.0.0',
         'scaling': 0, 'rho_is_vec': False,
         'local_modifications': 'Symbolic index arrays const in Flash; static pointer casts; QDLDL numeric refactor verifies fixed L indices; embedded unused certificate buffers alias their delta work vectors.',
         'source': 'https://github.com/osqp/osqp/tree/v1.0.0',
+        'bindings_template': 'https://github.com/osqp/osqp-python/blob/v1.0.0/src/osqp/codegen/pywrapper/bindings.cpp.jinja',
+        'bindings_template_rendering': {'prefix': 'quad_', 'extension_name': 'emosqp', 'final_newline': False},
         'files': {p.relative_to(out).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                   for p in sorted(out.rglob('*')) if p.is_file()
                   and p.suffix not in {'.o', '.su'}}}

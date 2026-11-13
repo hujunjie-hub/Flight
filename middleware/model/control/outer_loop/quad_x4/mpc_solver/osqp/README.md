@@ -5,6 +5,7 @@
 
 来源及完整 commit/archive/license SHA-256 见 `SOURCE_LOCK.json`；生成文件逐项 SHA-256 见
 `UPSTREAM_LOCK.json`。许可证为本目录 `LICENSE`（Apache-2.0），保留生成源码中的原始版权声明。
+`bindings.cpp` 是 OSQP Python 1.0.0 的 pywrapper 模板按 `prefix=quad_`、`extension_name=emosqp` 渲染的 Host 扩展文件；它由锁文件校验，但不参与固件构建。
 运行期不使用 Python、NumPy、SciPy、动态内存或桌面 OSQP 库。
 
 配置固定为 float32、embedded mode 2、15 变量/190 约束、45/702 个 P/A 非零元素，
