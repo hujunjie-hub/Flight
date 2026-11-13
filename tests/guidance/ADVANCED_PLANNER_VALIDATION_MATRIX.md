@@ -236,3 +236,14 @@ Host/SIL 高级 A*/地图/动态障碍测试入口须随对应实现一并提交
 - 具体状态只登记在 \`spec/09_需求验证实施与发布管理.md\`；本矩阵不建立第二套验收状态台账。
 
 
+
+
+## 13. MR-009 rounded Horner intermediate regression — S06-115
+
+- **Purpose:** detect a binary32 overflow that the prior ideal-real H_k recurrence can miss after an earlier Horner multiply/add rounds upward.
+- **Input:** deterministic degree-5 binary32 coefficients and local time s=0x1.8f5c28p-2f; no random seed.
+- **Oracle:** all ideal H_k < FLT_MAX, magnitude term < FLT_MAX/16, but the real separate binary32 multiply/add sequence reaches the round-to-nearest overflow midpoint at Horner stage k=3.
+- **Expected:** actual C sequence becomes non-finite; production consumer_eval_error_bound() returns +Inf; exactly one POSITION_HORNER test-only branch hit.
+- **Additional coverage:** 0/1 counters for all six consumer numerical rejection classes, full-validator status/reason checks for coefficient construction and derivative scaling, and a legal full-validator companion with all counters zero.
+- **Execution:** bash tests/guidance/run_mr009_focus.sh now runs five focused C groups. CI status is pending until the R30 commit completes.
+- **Scope:** Host/SIL numerical evidence only. It is not independent mathematical approval, H723 runtime, HIL, or flight evidence.

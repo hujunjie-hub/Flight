@@ -51,9 +51,14 @@ _Static_assert(sizeof(double) == sizeof(uint64_t),
 #include "m5_trajectory_safety_test_api.h"
 
 static _Thread_local M5SafetyTestConsumerRejectStage consumer_rejection;
+static _Thread_local uint32_t consumer_rejection_counts[
+    M5_TEST_CONSUMER_REJECT_STAGE_COUNT];
 
 static void trace_consumer_rejection(M5SafetyTestConsumerRejectStage stage)
 {
+  unsigned index = (unsigned)stage;
+  if (index > 0u && index < M5_TEST_CONSUMER_REJECT_STAGE_COUNT)
+    consumer_rejection_counts[index] = 1u;
   if (consumer_rejection == M5_TEST_CONSUMER_REJECT_NONE)
     consumer_rejection = stage;
 }
@@ -296,6 +301,30 @@ static double multiply_upper_nonnegative(double a, double b)
   if (a == 0.0 || b == 0.0) return 0.0;
   product = a * b;
   return nextafter(product, INFINITY);
+}
+
+/*
+ * Upper bound the magnitude of one round-to-nearest binary32 result.
+ *
+ * For a normal exact result, |fl(x)| <= (1+u)|x|, u=2^-24.
+ * For a subnormal exact result, |fl(x)| <= |x| + 2^-149. The split below
+ * covers both cases. The caller must first prove that the exact operation
+ * cannot cross the round-to-nearest overflow midpoint; after that proof the
+ * actual result is finite, so capping this bound at FLT_MAX is sound.
+ */
+static double binary32_rounded_upper_nonnegative(double exact_upper)
+{
+  double rounded_upper;
+  if (!(exact_upper >= 0.0) || !isfinite(exact_upper)) return INFINITY;
+  if (exact_upper == 0.0) return 0.0;
+  if (exact_upper < (double)FLT_MIN) {
+    rounded_upper = add_upper_nonnegative(exact_upper, 0x1p-149);
+  } else {
+    rounded_upper = multiply_upper_nonnegative(exact_upper, 1.0 + 0x1p-24);
+  }
+  if (!isfinite(rounded_upper)) return INFINITY;
+  return (rounded_upper > (double)FLT_MAX)
+      ? (double)FLT_MAX : rounded_upper;
 }
 
 /* gamma_2 = 2u/(1-2u), u = 2^-24, rounded upward. One definition so the
@@ -848,11 +877,12 @@ static void consumer_power_coefficients(
  *   sum_i max(|cf_i - c_low_i|, |cf_i - c_high_i|) * s_max^i
  *     + gamma_n * sum_i |cf_i| * s_max^i
  *
- * with gamma_n = n*u / (1 - n*u), u = 2^-24, and a small absolute floor for
- * subnormal-range final roundings. gamma_n requires normal-range intermediates
- * and no overflow, so a polynomial whose magnitude term is too small (possible
- * cancellation into the subnormal range) or too large returns +Inf and the
- * caller fails closed. Inputs outside the model are rejected, not guessed.
+ * with gamma_n = n*u / (1 - n*u), u = 2^-24. Each binary32 operation is
+ * bounded by u*|exact| + 2^-149, so the gamma term and the separately
+ * propagated subnormal floor cover normal and subnormal roundings. Before
+ * applying that model, every actual Horner multiply and add is checked against
+ * the binary32 round-to-nearest overflow midpoint. Inputs outside the model
+ * are rejected, not guessed.
  */
 static double consumer_eval_error_bound(
     const float consumer[6],
@@ -888,17 +918,47 @@ static double consumer_eval_error_bound(
   if (!isfinite(coefficient_term) || !isfinite(magnitude_term))
     return INFINITY;
   {
-    /* Horner intermediate H_k = |c_k| + s_max * H_(k+1), outward at every step. */
-    double h = fabs((double)consumer[degree]);
-    if (!isfinite(h)) return INFINITY;
+    /*
+     * Bound the rounded Horner chain, not only its ideal-real recurrence.
+     *
+     * For IEEE binary32 round-to-nearest/ties-to-even, the overflow midpoint
+     * is 2^128 - 2^103. At the midpoint the even result is 2^128, which
+     * overflows to infinity; therefore each exact product and sum upper bound
+     * must be strictly below it.
+     *
+     * R_n = |c_n|
+     * P_k = s_max * R_(k+1)
+     * R_k = |c_k| + round32_upper(P_k)
+     *
+     * round32_upper bounds the actual rounded product/sum and caps at FLT_MAX
+     * only after the corresponding exact operation is proven finite. This
+     * propagates each prior binary32 rounding into the next stage.
+     */
+    const double overflow_midpoint = 0x1p128 - 0x1p103;
+    double rounded_h = fabs((double)consumer[degree]);
+    if (!isfinite(rounded_h)) return INFINITY;
     for (i = degree; i-- > 0u;) {
-      double product = multiply_upper_nonnegative(h, s_max);
-      if (!isfinite(product) || product > (double)FLT_MAX) {
+      double product_exact = multiply_upper_nonnegative(rounded_h, s_max);
+      double product_rounded;
+      double sum_exact;
+      if (!isfinite(product_exact) || product_exact >= overflow_midpoint) {
         M5_TRACE_HORNER(degree);
         return INFINITY;
       }
-      h = add_upper_nonnegative(fabs((double)consumer[i]), product);
-      if (!isfinite(h) || h > (double)FLT_MAX) {
+      product_rounded =
+          binary32_rounded_upper_nonnegative(product_exact);
+      if (!isfinite(product_rounded)) {
+        M5_TRACE_HORNER(degree);
+        return INFINITY;
+      }
+      sum_exact = add_upper_nonnegative(
+          fabs((double)consumer[i]), product_rounded);
+      if (!isfinite(sum_exact) || sum_exact >= overflow_midpoint) {
+        M5_TRACE_HORNER(degree);
+        return INFINITY;
+      }
+      rounded_h = binary32_rounded_upper_nonnegative(sum_exact);
+      if (!isfinite(rounded_h)) {
         M5_TRACE_HORNER(degree);
         return INFINITY;
       }
@@ -2187,11 +2247,19 @@ M5TrajectorySafetyStatus m5_trajectory_safety_validate(
 void m5_trajectory_safety_test_reset_consumer_rejection(void)
 {
   consumer_rejection = M5_TEST_CONSUMER_REJECT_NONE;
+  memset(consumer_rejection_counts, 0, sizeof(consumer_rejection_counts));
 }
 
 M5SafetyTestConsumerRejectStage m5_trajectory_safety_test_consumer_rejection(void)
 {
   return consumer_rejection;
+}
+
+void m5_trajectory_safety_test_consumer_rejection_counts(
+    uint32_t counts[M5_TEST_CONSUMER_REJECT_STAGE_COUNT])
+{
+  if (counts != NULL)
+    memcpy(counts, consumer_rejection_counts, sizeof(consumer_rejection_counts));
 }
 
 uint8_t m5_trajectory_safety_test_curve_bounds(

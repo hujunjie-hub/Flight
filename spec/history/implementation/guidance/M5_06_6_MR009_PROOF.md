@@ -417,3 +417,90 @@ test-only trace/counter。当前补丁只完成精确状态/reason 断言，**�
 - 独立审查：仍未完成。
 
 **MR-009 保持 WAITING_INDEPENDENT_REVIEW。Agent 不自行 APPROVED。**
+
+
+## 26. R30：实际 binary32 舍入后的 Horner 中间值证明（未 APPROVE）
+
+R29 的理想实数递推
+
+~~~text
+H_n = |c_n|
+H_k = |c_k| + s_max * H_(k+1)
+~~~
+
+只包络理想实数 Horner 递推；它没有把上一层 binary32 乘法/加法的实际舍入结果传入下一层。若上一层向上舍入，下一层实际操作数可能大于理想 H_k。因此仅检查 H_k <= FLT_MAX 不是完整的中间值溢出证明。
+
+### 26.1 round-to-nearest 溢出阈值
+
+binary32 round-to-nearest/ties-to-even 的正向溢出中点为：
+
+~~~text
+T_RN = 2^128 - 2^103
+~~~
+
+在该中点，ties-to-even 选择假想的 2^128，其指数超出 binary32 有限范围，结果为 +Inf。负向阈值对称。因此，对每个乘法和加法的绝对值上界，必须严格小于 T_RN；等于或超过即 fail-closed。
+
+### 26.2 递推实际 rounded intermediate
+
+令 u=2^-24，eta=2^-149。对任意无溢出的 binary32 RN 操作：
+
+~~~text
+|fl(x)-x| <= u*|x| + eta
+~~~
+
+正规结果由相对项覆盖；次正规结果由绝对项覆盖。定义单次 binary32 结果的向上界：
+
+~~~text
+round32_upper(X) =
+  next_up(X*(1+u)),  X >= FLT_MIN
+  next_up(X+eta),   0 <= X < FLT_MIN
+~~~
+
+已证明对应操作不溢出后，可将该上界截到 FLT_MAX，因为实际 RN 结果必为有限 binary32。
+
+从最高次项开始，逐级执行：
+
+~~~text
+R_n = |c_n|
+P_k = up64(s_max * R_(k+1))
+require P_k < T_RN
+P32_k = min(FLT_MAX, round32_upper(P_k))
+A_k = up64(|c_k| + P32_k)
+require A_k < T_RN
+R_k = min(FLT_MAX, round32_upper(A_k))
+~~~
+
+其中 up64 是 binary64 nextafter(...,+Inf) 向外运算。这样每一级的乘积输入包含上一层真实 binary32 舍入的上界；每一级加法也以实际 rounded product 上界为输入。position/velocity/acceleration 分别按 degree 5/4/3 执行。任何非有限值或 P_k/A_k >= T_RN 返回 +Inf，由调用者转成 M5_SAFETY_NUMERIC_FAILURE。
+
+### 26.3 S06-115：R29 exact-H 漏洞反例
+
+固定 binary32 输入（无随机 seed）：
+
+~~~text
+s  = 0x1.8f5c28p-2f
+c3 = 0x1.64befeP+127f
+c4 = 0x1.b6eda2P+126f
+c5 = 0x1.ca01dcP+127f
+c0 = c1 = c2 = 0
+~~~
+
+该输入满足所有理想 H_k < FLT_MAX，最大 H_3/FLT_MAX = 0.9999999992172294；sum |c_i|s^i / FLT_MAX = 0.05931899342614322 < 1/16，因此 R29 的 exact-H 与 magnitude guard 均不会拒绝。真实分离的 binary32 multiply/add 在 k=4 向上舍入后，k=3 的精确加法输入恰好落在 T_RN，RN ties-to-even 结果为 +Inf。旧 exact-H 检查会接受该输入；R30 的 rounded recurrence 必须拒绝，并记录一次 POSITION_HORNER 命中。
+
+S06-115 同时断言：理想 H_k 均小于 FLT_MAX、幅度项小于 FLT_MAX/16、真实 volatile binary32 Horner 在 k=3 发生非有限、生产 consumer_eval_error_bound() 返回 +Inf、对应 test-only branch counter 恰为 1。
+
+### 26.4 分支证据与边界
+
+- Test-only 计数器对系数构造、速度缩放、加速度缩放、position/velocity/acceleration Horner 六类拒绝分别记录 0/1 命中；保留 first-stage enum。
+- 计数器只在 FLIGHT_M5_SAFETY_TEST_API 编译，复位/读取 API 不进入产品 ABI；无测试宏的生产对象不增加状态、栈或运行时分支。
+- 全验证器路径继续验证系数构造和两类导数缩放拒绝的 NUMERIC_FAILURE / NUMERIC / passed=0，并验证合法 companion 的所有计数为 0。
+- 三个 Horner 度数通过同一个生产 consumer_eval_error_bound() helper 逐项命中；S06-115 另外给出实际 binary32 溢出反例。这不冒充三个 Horner 分支均已由完整 validator 输入可达；完整 validator 可达性仍交由独立审查人判断。
+- 专用 runner bash tests/guidance/run_mr009_focus.sh 现在运行 Horner、六阶段追踪、极端参考、浮点环境和真实 C 时间转换五组测试。
+
+### 分类
+
+- 已实现：逐级 rounded product/sum 上界和 RN overflow-midpoint 拒绝。
+- 已增加：S06-115 确定性 exact-H 反例、六类 test-only 0/1 branch counter、合法 companion 零计数断言。
+- 待验证：本轮 commit 的 Host、ASan/UBSan、Cortex-M7 编译及专用 runner CI 结果。
+- 待独立审查：消费者系数身份、FP 环境/目标等价、M6 时间域和三个 Horner 拒绝分支的完整 validator 可达性。
+
+**MR-009 仍为 WAITING_INDEPENDENT_REVIEW；Agent 不 APPROVE。M5-06 继续 BLOCKED，S06-100..102 继续 NOT_RUN，M5-07 不得启动。**

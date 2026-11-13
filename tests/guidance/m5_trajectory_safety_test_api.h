@@ -118,9 +118,13 @@ typedef enum {
   M5_TEST_CONSUMER_REJECT_ACCELERATION_HORNER
 } M5SafetyTestConsumerRejectStage;
 
-/* Reset or read the first consumer numerical rejection in the calling thread. */
+/* Reset/read the first rejection and a test-only 0/1 hit vector indexed by
+   M5SafetyTestConsumerRejectStage. No trace state exists without the test API. */
+#define M5_TEST_CONSUMER_REJECT_STAGE_COUNT 7u
 void m5_trajectory_safety_test_reset_consumer_rejection(void);
 M5SafetyTestConsumerRejectStage m5_trajectory_safety_test_consumer_rejection(void);
+void m5_trajectory_safety_test_consumer_rejection_counts(
+    uint32_t counts[M5_TEST_CONSUMER_REJECT_STAGE_COUNT]);
 
 uint8_t m5_trajectory_safety_test_rounding_bounds(
     double value, float *lower, float *upper);

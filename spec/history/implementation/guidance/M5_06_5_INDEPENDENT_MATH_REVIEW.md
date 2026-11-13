@@ -450,3 +450,14 @@ R10 撤回 R9 的固定系数不可行结论：S06-104 现在只给出各通道�
   error/γ₂ 为 3.618–4.059，证明不是 1 微秒替代；76 checks。
 - S06-108 由生产 locator 直接返回 active/local_us/global_us；wrong_local=72。
 - 产品 config 增加非零错误 profile_hash 拒绝；profile_id 由 C API 返回。
+
+
+## R30：rounded Horner intermediate 修复（2026-11-13）
+
+- 将 exact-real H_k 检查升级为逐级 rounded binary32 product/sum 上界；按 RN ties-to-even 溢出中点 2^128 - 2^103 做严格拒绝，且将每一级舍入后的上界传递到下一层。
+- 误差模型明确为 |fl(x)-x| <= 2^-24*|x| + 2^-149，同时覆盖正规和次正规结果；原有幅度阈值与 fail-closed 条件不放宽。
+- S06-115 给出 R29 exact-H 漏洞反例：所有理想 H_k 均小于 FLT_MAX、幅度项低于 FLT_MAX/16，但真实 binary32 Horner 在 k=3 到达 RN 溢出中点。
+- 六类拒绝增加 test-only 0/1 branch counters；完整 validator 的系数构造/速度缩放/加速度缩放分支和合法 companion 计数器断言保留。Horner 度数分支由生产 helper 直接测试，完整 validator 可达性不作超范围声明。
+- 专用 MR-009 runner 扩展为五组 C 测试。R30 证据与新审查矩阵见 spec/quality/owner_approval/R30/05_MR009_INDEPENDENT_REVIEW_MATRIX.md。
+
+状态：IMPLEMENTED / CI_PENDING / WAITING_INDEPENDENT_REVIEW。R30 证据必须绑定最终 commit；Agent 不得把 MR-009 标为 APPROVED。

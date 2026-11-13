@@ -5154,6 +5154,20 @@ static void test_m5_safety_subnormal_jerk_numeric_failure(void)
 
 /* MR-009 R28: exercise the production per-level Horner bound directly and
    through the production validator with finite extreme coefficients. */
+static void check_mr009_rejection_counts(
+    M5SafetyTestConsumerRejectStage expected)
+{
+  uint32_t counts[M5_TEST_CONSUMER_REJECT_STAGE_COUNT] = {0};
+  unsigned i;
+  m5_trajectory_safety_test_consumer_rejection_counts(counts);
+  for (i = 0u; i < M5_TEST_CONSUMER_REJECT_STAGE_COUNT; ++i) {
+    uint32_t wanted = (expected != M5_TEST_CONSUMER_REJECT_NONE &&
+        i == (unsigned)expected) ? 1u : 0u;
+    CHECK(counts[i] == wanted);
+  }
+}
+
+/* MR-009 R30: the rounded Horner chain, not only ideal H_k, must be finite. */
 static void test_m5_safety_mr009_horner_bound_extremes(void)
 {
   double low[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -5162,17 +5176,25 @@ static void test_m5_safety_mr009_horner_bound_extremes(void)
   double bound;
 
   c[0] = 1.0f;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 5u, 10u, 0.02, low, high);
   CHECK(isfinite(bound) && bound >= 0.0);
+  CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+        M5_TEST_CONSUMER_REJECT_NONE);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_NONE);
 
-  /* FLT_MAX near c0/c1: the H_k accumulation must overflow to +Inf. */
+  /* FLT_MAX near c0/c1: the rounded position Horner chain rejects. */
   c[0] = FLT_MAX;
   c[1] = FLT_MAX;
   c[2] = FLT_MAX;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 5u, 10u, 1.0, low, high);
   CHECK(isinf(bound));
+  CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+        M5_TEST_CONSUMER_REJECT_POSITION_HORNER);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_POSITION_HORNER);
 
   /* Positive/negative cancellation cannot hide the magnitude term. */
   c[0] = FLT_MAX;
@@ -5181,55 +5203,124 @@ static void test_m5_safety_mr009_horner_bound_extremes(void)
   c[3] = -FLT_MAX;
   c[4] = FLT_MAX;
   c[5] = -FLT_MAX;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 5u, 10u, 1.0, low, high);
   CHECK(isinf(bound));
 
-  /* Velocity coefficient scaling (5c5..2c2) with FLT_MAX. */
+  /* Velocity Horner degree and acceleration Horner degree remain guarded. */
   c[0] = 0.0f;
   c[1] = FLT_MAX;
   c[2] = FLT_MAX;
   c[3] = FLT_MAX;
   c[4] = FLT_MAX;
   c[5] = 0.0f;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 4u, 12u, 1.0, low, high);
   CHECK(isinf(bound));
+  CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+        M5_TEST_CONSUMER_REJECT_VELOCITY_HORNER);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_VELOCITY_HORNER);
 
-  /* Acceleration coefficient scaling (20c5..2c2) with FLT_MAX. */
   c[0] = 0.0f;
   c[1] = 0.0f;
   c[2] = FLT_MAX;
   c[3] = FLT_MAX;
   c[4] = FLT_MAX;
   c[5] = 0.0f;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 3u, 10u, 1.0, low, high);
   CHECK(isinf(bound));
+  CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+        M5_TEST_CONSUMER_REJECT_ACCELERATION_HORNER);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_ACCELERATION_HORNER);
 
-  /* Subnormal-range magnitude is rejected by the cancellation guard. */
+  /* Subnormal-range magnitude is rejected conservatively, before Horner. */
   c[0] = nextafterf(0.0f, 1.0f);
   c[1] = 0.0f;
   c[2] = 0.0f;
   c[3] = 0.0f;
   c[4] = 0.0f;
   c[5] = 0.0f;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 5u, 10u, 1.0, low, high);
   CHECK(isinf(bound));
+  CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+        M5_TEST_CONSUMER_REJECT_NONE);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_NONE);
 
   /* A non-finite coefficient is never accepted. */
   c[0] = NAN;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 5u, 10u, 1.0, low, high);
   CHECK(isinf(bound));
+  CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+        M5_TEST_CONSUMER_REJECT_NONE);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_NONE);
 
   /* Extremely short interval: finite and non-negative, no silent NaN. */
   c[0] = 1.0f;
   c[1] = 0.0f;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 5u, 10u, nextafter(0.0, 1.0), low, high);
   CHECK(isfinite(bound) && bound >= 0.0);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_NONE);
+
+  /*
+   * S06-115 counterexample: every ideal H_k is below FLT_MAX and the
+   * magnitude term is below FLT_MAX/16, yet binary32 Horner rounds the k=4
+   * intermediate upward so the k=3 add lands exactly on the RN overflow
+   * midpoint and becomes +Inf. The former exact-H-only guard accepted it.
+   */
+  {
+    const float time_s = 0x1.8f5c28p-2f;
+    const float rounded_case[6] = {
+      0.0f, 0.0f, 0.0f,
+      0x1.64befeP+127f,
+      0x1.b6eda2P+126f,
+      0x1.ca01dcP+127f
+    };
+    double ideal_h = fabs((double)rounded_case[5]);
+    double magnitude = 0.0;
+    double power = 1.0;
+    volatile float actual = rounded_case[5];
+    unsigned k;
+    unsigned actual_overflow_stage = 99u;
+
+    for (k = 0u; k <= 5u; ++k) {
+      magnitude += fabs((double)rounded_case[k]) * power;
+      power *= (double)time_s;
+    }
+    for (k = 5u; k-- > 0u;) {
+      ideal_h = fabs((double)rounded_case[k]) + (double)time_s * ideal_h;
+      CHECK(ideal_h < (double)FLT_MAX);
+    }
+    CHECK(magnitude < (double)FLT_MAX * 0.0625);
+
+    for (k = 5u; k-- > 0u;) {
+      volatile float product = actual * time_s;
+      volatile float sum = product + rounded_case[k];
+      if (!isfinite(product) || !isfinite(sum)) {
+        actual_overflow_stage = k;
+        break;
+      }
+      actual = sum;
+    }
+    CHECK(actual_overflow_stage == 3u);
+
+    m5_trajectory_safety_test_reset_consumer_rejection();
+    bound = m5_trajectory_safety_test_consumer_error_bound(
+        rounded_case, 5u, 10u, (double)time_s, low, high);
+    CHECK(isinf(bound));
+    CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+          M5_TEST_CONSUMER_REJECT_POSITION_HORNER);
+    check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_POSITION_HORNER);
+  }
 }
 
 static void test_m5_safety_mr009_consumer_rejection_stages(void)
@@ -5254,6 +5345,8 @@ static void test_m5_safety_mr009_consumer_rejection_stages(void)
   SafetyFx fx;
   unsigned i;
 
+  /* Full validator: coefficient construction and both derivative scaling
+     stages must each produce NUMERIC_FAILURE for the intended branch only. */
   for (i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
     safety_fx_init(&fx, 59400000u);
     safety_zero_uncertainty(&fx);
@@ -5264,8 +5357,11 @@ static void test_m5_safety_mr009_consumer_rejection_stages(void)
     CHECK(fx.result.reason_code == M5_SAFETY_REASON_NUMERIC);
     CHECK(fx.result.passed == 0u);
     CHECK(m5_trajectory_safety_test_consumer_rejection() == cases[i].stage);
+    check_mr009_rejection_counts(cases[i].stage);
   }
 
+  /* The same production helper is exercised at each derivative degree.
+     Full-validator reachability is deliberately not inferred from this hook. */
   for (i = 0u; i < sizeof(horner_stages) / sizeof(horner_stages[0]); ++i) {
     unsigned degree = i + 3u;
     float c[6] = {0};
@@ -5275,8 +5371,10 @@ static void test_m5_safety_mr009_consumer_rejection_stages(void)
     CHECK(isinf(m5_trajectory_safety_test_consumer_error_bound(
         c, degree, roundings[i], 0.02, exact, exact)));
     CHECK(m5_trajectory_safety_test_consumer_rejection() == horner_stages[i]);
+    check_mr009_rejection_counts(horner_stages[i]);
   }
 
+  /* A legal full-validator companion passes and has no rejection trace. */
   safety_fx_init(&fx, 59400000u);
   safety_zero_uncertainty(&fx);
   m5_trajectory_safety_test_reset_consumer_rejection();
@@ -5284,6 +5382,7 @@ static void test_m5_safety_mr009_consumer_rejection_stages(void)
       &fx.result) == M5_SAFETY_PASS);
   CHECK(fx.result.passed == 1u);
   CHECK(m5_trajectory_safety_test_consumer_rejection() == M5_TEST_CONSUMER_REJECT_NONE);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_NONE);
 }
 
 static void test_m5_safety_mr009_extreme_reference_rejected(void)
