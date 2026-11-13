@@ -161,15 +161,14 @@ typedef struct {
 } FmsGeofence;
 
 typedef struct {
-  uint32_t request_id;
+  uint64_t seen_us;
+  uint32_t request_id;  /* Zero denotes an unused entry. */
   uint32_t session;
   uint16_t source;
   uint16_t ack_state;
   uint16_t reason;
   uint16_t command_code;
   ProductOperationPayload payload;
-  uint64_t seen_us;
-  uint8_t used;
 } FmsDedupEntry;
 
 enum { FMS_TRACKER_NONE = 0, FMS_TRACKER_TAKEOFF = 1, FMS_TRACKER_LAND = 2, FMS_TRACKER_RETURN = 3 };

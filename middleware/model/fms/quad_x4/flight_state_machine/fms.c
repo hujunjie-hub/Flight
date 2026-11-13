@@ -387,14 +387,14 @@ static uint8_t fms_dedup_lookup(FmsEngine *e, const OperationRequest *req, uint6
   *out = NULL;
   for (i = 0u; i < FMS_DEDUP_CAPACITY; ++i) {
     FmsDedupEntry *d = &e->dedup[i];
-    if (d->used == 0u) {
+    if (d->request_id == 0u) {
       if (free_slot == NULL) {
         free_slot = d;
       }
       continue;
     }
     if (now > d->seen_us && (now - d->seen_us) > FMS_DEDUP_TTL_US) {
-      d->used = 0u;
+      d->request_id = 0u;
       if (free_slot == NULL) {
         free_slot = d;
       }
@@ -512,7 +512,6 @@ static void fms_handle_request(FmsEngine *e, const FmsInputs *in,
   }
 
   if (slot != NULL) {
-    slot->used = 1u;
     slot->request_id = req->request_id;
     slot->session = req->source_session_id;
     slot->source = req->header.source_id;
@@ -902,7 +901,7 @@ static void fms_tracker_ack(FmsEngine *e, FmsOutputView *out, const FmsTracker *
 {
   for (unsigned i = 0; i < FMS_DEDUP_CAPACITY; ++i) {
     FmsDedupEntry *entry = &e->dedup[i];
-    if (entry->used != 0u && entry->request_id == t->request_id &&
+    if (entry->request_id != 0u && entry->request_id == t->request_id &&
         entry->session == t->session && entry->source == t->source) {
       entry->ack_state = state;
       entry->reason = reason;

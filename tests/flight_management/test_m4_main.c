@@ -10,9 +10,12 @@
 #include <math.h>
 #include "ports/port_api.h"
 #include "fms_interface.h"
+#include "flight_state_machine/fms_internal.h"
 #ifdef M4_M5_INTEGRATION
 #include "guidance_update/guidance.h"
 #endif
+
+_Static_assert(sizeof(FmsDedupEntry) <= 72u, "FMS dedup entry exceeds its static allocation");
 
 #define T_BOOT 0x1122334455667788ull
 #define T_EPOCH 3u
@@ -1069,6 +1072,37 @@ static void test_duplicate_request_replays_ack(void)
   CHECK(fms_policy_stop() == STATUS_OK);
 }
 
+static void test_dedup_full_and_expiry(void)
+{
+  Fx fx;
+  const CommandAck *ack;
+  uint32_t first_id;
+  uint32_t overflow_id;
+
+  CHECK(fx_init(&fx));
+  first_id = fx.next_request_id;
+  for (unsigned i = 0u; i < FMS_DEDUP_CAPACITY; ++i) {
+    const uint32_t id = fx.next_request_id++;
+    CHECK(fx_send(&fx, PRODUCT_CMD_LAND, id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_REJECTED);
+    ack = fx_find_ack(&fx, id);
+    CHECK(ack != NULL && ack->reason_code == 2u); /* Disarmed. */
+  }
+
+  overflow_id = fx.next_request_id++;
+  CHECK(fx_send(&fx, PRODUCT_CMD_LAND, overflow_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_REJECTED);
+  ack = fx_find_ack(&fx, overflow_id);
+  CHECK(ack != NULL && ack->reason_code == 9u); /* Capacity. */
+  CHECK(fx_send(&fx, PRODUCT_CMD_LAND, first_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_REJECTED);
+  ack = fx_find_ack(&fx, first_id);
+  CHECK(ack != NULL && ack->reason_code == 2u); /* Cached rejection. */
+
+  fx_run(&fx, (uint32_t)FMS_DEDUP_TTL_US);
+  CHECK(fx_send(&fx, PRODUCT_CMD_LAND, overflow_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_REJECTED);
+  ack = fx_find_ack(&fx, overflow_id);
+  CHECK(ack != NULL && ack->reason_code == 2u); /* Capacity reclaimed. */
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
 static void test_geofence_required_rejects_outside_waypoint(void)
 {
   Fx fx;
@@ -1620,6 +1654,7 @@ int main(void)
     {"post_mission_return_waits_for_hold", test_post_mission_return_waits_for_stable_hold},
     {"post_mission_return_timeout_preserves_hold", test_post_mission_return_timeout_preserves_hold},
     {"duplicate_request_replay", test_duplicate_request_replays_ack},
+    {"dedup_full_and_expiry", test_dedup_full_and_expiry},
     {"geofence_required", test_geofence_required_rejects_outside_waypoint},
     {"mission_epoch_binding", test_mission_epoch_required_and_not_stale},
     {"first_reference_window", test_first_reference_window_expires_to_ground_stop},
