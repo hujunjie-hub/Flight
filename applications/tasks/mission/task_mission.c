@@ -14,6 +14,24 @@ static MissionUploadCandidate plan_mission;
 extern uint8_t flight_sil_ground_contact(void);
 #endif
 
+static void task_mission_update_ground_stop_certificate(const FmsOutputView *output,
+                                                    uint64_t now, int output_current)
+{
+  GroundStopCertificate certificate;
+  Status status = STATUS_NOT_READY;
+
+  if (output_current) {
+    status = output ? fms_build_ground_stop_certificate(output, now, &certificate)
+                    : STATUS_INVALID_ARGUMENT;
+  }
+  if (status == STATUS_OK) {
+    plan_bundle.ground_stop_certificate = certificate;
+  } else if (plan_bundle.ground_stop_certificate.certificate_expires_at_us <= now) {
+    memset(&plan_bundle.ground_stop_certificate, 0,
+           sizeof(plan_bundle.ground_stop_certificate));
+  }
+}
+
 static void task_mission_step(void) {
   FmsInputView input;
   GuidanceInput gin;
@@ -102,16 +120,8 @@ static void task_mission_step(void) {
   /* Translate only a validated M4 ground-disarm decision plus its matching
    * revoked permit. Keep the short-lived certificate in the bundle long enough
    * for the 1 ms actuator owner to consume it; never synthesize it while airborne. */
-  {
-    GroundStopCertificate certificate;
-    const uint64_t certificate_now = runtime_now_us();
-    if (!runtime_stats.planning_status &&
-        fms_build_ground_stop_certificate(&fms_output, certificate_now, &certificate) == STATUS_OK) {
-      plan_bundle.ground_stop_certificate = certificate;
-    } else if (plan_bundle.ground_stop_certificate.certificate_expires_at_us <= certificate_now) {
-      memset(&plan_bundle.ground_stop_certificate, 0, sizeof(plan_bundle.ground_stop_certificate));
-    }
-  }
+  task_mission_update_ground_stop_certificate(
+      &fms_output, runtime_now_us(), runtime_stats.planning_status == STATUS_OK);
   if(!runtime_stats.planning_status && next_origin) {
     EstimatorResetRequest reset;
     if(!fms_authorize_origin_reset(&origin,next_origin,&reset)) {

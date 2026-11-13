@@ -110,7 +110,8 @@ The production software path is now connected in this branch:
 
 - `task_mission_step()` runs the FMS policy, translates an eligible ground-only disarm output with `fms_build_ground_stop_certificate()`, and publishes the certificate in `ControlBundle.ground_stop_certificate`.
 - `task_actuator_step()` consumes the certificate from the runtime bundle, suppresses queued M6 demands while the stop owns output, calls `actuator_guard_ground_stop()`, advances the frame-boundary owner, and publishes the resulting actuator receipt.
-- The `--ground-stop-smoke` SIL case exercises the real actuator task owner, guard and receipt path. Its fixture currently constructs a valid `FmsOutputView` and injects the adapter-produced certificate into the runtime bundle; it does **not** drive `task_mission_step()` with a live FMS input sequence. Full mission-task-to-actuator-owner integration coverage therefore remains incomplete.
+- Certificate publication now uses the shared `task_mission_update_ground_stop_certificate()` helper in both the production mission owner and the SIL fixture. The fixture checks valid publication, rejection of an in-air update without replacing an unexpired certificate, expiry clearing, and republishing; it then exercises the real actuator task owner, guard and receipt path.
+- The SIL fixture still supplies a constructed `FmsOutputView`; it does **not** drive `task_mission_step()` / `fms_policy_update()` through a live FMS input and command/lifecycle sequence. Full live FMS-task-to-actuator-owner integration coverage therefore remains incomplete.
 
 ### Driver apply-time evidence
 
@@ -150,3 +151,8 @@ The CI failure on Run #19 is closed for this Host/SIL path. This does not close 
 4. **Separate M5-06 acceptance gate — BLOCKED.** The M5-06 PR #2 still requires independent mathematical review of Hermite→Bernstein conversion, derivative convex-hull bounds and outward interval assumptions, plus broader randomized dynamic uncertainty/acceleration-bound proof coverage. The M4/M5 regression passing here is not independent M5-06 approval; M5-07/physical release must not be inferred from this Host/SIL result.
 
 Production `BENCH_INHIBIT` remains unchanged. Host/SIL evidence is not H723 target build, HIL, physical ESC response, or flight authorization.
+
+
+### Mission certificate publication seam regression (CI pending)
+
+The SIL smoke now calls the same certificate-publication helper used by `task_mission_step()`. It verifies that a valid landed/disarmed FMS output publishes a certificate, an in-air update cannot replace an unexpired certificate, an expired certificate is cleared when no current FMS output exists, and a fresh valid output can republish it. This is stronger than directly assigning the certificate in the fixture, but it remains a seam test rather than a live `fms_policy_update()` command/lifecycle integration test. The updated workflow run is pending.
