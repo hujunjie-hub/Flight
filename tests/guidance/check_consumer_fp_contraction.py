@@ -187,7 +187,7 @@ VALIDATOR_REPLICA_TOKENS = {
 }
 
 def _normalize_source(source):
-    return re.sub(r"\\s+", " ", source)
+    return re.sub(r"\s+", " ", source)
 
 
 def check_model_against_source(source=None, consumer_source=None):
