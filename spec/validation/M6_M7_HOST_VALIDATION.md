@@ -21,20 +21,25 @@ bash tests/actuation/run_host_tests.sh
 
 The M6 runner compiles the real controller translation units and generated OSQP workspace. The M7 runner compiles the real actuator output guard with `FLIGHT_HOST_TEST`; it does not substitute a parallel implementation.
 
-## Status at CI bootstrap
+## First complete CI run
 
-| Gate | Status | Evidence |
-|---|---|---|
-| M4 host | NOT_RUN | Awaiting first branch CI run |
-| M5 host | NOT_RUN | Awaiting first branch CI run |
-| M4/M5 integration | NOT_RUN | Awaiting first branch CI run |
-| M6 host | NOT_RUN | Awaiting first branch CI run |
-| M7 host | NOT_RUN | Awaiting first branch CI run |
-| M6/M7 ASan + UBSan | NOT_RUN | Awaiting first branch CI run |
-| Cortex-M7 target build | NOT_RUN | Not covered by this host workflow |
-| HIL / DShot waveform / flight | NOT_RUN | Requires target hardware and independent evidence |
+- Commit: `13f1e6b87fbe449c0a1348f35b985c9b2a824bc0`
+- Workflow run: [43362327368](https://github.com/hujunjie-hub/Flight/actions/runs/43362327368)
+- Overall result: **SUCCESS** (3/3 jobs)
 
-No item is marked PASS until the corresponding job completes successfully against the commit under review.
+| Gate | Result | Checks | Failures |
+|---|---|---:|---:|
+| M4 host | PASS | 993 | 0 |
+| M5 host | PASS | 9,515 | 0 |
+| M4/M5 integration | PASS | 1,066 | 0 |
+| M6 MPC | PASS | 13 | 0 |
+| M6 input/time guard | PASS | 11 | 0 |
+| M7 actuator transaction | PASS | 230 | 0 |
+| M6/M7 ASan + UBSan | PASS | Re-ran M6/M7 suites | 0 |
+| Cortex-M7 target build | NOT_RUN | — | — |
+| HIL / DShot waveform / flight | NOT_RUN | — | — |
+
+The 11,828 checks above are the unique M4/M5/M6/M7 Host checks; the sanitizer job repeats the M6/M7 tests and is reported separately. The first run proves the new test runners and current Host baseline work. It does not yet cover the newly identified M6 reset/deadline-accounting regression cases; those are added in the following commit.
 
 ## Safety boundary
 

@@ -75,7 +75,7 @@ Status position_control_track(const ControllerInput *input, uint32_t reference_e
                               float dt, PositionControlOutput *out);
 Status position_control_altitude(const ControllerInput *input, float dt,
                                  float *acceleration_down);
-void mpc_reset(void);
+Status mpc_reset(void);
 int mpc_read(MpcSnapshot *out);
 void mpc_seed(const float a[3], uint32_t sequence);
 Status mpc_solve(const ControllerInput *in,

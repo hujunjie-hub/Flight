@@ -90,19 +90,25 @@ void mpc_get_run_stats(MpcRunStats *out) {
  * failed exactly there (median dual residual 1.75e-3).  Terminating on the
  * absolute tolerance alone (eps_abs unchanged) makes the solver honour the gate
  * that the application already applies; it does not relax that gate. */
-static void mpc_use_absolute_termination(void) {
+static Status mpc_use_absolute_termination(void) {
   OSQPSettings settings;
-  if (!quad_solver.settings) return;
+  if (!quad_solver.settings || !quad_solver.work)
+    return STATUS_NOT_READY;
   settings = *quad_solver.settings;
   settings.eps_rel = 0;
-  (void)osqp_update_settings(&quad_solver, &settings);
+  if (osqp_update_settings(&quad_solver, &settings) != 0 ||
+      quad_solver.settings->eps_rel != 0)
+    return STATUS_NUMERIC_ERROR;
+  return STATUS_OK;
 }
 
-void mpc_reset(void) {
+Status mpc_reset(void) {
+  Status status;
   /* Lifecycle only; both update tasks must have stopped. */
   memset(snapshots, 0, sizeof(snapshots));
   memset(&last_context, 0, sizeof(last_context));
   memset(seed_accel, 0, sizeof(seed_accel));
+  memset(&mpc_run_stats, 0, sizeof(mpc_run_stats));
   seed_sequence = 0;
   solve_sequence = 0;
   last_solve_time = 0;
@@ -113,8 +119,11 @@ void mpc_reset(void) {
   mpc_job_record_written = 0;
 #endif
   mpc_job_total = 0;
-  mpc_use_absolute_termination();
+  status = mpc_use_absolute_termination();
+  if (status != STATUS_OK)
+    return status;
   osqp_cold_start(&quad_solver);
+  return STATUS_OK;
 }
 int mpc_read(MpcSnapshot *out) {
   if (!lock_exchange())
@@ -387,6 +396,8 @@ Status control_backend_outer_update(const ControllerInput *in) {
   uint32_t epoch;
   float previous[3];
   Status s;
+  if (!in)
+    return STATUS_INVALID_ARGUMENT;
   if (!m6.initialized) {
     mpc_run_stats.blocked_uninitialized++;
     return STATUS_NOT_READY;
@@ -449,6 +460,16 @@ Status control_backend_outer_update(const ControllerInput *in) {
     osqp_cold_start(&quad_solver);
   last_context = result;
   s = mpc_solve(in, &m6.config.payload, previous, &result);
+  /* The deadline is part of the acceptance result. Classify the job only after
+   * checking it, otherwise an overrun is counted as solved/covered for 20 ms. */
+  if (clock_read(&end) || end.boot_id != start.boot_id ||
+      end.time_epoch != start.time_epoch ||
+      end.monotonic_us < start.monotonic_us ||
+      end.monotonic_us - start.monotonic_us > 2000) {
+    s = STATUS_DEADLINE_MISSED;
+    result.solver_status = CONTROL_SOLVER_DEADLINE_EXCEEDED;
+    mpc_record_last_deadline(result.solver_status);
+  }
   mpc_run_stats.jobs++;
   mpc_run_stats.last_solver_status = (int32_t)result.solver_status;
   if (s == STATUS_OK) {
@@ -471,14 +492,6 @@ Status control_backend_outer_update(const ControllerInput *in) {
   case CONTROL_SOLVER_DUAL_INFEASIBLE: mpc_run_stats.solver_infeasible++; break;
   case CONTROL_SOLVER_DEADLINE_EXCEEDED: mpc_run_stats.solver_deadline++; break;
   default: break;
-  }
-  if (clock_read(&end) || end.boot_id != start.boot_id ||
-      end.time_epoch != start.time_epoch ||
-      end.monotonic_us < start.monotonic_us ||
-      end.monotonic_us - start.monotonic_us > 2000) {
-    s = STATUS_DEADLINE_MISSED;
-    result.solver_status = CONTROL_SOLVER_DEADLINE_EXCEEDED;
-    mpc_record_last_deadline(result.solver_status);
   }
   result.expires_at_us =
       min_time(start.monotonic_us + 20000, in->control_time_us + 25000);

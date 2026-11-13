@@ -71,6 +71,7 @@ static int derive_allocation(const ProductControllerConfigPayload *p,
 Status control_backend_init(const ProductControllerConfig *c) {
   ControllerState next;
   const ProductControllerConfigPayload *p;
+  Status reset_status;
   if (!c || !c->profile_hash || !c->parameter_hash || !c->config_version)
     return STATUS_INVALID_ARGUMENT;
   p = &c->payload;
@@ -85,7 +86,12 @@ Status control_backend_init(const ProductControllerConfig *c) {
   m6 = next;
   position_control_reset();
   mpc_consumer_reset();
-  mpc_reset();
+  reset_status = mpc_reset();
+  if (reset_status != STATUS_OK) {
+    m6.initialized = 0;
+    m6.health.common.health_state = MODULE_HEALTH_FAILED;
+    return reset_status;
+  }
   return STATUS_OK;
 }
 /* Apply a parameter edit while the vehicle is disarmed.  The controller reads

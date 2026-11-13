@@ -13,6 +13,8 @@
 #include <string.h>
 #include <math.h>
 #include "attitude_rate_control/controller_internal.h"
+#include "osqp.h"
+#include "quad_workspace.h"
 
 static int checks = 0;
 static int failures = 0;
@@ -23,6 +25,7 @@ static int failures = 0;
   } while (0)
 
 static uint64_t g_now = 1000000u;
+static uint64_t g_advance_after_clock_read_us = 0u;
 
 Status clock_read(ClockInstant *out) {
     if (!out) return STATUS_INVALID_ARGUMENT;
@@ -30,6 +33,10 @@ Status clock_read(ClockInstant *out) {
     out->boot_id = 0xB00Bu;
     out->monotonic_us = g_now;
     out->time_epoch = 3u;
+    if (g_advance_after_clock_read_us) {
+        g_now += g_advance_after_clock_read_us;
+        g_advance_after_clock_read_us = 0u;
+    }
     return STATUS_OK;
 }
 
@@ -174,6 +181,14 @@ static void build_context(Context *c, uint64_t now, uint16_t reference_kind) {
     c->reference.directive_epoch = 4u;
     c->reference.reference_kind = reference_kind;
     c->reference.point_count = 24u;
+    c->reference.anchor.offset_us = 0u;
+    c->reference.anchor.valid_mask = 31u;
+    c->reference.anchor.point.valid_mask = 31u;
+    for (i = 0; i < 24u; ++i) {
+        c->reference.points[i].offset_us = (i + 1u) * 20000u;
+        c->reference.points[i].valid_mask = 31u;
+        c->reference.points[i].point.valid_mask = 31u;
+    }
 
     c->in.navigation = &c->nav;
     c->in.reference = &c->reference;
@@ -193,6 +208,92 @@ static Status validate(Context *c) {
     uint32_t epoch = 0;
     uint16_t mode = 0;
     return controller_validate_input(&c->in, &epoch, &mode);
+}
+
+static void configure_outer_test_controller(void) {
+    memset(&m6, 0, sizeof(m6));
+    m6.initialized = 1;
+    m6.config.payload.mass_kg = 1.5f;
+    m6.config.payload.mpc_q_diag[0] = 8.0f;
+    m6.config.payload.mpc_q_diag[1] = 8.0f;
+    m6.config.payload.mpc_q_diag[2] = 12.0f;
+    m6.config.payload.mpc_q_diag[3] = 3.0f;
+    m6.config.payload.mpc_q_diag[4] = 3.0f;
+    m6.config.payload.mpc_q_diag[5] = 4.0f;
+    m6.config.payload.mpc_qf_diag[0] = 8.0f;
+    m6.config.payload.mpc_qf_diag[1] = 8.0f;
+    m6.config.payload.mpc_qf_diag[2] = 12.0f;
+    m6.config.payload.mpc_qf_diag[3] = 3.0f;
+    m6.config.payload.mpc_qf_diag[4] = 3.0f;
+    m6.config.payload.mpc_qf_diag[5] = 4.0f;
+    m6.config.payload.mpc_r_diag[0] = 0.8f;
+    m6.config.payload.mpc_r_diag[1] = 0.8f;
+    m6.config.payload.mpc_r_diag[2] = 1.0f;
+    m6.config.payload.mpc_s_diag[0] = 0.2f;
+    m6.config.payload.mpc_s_diag[1] = 0.2f;
+    m6.config.payload.mpc_s_diag[2] = 0.25f;
+    m6.config.payload.actuation_preview_delay_s = 0.002f;
+}
+
+static void test_outer_update_lifecycle(void) {
+    Context c;
+    MpcRunStats stats;
+    MpcSnapshot snapshot;
+    Status status;
+    uint64_t now = 1500000u;
+
+    configure_outer_test_controller();
+    CHECK(control_backend_outer_update(NULL) == STATUS_INVALID_ARGUMENT,
+          "NULL outer-update input was not rejected");
+
+    mpc_note_worker(g_now, 2);
+    mpc_note_worker(g_now, 1);
+    mpc_get_run_stats(&stats);
+    CHECK(stats.entry_calls == 1u && stats.worker_ticks == 1u,
+          "worker counters were not recorded before reset");
+    CHECK(mpc_reset() == STATUS_OK, "MPC reset failed");
+    mpc_get_run_stats(&stats);
+    CHECK(stats.jobs == 0u && stats.solved == 0u && stats.rejected == 0u &&
+          stats.covered_us == 0u && stats.entry_calls == 0u && stats.worker_ticks == 0u,
+          "MPC reset left stale run statistics");
+    CHECK(quad_solver.settings != NULL && quad_solver.settings->eps_rel == 0.0f,
+          "MPC reset did not retain eps_rel=0");
+
+    g_now = now;
+    build_context(&c, now, GUIDANCE_REFERENCE_TRAJECTORY);
+    c.actuator.header.valid_until_us = now + 5000u;
+    c.capability.header.valid_until_us = now + 5000u;
+    status = control_backend_outer_update(&c.in);
+    CHECK(status == STATUS_OK, "valid outer update rejected, status=%d", (int)status);
+    CHECK(mpc_read(&snapshot), "successful MPC snapshot was not published");
+    CHECK(snapshot.expires_at_us > c.actuator.header.valid_until_us,
+          "MPC plan inherited actuator-status TTL");
+    CHECK(snapshot.expires_at_us > c.capability.header.valid_until_us,
+          "MPC plan inherited actuator-capability TTL");
+    CHECK(snapshot.expires_at_us == now + 20000u,
+          "MPC plan expiry=%llu, expected %llu",
+          (unsigned long long)snapshot.expires_at_us,
+          (unsigned long long)(now + 20000u));
+    mpc_get_run_stats(&stats);
+    CHECK(stats.jobs == 1u && stats.solved == 1u && stats.rejected == 0u &&
+          stats.covered_us == 20000u,
+          "successful job counters are inconsistent");
+
+    configure_outer_test_controller();
+    CHECK(mpc_reset() == STATUS_OK, "MPC reset before deadline test failed");
+    now = 3000000u;
+    g_now = now;
+    build_context(&c, now, GUIDANCE_REFERENCE_TRAJECTORY);
+    g_advance_after_clock_read_us = 2001u;
+    status = control_backend_outer_update(&c.in);
+    CHECK(status == STATUS_DEADLINE_MISSED,
+          "2 ms solver overrun returned status=%d", (int)status);
+    mpc_get_run_stats(&stats);
+    CHECK(stats.jobs == 1u && stats.solved == 0u && stats.rejected == 1u &&
+          stats.covered_us == 0u && stats.solver_deadline == 1u,
+          "deadline-missed job was counted as solved/covered");
+    CHECK(mpc_read(&snapshot) && snapshot.expires_at_us == 0u,
+          "deadline-missed MPC snapshot remained valid");
 }
 
 int main(void) {
@@ -257,6 +358,9 @@ int main(void) {
     build_context(&c, g_now, GUIDANCE_REFERENCE_TRAJECTORY);
     c.capability.available_mask = 7u;
     CHECK(validate(&c) == STATUS_OUT_OF_RANGE, "three-channel capability accepted");
+
+    /* M6-17..M6-23: outer worker lifecycle, plan TTL and deadline accounting. */
+    test_outer_update_lifecycle();
 
     printf("M6 guard checks=%d failures=%d\n", checks, failures);
     return failures == 0 ? 0 : 1;

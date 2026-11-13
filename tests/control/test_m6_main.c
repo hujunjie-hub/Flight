@@ -158,7 +158,10 @@ int main(void) {
 
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("FMAT-0012 M6 outer-loop host test\n");
-    osqp_cold_start(&quad_solver);
+    status = mpc_reset();
+    CHECK(status == STATUS_OK, "MPC reset failed, status=%d", (int)status);
+    CHECK(quad_solver.settings != NULL && quad_solver.settings->eps_rel == 0.0f,
+          "MPC reset did not apply absolute OSQP termination");
 
     /* M6-01: a valid geometric reference solves inside the model path. */
     make_reference(&ref, g_now, 0.1f);
