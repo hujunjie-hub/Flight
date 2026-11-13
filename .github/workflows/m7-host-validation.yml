@@ -1,0 +1,43 @@
+name: M7 host validation
+
+on:
+  push:
+    branches:
+      - test/fmat-0013-m7-actuation
+      - "opt/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  m7-host:
+    name: M7 actuator guard Host tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Run real M7 guard tests
+        run: bash tests/actuation/run_host_tests.sh
+      - name: Upload M7 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m7-host-evidence
+          path: build/validation/m7/
+
+  m7-sanitizers:
+    name: M7 AddressSanitizer and UndefinedBehaviorSanitizer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Run M7 tests with sanitizers
+        env:
+          EXTRA_CFLAGS: "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+        run: bash tests/actuation/run_host_tests.sh
