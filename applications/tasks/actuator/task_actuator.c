@@ -4,6 +4,7 @@
 #include <rtthread.h>
 #include "task_config.h"
 #include "runtime_internal.h"
+#include "messages/message_ids.h"
 #include "output_guard/actuator_guard.h"
 
 static void task_actuator_step(void)
