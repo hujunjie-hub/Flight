@@ -1205,6 +1205,10 @@ static uint8_t build_curve(
         if (!isfinite(s_eval_max)) return 0u;
 
         consumer_power_coefficients(a, b, (float)h, axis, cf);
+        /* Stop at coefficient construction failure; do not contaminate later
+           derivative/Horner branch traces with non-finite coefficients. */
+        for (k = 0u; k < 6u; ++k)
+          if (!isfinite(cf[k])) return 0u;
         curve->jerk_power[axis][0] = 6.0 * (double)cf[3];
         curve->jerk_power[axis][1] = 24.0 * (double)cf[4];
         curve->jerk_power[axis][2] = 60.0 * (double)cf[5];
@@ -1217,11 +1221,13 @@ static uint8_t build_curve(
         for (k = 0u; k < 5u; ++k) {
           vf[k] = (float)(k + 1u) * cf[k + 1u];
           M5_TRACE_NONFINITE(vf[k], M5_TEST_CONSUMER_REJECT_VELOCITY_SCALING);
+          if (!isfinite(vf[k])) return 0u;
           vc[k] = interval_scale(c_i[k + 1u], (double)(k + 1u));
         }
         for (k = 0u; k < 4u; ++k) {
           af[k] = (float)((k + 1u) * (k + 2u)) * cf[k + 2u];
           M5_TRACE_NONFINITE(af[k], M5_TEST_CONSUMER_REJECT_ACCELERATION_SCALING);
+          if (!isfinite(af[k])) return 0u;
           ac[k] = interval_scale(c_i[k + 2u],
                                  (double)((k + 1u) * (k + 2u)));
         }

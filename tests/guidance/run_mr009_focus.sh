@@ -26,7 +26,7 @@ CFLAGS=(
 )
 
 set -o pipefail
-"$CC" "${CFLAGS[@]}" \
+"$CC" "${CFLAGS[@]}" ${EXTRA_CFLAGS:-} \
   middleware/model/fms/geofence_geometry/geofence_geometry.c \
   middleware/model/fms/quad_x4/flight_policy/quad_x4_product_config.c \
   middleware/guidance/*/*.c \

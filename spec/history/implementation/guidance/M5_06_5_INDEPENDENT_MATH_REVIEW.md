@@ -461,3 +461,8 @@ R10 撤回 R9 的固定系数不可行结论：S06-104 现在只给出各通道�
 - 专用 MR-009 runner 扩展为五组 C 测试。R30 证据与新审查矩阵见 spec/quality/owner_approval/R30/05_MR009_INDEPENDENT_REVIEW_MATRIX.md。
 
 状态：IMPLEMENTED / CI_PENDING / WAITING_INDEPENDENT_REVIEW。R30 证据必须绑定最终 commit；Agent 不得把 MR-009 标为 APPROVED。
+
+
+### R30.1：分支计数互斥修正
+
+首轮 CI 的三个 branch-counter 断言失败后，生产构建路径增加系数构造、速度缩放和加速度缩放的阶段性 fail-fast。非有限值在本阶段立即返回，不再让下游缩放/误差估计产生次生 trace。六类计数仍是 test-only 0/1，安全拒绝行为保持 fail-closed。

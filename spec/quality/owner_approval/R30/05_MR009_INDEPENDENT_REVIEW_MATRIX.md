@@ -115,3 +115,18 @@ The Agent may update proof text and add tests. The Agent must not mark MR-009
 APPROVED. The independent reviewer must fill every row, identify assumptions
 and sign the final conclusion. Until then B05 remains WAITING_INDEPENDENT_REVIEW
 and M5-06 cannot be accepted.
+
+
+## 8. R30.1 branch-counter semantics
+
+The first R30 CI run found three counter assertions failing because the production
+builder continued into downstream derivative scaling after an upstream
+coefficient/scaling value became non-finite. R30.1 now returns immediately at
+the first failed numerical stage:
+- non-finite consumer coefficients stop before derivative scaling;
+- non-finite velocity scaling stops before acceleration scaling;
+- non-finite acceleration scaling stops before Horner error evaluation.
+
+This makes the six test-only 0/1 counters mutually exclusive and consistent
+with the first-stage enum. The change is fail-fast only; it does not relax a
+threshold or permit an invalid value.

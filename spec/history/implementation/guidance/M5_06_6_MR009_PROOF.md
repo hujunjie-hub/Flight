@@ -504,3 +504,8 @@ S06-115 同时断言：理想 H_k 均小于 FLT_MAX、幅度项小于 FLT_MAX/16
 - 待独立审查：消费者系数身份、FP 环境/目标等价、M6 时间域和三个 Horner 拒绝分支的完整 validator 可达性。
 
 **MR-009 仍为 WAITING_INDEPENDENT_REVIEW；Agent 不 APPROVE。M5-06 继续 BLOCKED，S06-100..102 继续 NOT_RUN，M5-07 不得启动。**
+
+
+### R30.1：数值阶段短路（CI 首轮失败后的修复）
+
+首轮 CI 的三项失败来自计数语义而非数学反例：系数构造失败后仍继续计算 vf/af；速度缩放失败后仍继续计算 af。生产路径现改为每一阶段遇到首个非有限值即返回 NUMERIC_FAILURE，不继续执行下游数值阶段。这样六类 0/1 counter 互斥且与 first-stage enum 一致，不会把同一根因计成多个拒绝分支。该修改只提前拒绝，不放宽任何安全阈值。
