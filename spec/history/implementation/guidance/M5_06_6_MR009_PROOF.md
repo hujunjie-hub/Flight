@@ -1,6 +1,6 @@
 # MR-009 数学推导：binary32 消费曲线误差包络
 
-状态：**TRIPLE_SELF_REVIEWED / PASS_WITH_DECLARED_SCOPE_LIMITATIONS**。项目所有者已明确取消外部独立审查要求，改由三轮内部复核；本文不声称获得独立第三方批准。
+状态：**INTERNAL_PRE_REVIEW_COMPLETE / WAITING_INDEPENDENT_REVIEW**。R31 三轮内部复核仅作为作者侧预审与修正记录；独立数学审查仍是 MR-009 的必需关闭条件，尚未获得第三方批准。
 
 ## 1. 被证明的对象
 
@@ -623,11 +623,12 @@ R30.0 首轮三项 branch-counter 失败保留为历史结果；R30.1 fail-fast 
 以上为实现与 CI 证据，不是独立审查批准。H723 实机、WCET/RTA、HIL、飞行仍 NOT_RUN；MR-009 继续 WAITING_INDEPENDENT_REVIEW。
 
 
-## 29. R31：项目所有者指定的三轮内部复核与修正（2026-11-13）
+## 29. R31：内部预审、修正与独立审查交接（2026-11-13）
 
-项目所有者明确取消 MR-009 外部独立审查要求，指定对当前分支执行三轮内部复核。
-本节是当前处置结论，覆盖并取代本文历史章节中的 WAITING_INDEPENDENT_REVIEW
-状态文字；不声称独立第三方批准。
+项目要求将 R30/R31 数学证明交由独立审查者逐项复核。以下三轮工作是作者侧
+内部预审与代码/测试修正记录，**不替代独立审查，也不关闭 MR-009**。此前各节
+中的 WAITING_INDEPENDENT_REVIEW 状态继续有效；当前尚无已登记的独立审查者或
+第三方 APPROVED 结论。
 
 ### 第一轮：数学模型与误差推导
 
@@ -696,8 +697,11 @@ R30.0 首轮三项 branch-counter 失败保留为历史结果；R30.1 fail-fast 
 
 ### 当前 disposition
 
-**MR-009：TRIPLE_SELF_REVIEWED / PASS_WITH_DECLARED_SCOPE_LIMITATIONS。**
-不再要求单独外部数学审查；不把本次内部复核表述为独立第三方认证。
-M5-06 整体验收仍受 S06-100..102、H723 实机、WCET/RTA、目标 RAM/stack
-watermark、HIL、飞行等门禁约束。M6 40 ms route preview 不属于本次 20 ms
-M5-06 证明域。M5-07 不启动。
+**MR-009：INTERNAL_PRE_REVIEW_COMPLETE / WAITING_INDEPENDENT_REVIEW。**
+内部三轮预审发现并修复了 R31 时间偏差导数问题，且当前证据基线 CI 通过；
+但作者侧预审不能批准自己的数学证明。独立审查者必须逐项填写
+`spec/quality/owner_approval/R30/05_MR009_INDEPENDENT_REVIEW_MATRIX.md`，
+确认假设、范围限制和完整 Validator 可达性边界，并给出明确结论。审查者
+尚未指定，审查日期和 disposition 均 PENDING。M5-06 整体验收仍受
+S06-100..102、H723 实机、WCET/RTA、目标 RAM/stack watermark、HIL、飞行等
+门禁约束。M6 40 ms route preview 不属于本次 20 ms M5-06 证明域；M5-07 不启动。
