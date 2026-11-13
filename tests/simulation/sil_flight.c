@@ -800,6 +800,7 @@ static void run_ground_stop_task_smoke(void)
   unsigned commits_before = commits;
   unsigned tick;
 
+  CHECK(!runtime_bench_inhibit_active());
   memset(&output, 0, sizeof(output));
   memset(&permit, 0, sizeof(permit));
   permit.header = h(SOURCE_M4, now + 5000u);
