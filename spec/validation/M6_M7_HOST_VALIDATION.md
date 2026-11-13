@@ -162,7 +162,7 @@ The SIL smoke calls the same certificate-publication helper used by `task_missio
 
 ### Branch lineage / integration gate
 
-At the time of this check, M6 branch HEAD `1bbc3d8d716a723dabc51528b86c3d6fc17be7d2` and M5-06 branch HEAD `51e7e923419733f5aa3b21efa1e46588629623ed` are **diverged**, with common ancestor `edf32b4e39cdae014aa76870dc821882807a6905`. GitHub compare reports M6 ahead by 54 commits and behind M5-06 by 395 commits. The M6/M7 Host CI therefore validates this independent branch only; it does not contain or supersede the current M5-06 branch. Do not rebase, merge, or claim unified milestone acceptance without an explicit integration plan and independent M5-06 approval.
+At the time of this check, M6 branch HEAD `63fa80e960a752bcef97887a16a22a38905bfad2` and M5-06 branch HEAD `51e7e923419733f5aa3b21efa1e46588629623ed` are **diverged**, with common ancestor `edf32b4e39cdae014aa76870dc821882807a6905`. GitHub compare reports M6 ahead by 57 commits and behind M5-06 by 395 commits. The M6/M7 Host CI therefore validates this independent branch only; it does not contain or supersede the current M5-06 branch. Do not rebase, merge, or claim unified milestone acceptance without an explicit integration plan and independent M5-06 approval.
 
 
 ### Invalid certificate demand-continuity regression — Run #25 PASS
@@ -179,6 +179,8 @@ A current FMS output that is not eligible for a ground-stop certificate now clea
 [Run #27](https://github.com/hujunjie-hub/Flight/actions/runs/43376273060), exact commit `1bbc3d8d716a723dabc51528b86c3d6fc17be7d2`: **4/4 jobs SUCCESS**. The SIL runtime ground-stop scenario completed **27 checks / 0 failures**, with 18 frame commits (one 5 N demand plus the bounded ramp frames) and 58 inhibit calls. M4 Host 993/0, M5 Host 9,515/0, M4/M5 integration 1,066/0, M6 MPC 15/0, M6 guard 26/0, M7 guard 274/0, and ASan/UBSan PASS.
 
 
-### Real FMS output → ground-stop certificate adapter test (CI pending)
+### Real FMS output → ground-stop certificate adapter test — Run #30 PASS
 
-The M4 Host test `test_first_reference_window_expires_to_ground_stop` now validates the real FMS first-reference timeout output: LANDED state, DISARMED state, revoked permit reason, forced-safe decision reason, and a successful `fms_build_ground_stop_certificate()` conversion with matching authority/directive epochs. Run #29 initially exposed that `run_host_tests.sh` did not link the production `ground_stop_adapter.c`; the test runner now includes that production source instead of stubbing or removing the assertion. This closes the synthetic-output gap at the FMS-policy-to-adapter boundary. The complete `task_mission_step()` queue/scheduling path remains open. The corrected workflow run is pending.
+The M4 Host test `test_first_reference_window_expires_to_ground_stop` validates the real FMS first-reference timeout output: LANDED state, DISARMED state, revoked permit reason, forced-safe decision reason, and a successful `fms_build_ground_stop_certificate()` conversion with matching authority/directive epochs. Run #29 initially exposed that `run_host_tests.sh` did not link the production `ground_stop_adapter.c`; commit `63fa80e960a752bcef97887a16a22a38905bfad2` added the production adapter source to the Host link.
+
+[Run #30](https://github.com/hujunjie-hub/Flight/actions/runs/43376885571), exact commit `63fa80e960a752bcef97887a16a22a38905bfad2`: **4/4 jobs SUCCESS**. M4 Host 1,002/0, M5 Host 9,515/0, M4/M5 integration 1,075/0, M6 MPC 15/0, M6 guard 26/0, M7 guard 274/0, runtime SIL 27/0, and ASan/UBSan PASS. This closes the synthetic-output gap at the FMS-policy-to-adapter boundary. The complete `task_mission_step()` queue/scheduling path remains open.
