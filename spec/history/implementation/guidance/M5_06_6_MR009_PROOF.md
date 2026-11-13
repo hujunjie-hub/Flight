@@ -708,6 +708,21 @@ WCET/RTA、目标 RAM/stack watermark、HIL、飞行仍按各自门禁处理；M
   双源/expanded-time 审计强化：`ad9df36687b68b43f9118ae6e26be8716d900c90`。
   这几项分别覆盖生产误差公式、独立精确 oracle 和防回归审计；最终全套
   CI 以最终文档提交对应的 HEAD 为准。
+
+- 在代码与审计基线 `8dcb60b3ac18e6a763c939d3e810984092cdd321` 上，
+  Host validation #43446380866（6/6 jobs）、M6/M7 validation #43446380836
+  （5/5 jobs）、M7 validation #43446380724（2/2 jobs）全部 SUCCESS。
+- Host 证据：M5 322,299/0；MR-009 focused 430/0；M4/M5 integration
+  1,075/0；S06-094 120/0；S06-099 60,002 个物理时间与生产参数检查均
+  0 failures；S06-108/109/113 分别 96/96/76 checks，0 failures；
+  S06-107 Fraction consumer-budget oracle PASS。
+- ARM FP audit：GCC 14.2.1；`model_check=MATCH`、`missing_tokens=[]`、
+  18 mutations detected；consumer 与 validator objects 均
+  `fused_operations=0`。Validator source SHA256
+  `8dde57b4570b6dc1cbf82f31b9dc5637e8eec06dd23d7139f560170d461637bd`；
+  consumer source SHA256
+  `48fa1f629380ce354617af7082e7f19bd81974f00f9b9c126c9b4c690ff1c31b`。
+  这是远程 CI 证据，不声称本地 evidence ZIP 或 H723 实机运行。
 - 三个 degree 5/4/3 Horner 拒绝分支仍由同一个生产 helper 直接测试；
   本结论不声称它们都能由合法产品包线输入经完整 validator 触发。
   完整 validator 的 coefficient/scaling fail-fast 路径有状态、reason、
