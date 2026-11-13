@@ -99,6 +99,10 @@ echo "== SIL link =="
 exe="$out/sil_flight"
 "$cxx" -pthread "${objects[@]}" -lm -o "$exe"
 
-echo "== SIL ground-stop task smoke =="
+echo "== SIL live FMS-to-M7 task integration =="
+"$exe" --live-fms-ground-stop-smoke
+echo "SIL live FMS-to-M7 task integration: PASS"
+
+echo "== SIL ground-stop ramp smoke =="
 "$exe" --ground-stop-smoke
-echo "SIL runtime ground-stop integration: PASS"
+echo "SIL runtime ground-stop ramp integration: PASS"

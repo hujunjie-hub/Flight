@@ -790,6 +790,171 @@ static int start_fmt(const char *port_text, const char *hover_text)
   return 0;
 }
 
+
+static void sil_seed_live_fms_inputs(void)
+{
+  if (!runtime_data_lock(RT_WAITING_FOREVER)) {
+    CHECK(0);
+    return;
+  }
+  memset(&runtime_data.nav, 0, sizeof(runtime_data.nav));
+  memset(&runtime_data.nav_cap, 0, sizeof(runtime_data.nav_cap));
+  memset(&runtime_data.control_cap, 0, sizeof(runtime_data.control_cap));
+  memset(&runtime_data.actuator, 0, sizeof(runtime_data.actuator));
+  memset(&runtime_data.actuator_cap, 0, sizeof(runtime_data.actuator_cap));
+  runtime_data.nav.state_epoch = 7u;
+  runtime_data.nav.origin_id = 42u;
+  runtime_data.nav.core.valid_mask = 0xFFu;
+  runtime_data.nav.core.q_nb_wxyz[0] = 1.0f;
+  runtime_data.nav.core.position_std_m[0] = 0.2f;
+  runtime_data.nav.core.position_std_m[1] = 0.2f;
+  runtime_data.nav.core.position_std_m[2] = 0.3f;
+  runtime_data.nav.core.velocity_std_mps[0] = 0.05f;
+  runtime_data.nav.core.velocity_std_mps[1] = 0.05f;
+  runtime_data.nav.core.velocity_std_mps[2] = 0.05f;
+  runtime_data.nav.core.attitude_std_rad[0] = 0.01f;
+  runtime_data.nav.core.attitude_std_rad[1] = 0.01f;
+  runtime_data.nav.core.attitude_std_rad[2] = 0.02f;
+
+  runtime_data.nav_cap.state_epoch = 7u;
+  runtime_data.nav_cap.origin_id = 42u;
+  runtime_data.nav_cap.capability_mask = 0xFFu;
+  runtime_data.nav_cap.solution_state = 1u;
+  runtime_data.nav_cap.horizontal_position_std_m = 0.3f;
+  runtime_data.nav_cap.vertical_position_std_m = 0.4f;
+  runtime_data.nav_cap.velocity_std_mps = 0.1f;
+  runtime_data.nav_cap.heading_std_rad = 0.05f;
+
+  runtime_data.control_cap.control_layout_id = 1u;
+  runtime_data.control_cap.controllable_dof_mask = 0x0Fu;
+  runtime_data.control_cap.health_state = 2u;
+
+  runtime_data.actuator_cap.actuator_layout_id = PRODUCT_ACTUATOR_LAYOUT_ID;
+  runtime_data.actuator_cap.available_mask = 0x0Fu;
+  runtime_data.actuator_cap.controllable_dof_mask = 0x0Fu;
+  runtime_data.actuator.actuator_layout_id = PRODUCT_ACTUATOR_LAYOUT_ID;
+  runtime_data.actuator.available_mask = 0x0Fu;
+  runtime_data.actuator.fault_mask = 0u;
+
+  runtime_data.bundle_ready = 0u;
+  runtime_data.have_demand = 0u;
+  runtime_data.have_mission = 0u;
+  runtime_data.have_operator = 0u;
+  runtime_data_unlock();
+}
+
+static void sil_refresh_live_fms_inputs(void)
+{
+  const uint64_t now = test_clock.monotonic_us;
+  if (!runtime_data_lock(RT_WAITING_FOREVER)) {
+    CHECK(0);
+    return;
+  }
+  runtime_data.nav.header = h(20u, now + 50000u);
+  runtime_data.nav.header.message_type = MSG_NAVIGATION_SNAPSHOT;
+  runtime_data.nav.header.sequence = ++sil_requests;
+  runtime_data.nav_cap.header = h(20u, now + 50000u);
+  runtime_data.nav_cap.header.message_type = MSG_NAVIGATION_CAPABILITY;
+  runtime_data.nav_cap.header.sequence = ++sil_requests;
+  runtime_data.control_cap.header = h(23u, now + 100000u);
+  runtime_data.control_cap.header.message_type = MSG_CONTROL_CAPABILITY;
+  runtime_data.control_cap.header.sequence = ++sil_requests;
+  runtime_data.actuator.header = h(24u, now + 50000u);
+  runtime_data.actuator.header.message_type = MSG_ACTUATOR_STATUS;
+  runtime_data.actuator.header.sequence = ++sil_requests;
+  runtime_data.actuator_cap.header = h(24u, now + 100000u);
+  runtime_data.actuator_cap.header.message_type = MSG_ACTUATOR_CAPABILITY;
+  runtime_data.actuator_cap.header.sequence = ++sil_requests;
+  runtime_data_unlock();
+  feed_operator(0u, 0.0f);
+}
+
+static int sil_command_has_ack(uint32_t request_id, uint16_t expected_state)
+{
+  for (uint16_t i = 0u; i < fms_output.command_result_count; ++i) {
+    if (fms_output.command_results[i].request_id == request_id)
+      return fms_output.command_results[i].ack_state == expected_state;
+  }
+  return 0;
+}
+
+/* Exercise the real request queue, mission owner, FMS policy and actuator owner
+ * in one process. Unlike the ramp-only smoke, this does not manufacture an
+ * FmsOutputView: the certificate must come from the live DISARM command path. */
+static void run_live_fms_ground_stop_task_smoke(void)
+{
+  uint32_t arm_request, disarm_request;
+  unsigned tick;
+  const unsigned commits_before = commits;
+
+  CHECK(!runtime_bench_inhibit_active());
+  sil_seed_live_fms_inputs();
+
+  /* The real LandDetector requires its acceleration filter warm-up and stable
+   * ground-contact dwell before PreArm can become READY. */
+  for (tick = 0u; tick < 430u; ++tick) {
+    test_clock.monotonic_us += 10000u;
+    sil_refresh_live_fms_inputs();
+    task_mission_step();
+  }
+  printf("live_fms_prearm: landed=%u prearm=%u\n",
+         fms_output.landed_state.state, fms_output.prearm_result.state);
+  CHECK(fms_output.landed_state.state == LANDED_STATE_LANDED);
+  CHECK(fms_output.prearm_result.state == PREARM_READY);
+  if (fms_output.prearm_result.state != PREARM_READY)
+    return;
+
+  sil_refresh_live_fms_inputs();
+  arm_request = submit_command_with_target(PRODUCT_CMD_ARM,
+      fms_output.prearm_result.check_epoch, 0.0f, NULL);
+  CHECK(arm_request != 0u);
+  test_clock.monotonic_us += 10000u;
+  sil_refresh_live_fms_inputs();
+  task_mission_step();
+  CHECK(sil_command_has_ack(arm_request, COMMAND_ACK_COMPLETED));
+  CHECK(fms_output.state_snapshot.arm_state == ARM_STATE_ARMED);
+  if (fms_output.state_snapshot.arm_state != ARM_STATE_ARMED)
+    return;
+
+  /* Give the production guidance update one owner cycle, then request a
+   * ground disarm while the LandDetector still reports LANDED. */
+  test_clock.monotonic_us += 10000u;
+  sil_refresh_live_fms_inputs();
+  task_mission_step();
+  test_clock.monotonic_us += 10000u;
+  sil_refresh_live_fms_inputs();
+  disarm_request = submit_command_with_target(PRODUCT_CMD_DISARM, 0u, 0.0f, NULL);
+  CHECK(disarm_request != 0u);
+  task_mission_step();
+
+  CHECK(sil_command_has_ack(disarm_request, COMMAND_ACK_COMPLETED));
+  CHECK(fms_output.state_snapshot.arm_state == ARM_STATE_DISARMED);
+  CHECK(fms_output.landed_state.state == LANDED_STATE_LANDED);
+  CHECK(fms_output.actuation_permit.permit_flags == PERMIT_FLAG_REVOKED);
+  CHECK(fms_output.actuation_permit.reason_code == FMS_PERMIT_REVOKE_REASON_COMMAND_DISARM);
+  CHECK(runtime_data.bundle.ground_stop_certificate.header.message_type ==
+        MSG_GROUND_STOP_CERTIFICATE);
+  CHECK(runtime_data.bundle.ground_stop_certificate.authority_epoch ==
+        fms_output.actuation_permit.authority_epoch);
+  CHECK(runtime_data.bundle.ground_stop_certificate.directive_epoch ==
+        fms_output.actuation_permit.directive_epoch);
+
+  /* The real actuator task consumes the certificate published by the real
+   * mission task and must produce a terminal zero-target receipt. */
+  for (tick = 0u; tick < 180u &&
+       runtime_data.receipt.result_code != ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED; ++tick) {
+    test_clock.monotonic_us += 1000u;
+    turn(task_actuator_entry);
+  }
+  CHECK(commits >= commits_before + 1u);
+  CHECK(actuator_guard_state() == ACTUATOR_GUARD_DISARMED);
+  CHECK(runtime_data.receipt.result_code == ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED);
+  CHECK(runtime_data.receipt.header.message_type == MSG_ACTUATOR_COMMIT_RECEIPT);
+  CHECK(runtime_data.receipt.committed_demand.motor_thrust_n[0] == 0.0f);
+  CHECK((runtime_data.receipt.limit_flags & ACTUATOR_GROUND_STOP_OVERRUN_FLAG) == 0u);
+  printf("live_fms_ground_stop: landed/disarm certificate -> actuator zero receipt\n");
+}
+
 static void run_ground_stop_task_smoke(void)
 {
   FmsOutputView output;
@@ -962,7 +1127,9 @@ int main(int argc, char **argv)
   RuntimeStats stats;
 
   const int ground_stop_smoke = argc == 2 && !strcmp(argv[1], "--ground-stop-smoke");
-  if (argc != 1 && !ground_stop_smoke) {
+  const int live_fms_ground_stop_smoke =
+      argc == 2 && !strcmp(argv[1], "--live-fms-ground-stop-smoke");
+  if (argc != 1 && !ground_stop_smoke && !live_fms_ground_stop_smoke) {
 #ifdef FLIGHT_GROUND_STATION
     if (argc == 6 && !strcmp(argv[3], "Ground")) {
       ground_online = 1;
@@ -1015,6 +1182,13 @@ int main(int argc, char **argv)
 #endif
     fmt_sim_host_close();
     return 1;
+  }
+  if (live_fms_ground_stop_smoke) {
+    run_live_fms_ground_stop_task_smoke();
+    runtime_shutdown();
+    printf("sil_live_fms_ground_stop: %u checks, %u failures, commits=%u\\n",
+           checks, failures, commits);
+    return failures ? 1 : 0;
   }
   if (ground_stop_smoke) {
     run_ground_stop_task_smoke();
