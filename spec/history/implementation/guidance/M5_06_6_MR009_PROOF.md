@@ -1,6 +1,6 @@
 # MR-009 数学推导：binary32 消费曲线误差包络
 
-状态：**INTERNAL_THREE_PASS_REVIEW_COMPLETE_WITH_LIMITATIONS**。项目所有者已明确取消外部独立审查要求，改由三轮内部复核；本文不声称获得独立第三方批准。
+状态：**TRIPLE_SELF_REVIEWED / PASS_WITH_DECLARED_SCOPE_LIMITATIONS**。项目所有者已明确取消外部独立审查要求，改由三轮内部复核；本文不声称获得独立第三方批准。
 
 ## 1. 被证明的对象
 
@@ -625,114 +625,79 @@ R30.0 首轮三项 branch-counter 失败保留为历史结果；R30.1 fail-fast 
 
 ## 29. R31：项目所有者指定的三轮内部复核与修正（2026-11-13）
 
-项目所有者明确取消 MR-009 外部独立审查要求，指定对当前分支进行三轮内部复核。
-本节是当前处置结论，覆盖并取代本文历史章节中所有 `WAITING_INDEPENDENT_REVIEW`
+项目所有者明确取消 MR-009 外部独立审查要求，指定对当前分支执行三轮内部复核。
+本节是当前处置结论，覆盖并取代本文历史章节中的 WAITING_INDEPENDENT_REVIEW
 状态文字；不声称独立第三方批准。
 
-### 第一轮：数学推导
+### 第一轮：数学模型与误差推导
 
-- 复核 consumer/validator 系数身份、binary32 运算顺序、Horner rounding count、
-  `gamma_n/gamma_2` 定向舍入、RN overflow midpoint、正规/次正规误差传播。
-- 发现并修复速度/加速度时间偏差导数使用了未舍入位置系数导数的问题。
-  现在对 `vf`、`af` 实际 binary32 缩放系数分别求一阶导数上界。
-- `s_max` 采用 outward multiplication，`s_eval_max`、`delta_s` 继续向外传播。
+- 复核同一组 binary32 端点、binary32 段时长 h、Hermite 系数区间、
+  consumer/validator 系数身份、Horner rounding count 10/12/10、
+  gamma_n/gamma_2 定向舍入及 RN overflow midpoint。
+- 发现并修复速度/加速度时间偏差导数使用未舍入位置系数导数的问题。
+  position 使用 cf 的一阶导数；velocity 使用实际 binary32 缩放后的 vf
+  一阶导数；acceleration 使用实际 binary32 缩放后的 af 一阶导数。
+- s_max、delta_s、s_eval_max 均向外传播。§7.1 明确推导次正规单次残差
+  不超过半个最小间距 2^-150，经过最多 n 次后续相对舍入后，以
+  n*2^-149*max(1,s_eval_max)^n 作保守上界。
+- 结论：当前 20 ms M5-06 证明域内，未发现需要放宽安全阈值或改变判定逻辑
+  的数学缺陷。
 
-### 第二轮：实现与浮点语义
+### 第二轮：实现、浮点语义与源代码一致性
 
-- 对照 `control_reference.c` 逐项核对位置、速度、加速度系数和 Horner 顺序。
-- 确认系数缩放误差由 interval coefficient term 覆盖，Horner 乘加由
-  `gamma_n` 与绝对次正规项覆盖；逐级 rounded recurrence 在 RN overflow
-  midpoint 前 fail-closed。
-- 确认 Host fenv/MXCSR 与 Cortex-M7 FPSCR 检查；H723 实机等价性仍 NOT_RUN。
+- 对照 control_reference.c 逐项核对位置/速度/加速度系数构造、局部时间
+  转换、三组 Horner 表达式及 binary32 舍入顺序。
+- consumer_eval_error_bound() 的系数差项覆盖实际 derivative coefficient
+  scaling；Horner 相对项、次正规绝对项和逐级 rounded recurrence 分别覆盖
+  运算误差、下溢传播和中间溢出，遇到非有限值或达到 RN overflow midpoint
+  均 fail-closed。
+- FP 模型审计同时检查 M6 consumer 与 M5 validator replica 的时间换算、
+  expanded s_eval_max、position/velocity/acceleration Horner 与 cf'/vf'/af'
+  时间导数；18 个 mutation cases 全部可检测。Cortex-M7 object audit 要求
+  consumer/validator 无 FMA/MLA 融合。Host fenv/MXCSR 与 ARM FPSCR runtime
+  gate 均保留；H723 实机等价性仍 NOT_RUN。
+- 结论：静态实现与证明模型一致性检查已加强；没有发现其他生产算术缺陷。
 
-### 第三轮：测试、边界与证据
+### 第三轮：测试、集成与证据
 
-- 更新 `verify_consumer_error_budget.py`：速度/加速度 oracle 系数先按
-  binary32 逐项舍入，再计算系数差、Horner 幅值与对应输出多项式的一阶导数时间项。
-- 保留 S06-115 的域外 helper 反例边界；不把 helper-level Horner stress
-  误写成完整 Validator 输入可达性证明。
-- 代码修正提交：`79f23d0200c31ebe934bfc8793e65d7af1e6bdd4`；
-  oracle 修正提交：`a55071966209a1af615ff6137963eab4631e8bae`；
-  后续文档/注释同步提交以分支 HEAD 为准。
-- 当前分支 CI：Host validation #43443825526（6/6 SUCCESS），M7 validation
-  #43443825495（2/2 SUCCESS）；M6/M7 validation #43443825676 需待最终状态
-  写入本节的后续同步记录确认。
-
-**当前结论：** MR-009 的数学实现与内部三轮复核完成（带明确边界），不再等待外部
-独立审查。该结论不等于 M5-06 整体验收或飞行放行。S06-100..102、H723 实机、
-WCET/RTA、目标 RAM/stack watermark、HIL、飞行仍按各自门禁处理；M5-07 不启动。
-
-## 29. 2026-11-13：MR-009 三轮内部复核结论
-
-项目所有者明确要求不再等待单独独立审查，改为对当前分支执行三轮复核。
-本节为当前结论，历史章节中的 WAITING_INDEPENDENT_REVIEW 均保留为当时
-状态记录，不再代表当前 MR-009 disposition。
-
-### 第 1 轮：数学模型
-
-- 五次 Hermite 系数区间以同一组 binary32 端点和 binary32 段时长 `h`
-  为输入；消费端系数与精确实数系数的差由区间距离项覆盖。
-- Position/Velocity/Acceleration 的 Horner 舍入次数分别为 10/12/10；
-  Velocity 与 Acceleration 的次数包含系数缩放，属于保守计数。
-- `gamma_n`、`gamma_2` 的有向舍入、RN overflow midpoint、次正规残差
-  传播和时间参数偏差均已逐项核对。次正规项的 `2^-149` 传播界已在 §7.1
-  明确给出半最小次正规间距及后续相对放大的推导。
-- 复核发现 R30 的 velocity/acceleration 时间偏差曾分别使用 `cf` 的二阶/
-  三阶导数，未计入 `vf/af` 系数缩放舍入；R31 已改为对实际 rounded
-  consumer polynomials `V_c`、`A_c` 分别求一阶导数上界。
-- 结论：当前证明范围内通过；没有发现需要放宽阈值或改变安全判定的
-  数学缺陷。
-
-### 第 2 轮：实现与浮点语义
-
-- 对照 M6 consumer 和 M5 validator 的系数构造、时间转换、三组 Horner
-  表达式；新增双源 token 审计，要求实际 consumer 和 validator replica
-  的运算顺序均与证明模型一致。
-- `consumer_eval_error_bound()` 的系数、Horner、溢出递推和次正规传播
-  全部使用扩大后的 `s_eval_max`；子区间 `s_max` 也显式向外计算。
-- FP 审计自测由 9 个扩展为 18 个变异用例，除 consumer 时间换算和三组
-  Horner 表达式外，还覆盖 expanded-time 区间及 `cf'`/rounded `vf'`/
-  rounded `af'` 时间导数，及原有 gamma、区间、次正规、圆整环境条件。
-- Cortex-M7 object audit 仍要求 consumer 与 validator 均无 FMA/MLA
-  融合；运行时继续检查 RN、FZ、DN 条件，不满足时 fail-closed。
-- 结论：实现与证明模型的静态一致性检查已加强；没有发现需改动生产
-  Horner 公式的问题。
-
-### 第 3 轮：测试、集成与边界
-
-- S06-099 仍穷举 20 ms/40 ms 的 60,002 个整数微秒偏移；新增对生产证明
-  参数 `s_model=h*(offset_us/step_us)` 的精确 Fraction 比较，直接检查
-  `|s_consumer-s_model|<=gamma_2*s_model`，并保留对物理微秒时间的检查。
-- R31 生产数学修正：`79f23d0200c31ebe934bfc8793e65d7af1e6bdd4`；
-  S06-107 Fraction oracle 修正：`a55071966209a1af615ff6137963eab4631e8bae`；
-  双源/expanded-time 审计强化：`ad9df36687b68b43f9118ae6e26be8716d900c90`。
-  这几项分别覆盖生产误差公式、独立精确 oracle 和防回归审计；最终全套
-  CI 以最终文档提交对应的 HEAD 为准。
-
-- 在代码与审计基线 `8dcb60b3ac18e6a763c939d3e810984092cdd321` 上，
-  Host validation #43446380866（6/6 jobs）、M6/M7 validation #43446380836
-  （5/5 jobs）、M7 validation #43446380724（2/2 jobs）全部 SUCCESS。
+- S06-099 穷举 20 ms/40 ms 共 60,002 个整数微秒偏移；使用精确 Fraction
+  同时检查物理微秒时间与生产模型 s_model=h*(offset_us/step_us) 的
+  gamma_2 不等式。物理时间最大比值 4.897714e-08；生产模型最大比值为
+  gamma_2 的 0.6601743 倍。
+- S06-107 Fraction oracle 已更新：velocity/acceleration 系数先逐项按
+  binary32 舍入，再分别计算系数差、Horner 幅值和各自消费多项式的一阶
+  导数时间项；不再用理想导数替代实际 consumer polynomial。
+- 代码修正提交：79f23d0200c31ebe934bfc8793e65d7af1e6bdd4；
+  oracle 修正提交：a55071966209a1af615ff6137963eab4631e8bae；
+  双源/expanded-time 审计强化：ad9df36687b68b43f9118ae6e26be8716d900c90；
+  本轮最终审计记录基线：8dcb60b3ac18e6a763c939d3e810984092cdd321。
+- 当前验证基线 8dcb60b3ac18e6a763c939d3e810984092cdd321：
+  Host validation #43446380866（6/6 SUCCESS）；
+  M6/M7 validation #43446380836（5/5 SUCCESS）；
+  M7 validation #43446380724（2/2 SUCCESS）。M5 host regression、
+  M5 ASan/UBSan、focused MR-009、Spec Audit、生产 ABI、18 mutation FP
+  audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer
+  均通过。
 - Host 证据：M5 322,299/0；MR-009 focused 430/0；M4/M5 integration
   1,075/0；S06-094 120/0；S06-099 60,002 个物理时间与生产参数检查均
   0 failures；S06-108/109/113 分别 96/96/76 checks，0 failures；
   S06-107 Fraction consumer-budget oracle PASS。
-- ARM FP audit：GCC 14.2.1；`model_check=MATCH`、`missing_tokens=[]`、
-  18 mutations detected；consumer 与 validator objects 均
-  `fused_operations=0`。Validator source SHA256
-  `8dde57b4570b6dc1cbf82f31b9dc5637e8eec06dd23d7139f560170d461637bd`；
+- ARM FP audit：GCC 14.2.1；model_check=MATCH、missing_tokens=[]、
+  18 mutations detected；consumer 与 validator objects 均 fused_operations=0。
+  Validator source SHA256
+  8dde57b4570b6dc1cbf82f31b9dc5637e8eec06dd23d7139f560170d461637bd；
   consumer source SHA256
-  `48fa1f629380ce354617af7082e7f19bd81974f00f9b9c126c9b4c690ff1c31b`。
+  48fa1f629380ce354617af7082e7f19bd81974f00f9b9c126c9b4c690ff1c31b。
   这是远程 CI 证据，不声称本地 evidence ZIP 或 H723 实机运行。
-- 三个 degree 5/4/3 Horner 拒绝分支仍由同一个生产 helper 直接测试；
-  本结论不声称它们都能由合法产品包线输入经完整 validator 触发。
-  完整 validator 的 coefficient/scaling fail-fast 路径有状态、reason、
-  passed 和互斥计数断言；Horner helper 的返回值与各自计数也有断言。
-- M5-06 当前证明域仍为 20 ms preview；M6 40 ms route preview 不在本次
-  M5-06 证明范围内。H723 实机运行、WCET/RTA、HIL 和飞行验证仍未执行，
-  不得将 Host/交叉编译 PASS 描述为这些验证已完成。
+- degree 5/4/3 Horner 拒绝分支由同一个生产 helper 直接测试；不声称三者
+  都能由合法产品包线输入经完整 validator 触发。完整 validator 的
+  coefficient/velocity-scaling/acceleration-scaling fail-fast 路径与合法
+  companion 有状态、reason、passed 和互斥计数断言。
 
 ### 当前 disposition
 
 **MR-009：TRIPLE_SELF_REVIEWED / PASS_WITH_DECLARED_SCOPE_LIMITATIONS。**
 不再要求单独外部数学审查；不把本次内部复核表述为独立第三方认证。
-本次只关闭 MR-009 数学复核工作，不推进 M5-07，不改变其他阶段或分支。
+M5-06 整体验收仍受 S06-100..102、H723 实机、WCET/RTA、目标 RAM/stack
+watermark、HIL、飞行等门禁约束。M6 40 ms route preview 不属于本次 20 ms
+M5-06 证明域。M5-07 不启动。
