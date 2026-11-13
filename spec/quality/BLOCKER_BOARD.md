@@ -109,6 +109,6 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 ## 派生规则
 
 - 状态变化先改 `ISSUE_REGISTER.md`，再更新本视图。
-- `FIXED_WAITING_RETEST` 不等于 VERIFIED；`VERIFIED/CLOSED` 只能由独立审查者确认。
+- `FIXED_WAITING_RETEST` 不等于 VERIFIED；`VERIFIED/CLOSED` 通常只能由独立审查者确认；仅可对项目所有者明确豁免的单项按登记的内部复核结果关闭。FLIGHT-LOCAL-04/MR-009 是当前唯一例外，状态为 `CLOSED / TRIPLE_SELF_REVIEWED_WITH_SCOPE_LIMITATIONS`，不代表独立第三方批准；其他问题仍遵循独立复验规则。
 - S06-100..102 保持 NOT_RUN；MR-009 已完成内部三轮复核，但 M5-06 仍受其他发布门禁阻塞；M5-07 不得启动。
 - R27 文档、R27 快照和 R22 原始字节保留为 HISTORICAL/NOT_RECOVERABLE，不得覆盖。
