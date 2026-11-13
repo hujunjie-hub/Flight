@@ -56,7 +56,8 @@
     "EnvironmentConstraint": 52,
     "ProductFmsInputExtension": 53,
     "EstimatorHealth": 54,
-    "ControlHealth": 55
+    "ControlHealth": 55,
+    "GroundStopCertificate": 56
   },
   "aliases": {
     "FmsHealth": "ModuleHealth",
