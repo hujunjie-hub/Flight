@@ -31,6 +31,7 @@ typedef struct {
   SafetyEnvelope envelope;
   AuthorityStatus authority;
   ActuationPermit permit;
+  GroundStopCertificate ground_stop_certificate;
   ActuatorStatus actuator;
   ActuatorCapability actuator_cap;
   ActuatorCommitReceipt receipt;

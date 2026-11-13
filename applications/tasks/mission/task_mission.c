@@ -99,6 +99,19 @@ static void task_mission_step(void) {
   runtime_stats.planning_status=fms_policy_update(&input,&fms_output); runtime_stats.planning_updates++;
   /* Revoke/renew directly before doing any more planning work. */
   if(!runtime_stats.planning_status) (void)actuator_update_permit(&fms_output.actuation_permit,runtime_now_us());
+  /* Translate only a validated M4 ground-disarm decision plus its matching
+   * revoked permit. Keep the short-lived certificate in the bundle long enough
+   * for the 1 ms actuator owner to consume it; never synthesize it while airborne. */
+  {
+    GroundStopCertificate certificate;
+    const uint64_t certificate_now = runtime_now_us();
+    if (!runtime_stats.planning_status &&
+        fms_build_ground_stop_certificate(&fms_output, certificate_now, &certificate) == STATUS_OK) {
+      plan_bundle.ground_stop_certificate = certificate;
+    } else if (plan_bundle.ground_stop_certificate.certificate_expires_at_us <= certificate_now) {
+      memset(&plan_bundle.ground_stop_certificate, 0, sizeof(plan_bundle.ground_stop_certificate));
+    }
+  }
   if(!runtime_stats.planning_status && next_origin) {
     EstimatorResetRequest reset;
     if(!fms_authorize_origin_reset(&origin,next_origin,&reset)) {

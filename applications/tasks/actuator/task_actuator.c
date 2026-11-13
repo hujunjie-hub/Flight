@@ -4,6 +4,7 @@
 #include <rtthread.h>
 #include "task_config.h"
 #include "runtime_internal.h"
+#include "output_guard/actuator_guard.h"
 
 static void task_actuator_step(void)
 {
@@ -12,11 +13,21 @@ static void task_actuator_step(void)
     ActuatorCapability capability;
     ActuatorCommitReceipt receipt = {0};
     ActuationPermit permit;
+    GroundStopCertificate ground_stop;
     int have_demand = 0;
+    int have_ground_stop = 0;
+    const uint64_t now_us = runtime_now_us();
 
     runtime_data_mark_heartbeat(RUNTIME_OWNER_ACTUATOR, runtime_now_us());
     if (runtime_data_lock(0))
     {
+        if (runtime_data.bundle_ready)
+        {
+            ground_stop = runtime_data.bundle.ground_stop_certificate;
+            have_ground_stop =
+                ground_stop.header.message_type == MSG_GROUND_STOP_CERTIFICATE &&
+                ground_stop.certificate_expires_at_us > now_us;
+        }
         if (runtime_data.have_demand)
         {
             demand = runtime_data.demand;
@@ -25,6 +36,14 @@ static void task_actuator_step(void)
             have_demand = 1;
         }
         runtime_data_unlock();
+    }
+    /* The M4 certificate is a separate, post-revocation transaction. It
+     * owns the actuator output while active; do not let a queued M6 demand race
+     * the bounded ramp. Repeated copies are idempotent in the M7 guard. */
+    if (have_ground_stop)
+    {
+        (void)actuator_guard_ground_stop(&ground_stop, runtime_now_us());
+        have_demand = 0;
     }
     if (have_demand)
     {
