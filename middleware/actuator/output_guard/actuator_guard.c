@@ -263,7 +263,9 @@ Status actuator_guard_ground_stop(const GroundStopCertificate *c,uint64_t now) {
   if(!a.initialized) { unlock(); return STATUS_NOT_READY; }
   current=a.permit;
   if(gs.latched) { unlock(); return STATUS_NOT_READY; }
-  if(!current.permit_epoch || !c->authority_epoch || !c->directive_epoch ||
+  if(!current.permit_epoch ||
+     (current.permit_flags & PERMIT_FLAG_REVOKED)==0u ||
+     !c->authority_epoch || !c->directive_epoch ||
      c->authority_epoch!=current.authority_epoch ||
      c->directive_epoch!=current.directive_epoch) {
     unlock();

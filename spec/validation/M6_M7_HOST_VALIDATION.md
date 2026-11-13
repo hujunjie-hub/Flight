@@ -79,8 +79,19 @@ M7 certificate epoch binding, in-flight permit blocking and late-apply overrun c
 
 The third run verifies certificate authority/directive epoch binding, rejection of new permits and demands while the ramp owns output, actual driver-apply deadline reporting, and a late final zero frame that must retain the OVERRUN flag. The 11,869 unique Host checks pass; the sanitizer job repeats M6/M7 tests.
 
-A final concurrency audit then identified that the terminal ground-stop latch and lifecycle stop reset must use the same lock as concurrent permit publication. That lock-order follow-up is committed separately and remains pending its own CI run.
+The concurrency follow-up is committed as `907ce7fac83f476fa0d840004a9559f220d7e9a7`; CI run [43363758248](https://github.com/hujunjie-hub/Flight/actions/runs/43363758248) completed SUCCESS (3/3 jobs). It serializes the terminal ground-stop latch, permit updates, and actuator stop/reset through the same lock.
 
 ## Safety boundary
 
 Host tests prove only the exercised software paths. They do not establish target WCET, board integration, DShot waveform timing, physical motor response, HIL acceptance, or flight readiness. The production H723 build remains `BENCH_INHIBIT`; `SIM_CONTROLLED_STOP` is enabled only for the host test build.
+
+
+## Remaining M7 end-to-end integration blocker
+
+The ground-stop guard transaction is covered by Host tests, but the production call path is not yet connected:
+
+- `fms_permit_tick()` revokes the permit / calls `fms_permit_ground_disarm()`, but no FMS output currently publishes a `GroundStopCertificate`.
+- `task_actuator_step()` consumes `ActuatorDemand`, polls status, and reads receipts; it does not consume a ground-stop certificate or call `actuator_guard_ground_stop()`.
+- `actuator_device_commit()` timestamps the write with `clock_now_us()` after `rt_device_write()`. That is a submission-return timestamp, not yet independently proven to be the physical DShot frame-application time.
+
+Therefore **FMS→M7 ground-stop integration = NOT_IMPLEMENTED / NOT_RUN**. The M7 Host test proves the guard API in isolation only. Do not claim that the FMS first-reference timeout or landed disarm path executes a bounded physical thrust ramp on H723. Before enabling physical output, add the certificate to the FMS/runtime contract, consume it in the actuator owner task, obtain a defensible driver-application timestamp (or explicitly redefine the evidence as enqueue time), and test the full revoked-permit→ramp→zero-receipt→DISARMED chain. Keep production `BENCH_INHIBIT` unchanged.

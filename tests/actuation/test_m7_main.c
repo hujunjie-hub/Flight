@@ -369,6 +369,13 @@ static void case_ground_stop(void) {
     CHECK(actuator_guard_ground_stop(&certificate, t) == STATUS_NOT_PERMITTED,
           "certificate from an old directive epoch was accepted");
 
+    /* An epoch-matching certificate is still insufficient while CONTROL_ACTIVE
+     * remains live: the M4 revocation must be observed before the stop begins. */
+    certificate = make_ground_stop(t, ACTUATOR_GROUND_STOP_CODE_ZERO,
+                                   ACTUATOR_GROUND_STOP_LIFECYCLE_DISARMING, 100.0f);
+    CHECK(actuator_guard_ground_stop(&certificate, t) == STATUS_NOT_PERMITTED,
+          "ground stop was accepted while the CONTROL_ACTIVE permit remained live");
+
     /* The revocation that normally precedes a ground stop must not block it. */
     permit = make_permit(6u, 2u, t, t + 200000u, PERMIT_FLAG_REVOKED);
     CHECK(actuator_update_permit(&permit, t) == STATUS_OK, "revocation rejected");
