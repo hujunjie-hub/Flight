@@ -8,16 +8,40 @@ real `pkgs --update` result.
 """
 import tempfile
 import unittest
+from subprocess import CompletedProcess
 from pathlib import Path
+from unittest.mock import patch
 
 from tools.check_rtt_package_tree import (
     installed_package_dirs,
     missing_generated_metadata,
     package_tree_ready,
 )
+from tools.check_rt_packages_lock import verify_installed_packages
 
 
 class RtThreadPackageTreeTests(unittest.TestCase):
+    def test_installed_package_matches_lock_and_has_no_tracked_edits(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            package = root / "packages/hal"
+            package.mkdir(parents=True)
+            pin = "a" * 40
+            lock = {"packages": [{"symbol": "HAL", "installed_dir": "packages/hal",
+                                  "pinned_commit": pin}]}
+            for head, dirty, expected in ((pin, "", None), ("b" * 40, "", "HEAD"),
+                                          (pin, " M Inc/hal.h", "tracked changes")):
+                with self.subTest(head=head, dirty=dirty), patch(
+                        "tools.check_rt_packages_lock.subprocess.run", side_effect=[
+                            CompletedProcess([], 0, str(package.resolve()) + "\n"),
+                            CompletedProcess([], 0, head + "\n"),
+                            CompletedProcess([], 0, dirty + "\n")]):
+                    _, errors = verify_installed_packages(root, lock)
+                    if expected:
+                        self.assertTrue(any(expected in error for error in errors), errors)
+                    else:
+                        self.assertEqual(errors, [])
+
     def test_missing_entrypoints_block(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

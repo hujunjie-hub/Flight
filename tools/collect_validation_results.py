@@ -297,9 +297,10 @@ def parse_output(name, output, exit_code):
                                         "lock": data.get("lock")}
 
     if name == "spec_layout":
-        failures = 0 if exit_code == 0 else 1
-        checks = 1 if exit_code == 0 else 0
-        return checks, failures, seed, {"parser": "exit-only"}
+        data = _json_object(output) or {}
+        checks = data.get("checks", 0)
+        failures = 0 if exit_code == 0 and data.get("status") == "PASS" else 1
+        return checks, failures, seed, {"parser": "JSON", "status": data.get("status")}
 
     if name == "scons_link":
         data = _json_object(output) or {}
@@ -392,6 +393,14 @@ def parse_output(name, output, exit_code):
         if not match:
             fail("stack_image_selftest: PASS marker missing")
         return int(match.group(1)), 0, seed, {"parser": "stack-image-selftest"}
+
+    if name == "runner_selftest":
+        match = re.search(r"^Ran (\d+) tests? in ", output, re.M)
+        failures = re.search(r"^FAILED \(failures=(\d+)\)$", output, re.M)
+        if not match or (not failures and not re.search(r"^OK$", output, re.M)):
+            fail("runner_selftest: unittest summary missing")
+        return int(match.group(1)), int(failures.group(1)) if failures else 0, seed, {
+            "parser": "unittest-summary"}
 
     fail(f"no strict parser for command {name}")
 

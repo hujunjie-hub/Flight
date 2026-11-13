@@ -50,6 +50,11 @@ def main():
             "gitignored and is not produced by this repository. Run the "
             "RT-Thread package manager (pkgs --update) for the selected "
             ".config before the firmware link check.")
+    lock_check = subprocess.run([sys.executable, "tools/check_rt_packages_lock.py", "--installed"],
+                                cwd=ROOT, capture_output=True, text=True)
+    if lock_check.returncode:
+        return blocked("Installed RT-Thread packages failed lock verification:\n" +
+                       lock_check.stdout + lock_check.stderr)
     python = ROOT / "build/m4_m5_tools/Scripts/python.exe"
     if not python.is_file():
         raise SystemExit("Install SCons in build/m4_m5_tools first (see implementation report)")

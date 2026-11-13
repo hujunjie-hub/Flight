@@ -128,7 +128,8 @@ def main():
             "tests/abi/abi_report.py", "middleware/contracts/abi_lock.h",
             "spec/message_registry.json")),
         "scons_link": rel(files_under(
-            "tests/guidance/check_target_build.py", "SConstruct", "SConscript")),
+            "tests/guidance/check_target_build.py", "SConstruct", "SConscript",
+            "tools/check_rt_packages_lock.py", "tools/rt_packages.lock.json", ".config")),
         "s06_112": rel(files_under(
             "tests/guidance/verify_jerk_continuous.py",
             "tests/guidance/m5_product_envelope.py",
@@ -146,9 +147,8 @@ def main():
             "spec/validation/flight_acceptance_manifest.json")),
         "manifest_check": rel(files_under(
             "tools/check_validation_evidence.py",
-            "spec/validation/flight_acceptance_manifest.json",
-            "build/validation/regenerated/r28_environment.json",
-            "build/validation/regenerated/r28_test_results.json")),
+            "tools/prepare_archive_metadata.py", "tests/guidance/run_validation.py",
+            "spec/validation/flight_acceptance_manifest.json")),
         "issues_check": rel(files_under(
             "tools/check_validation_evidence.py", "spec/quality/ISSUE_REGISTER.md")),
         "stack_check": rel(files_under(
@@ -162,6 +162,8 @@ def main():
             "tools/analyze_stack_image.py",
             "tools/analyze_stack.py")),
         "stack_image_selftest": rel(files_under("tools/analyze_stack_image.py")),
+        "runner_selftest": rel(files_under("tests/guidance/test_run_validation.py",
+                                           "tests/guidance/run_validation.py")),
     }
     files = {}
     for test_name, paths in tests.items():

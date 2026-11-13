@@ -99,7 +99,7 @@ def build_latest_local_validation(
     if not branch or branch == "HEAD":
         raise ValueError("a named branch is required")
 
-    result = dict(existing)
+    result = dict(existing) if existing.get("run_id") == run_id else {}
     result.update({
         "run_id": run_id,
         "branch": branch,

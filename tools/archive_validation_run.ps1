@@ -66,11 +66,13 @@ New-Item -ItemType Directory -Force -Path $runDir | Out-Null
 
 $copyPaths = @(
     "build/m4_m5_implementation/evidence",
+    "build/m4_m5_implementation/target",
     "build/ci/m4-m5",
     "build/m4_host",
     "build/m5_host",
     "build/m4_m5_host",
     "build/m5_arm",
+    "build/stack_image",
     "build/validation",
     "tests/guidance/evidence",
     "spec/validation/flight_acceptance_manifest.json",

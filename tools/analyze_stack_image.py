@@ -60,7 +60,7 @@ def load_su(su_dir):
 
 
 def analyze(dis_text, su_frames, root_name=ROOT_FN, limit=LIMIT):
-    funcs, order = A.parse_disassembly(dis_text)
+    funcs, _ = A.parse_disassembly(dis_text)
     if not funcs:
         return {"status": "UNKNOWN", "reason": "no functions in disassembly"}
     frames = {}
@@ -88,19 +88,27 @@ def analyze(dis_text, su_frames, root_name=ROOT_FN, limit=LIMIT):
                 unknown.append({"caller": name, "target": target, "kind": "tail-external"})
         for reason in info["unknown_calls"]:
             unknown.append({"caller": name, "target": None, "kind": reason})
+        if frames[name]["kind"] == "dynamic":
+            unknown.append({"caller": name, "target": None, "kind": "dynamic .su frame"})
         edges[name] = sorted(set(children))
     if root_name not in funcs:
         return {"status": "UNKNOWN", "reason": f"root {root_name} not found",
                 "function_count": len(funcs), "unknown_edges": unknown}
 
+    for mismatch in mismatches:
+        unknown.append({"caller": mismatch["function"], "target": None,
+                        "kind": ".su and disassembly disagree"})
+
     colour = {}
     cycles = []
+    back_edges = set()
 
     def detect(node, path):
         colour[node] = 1
         for child in edges.get(node, []):
             if colour.get(child) == 1:
                 cycles.append(path + [node, child])
+                back_edges.add((node, child))
             elif colour.get(child, 0) == 0:
                 detect(child, path + [node])
         colour[node] = 2
@@ -113,7 +121,7 @@ def analyze(dis_text, su_frames, root_name=ROOT_FN, limit=LIMIT):
             return memo[node]
         best_child, best_val = None, 0
         for child in edges.get(node, []):
-            if colour.get(child) == 1:
+            if (node, child) in back_edges:
                 continue
             value, _ = longest(child)
             if value > best_val:
@@ -239,8 +247,21 @@ def self_test():
         failures.append("unresolved call not UNKNOWN")
     mismatch = analyze(dis, {"root": {"su_bytes": 99}}, root_name="root", limit=4096)
     cases += 1
-    if not mismatch["su_vs_sp_mismatches"]:
-        failures.append(".su mismatch not reported")
+    if mismatch["status"] != "UNKNOWN" or not mismatch["su_vs_sp_mismatches"]:
+        failures.append("reachable .su mismatch did not make the result UNKNOWN")
+    dynamic = analyze(dis, {"root": {"su_bytes": 12, "kind": "dynamic"}},
+                      root_name="root", limit=4096)
+    cases += 1
+    if dynamic["status"] != "UNKNOWN":
+        failures.append("reachable unbounded dynamic .su frame did not make the result UNKNOWN")
+    recursive = dis.replace("bl\t0 <helper>", "bl\t0 <root>")
+    cases += 1
+    try:
+        result = analyze(recursive, {}, root_name="root", limit=4096)
+        if result["status"] != "UNKNOWN" or not result["recursion_reachable"]:
+            failures.append("reachable recursion did not make the result UNKNOWN")
+    except RecursionError:
+        failures.append("reachable recursion crashed stack analysis")
     if failures:
         for failure in failures:
             print("STACK_IMAGE_SELFTEST_FAIL:", failure, file=sys.stderr)

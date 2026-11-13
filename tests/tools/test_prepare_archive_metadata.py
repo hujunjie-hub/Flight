@@ -21,6 +21,7 @@ SHA_D = "d" * 40
 class ArchiveMetadataTests(unittest.TestCase):
     def base(self):
         return {
+            "run_id": "M5-06-R29-20261111",
             "status": "FAIL",
             "test_failures": 0,
             "gate_failures": 3,
@@ -78,6 +79,11 @@ class ArchiveMetadataTests(unittest.TestCase):
         self.assertEqual(result["gate_failures"], 3)
         self.assertEqual(result["blocked_gates"], 1)
 
+    def test_new_run_does_not_inherit_gate_results(self):
+        result = self.build(run_id="M5-06-NEXT-RUN")
+        self.assertNotIn("status", result)
+        self.assertNotIn("gate_failures", result)
+
     def test_external_report_and_sidecar_paths_are_run_scoped(self):
         result = self.build()
         self.assertTrue(result["archive_external_report"].endswith(
@@ -130,8 +136,8 @@ class ArchiveMetadataTests(unittest.TestCase):
             self.assertEqual(result["validated_code_commit"], base)
             self.assertEqual(result["archive_zip_hash_location"], EXTERNAL_HASH_POLICY)
             self.assertIsNone(result["archive_zip_sha256"])
-            self.assertEqual(result["status"], "FAIL")
-            self.assertEqual(result["gate_failures"], 2)
+            self.assertNotIn("status", result)
+            self.assertNotIn("gate_failures", result)
 
 
 if __name__ == "__main__":

@@ -11,17 +11,20 @@ The verifier is intentionally strict:
 * lock status must be RESOLVED with a named approver;
 * every selected package needs a `pinned_version` (never "latest") and a 40-hex
   `pinned_commit`;
-* `CONFIG_PKG_USING_<NAME>_LATEST_VERSION` must no longer be enabled;
-* the `.config` version must equal the locked version;
+* the `.config` version must match the lock, with `latest` allowed only when
+  its lock entry binds an exact commit;
 * the lock must not carry packages that are no longer selected.
 
 Exit codes: 0 = fully pinned, 1 = at least one problem, 2 = BLOCKED because
-`.config` or the lock file is missing. Installation itself is not performed here.
+`.config` or the lock file is missing. `--installed` additionally verifies the
+commit and tracked worktree of every package used by the link check.
 """
-from pathlib import Path
+import argparse
 import json
 import re
+import subprocess
 import sys
+from pathlib import Path
 
 ROOT = next(p for p in Path(__file__).resolve().parents if (p/'SConstruct').is_file())
 LOCK = ROOT / "tools/rt_packages.lock.json"
@@ -113,7 +116,44 @@ def verify(config_text, lock):
     return problems
 
 
+def verify_installed_packages(root, lock):
+    """Bind each installed package's tracked source tree to its approved commit."""
+    installed, problems = {}, []
+    for entry in lock["packages"]:
+        symbol = entry["symbol"]
+        relative = Path(entry.get("installed_dir") or ".")
+        package = (root / relative).resolve()
+        if package.parent != (root / "packages").resolve() or not package.is_dir():
+            problems.append(f"{symbol}: installed package directory missing or invalid: {relative}")
+            continue
+
+        def git(*args):
+            result = subprocess.run(["git", "-C", str(package), *args], capture_output=True,
+                                    text=True, check=True)
+            return result.stdout.strip()
+
+        try:
+            if Path(git("rev-parse", "--show-toplevel")).resolve() != package:
+                problems.append(f"{symbol}: installed package is missing its own Git checkout")
+                continue
+            head = git("rev-parse", "HEAD")
+            dirty = git("status", "--porcelain", "--untracked-files=no")
+        except (OSError, subprocess.CalledProcessError) as error:
+            problems.append(f"{symbol}: could not identify installed Git tree: {error}")
+            continue
+        installed[symbol] = {"path": relative.as_posix(), "commit": head,
+                             "tracked_changes": dirty.splitlines()}
+        if head != entry["pinned_commit"]:
+            problems.append(f"{symbol}: installed HEAD {head} differs from {entry['pinned_commit']}")
+        if dirty:
+            problems.append(f"{symbol}: installed package has tracked changes")
+    return installed, problems
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--installed", action="store_true", help="also verify the installed package trees")
+    args = parser.parse_args()
     if not CONFIG.is_file() or not LOCK.is_file():
         print(json.dumps({"status": "BLOCKED",
                           "reason": ".config or tools/rt_packages.lock.json missing"},
@@ -122,15 +162,18 @@ def main():
     config_text = CONFIG.read_text(encoding="utf-8")
     lock = json.loads(LOCK.read_text(encoding="utf-8"))
     problems = verify(config_text, lock)
+    installed = {}
+    if args.installed and not problems:
+        installed, problems = verify_installed_packages(ROOT, lock)
     report = {
         "status": "PASS" if not problems else "FAIL",
         "scope": "RT-THREAD_PACKAGES_FOR_FIRMWARE_LINK",
         "lock_status": lock.get("status"),
         "selected_packages": sorted(selected_packages(config_text)),
+        "installed_packages": installed,
         "problems": problems,
-        "note": "A pass only means the selection is pinned; installing packages/ "
-                "still requires the RT-Thread env tool as documented in "
-                "spec/validation/rt_thread_packages_reproducibility.md.",
+        "note": "Includes verification of installed commits and tracked sources." if args.installed else
+                "Selection only. Use --installed to verify the local package trees.",
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=2), encoding="utf-8")
