@@ -162,9 +162,11 @@ The SIL smoke now calls the same certificate-publication helper used by `task_mi
 
 ### Branch lineage / integration gate
 
-At the time of this check, M6 branch HEAD `a8f62f5b270355d699b8a42861198cfa93894337` and M5-06 branch HEAD `51e7e923419733f5aa3b21efa1e46588629623ed` are **diverged**, with common ancestor `edf32b4e39cdae014aa76870dc821882807a6905`. GitHub compare reports M6 ahead by 50 commits and behind M5-06 by 395 commits. The M6/M7 Host CI therefore validates this independent branch only; it does not contain or supersede the current M5-06 branch. Do not rebase, merge, or claim unified milestone acceptance without an explicit integration plan and independent M5-06 approval.
+At the time of this check, M6 branch HEAD `41ba12f2d1fbb3b4525407f5b621db8cddc6dbc4` and M5-06 branch HEAD `51e7e923419733f5aa3b21efa1e46588629623ed` are **diverged**, with common ancestor `edf32b4e39cdae014aa76870dc821882807a6905`. GitHub compare reports M6 ahead by 52 commits and behind M5-06 by 395 commits. The M6/M7 Host CI therefore validates this independent branch only; it does not contain or supersede the current M5-06 branch. Do not rebase, merge, or claim unified milestone acceptance without an explicit integration plan and independent M5-06 approval.
 
 
-### Invalid certificate demand-continuity regression (CI pending)
+### Invalid certificate demand-continuity regression — Run #25 PASS
 
-The actuator owner now suppresses a queued M6 demand only when `actuator_guard_ground_stop()` returns `STATUS_OK`. A malformed, stale or unauthorized certificate candidate cannot take ownership of output. The SIL fixture proves that an invalid in-air candidate does not block a valid 5 N demand, then verifies that a subsequently accepted certificate drives a multi-frame 5 N→0 N ground-stop ramp and terminal zero receipt. The updated workflow run is pending.
+The actuator owner now suppresses a queued M6 demand only when `actuator_guard_ground_stop()` returns `STATUS_OK`. A malformed, stale or unauthorized certificate candidate cannot take ownership of output. The SIL fixture proves that an invalid in-air candidate does not block a valid 5 N demand, then verifies that a subsequently accepted certificate drives a multi-frame 5 N→0 N ground-stop ramp and terminal zero receipt.
+
+[Run #25](https://github.com/hujunjie-hub/Flight/actions/runs/43375635462), exact commit `41ba12f2d1fbb3b4525407f5b621db8cddc6dbc4`: **4/4 jobs SUCCESS**. M4 Host 993/0, M5 Host 9,515/0, M4/M5 integration 1,066/0, M6 MPC 15/0, M6 guard 26/0, M7 guard 274/0, and ASan/UBSan PASS. The runtime SIL scenario completed **19 checks / 0 failures**, with **18 frame commits** (one 5 N demand plus the bounded ramp frames) and 58 inhibit calls; the final receipt confirmed zero thrust without an apply-time overrun.
