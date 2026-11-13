@@ -10,9 +10,11 @@ command -v "$cc" >/dev/null 2>&1 || { echo "ARM compiler not found: $cc" >&2; ex
 command -v "$size" >/dev/null 2>&1 || { echo "ARM size tool not found: $size" >&2; exit 2; }
 out="build/m5_arm"
 mkdir -p "$out"
-flags=(-mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard
+flags=(
+       -mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard
        -std=c11 -Wall -Wextra -Werror -fno-short-enums -fstack-usage
-       -Imiddleware/contracts -Imiddleware/model/fms -Imiddleware/guidance)
+       -Imiddleware/contracts -Imiddleware/model/fms -Imiddleware/guidance
+)
 sources=(
   middleware/model/fms/geofence_geometry/geofence_geometry.c
   middleware/guidance/guidance_update/guidance.c
