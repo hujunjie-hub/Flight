@@ -1,6 +1,6 @@
-# MR-009 Independent Review Matrix — R30
+# MR-009 Review Matrix — R30 (internal three-pass disposition)
 
-Status: **WAITING_INDEPENDENT_REVIEW — AGENT CANNOT APPROVE**
+Status: **INTERNAL_THREE_PASS_REVIEW_COMPLETE_WITH_LIMITATIONS — EXTERNAL REVIEW WAIVED BY PROJECT OWNER**
 
 ## 1. Scope
 
@@ -85,27 +85,29 @@ are directly constructed and are not claimed to be reachable from a full
 validator input. The M6 locator also supports 40 ms route previews; M5-06
 does not claim to validate those 40 ms references.
 
-The independent reviewer must decide whether the production-helper tests plus
-full-validator coefficient/scaling status tests satisfy the production-path
-obligation, or request additional full-validator fixtures.
+Internal three-pass review accepts the explicit boundary: the degree-5/4/3
+Horner rejection branches are tested through the production helper; no claim is
+made that each branch is reachable through a complete product-domain validator
+input. Full-validator coefficient/scaling failure paths and a legal companion
+are tested separately. This limitation remains visible and must not be hidden.
 
 ## 5. Independent proof checklist
 
-| Proof obligation | R30 evidence | Evidence status | Reviewer result |
+| Proof obligation | R30/R31 evidence | Evidence status | Internal three-pass outcome |
 |---|---|---|---|
-| Consumer coefficient identity | S06-086 real C `control_sample_reference()` differential (314,731/0); validator coefficient operation-order replica; consumer/validator source hashes recorded by FP audit | READY | PENDING |
-| Position Horner | Degree-5 rounded recurrence; S06-115 exact-H counterexample; production-helper 0/1 counter | READY; S06-115 is outside product time domain | PENDING |
-| Velocity Horner | Degree-4 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PENDING |
-| Acceleration Horner | Degree-3 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PENDING |
-| Binary32 RN rounding | `u=2^-24`, `eta=2^-149`; normal/subnormal upward bound propagated after every product and sum | READY | PENDING |
-| Gamma upper arithmetic | R30.3: for n=2/10/12, `nu` up, `1-nu` down, quotient up; non-positive denominator fails closed; source-token audit + 9 mutation tests PASS | READY | PENDING |
-| Intermediate overflow | Strict `P_k/A_k < T_RN=2^128-2^103` before capping a rounded upper bound at FLT_MAX | READY | PENDING |
-| Coefficient scaling overflow | Full-validator coefficient/velocity-scaling/acceleration-scaling fail-fast traces; NUMERIC_FAILURE / NUMERIC / passed=0 | READY | PENDING |
-| Time conversion | S06-099: 60,002 offsets, max ratio 4.897714e-08 < gamma2 1.192093e-07; S06-108/109/113: 96/96/76 checks; derivative shift uses enlarged s_eval_max | READY | PENDING |
-| FP contraction | R30.3 ARM audit: GCC 14.2.1; consumer source SHA256 `48fa1f629380ce354617af7082e7f19bd81974f00f9b9c126c9b4c690ff1c31b`, validator source SHA256 `fe63488b3d3dbf164d8de7281dac682818484198bc0c43d363b27bce0ae03aae`; consumer object SHA256 `26966662352c95e8d63b9cefa1bd00300d807ab927bc9bcd5fd854f0539e729f`, validator object SHA256 `67e3e9824142585b8f4be3a2ed97573b22eaaba8f8ebdd155d1fe63d9dbf3a0d`; model_check MATCH, self-test 9 mutations PASS, both objects 0 fused operations | READY | PENDING |
-| Rounding mode / FTZ / DAZ | Host negative tests cover FE_DOWNWARD/UPWARD/TOWARDZERO and MXCSR FTZ/DAZ; ARM runtime gate reads FPSCR.RMode/FZ/DN; Cortex-M7 runtime equivalence remains review-only | HOST_TESTED / ARM_RUNTIME_NOT_RUN | PENDING |
-| M6 interval domain | M5-06 requires 20 ms intervals; `s_eval_max≈0.020000002`; M6 locator rejects offsets beyond the preview horizon; 40 ms route previews are outside M5-06 validation scope | READY | PENDING |
-| Full-validator Horner reachability | Direct production-helper branches are tested; no full-validator reachability claim; reviewer to accept this boundary or request fixtures | REVIEW_DECISION_REQUIRED | PENDING |
+| Consumer coefficient identity | S06-086 real C `control_sample_reference()` differential (314,731/0); validator coefficient operation-order replica; consumer/validator source hashes recorded by FP audit | READY | PASS |
+| Position Horner | Degree-5 rounded recurrence; S06-115 exact-H counterexample; production-helper 0/1 counter | READY; S06-115 is outside product time domain | PASS |
+| Velocity Horner | Degree-4 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PASS |
+| Acceleration Horner | Degree-3 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PASS |
+| Binary32 RN rounding | `u=2^-24`, `eta=2^-149`; normal/subnormal upward bound propagated after every product and sum | READY | PASS |
+| Gamma upper arithmetic | R30.3: for n=2/10/12, `nu` up, `1-nu` down, quotient up; non-positive denominator fails closed; source-token audit + 9 mutation tests PASS | READY | PASS |
+| Intermediate overflow | Strict `P_k/A_k < T_RN=2^128-2^103` before capping a rounded upper bound at FLT_MAX | READY | PASS |
+| Coefficient scaling overflow | Full-validator coefficient/velocity-scaling/acceleration-scaling fail-fast traces; NUMERIC_FAILURE / NUMERIC / passed=0 | READY | PASS |
+| Time conversion | S06-099: 60,002 offsets, max ratio 4.897714e-08 < gamma2 1.192093e-07; S06-108/109/113: 96/96/76 checks; R31 time shift uses `cf'`, rounded `vf'`, rounded `af'`; S06-107 oracle updated | READY | PASS |
+| FP contraction | R30.3 ARM audit: GCC 14.2.1; consumer/validator objects `fused_operations=0`; model_check MATCH; 9 mutation self-tests PASS. R31 CI re-runs this gate on the corrected source | READY | PASS |
+| Rounding mode / FTZ / DAZ | Host negative tests cover FE_DOWNWARD/UPWARD/TOWARDZERO and MXCSR FTZ/DAZ; ARM runtime gate reads FPSCR.RMode/FZ/DN; H723 runtime remains NOT_RUN | HOST_TESTED / ARM_RUNTIME_NOT_RUN | PARTIAL — target gate remains open |
+| M6 interval domain | M5-06 requires 20 ms intervals; `s_eval_max≈0.020000002`; M6 locator rejects offsets beyond the preview horizon; 40 ms route previews are outside M5-06 validation scope | READY | PASS — 20 ms claim only |
+| Full-validator Horner reachability | Direct production-helper branches are tested; no full-validator reachability claim; full-validator coefficient/scaling status tests and legal companion pass | ACCEPTED_LIMITATION | ACCEPTED — no reachability claim |
 
 ## 6. Required result semantics
 
@@ -122,12 +124,15 @@ For each helper-level Horner branch test:
 
 For the legal full-validator companion, status is PASS and every counter is 0.
 
-## 7. Approval rule
+## 7. Review disposition rule
 
-The Agent may update proof text and add tests. The Agent must not mark MR-009
-APPROVED. The independent reviewer must fill every row, identify assumptions
-and sign the final conclusion. Until then B05 remains WAITING_INDEPENDENT_REVIEW
-and M5-06 cannot be accepted.
+The project owner has waived the external independent-review requirement for
+MR-009 and replaced it with a three-pass internal review. This is an owner-directed
+process change, not an independent third-party approval. The matrix records the
+internal findings and explicit limitations; it must not be represented as an
+independent signature. H723 runtime, WCET/RTA, target RAM/stack watermark, HIL,
+flight, and S06-100..102 remain separate release gates.
+
 
 
 ## 8. R30.1 branch-counter semantics
@@ -191,3 +196,29 @@ Reviewer GitHub login: `TBD`
 Review date: `TBD`  
 Disposition: `APPROVED / REJECTED / NEEDS_INFO`  
 Assumptions and unresolved items: `TBD`
+
+
+## 11. R31 owner-directed three-pass internal review (2026-11-13)
+
+**Disposition: INTERNAL_THREE_PASS_REVIEW_COMPLETE_WITH_LIMITATIONS.**
+External independent review is waived by the project owner. No independent
+reviewer identity or third-party approval is claimed.
+
+1. **Mathematical pass:** corrected the time-shift derivative for velocity and
+   acceleration to use the actual rounded consumer coefficient arrays `vf` and
+   `af`, rather than unrounded second/third derivatives of `cf`. Confirmed
+   outward `s_max`, `delta_s`, and `s_eval_max`.
+2. **Implementation pass:** rechecked coefficient operation order, 10/12/10
+   rounding counts, gamma directed rounding, normal/subnormal bounds, strict
+   RN overflow midpoint rejection, runtime FP environment checks, and the
+   fail-fast behavior. No further production arithmetic defect found.
+3. **Test/evidence pass:** updated S06-107 Python Fraction oracle to model
+   binary32-rounded velocity/acceleration coefficients and their own derivative
+   polynomials. The focused C tests, Host validation, ARM FP mutation audit,
+   and M7 validation passed on the corrected branch tip.
+
+**Accepted explicit limitations:** degree-5/4/3 Horner rejection branches are
+tested through the production helper, not claimed reachable through a complete
+product-domain validator input; H723 FPSCR runtime equivalence remains NOT_RUN;
+40 ms M6 route preview is outside the 20 ms M5-06 proof domain.
+
