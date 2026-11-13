@@ -816,9 +816,11 @@ static double evaluate_bernstein(const double *control, unsigned degree, double 
  * control_reference.c with those exact production flags and scans the emitted
  * Cortex-M7 object for fused multiply/add instructions. A future toolchain or
  * flag change that emits one fails the gate and requires a new proof review.
- * The bound is evaluated at s_max = h * u1 and is therefore valid for the whole
- * sub-interval; subdivision cannot reduce a systematic bias, which is why this
- * term must not be absorbed by clearance_margin_m.
+ * The coefficient/Horner bound is evaluated through s_eval_max =
+ * s_max + gamma_2*s_max, where s_max = h*u1 bounds the exact sub-interval
+ * time and gamma_2 covers the consumer's rounded local-time conversion.
+ * Subdivision cannot reduce a systematic bias, which is why this term must not
+ * be absorbed by clearance_margin_m.
  */
 static void consumer_power_coefficients(
     const MotionReferencePoint *a,
