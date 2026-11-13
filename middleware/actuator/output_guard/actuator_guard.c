@@ -13,6 +13,11 @@ static struct {
   uint64_t last_commit, last_frame, last_demand;
   uint32_t state, sequence, watermark, demand_sequence, faults;
   uint8_t initialized, has_demand, has_commit, has_frame;
+  uint8_t commit_pending, pending_ground_stop, pending_zero;
+  uint32_t pending_limit_flags, pending_control_sequence, pending_output_policy_id;
+  uint64_t pending_commit_time_us, pending_apply_time_us;
+  ActuationPermit pending_permit;
+  float pending_thrust[4];
 } a;
 static ActuatorDriver io;
 /* Ground stop transaction. `latched` survives until actuator_init(): once the
@@ -55,6 +60,81 @@ static Status safe(Status s, uint32_t state) {
   a.health.last_error_code=(uint32_t)s;
   a.health.health_state=state==ACTUATOR_GUARD_FAULT_LATCHED ? MODULE_HEALTH_FAILED : MODULE_HEALTH_DEGRADED;
   return s;
+}
+
+/* Complete a submitted frame outside the permit critical section. The DShot
+ * adapter returns STATUS_NOT_READY until the ISR has observed frame completion;
+ * only that completion may update thrust history or publish a commit receipt. */
+static Status complete_pending_commit(uint64_t now) {
+  uint64_t actual = a.pending_apply_time_us;
+  Status r = STATUS_OK;
+  uint8_t ground_stop, zero;
+  if (!a.commit_pending) return STATUS_OK;
+  if (io.poll_apply) {
+    r = io.poll_apply(&actual);
+    if (r == STATUS_NOT_READY) return STATUS_NOT_READY;
+    if (r != STATUS_OK) {
+      a.commit_pending = 0u;
+      return safe(r, ACTUATOR_GUARD_FAULT_LATCHED);
+    }
+  }
+  if (actual < a.pending_commit_time_us) {
+    a.commit_pending = 0u;
+    return safe(STATUS_STALE_DATA, ACTUATOR_GUARD_FAULT_LATCHED);
+  }
+
+  ground_stop = a.pending_ground_stop;
+  zero = a.pending_zero;
+  if (ground_stop &&
+      (actual < gs.start_us ||
+       actual - gs.start_us > ACTUATOR_GROUND_STOP_MAX_APPLY_US))
+    gs.overrun = 1u;
+
+  memset(&a.receipt, 0, sizeof(a.receipt));
+  header(&a.receipt.header, MSG_ACTUATOR_COMMIT_RECEIPT, now);
+  a.receipt.applied_control_sequence = ground_stop ? 0u : a.pending_control_sequence;
+  a.receipt.permit_epoch = a.pending_permit.permit_epoch;
+  a.receipt.directive_epoch = a.pending_permit.directive_epoch;
+  a.receipt.authority_epoch = a.pending_permit.authority_epoch;
+  a.receipt.state_epoch = a.pending_permit.state_epoch;
+  a.receipt.reference_epoch = a.pending_permit.reference_epoch;
+  a.receipt.commit_time_us = a.pending_commit_time_us;
+  a.receipt.estimated_apply_time_us = actual;
+  a.receipt.receipt_expires_at_us = now + 5000u;
+  a.receipt.output_policy_id = (uint16_t)a.pending_output_policy_id;
+  a.receipt.limit_flags = a.pending_limit_flags;
+  if (ground_stop && gs.overrun)
+    a.receipt.limit_flags |= ACTUATOR_GROUND_STOP_OVERRUN_FLAG;
+  a.receipt.result_code = ground_stop && zero ?
+      ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED : ACTUATOR_RECEIPT_COMMITTED;
+  a.receipt.committed_demand.valid_mask = 15u;
+  memcpy(a.receipt.committed_demand.motor_thrust_n, a.pending_thrust,
+         sizeof(a.pending_thrust));
+
+  memcpy(a.last_thrust, a.pending_thrust, sizeof(a.last_thrust));
+  a.last_commit = actual;
+  a.has_commit = 1u;
+  a.commit_pending = 0u;
+  a.pending_ground_stop = 0u;
+  a.pending_zero = 0u;
+
+  if (ground_stop && zero) {
+    lock();
+    gs.active = 0u;
+    gs.latched = 1u;
+    a.has_demand = 0u;
+    a.state = ACTUATOR_GUARD_DISARMED;
+    a.health.health_state = MODULE_HEALTH_DEGRADED;
+    unlock();
+    inhibit();
+  } else if (ground_stop) {
+    a.state = ACTUATOR_GUARD_SAFE_ACTION;
+    a.health.health_state = MODULE_HEALTH_DEGRADED;
+  } else {
+    a.state = ACTUATOR_GUARD_ACTIVE;
+    a.health.health_state = MODULE_HEALTH_HEALTHY;
+  }
+  return STATUS_OK;
 }
 Status actuator_guard_set_driver(const ActuatorDriver *d) {
   if (a.initialized || !d || (!!d->lock != !!d->unlock)) return STATUS_INVALID_ARGUMENT;
@@ -182,6 +262,7 @@ static uint16_t thrust_to_code(unsigned m,float thrust_n) {
 static Status ground_stop_frame(uint64_t now) {
   uint16_t commands[4]={0,0,0,0}; float applied[4]; uint64_t elapsed,actual; Status r;
   unsigned m; int zero=1;
+  if (a.commit_pending) return STATUS_NOT_READY;
   elapsed = (a.has_commit && now>=a.last_commit) ? now-a.last_commit : 0u;
   {
     float step = gs.ramp_nps*(float)elapsed*1e-6f;
@@ -195,38 +276,28 @@ static Status ground_stop_frame(uint64_t now) {
     }
   }
   if(now < gs.start_us) return STATUS_STALE_DATA;
-  if(now-gs.start_us>ACTUATOR_GROUND_STOP_MAX_APPLY_US) gs.overrun=1;
+  if(now-gs.start_us>ACTUATOR_GROUND_STOP_MAX_APPLY_US) gs.overrun=1u;
   lock();
-  actual=now; r=io.commit ? io.commit(commands,&actual) : STATUS_NOT_READY;
-  unlock();
-  /* The driver timestamp is the apply evidence, not the submission time. A
-   * late final zero frame is still a completed stop, but it must carry OVERRUN. */
-  if(actual < now) { gs.overrun=1; r=STATUS_STALE_DATA; }
-  else if(actual-gs.start_us>ACTUATOR_GROUND_STOP_MAX_APPLY_US) gs.overrun=1;
-  memset(&a.receipt,0,sizeof(a.receipt)); header(&a.receipt.header,MSG_ACTUATOR_COMMIT_RECEIPT,now);
-  a.receipt.commit_time_us=now; a.receipt.estimated_apply_time_us=actual;
-  a.receipt.receipt_expires_at_us=now+5000u;
-  a.receipt.output_policy_id=(uint16_t)a.config.payload.output_policy_id;
-  a.receipt.limit_flags=gs.overrun?ACTUATOR_GROUND_STOP_OVERRUN_FLAG:0u;
-  a.receipt.committed_demand.valid_mask=15u;
-  memcpy(a.receipt.committed_demand.motor_thrust_n,applied,sizeof(applied));
-  if(r) { a.receipt.result_code=ACTUATOR_RECEIPT_DRIVER_FAULT; return safe(r,ACTUATOR_GUARD_FAULT_LATCHED); }
-  memcpy(a.last_thrust,applied,sizeof(applied)); a.last_commit=now; a.has_commit=1;
-  if(zero) {
-    /* Permit publication may run concurrently with the actuator owner. Publish
-     * the terminal latch under the same lock used by permit updates. */
-    lock();
-    gs.active=0; gs.latched=1;
-    a.has_demand=0; a.state=ACTUATOR_GUARD_DISARMED;
-    a.health.health_state=MODULE_HEALTH_DEGRADED;
-    unlock();
-    a.receipt.result_code=ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED;
-    inhibit();
-    return STATUS_OK;
+  if (a.commit_pending) { unlock(); return STATUS_NOT_READY; }
+  actual=now;
+  r=io.commit ? io.commit(commands,&actual) : STATUS_NOT_READY;
+  if (r == STATUS_OK) {
+    a.commit_pending=1u;
+    a.pending_ground_stop=1u;
+    a.pending_zero=(uint8_t)zero;
+    a.pending_limit_flags=gs.overrun?ACTUATOR_GROUND_STOP_OVERRUN_FLAG:0u;
+    a.pending_control_sequence=0u;
+    a.pending_output_policy_id=a.config.payload.output_policy_id;
+    a.pending_commit_time_us=now;
+    a.pending_apply_time_us=actual;
+    a.pending_permit=a.permit;
+    memcpy(a.pending_thrust,applied,sizeof(applied));
+    memset(&a.receipt,0,sizeof(a.receipt));
   }
-  a.receipt.result_code=ACTUATOR_RECEIPT_COMMITTED;
-  a.state=ACTUATOR_GUARD_SAFE_ACTION; a.health.health_state=MODULE_HEALTH_DEGRADED;
-  return STATUS_OK;
+  unlock();
+  if(r) return safe(r,ACTUATOR_GUARD_FAULT_LATCHED);
+  r=complete_pending_commit(now);
+  return r==STATUS_NOT_READY ? STATUS_OK : r;
 }
 
 Status actuator_guard_ground_stop(const GroundStopCertificate *c,uint64_t now) {
@@ -262,6 +333,7 @@ Status actuator_guard_ground_stop(const GroundStopCertificate *c,uint64_t now) {
   lock();
   if(!a.initialized) { unlock(); return STATUS_NOT_READY; }
   current=a.permit;
+  if(a.commit_pending) { unlock(); return STATUS_NOT_READY; }
   if(gs.latched) { unlock(); return STATUS_NOT_READY; }
   if(!current.permit_epoch ||
      (current.permit_flags & PERMIT_FLAG_REVOKED)==0u ||
@@ -309,6 +381,9 @@ Status actuator_guard_frame_boundary(uint64_t now) {
   uint64_t actual; Status r;
   if(!a.initialized || a.state==ACTUATOR_GUARD_FAULT_LATCHED) return STATUS_NOT_READY;
   if(!clock_at_or_after(now,&clock)) return safe(STATUS_STALE_DATA,ACTUATOR_GUARD_FAULT_LATCHED);
+  r=complete_pending_commit(now);
+  if(r==STATUS_NOT_READY) return STATUS_NOT_READY;
+  if(r!=STATUS_OK) return r;
   if(a.has_frame && (now<a.last_frame || now-a.last_frame<2500)) return STATUS_DEADLINE_MISSED;
   a.last_frame=now; a.has_frame=1;
   /* A completed ground stop owns the output: nothing else may commit. */
@@ -339,21 +414,26 @@ Status actuator_guard_frame_boundary(uint64_t now) {
   if(!demand_valid(&a.latest,&a.permit,now) || now-a.last_demand>5000) {
     unlock(); return safe(STATUS_NOT_PERMITTED,ACTUATOR_GUARD_SAFE_ACTION);
   }
+  if(a.commit_pending) { unlock(); return STATUS_NOT_READY; }
   actual=now;
-  r=io.commit(commands,&actual); unlock();
-  memset(&a.receipt,0,sizeof(a.receipt)); header(&a.receipt.header,MSG_ACTUATOR_COMMIT_RECEIPT,now);
-  a.receipt.applied_control_sequence=a.latest.control_sequence;
-  a.receipt.permit_epoch=p.permit_epoch; a.receipt.directive_epoch=p.directive_epoch;
-  a.receipt.authority_epoch=p.authority_epoch; a.receipt.state_epoch=p.state_epoch;
-  a.receipt.reference_epoch=p.reference_epoch; a.receipt.commit_time_us=now;
-  a.receipt.estimated_apply_time_us=actual; a.receipt.receipt_expires_at_us=now+5000;
-  a.receipt.output_policy_id=(uint16_t)a.config.payload.output_policy_id; a.receipt.limit_flags=limits;
-  a.receipt.result_code=r ? ACTUATOR_RECEIPT_DRIVER_FAULT : ACTUATOR_RECEIPT_COMMITTED;
+  r=io.commit(commands,&actual);
+  if(r==STATUS_OK) {
+    a.commit_pending=1u;
+    a.pending_ground_stop=0u;
+    a.pending_zero=0u;
+    a.pending_limit_flags=limits;
+    a.pending_control_sequence=a.latest.control_sequence;
+    a.pending_output_policy_id=a.config.payload.output_policy_id;
+    a.pending_commit_time_us=now;
+    a.pending_apply_time_us=actual;
+    a.pending_permit=p;
+    memcpy(a.pending_thrust,applied,sizeof(applied));
+    memset(&a.receipt,0,sizeof(a.receipt));
+  }
+  unlock();
   if(r) return safe(r,ACTUATOR_GUARD_FAULT_LATCHED);
-  a.receipt.committed_demand.valid_mask=15;
-  memcpy(a.receipt.committed_demand.motor_thrust_n,applied,sizeof(applied));
-  memcpy(a.last_thrust,applied,sizeof(applied)); a.last_commit=now; a.has_commit=1;
-  a.state=ACTUATOR_GUARD_ACTIVE; a.health.health_state=MODULE_HEALTH_HEALTHY; return STATUS_OK;
+  r=complete_pending_commit(now);
+  return r==STATUS_NOT_READY ? STATUS_OK : r;
 }
 Status actuator_poll(uint64_t now,ActuatorStatus *s) {
   ActuationPermit p;
@@ -363,6 +443,13 @@ Status actuator_poll(uint64_t now,ActuatorStatus *s) {
   header(&s->header,MSG_ACTUATOR_STATUS,now); s->actuator_layout_id=PRODUCT_ACTUATOR_LAYOUT_ID;
   if(a.state==ACTUATOR_GUARD_FAULT_LATCHED) { s->fault_mask=15; return STATUS_NOT_READY; }
   if(!clock_at_or_after(now,&clock)) { s->fault_mask=15; return safe(STATUS_STALE_DATA,ACTUATOR_GUARD_FAULT_LATCHED); }
+  {
+    Status pending_status = complete_pending_commit(now);
+    if (pending_status != STATUS_OK && pending_status != STATUS_NOT_READY) {
+      s->fault_mask=15;
+      return pending_status;
+    }
+  }
   if(io.fault_count && io.fault_count()!=a.faults) { s->fault_mask=15; return safe(STATUS_NOT_READY,ACTUATOR_GUARD_FAULT_LATCHED); }
   lock(); p=a.permit; unlock();
   if(a.config.payload.output_policy_id==1) { inhibit(); a.state=ACTUATOR_GUARD_DISARMED; }

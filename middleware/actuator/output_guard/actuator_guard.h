@@ -11,8 +11,10 @@ typedef struct {
   void (*lock)(void);
   void (*unlock)(void);
   void (*inhibit)(void);
-  /* Submit four command values in output channel order at a frame boundary. */
+  /* Nonblocking submission under the permit lock; never wait for DMA/ISR. */
   Status (*commit)(const uint16_t commands[4], uint64_t *actual_apply_us);
+  /* Nonblocking completion poll. STATUS_NOT_READY means the submitted frame is in flight. */
+  Status (*poll_apply)(uint64_t *actual_apply_us);
   uint32_t (*fault_count)(void);
 } ActuatorDriver;
 Status actuator_guard_set_driver(const ActuatorDriver *driver);
