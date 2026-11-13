@@ -102,11 +102,11 @@ are tested separately. This limitation remains visible and must not be hidden.
 | Velocity Horner | Degree-4 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PASS |
 | Acceleration Horner | Degree-3 rounded recurrence; production-helper 0/1 counter; helper-level reachability only | READY; full-validator reachability not claimed | PASS |
 | Binary32 RN rounding | `u=2^-24`, `eta=2^-149`; normal/subnormal upward bound propagated after every product and sum | READY | PASS |
-| Gamma upper arithmetic | R30.3: for n=2/10/12, `nu` up, `1-nu` down, quotient up; non-positive denominator fails closed; dual-source token audit + 18 mutation tests PASS | READY | PASS |
+| Gamma upper arithmetic | R31: for n=2/10/12, `nu` up, `1-nu` down, quotient up; non-positive denominator fails closed; dual-source/expanded-time token audit + 18 mutation tests PASS | READY | PASS |
 | Intermediate overflow | Strict `P_k/A_k < T_RN=2^128-2^103` before capping a rounded upper bound at FLT_MAX | READY | PASS |
 | Coefficient scaling overflow | Full-validator coefficient/velocity-scaling/acceleration-scaling fail-fast traces; NUMERIC_FAILURE / NUMERIC / passed=0 | READY | PASS |
 | Time conversion | S06-099: 60,002 offsets; physical-time max ratio 4.897714e-08 and production h*offset/step max ratio 0.6601743 of gamma2; S06-108/109/113: 96/96/76 checks; R31 time shift uses cf', rounded vf', rounded af'; S06-107 oracle updated | READY | PASS |
-| FP contraction | R30.3 ARM audit: GCC 14.2.1; consumer/validator objects `fused_operations=0`; consumer/validator source-token MATCH; 18 mutation self-tests PASS; both objects 0 fused operations | READY | PASS |
+| FP contraction | R31 ARM audit: GCC 14.2.1; validator source SHA256 `8dde57b4570b6dc1cbf82f31b9dc5637e8eec06dd23d7139f560170d461637bd`; consumer source SHA256 `48fa1f629380ce354617af7082e7f19bd81974f00f9b9c126c9b4c690ff1c31b`; `model_check=MATCH`; 18 mutations PASS; both objects `fused_operations=0` | READY | PASS |
 | Rounding mode / FTZ / DAZ | Host negative tests cover FE_DOWNWARD/UPWARD/TOWARDZERO and MXCSR FTZ/DAZ; ARM runtime gate reads FPSCR.RMode/FZ/DN; H723 runtime remains NOT_RUN | HOST_TESTED / ARM_RUNTIME_NOT_RUN | PARTIAL — target gate remains open |
 | M6 interval domain | M5-06 requires 20 ms intervals; `s_eval_max≈0.020000002`; M6 locator rejects offsets beyond the preview horizon; 40 ms route previews are outside M5-06 validation scope | READY | PASS — 20 ms claim only |
 | Full-validator Horner reachability | Direct production-helper branches are tested; no full-validator reachability claim; full-validator coefficient/scaling status tests and legal companion pass | ACCEPTED_LIMITATION | ACCEPTED — no reachability claim |
@@ -230,3 +230,18 @@ The FP source audit now checks both compiled translation units and the validator
 replica, including the expanded s_eval_max use and the position/rounded-velocity/
 rounded-acceleration time derivatives. Its mutation suite contains 18 cases.
 The latest audit result is recorded against the final branch HEAD after CI.
+
+### CI evidence (R31 code/audit baseline)
+
+Validated baseline: `8dcb60b3ac18e6a763c939d3e810984092cdd321`.
+
+- Host validation #43446380866: 6/6 jobs SUCCESS.
+- M6/M7 validation #43446380836: 5/5 jobs SUCCESS.
+- M7 validation #43446380724: 2/2 jobs SUCCESS.
+- M5 Host 322,299/0; MR-009 focused 430/0; M4/M5 integration 1,075/0;
+  S06-094 120/0; S06-099 60,002 offsets/0; S06-108/109/113 96/96/76 checks;
+  S06-107 consumer-budget oracle PASS.
+- ARM FP audit: GCC 14.2.1, `model_check=MATCH`, 18 mutations detected,
+  consumer and validator objects both `fused_operations=0`.
+- H723 FPSCR runtime, WCET/RTA, target RAM/stack watermark, HIL and flight
+  remain NOT_RUN and are not implied by these CI results.
