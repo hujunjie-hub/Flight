@@ -1171,6 +1171,7 @@ static void test_mission_epoch_required_and_not_stale(void)
 static void test_first_reference_window_expires_to_ground_stop(void)
 {
   Fx fx;
+  GroundStopCertificate certificate;
   uint32_t id;
 
   CHECK(fx_init(&fx));
@@ -1184,7 +1185,19 @@ static void test_first_reference_window_expires_to_ground_stop(void)
   CHECK(fx_step(&fx) == STATUS_OK); /* The first candidate arrives after the absolute deadline. */
   CHECK(fx.out.state_snapshot.arm_state == ARM_STATE_DISARMED);
   CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_NONE);
+  CHECK(fx.out.landed_state.state == LANDED_STATE_LANDED);
   CHECK(fx.out.actuation_permit.permit_flags & PERMIT_FLAG_REVOKED);
+  CHECK(fx.out.actuation_permit.reason_code ==
+        FMS_PERMIT_REVOKE_REASON_FIRST_REFERENCE_GROUND_DISARM);
+  CHECK(fx.out.decision_event.decision_code == DECISION_FORCE_SAFE_ACTION);
+  CHECK(fx.out.decision_event.reason_code ==
+        FMS_DECISION_REASON_FIRST_REFERENCE_GROUND_DISARM);
+  CHECK(fms_build_ground_stop_certificate(&fx.out, fx.now - STEP_US, &certificate) ==
+        STATUS_OK);
+  CHECK(certificate.header.message_type == MSG_GROUND_STOP_CERTIFICATE);
+  CHECK(certificate.lifecycle == ACTUATOR_GROUND_STOP_LIFECYCLE_LANDED);
+  CHECK(certificate.authority_epoch == fx.out.actuation_permit.authority_epoch);
+  CHECK(certificate.directive_epoch == fx.out.actuation_permit.directive_epoch);
   CHECK(fx_step(&fx) == STATUS_OK);
   CHECK(fx.out.actuation_permit.header.valid_until_us == 0u);
   CHECK(fms_policy_stop() == STATUS_OK);
