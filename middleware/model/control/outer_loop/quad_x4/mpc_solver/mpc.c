@@ -401,7 +401,6 @@ Status mpc_solve(const ControllerInput *in,
       out->solver_status = CONTROL_SOLVER_NUMERICAL_FAILURE;
       return mpc_stop(&record, out, MPC_OUTCOME_PRIMAL, STATUS_OUT_OF_RANGE);
     }
-      }
     for (k = 0; k < 5; ++k) {
       float a = x[3 * k], b = x[3 * k + 1], c = CONTROL_GRAVITY_MPS2 - x[3 * k + 2];
       float magnitude = cfg->mass_kg * sqrtf(a * a + b * b + c * c);
@@ -410,7 +409,6 @@ Status mpc_solve(const ControllerInput *in,
       if (magnitude > e->max_total_thrust_n + 1e-3f) {
         out->solver_status = CONTROL_SOLVER_NUMERICAL_FAILURE;
         return mpc_stop(&record, out, MPC_OUTCOME_THRUST, STATUS_OUT_OF_RANGE);
-      }
       }
     }
     memcpy(out->acceleration, x, 3 * sizeof(float));
