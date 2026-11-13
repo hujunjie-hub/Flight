@@ -15,7 +15,7 @@
   "local_modifications": "Symbolic index arrays const in Flash; static pointer casts; QDLDL numeric refactor verifies fixed L indices; embedded unused certificate buffers alias their delta work vectors.",
   "source": "https://github.com/osqp/osqp/tree/v1.0.0",
   "files": {
-    "bindings.cpp": "cf29aa334b84346a9eb12b2886b3d793a459187cab9820313f588616b1d7c89d",
+    "bindings.cpp": "fb06e8904a2c26b39fde2f829afabcb95695e93028a9d641b87f2bb0db5044fb",
     "CMakeLists.txt": "ea8a50d229b1d2a455275c06dadb0a31db976192b31f769feb5eb0a910e7bf85",
     "emosqp.c": "fa39dfae53679100f7ba31afe600eab41144d61a6db220fc8512f0b8c8fb19b6",
     "inc/private/algebra_impl.h": "959ec180af6e1423f35722a3a9e662eba97aa884d7831a37292ce602d5e3eab0",
@@ -68,5 +68,6 @@
     "prefix": "quad_",
     "extension_name": "emosqp",
     "final_newline": false
-  }
+  },
+  "hash_newlines": "canonical CRLF"
 }

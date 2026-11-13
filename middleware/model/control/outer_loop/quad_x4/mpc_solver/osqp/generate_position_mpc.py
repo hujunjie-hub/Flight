@@ -9,6 +9,13 @@ import numpy as np
 import scipy.sparse as sp
 import osqp
 
+
+def locked_file_sha256(path):
+    data = path.read_bytes()
+    data = data.replace(b'\r\n', b'\n').replace(b'\r', b'\n')
+    return hashlib.sha256(data.replace(b'\n', b'\r\n')).hexdigest()
+
+
 assert osqp.__version__ == '1.0.0', osqp.__version__
 out = Path(__file__).resolve().parent / 'generated'
 # Condensed MPC has no cross-axis Hessian terms. Retain all per-axis upper
@@ -85,7 +92,8 @@ lock = {'version': '1.0.0', 'generator': 'osqp Python 1.0.0',
         'source': 'https://github.com/osqp/osqp/tree/v1.0.0',
         'bindings_template': 'https://github.com/osqp/osqp-python/blob/v1.0.0/src/osqp/codegen/pywrapper/bindings.cpp.jinja',
         'bindings_template_rendering': {'prefix': 'quad_', 'extension_name': 'emosqp', 'final_newline': False},
-        'files': {p.relative_to(out).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+        'hash_newlines': 'canonical CRLF',
+        'files': {p.relative_to(out).as_posix(): locked_file_sha256(p)
                   for p in sorted(out.rglob('*')) if p.is_file()
                   and p.suffix not in {'.o', '.su'}}}
 (out.parent / 'UPSTREAM_LOCK.json').write_text(json.dumps(lock, indent=2)+'\n')

@@ -76,8 +76,14 @@ sources.extend(ROOT/path for path in (
 commands=[]
 results={'host_tests':'NOT_RUN','arm_compile_link':'NOT_RUN','target_hardware':'NOT_RUN','flight':'NOT_RUN'}
 lock=json.loads((ROOT/'middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/UPSTREAM_LOCK.json').read_text())
+def locked_file_sha256(path):
+    data=path.read_bytes()
+    data=data.replace(b'\r\n',b'\n').replace(b'\r',b'\n')
+    return hashlib.sha256(data.replace(b'\n',b'\r\n')).hexdigest()
 for rel,digest in lock['files'].items():
-    assert hashlib.sha256((ROOT/'middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/generated'/rel).read_bytes()).hexdigest()==digest, rel
+    path=ROOT/'middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/generated'/rel
+    actual=locked_file_sha256(path)
+    assert actual==digest, f'{rel}: expected {digest}, got {actual}'
 def run(cmd):
     p=subprocess.run(list(map(str,cmd)),cwd=ROOT,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
     commands.append({'command':list(map(str,cmd)),'exit_code':p.returncode,'output':p.stdout})
