@@ -895,7 +895,7 @@ static double consumer_eval_error_bound(
     const M5SafetyInterval exact[6],
     unsigned degree,
     unsigned rounding_count,
-    double s_max)
+    double s_eval_max)
 {
   const double unit = 0x1p-24; /* binary32 unit roundoff, round-to-nearest */
   double coefficient_term = 0.0;
@@ -904,7 +904,7 @@ static double consumer_eval_error_bound(
   double gamma, result;
   unsigned i;
 
-  if (!(s_max >= 0.0) || !isfinite(s_max) || rounding_count == 0u)
+  if (!(s_eval_max >= 0.0) || !isfinite(s_eval_max) || rounding_count == 0u)
     return INFINITY;
   for (i = 0u; i <= degree; ++i) {
     double cf = (double)consumer[i];
@@ -919,7 +919,7 @@ static double consumer_eval_error_bound(
         multiply_upper_nonnegative(difference, power));
     magnitude_term = add_upper_nonnegative(magnitude_term,
         multiply_upper_nonnegative(magnitude, power));
-    power = multiply_upper_nonnegative(power, s_max);
+    power = multiply_upper_nonnegative(power, s_eval_max);
   }
   if (!isfinite(coefficient_term) || !isfinite(magnitude_term))
     return INFINITY;
@@ -933,7 +933,7 @@ static double consumer_eval_error_bound(
      * must be strictly below it.
      *
      * R_n = |c_n|
-     * P_k = s_max * R_(k+1)
+     * P_k = s_eval_max * R_(k+1)
      * R_k = |c_k| + round32_upper(P_k)
      *
      * round32_upper bounds the actual rounded product/sum and caps at FLT_MAX
@@ -944,7 +944,7 @@ static double consumer_eval_error_bound(
     double rounded_h = fabs((double)consumer[degree]);
     if (!isfinite(rounded_h)) return INFINITY;
     for (i = degree; i-- > 0u;) {
-      double product_exact = multiply_upper_nonnegative(rounded_h, s_max);
+      double product_exact = multiply_upper_nonnegative(rounded_h, s_eval_max);
       double product_rounded;
       double sum_exact;
       if (!isfinite(product_exact) || product_exact >= overflow_midpoint) {
@@ -992,11 +992,11 @@ static double consumer_eval_error_bound(
       multiply_upper_nonnegative(magnitude_term, gamma));
   /* Absolute floor. A rounding at Horner step k is multiplied by s for every
      later step, so its contribution is at most 2^-149 * s^(n-k); the worst
-     case is bounded by n * 2^-149 * max(1, s_max)^n. For s_max <= 1 this is
+     case is bounded by n * 2^-149 * max(1, s_eval_max)^n. For s_eval_max <= 1 this is
      exactly the R5 term n * 2^-149 (no amplification), which is why the
      production validator additionally requires s_eval_max <= 1. */
   {
-    double scale = s_max > 1.0 ? s_max : 1.0; /* max(1, s_max) */
+    double scale = s_eval_max > 1.0 ? s_eval_max : 1.0; /* max(1, s_eval_max) */
     double amplification = 1.0;
     unsigned step;
     for (step = 0u; step < rounding_count; ++step)
@@ -1196,7 +1196,7 @@ static uint8_t build_curve(
       {
         float cf[6], vf[6], af[6];
         M5SafetyInterval vc[6], ac[6];
-        double s_max = h * (double)u1;
+        double s_max = multiply_upper_nonnegative(h, (double)u1);
         double gamma2 = gamma2_upper();
         double delta_s, s_eval_max;
 
@@ -1240,6 +1240,9 @@ static uint8_t build_curve(
           ac[k] = interval_scale(c_i[k + 2u],
                                  (double)((k + 1u) * (k + 2u)));
         }
+        /* The time-shift derivative belongs to each consumer output polynomial.
+           vf/af contain the consumer's rounded coefficient scaling; differentiating
+           cf twice/three times would silently omit that rounding. */
         curve->eval_position_error[axis] = add_upper_nonnegative(
             consumer_eval_error_bound(cf, c_i, 5u,
                 M5_CONSUMER_POSITION_ROUNDINGS, s_eval_max),
@@ -1249,12 +1252,12 @@ static uint8_t build_curve(
             consumer_eval_error_bound(vf, vc, 4u,
                 M5_CONSUMER_VELOCITY_ROUNDINGS, s_eval_max),
             multiply_upper_nonnegative(delta_s,
-                polynomial_derivative_magnitude(cf, 5u, 2u, s_eval_max)));
+                polynomial_derivative_magnitude(vf, 4u, 1u, s_eval_max)));
         curve->eval_acceleration_error[axis] = add_upper_nonnegative(
             consumer_eval_error_bound(af, ac, 3u,
                 M5_CONSUMER_ACCELERATION_ROUNDINGS, s_eval_max),
             multiply_upper_nonnegative(delta_s,
-                polynomial_derivative_magnitude(cf, 5u, 3u, s_eval_max)));
+                polynomial_derivative_magnitude(af, 3u, 1u, s_eval_max)));
         if (!isfinite(curve->eval_position_error[axis]) ||
             !isfinite(curve->eval_velocity_error[axis]) ||
             !isfinite(curve->eval_acceleration_error[axis])) return 0u;
