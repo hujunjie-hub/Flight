@@ -52,7 +52,6 @@
 - `BLOCKED` 必须写 blocker、责任方、解除条件和下一次检查点；不得作为长期隐藏失败的状态。
 - `NEEDS_INFO` 不得被误写为 NOT_RUN 或 PASS。
 - GitHub closed 只允许在 CLOSED 状态。
-- **项目所有者豁免例外**：项目所有者可对明确命名的单项问题豁免外部独立审查，并以有记录的三轮内部复核替代。必须记录授权、范围、三轮结论、证据和未覆盖限制；使用 `CLOSED / TRIPLE_SELF_REVIEWED_WITH_SCOPE_LIMITATIONS`，不得标为 `VERIFIED` 或声称独立第三方批准。该例外不改变其他问题的默认独立复验要求；当前仅 FLIGHT-LOCAL-04/MR-009（2026-11-13）适用。
 
 ## 4. 严重度和阻断规则
 
@@ -70,7 +69,7 @@
 5. 修复必须增加回归测试；禁止删掉原失败用例或放宽安全阈值。
 6. 修复 commit 必须链接 Issue；测试日志绑定修复 commit SHA。
 7. 原测试、相邻边界、Sanitizer 和受影响集成测试全部复测。
-8. 重要数值/安全问题默认需要独立数学审查；作者不能作为唯一审查者。仅在项目所有者对特定问题明确豁免外部独立审查时，才可用记录完整的三轮内部复核替代，并必须声明范围限制，不得声称第三方批准。
+8. 重要数值/安全问题必须由独立数学审查者复核；修复作者不能作为唯一审查者。内部预审、作者自测或 CI PASS 均不能替代独立审查。
 
 ## 6. 多问题并发排查
 
@@ -109,8 +108,8 @@ Next action / owner:
 
 Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”只用于保留复验证据；
 不得将它描述为已发布 GitHub Issue。每条必须保留原始失败日志和 draft。状态最多到
-`FIXED_WAITING_RETEST`，通常必须由独立审查者在 GitHub Issue 上复验后才能进入
-`VERIFIED/CLOSED`；仅允许第 3 节记录的项目所有者单项豁免例外。R16 的 `FLIGHT-LOCAL-22`（4,128 B 栈）保持 `OPEN/BLOCKED`，
+`FIXED_WAITING_RETEST`，必须由独立审查者在 GitHub Issue 上复验后才能进入
+`VERIFIED/CLOSED`。R16 的 `FLIGHT-LOCAL-22`（4,128 B 栈）保持 `OPEN/BLOCKED`，
 不得用降低安全要求或压缩缓冲区的方式关闭。
 
 ## 12. R17 阻塞项治理
@@ -122,8 +121,7 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
   VERIFIED/CLOSED。
 - B01/B02（Spec/ABI EOL 重基线）、B03/B04（包版本/链接）、B05（MR-009）、
   B06（4,232 B 栈）、B07（H723 实机）在 R17 继续保留真实失败/BLOCKED 状态；
-  该句为 R17 历史状态，MR-009 当前状态以 2026-11-13 R31 owner-directed
-  three-pass record 和 ISSUE_REGISTER 为准。
+  该句为 R17 历史状态；MR-009 当前状态以 2026-11-13 R31 独立审查交接记录和 ISSUE_REGISTER 为准。
 
 ## 13. R19 发布状态规则
 
@@ -132,9 +130,8 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
 - 未授权时不得创建/声称 GitHub Issue 编号，不得把本地状态写成 CLOSED。
 - 授权后才可把本地条目同步到 GitHub Issues，并保持状态一致；GitHub 在线 Issue
   是同步后的在线入口。
-- 独立复验前，本地状态最多 `FIXED_WAITING_RETEST`；`VERIFIED/CLOSED` 通常只能由
-  独立审查者确认。项目所有者对 FLIGHT-LOCAL-04/MR-009 的明确豁免按第 3 节
-  特例记录，不构成通用豁免。
+- 独立复验前，本地状态最多 `FIXED_WAITING_RETEST`；`VERIFIED/CLOSED` 只能由
+  独立审查者确认。
 
 ## 14. R28 严格证据与交接规则
 
@@ -162,4 +159,4 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
 - `prepare_archive_metadata.py` 在 ZIP 创建前从真实 Git 动态生成 archive head、remote、ahead、tooling/collector/script commits 和 tool source identity。
 - ZIP 自身 SHA256/size 只能写入外部 report 和 `.sha256` sidecar，不得嵌入 ZIP 内部 Manifest。
 - R29 checker 必须拒绝旧 R28 后置元数据模式；UNKNOWN/BLOCKED 不得 PASS。
-- B01/B02/B03 未经 OWNER 批准保持 FAIL；B05 在 R29 时为 WAITING_INDEPENDENT_REVIEW，当前按 2026-11-13 项目所有者豁免及 R31 三轮内部复核记录关闭（见 ISSUE_REGISTER/BLOCKER_BOARD）；其他安全问题仍遵循独立审查默认规则。
+- B01/B02/B03 未经 OWNER 批准保持 FAIL；B05/MR-009 在 R31 内部预审后仍为 WAITING_INDEPENDENT_REVIEW，须由独立审查者逐项签署；其他安全问题同样遵循独立审查要求。
