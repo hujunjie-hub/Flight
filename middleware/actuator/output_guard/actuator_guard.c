@@ -108,6 +108,9 @@ Status actuator_update_permit(const ActuationPermit *p, uint64_t now) {
      p->header.source_id!=SOURCE_M4 || p->header.boot_id!=a.clock.boot_id ||
      p->header.time_epoch!=a.clock.time_epoch || !p->permit_epoch) return STATUS_NOT_PERMITTED;
   lock();
+  /* A ground-stop transaction owns the output until zero is committed and
+   * latched. A newer permit must not be able to replace that terminal action. */
+  if(gs.active || gs.latched) { unlock(); return STATUS_NOT_PERMITTED; }
   if(a.watermark && p->permit_epoch!=a.watermark && !newer(p->permit_epoch,a.watermark)) {
     unlock(); return STATUS_STALE_DATA;
   }
@@ -141,8 +144,9 @@ static int demand_valid(const ActuatorDemand *d,const ActuationPermit *p,uint64_
 Status actuator_apply(const ActuatorDemand *d,const ActuationPermit *p,ActuatorStatus *s) {
   ClockInstant c; ActuationPermit current; Status r;
   if(!s || !d || !p) return STATUS_INVALID_ARGUMENT;
-  /* After a completed ground stop the output is latched at zero; a demand must
-   * not be able to re-arm it without a new initialisation. */
+  /* The ramp owns every frame once accepted; do not acknowledge new demands
+   * while it is in progress, and keep the completed zero latch terminal. */
+  if(gs.active) return STATUS_NOT_PERMITTED;
   if(gs.latched) { a.has_demand=0; inhibit(); return STATUS_NOT_PERMITTED; }
   if(!a.initialized || a.state==ACTUATOR_GUARD_FAULT_LATCHED || clock_read(&c)) return STATUS_NOT_READY;
   r=actuator_update_permit(p,c.monotonic_us); if(r) return r;
@@ -182,10 +186,15 @@ static Status ground_stop_frame(uint64_t now) {
       commands[a.config.payload.motor_to_timer_channel[m]-1]=thrust_to_code(m,next);
     }
   }
-  if(!zero && now-gs.start_us>ACTUATOR_GROUND_STOP_MAX_APPLY_US) gs.overrun=1;
+  if(now < gs.start_us) return STATUS_STALE_DATA;
+  if(now-gs.start_us>ACTUATOR_GROUND_STOP_MAX_APPLY_US) gs.overrun=1;
   lock();
   actual=now; r=io.commit ? io.commit(commands,&actual) : STATUS_NOT_READY;
   unlock();
+  /* The driver timestamp is the apply evidence, not the submission time. A
+   * late final zero frame is still a completed stop, but it must carry OVERRUN. */
+  if(actual < now) { gs.overrun=1; r=STATUS_STALE_DATA; }
+  else if(actual-gs.start_us>ACTUATOR_GROUND_STOP_MAX_APPLY_US) gs.overrun=1;
   memset(&a.receipt,0,sizeof(a.receipt)); header(&a.receipt.header,MSG_ACTUATOR_COMMIT_RECEIPT,now);
   a.receipt.commit_time_us=now; a.receipt.estimated_apply_time_us=actual;
   a.receipt.receipt_expires_at_us=now+5000u;
@@ -208,9 +217,10 @@ static Status ground_stop_frame(uint64_t now) {
 }
 
 Status actuator_guard_ground_stop(const GroundStopCertificate *c,uint64_t now) {
-  ClockInstant clock; float max_thrust=0.0f,worst_us; unsigned m;
+  ClockInstant clock; ActuationPermit current;
+  float max_thrust=0.0f,worst_us; unsigned m;
   if(!c) return STATUS_INVALID_ARGUMENT;
-  if(!a.initialized || gs.latched) return STATUS_NOT_READY;
+  if(!a.initialized) return STATUS_NOT_READY;
   if(!clock_at_or_after(now,&clock)) return STATUS_STALE_DATA;
   if(!header_valid(&c->header,now) || c->header.message_type!=MSG_GROUND_STOP_CERTIFICATE ||
      c->header.source_id!=SOURCE_M4 || c->header.boot_id!=a.clock.boot_id ||
@@ -231,18 +241,34 @@ Status actuator_guard_ground_stop(const GroundStopCertificate *c,uint64_t now) {
   /* Refuse a rate that cannot meet the apply-time budget from the configured
    * maximum thrust instead of silently overrunning it later. */
   if(worst_us>(float)ACTUATOR_GROUND_STOP_MAX_APPLY_US) return STATUS_OUT_OF_RANGE;
+
+  /* Permit publication may run concurrently with the serialized actuator
+   * owner. Read the bound epochs and claim the transaction under the same lock
+   * used by permit updates, so no newer permit can slip between the check and
+   * the ground-stop latch. */
+  lock();
+  current=a.permit;
+  if(gs.latched) { unlock(); return STATUS_NOT_READY; }
+  if(!current.permit_epoch || !c->authority_epoch || !c->directive_epoch ||
+     c->authority_epoch!=current.authority_epoch ||
+     c->directive_epoch!=current.directive_epoch) {
+    unlock();
+    return STATUS_NOT_PERMITTED;
+  }
   /* Publishers repeat their message every cycle. A repeat of the running
    * transaction must not restart it: moving start_us forward would push the
    * apply-time budget with it and hide an overrun. A different stop code or rate
    * mid-ramp is a new transaction and is refused rather than silently applied. */
   if(gs.active) {
-    if(c->stop_code!=gs.stop_code || c->ramp_nps!=gs.ramp_nps) return STATUS_NOT_PERMITTED;
-    return STATUS_OK;
+    int same = c->stop_code==gs.stop_code && c->ramp_nps==gs.ramp_nps;
+    unlock();
+    return same ? STATUS_OK : STATUS_NOT_PERMITTED;
   }
   gs.active=1; gs.latched=0; gs.overrun=0;
   gs.stop_code=c->stop_code; gs.ramp_nps=c->ramp_nps;
   gs.start_us=now; gs.predicted_us=(uint64_t)worst_us;
   a.state=ACTUATOR_GUARD_SAFE_ACTION;
+  unlock();
   return STATUS_OK;
 }
 

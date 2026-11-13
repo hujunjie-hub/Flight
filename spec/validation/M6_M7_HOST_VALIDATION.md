@@ -41,6 +41,26 @@ The M6 runner compiles the real controller translation units and generated OSQP 
 
 The 11,828 checks above are the unique M4/M5/M6/M7 Host checks; the sanitizer job repeats the M6/M7 tests and is reported separately. The first run proves the new test runners and current Host baseline work. It does not yet cover the newly identified M6 reset/deadline-accounting regression cases; those are added in the following commit.
 
+## Second CI run — M6 lifecycle and deadline accounting
+
+- Commit: `2fea8ce32316efde2ebcabfb367769b2466fab4b`
+- Workflow run: [43362749296](https://github.com/hujunjie-hub/Flight/actions/runs/43362749296)
+- Overall result: **SUCCESS** (3/3 jobs)
+
+| Gate | Result | Checks | Failures |
+|---|---|---:|---:|
+| M4 host | PASS | 993 | 0 |
+| M5 host | PASS | 9,515 | 0 |
+| M4/M5 integration | PASS | 1,066 | 0 |
+| M6 MPC | PASS | 15 | 0 |
+| M6 input/time + outer lifecycle | PASS | 26 | 0 |
+| M7 actuator | PASS | 230 | 0 |
+| M6/M7 ASan + UBSan | PASS | Re-ran M6/M7 suites | 0 |
+
+M6 now verifies OSQP absolute termination is applied, reset clears run statistics, the outer update rejects NULL, actuator telemetry TTL does not cap the MPC plan, and a 2 ms deadline overrun is not counted as solved or covered. The deadline case returns `STATUS_DEADLINE_MISSED`, publishes an expired snapshot and increments the deadline/rejected counters.
+
+M7 certificate epoch binding, in-flight permit blocking and late-apply overrun cases are added in the following commit; they remain pending until their own CI run.
+
 ## Safety boundary
 
 Host tests prove only the exercised software paths. They do not establish target WCET, board integration, DShot waveform timing, physical motor response, HIL acceptance, or flight readiness. The production H723 build remains `BENCH_INHIBIT`; `SIM_CONTROLLED_STOP` is enabled only for the host test build.

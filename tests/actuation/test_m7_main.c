@@ -358,6 +358,16 @@ static void case_ground_stop(void) {
     certificate.certificate_expires_at_us = t;
     CHECK(actuator_guard_ground_stop(&certificate, t) == STATUS_STALE_DATA,
           "an expired certificate was accepted");
+    certificate = make_ground_stop(t, ACTUATOR_GROUND_STOP_CODE_ZERO,
+                                   ACTUATOR_GROUND_STOP_LIFECYCLE_LANDED, 100.0f);
+    certificate.authority_epoch++;
+    CHECK(actuator_guard_ground_stop(&certificate, t) == STATUS_NOT_PERMITTED,
+          "certificate from an old authority epoch was accepted");
+    certificate = make_ground_stop(t, ACTUATOR_GROUND_STOP_CODE_ZERO,
+                                   ACTUATOR_GROUND_STOP_LIFECYCLE_LANDED, 100.0f);
+    certificate.directive_epoch++;
+    CHECK(actuator_guard_ground_stop(&certificate, t) == STATUS_NOT_PERMITTED,
+          "certificate from an old directive epoch was accepted");
 
     /* The revocation that normally precedes a ground stop must not block it. */
     permit = make_permit(6u, 2u, t, t + 200000u, PERMIT_FLAG_REVOKED);
@@ -394,6 +404,23 @@ static void case_ground_stop(void) {
               "a different ramp rate was accepted mid-ramp");
         CHECK(actuator_guard_ground_stop_start_us() == start,
               "a refused certificate moved the transaction clock");
+    }
+
+    /* Once accepted, the ramp owns the output. A newer permit and demand must
+     * not be acknowledged while the zero-target transaction is in progress. */
+    {
+        unsigned commits_before = g_commit_calls;
+        permit = make_permit(7u, 3u, t + ACTUATOR_GROUND_STOP_FRAME_US,
+                             t + 200000u, PERMIT_SCOPE_CONTROL_ACTIVE);
+        demand = make_demand(&permit, 8u, t + ACTUATOR_GROUND_STOP_FRAME_US, 10.0f);
+        set_now(t + ACTUATOR_GROUND_STOP_FRAME_US);
+        CHECK(actuator_update_permit(&permit, t + ACTUATOR_GROUND_STOP_FRAME_US) ==
+                  STATUS_NOT_PERMITTED,
+              "a new permit replaced an active ground-stop transaction");
+        CHECK(actuator_apply(&demand, &permit, &g_status) == STATUS_NOT_PERMITTED,
+              "a new demand was acknowledged during the ground-stop ramp");
+        CHECK(g_commit_calls == commits_before,
+              "a demand caused a commit while the ground-stop ramp owned output");
     }
 
     /* M7-12/13: every frame steps down by at most ramp*dt and never jumps. */
@@ -458,6 +485,59 @@ static void case_ground_stop(void) {
     }
 }
 
+/* M7-18..M7-19: report driver-apply and final-frame deadline overruns. */
+static void case_ground_stop_overrun(void) {
+    ProductActuatorConfig config = make_config();
+    GroundStopCertificate certificate;
+    ActuationPermit permit;
+    ActuatorCommitReceipt receipt;
+    uint64_t t;
+
+    printf("M7-18..19 ground stop apply-time overrun evidence\n");
+
+    /* A slow driver can apply a still-nonzero ramp frame after the deadline.
+     * The receipt must expose the actual apply timestamp as an overrun. */
+    fresh_guard(&config);
+    t = arm_full_thrust(&config, 8000000u);
+    permit = make_permit(6u, 2u, t, t + 200000u, PERMIT_FLAG_REVOKED);
+    CHECK(actuator_update_permit(&permit, t) == STATUS_OK, "overrun setup revocation rejected");
+    certificate = make_ground_stop(t, ACTUATOR_GROUND_STOP_CODE_ZERO,
+                                   ACTUATOR_GROUND_STOP_LIFECYCLE_DISARMING, 100.0f);
+    CHECK(actuator_guard_ground_stop(&certificate, t) == STATUS_OK,
+          "overrun setup certificate rejected");
+    g_apply_latency_us = ACTUATOR_GROUND_STOP_MAX_APPLY_US + 1u;
+    t += ACTUATOR_GROUND_STOP_FRAME_US;
+    set_now(t);
+    CHECK(actuator_guard_frame_boundary(t) == STATUS_OK,
+          "late-driver ramp frame rejected");
+    CHECK(actuator_get_commit_receipt(&receipt) == STATUS_OK,
+          "late-driver frame has no receipt");
+    CHECK((receipt.limit_flags & ACTUATOR_GROUND_STOP_OVERRUN_FLAG) != 0u,
+          "late driver apply timestamp was not marked OVERRUN");
+    g_apply_latency_us = 500u;
+
+    /* A delayed frame may reach zero in one step. It is still a confirmed zero,
+     * but must not hide that the apply deadline was exceeded. */
+    fresh_guard(&config);
+    t = arm_full_thrust(&config, 9000000u);
+    permit = make_permit(6u, 2u, t, t + 200000u, PERMIT_FLAG_REVOKED);
+    CHECK(actuator_update_permit(&permit, t) == STATUS_OK, "late-zero setup revocation rejected");
+    certificate = make_ground_stop(t, ACTUATOR_GROUND_STOP_CODE_ZERO,
+                                   ACTUATOR_GROUND_STOP_LIFECYCLE_DISARMING, 100.0f);
+    CHECK(actuator_guard_ground_stop(&certificate, t) == STATUS_OK,
+          "late-zero setup certificate rejected");
+    t += ACTUATOR_GROUND_STOP_MAX_APPLY_US + 1u;
+    set_now(t);
+    CHECK(actuator_guard_frame_boundary(t) == STATUS_OK,
+          "late zero frame rejected");
+    CHECK(actuator_get_commit_receipt(&receipt) == STATUS_OK,
+          "late zero frame has no receipt");
+    CHECK(receipt.result_code == ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED,
+          "late frame did not report the applied zero target");
+    CHECK((receipt.limit_flags & ACTUATOR_GROUND_STOP_OVERRUN_FLAG) != 0u,
+          "late final zero frame hid its apply-time overrun");
+}
+
 int main(void) {
     ActuatorDriver driver;
     memset(&driver, 0, sizeof(driver));
@@ -474,6 +554,7 @@ int main(void) {
     case_permit_generations();
     case_binding_and_expiry();
     case_ground_stop();
+    case_ground_stop_overrun();
     printf("M7 checks=%d failures=%d\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }
