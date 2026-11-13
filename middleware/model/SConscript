@@ -19,7 +19,7 @@ models = [
     ('FlightManagement', 'FMS_ENABLE',
      ['fms/fms_interface.c'] + [fms + '/' + file for file in (
          'flight_state_machine/fms.c', 'mission_lifecycle/mission_lifecycle.c', 'operator_authority/operator_authority.c',
-         'flight_safety/actuation_permit.c', 'flight_safety/fms_safety.c', 'flight_policy/quad_x4_fms.c')],
+         'flight_safety/actuation_permit.c', 'flight_safety/fms_safety.c', 'flight_safety/ground_stop_adapter.c', 'flight_policy/quad_x4_fms.c')],
      [fms]),
     ('Control', 'CONTROLLER_ENABLE',
      ['control/control_interface.c'] + [inner + '/' + file for file in (
