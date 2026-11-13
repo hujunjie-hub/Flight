@@ -779,6 +779,64 @@ static int start_fmt(const char *port_text, const char *hover_text)
   return 0;
 }
 
+static void run_ground_stop_task_smoke(void)
+{
+  FmsOutputView output;
+  ActuationPermit permit;
+  GroundStopCertificate certificate;
+  uint64_t now = test_clock.monotonic_us;
+  unsigned commits_before = commits;
+
+  memset(&output, 0, sizeof(output));
+  memset(&permit, 0, sizeof(permit));
+  permit.header = h(SOURCE_M4, now + 5000u);
+  permit.header.message_type = MSG_ACTUATION_PERMIT;
+  permit.permit_epoch = 1u;
+  permit.authority_epoch = 5u;
+  permit.directive_epoch = 3u;
+  permit.state_epoch = 1u;
+  permit.reference_epoch = 1u;
+  permit.permit_flags = PERMIT_FLAG_REVOKED;
+  permit.reason_code = FMS_PERMIT_REVOKE_REASON_COMMAND_DISARM;
+  permit.output_policy_id = 2u;
+  permit.permit_expires_at_us = now + 200000u;
+
+  output.actuation_permit = permit;
+  output.decision_event.header = h(SOURCE_M4, now + 5000u);
+  output.decision_event.header.message_type = MSG_DECISION_EVENT;
+  output.decision_event.decision_code = DECISION_ACCEPT;
+  output.decision_event.reason_code = 0u;
+  output.landed_state.header = h(SOURCE_M4, now + 5000u);
+  output.landed_state.header.message_type = MSG_LANDED_STATE_SNAPSHOT;
+  output.landed_state.state = LANDED_STATE_LANDED;
+  output.state_snapshot.header = h(SOURCE_M4, now + 5000u);
+  output.state_snapshot.header.message_type = MSG_FMS_STATE_SNAPSHOT;
+  output.state_snapshot.arm_state = ARM_STATE_DISARMED;
+
+  CHECK(fms_build_ground_stop_certificate(&output, now, &certificate) == STATUS_OK);
+  CHECK(actuator_update_permit(&permit, now) == STATUS_OK);
+  CHECK(certificate.header.message_type == MSG_GROUND_STOP_CERTIFICATE);
+
+  CHECK(runtime_data_lock(0));
+  runtime_data.bundle.permit = permit;
+  runtime_data.bundle.ground_stop_certificate = certificate;
+  runtime_data.bundle_ready = 1u;
+  runtime_data.have_demand = 0u;
+  runtime_data_unlock();
+
+  /* Exercise the real task owner: it must consume the certificate before any
+   * queued demand and hand the transaction to the production M7 output guard. */
+  turn(task_actuator_entry);
+  test_clock.monotonic_us += ACTUATOR_GROUND_STOP_FRAME_US;
+  CHECK(actuator_guard_frame_boundary(test_clock.monotonic_us) == STATUS_OK);
+  turn(task_actuator_entry);
+
+  CHECK(commits > commits_before);
+  CHECK(actuator_guard_state() == ACTUATOR_GUARD_DISARMED);
+  CHECK(runtime_data.receipt.result_code == ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED);
+  CHECK(runtime_data.receipt.header.message_type == MSG_ACTUATOR_COMMIT_RECEIPT);
+}
+
 int main(int argc, char **argv)
 {
   unsigned takeoff_commits = 0, takeoff_completed_ms = 0;
@@ -798,7 +856,8 @@ int main(int argc, char **argv)
   int motion_request_failed = 0;
   RuntimeStats stats;
 
-  if (argc != 1) {
+  const int ground_stop_smoke = argc == 2 && !strcmp(argv[1], "--ground-stop-smoke");
+  if (argc != 1 && !ground_stop_smoke) {
 #ifdef FLIGHT_GROUND_STATION
     if (argc == 6 && !strcmp(argv[3], "Ground")) {
       ground_online = 1;
@@ -851,6 +910,13 @@ int main(int argc, char **argv)
 #endif
     fmt_sim_host_close();
     return 1;
+  }
+  if (ground_stop_smoke) {
+    run_ground_stop_task_smoke();
+    runtime_shutdown();
+    printf("sil_ground_stop_smoke: %u checks, %u failures, commits=%u inhibits=%u\\n",
+           checks, failures, commits, inhibits);
+    return failures ? 1 : 0;
   }
   if (fmt_online)
     sensor_imu_use_external_source(true);

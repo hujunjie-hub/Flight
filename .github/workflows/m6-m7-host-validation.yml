@@ -60,3 +60,19 @@ jobs:
         env:
           EXTRA_CFLAGS: "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
         run: bash tests/actuation/run_host_tests.sh
+
+  sil-ground-stop-integration:
+    name: Runtime task and M4-to-M7 ground-stop SIL integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Compile real runtime owners and run ground-stop task smoke
+        run: bash tests/simulation/run_sil.sh
+      - name: Upload SIL integration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sil-ground-stop-evidence
+          path: build/validation/sim/sil/
