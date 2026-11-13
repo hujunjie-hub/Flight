@@ -172,19 +172,28 @@ M5-06 validator 不接受该 40 ms 输入；本证明不声称覆盖该路径。
 
 ### 7.1 次正规绝对项
 
-单次 binary32 运算在次正规区的绝对舍入误差不超过
-`eta=2^-149`（以一个最小次正规数作保守上界）。该误差会被后续 Horner
-乘法继续传播，因此不能在所有 `s_max` 下简单地只加 `n*eta`。对至多
-`n` 次舍入，源码使用保守上界
+round-to-nearest 下，精确结果落入次正规区时，单次绝对舍入残差
+不超过半个最小次正规间距，即 `2^-150`。该残差进入后续 Horner 链后，
+会被后续乘法中的 `|s|` 以及后续正规运算中的相对因子放大。设总舍入
+次数为 `n∈{10,12}`：任一残差最多经过 `n` 个后续运算，且最多经过
+`n` 次乘以 `s`，因此其传播量不超过
 
 ```
-n * eta * max(1, s_eval_max)^n
+2^-150 * (1+u)^n * max(1, s_eval_max)^n
 ```
 
-其中 `s_eval_max` 是扩大后的实际求值区间上界。实现通过
-`multiply_upper_nonnegative()` 传播放大因子，再用
+由于 `u=2^-24` 且 `n<=12`，有 `(1+u)^n < 2`，故进一步得到源码采用的
+保守界
+
+```
+n * 2^-149 * max(1, s_eval_max)^n
+```
+
+这里的 `2^-149` 不是把单次实际残差误写成一个最小次正规数；它是将
+半间距残差经过最多 `n` 个后续相对舍入放大后，再用因子 2 吸收的
+统一上界。实现通过 `multiply_upper_nonnegative()` 传播放大因子，再用
 `add_upper_nonnegative()` 加入总误差。仅当 `s_eval_max<=1` 时，该项才
-退化为 `n*eta`。
+退化为 `n*2^-149`。
 
 ### 7.2 正规范围前提的显式拒绝
 
@@ -652,3 +661,56 @@ R30.0 首轮三项 branch-counter 失败保留为历史结果；R30.1 fail-fast 
 **当前结论：** MR-009 的数学实现与内部三轮复核完成（带明确边界），不再等待外部
 独立审查。该结论不等于 M5-06 整体验收或飞行放行。S06-100..102、H723 实机、
 WCET/RTA、目标 RAM/stack watermark、HIL、飞行仍按各自门禁处理；M5-07 不启动。
+
+## 29. 2026-11-13：MR-009 三轮内部复核结论
+
+项目所有者明确要求不再等待单独独立审查，改为对当前分支执行三轮复核。
+本节为当前结论，历史章节中的 WAITING_INDEPENDENT_REVIEW 均保留为当时
+状态记录，不再代表当前 MR-009 disposition。
+
+### 第 1 轮：数学模型
+
+- 五次 Hermite 系数区间以同一组 binary32 端点和 binary32 段时长 `h`
+  为输入；消费端系数与精确实数系数的差由区间距离项覆盖。
+- Position/Velocity/Acceleration 的 Horner 舍入次数分别为 10/12/10；
+  Velocity 与 Acceleration 的次数包含系数缩放，属于保守计数。
+- `gamma_n`、`gamma_2` 的有向舍入、RN overflow midpoint、次正规残差
+  传播和时间参数偏差均已逐项核对。次正规项的 `2^-149` 传播界已在 §7.1
+  明确给出半最小次正规间距及后续相对放大的推导。
+- 结论：当前证明范围内通过；没有发现需要放宽阈值或改变安全判定的
+  数学缺陷。
+
+### 第 2 轮：实现与浮点语义
+
+- 对照 M6 consumer 和 M5 validator 的系数构造、时间转换、三组 Horner
+  表达式；新增双源 token 审计，要求实际 consumer 和 validator replica
+  的运算顺序均与证明模型一致。
+- FP 审计自测由 9 个扩展为 13 个变异用例，覆盖 consumer 时间换算、
+  position/velocity/acceleration Horner 表达式，以及原有 gamma、区间、
+  次正规、圆整环境和舍入次数条件。
+- Cortex-M7 object audit 仍要求 consumer 与 validator 均无 FMA/MLA
+  融合；运行时继续检查 RN、FZ、DN 条件，不满足时 fail-closed。
+- 结论：实现与证明模型的静态一致性检查已加强；没有发现需改动生产
+  Horner 公式的问题。
+
+### 第 3 轮：测试、集成与边界
+
+- S06-099 仍穷举 20 ms/40 ms 的 60,002 个整数微秒偏移；新增对生产证明
+  参数 `s_model=h*(offset_us/step_us)` 的精确 Fraction 比较，直接检查
+  `|s_consumer-s_model|<=gamma_2*s_model`，并保留对物理微秒时间的检查。
+- 当前代码复核基线：`f21828c58a233903155006b0bf1da33db537da1e`。
+  该基线的 FP 审计 mutation gate 和 Cortex-M7 contraction audit 已通过；
+  最终文档提交后的全套 CI 结果将在对应提交记录中更新。
+- 三个 degree 5/4/3 Horner 拒绝分支仍由同一个生产 helper 直接测试；
+  本结论不声称它们都能由合法产品包线输入经完整 validator 触发。
+  完整 validator 的 coefficient/scaling fail-fast 路径有状态、reason、
+  passed 和互斥计数断言；Horner helper 的返回值与各自计数也有断言。
+- M5-06 当前证明域仍为 20 ms preview；M6 40 ms route preview 不在本次
+  M5-06 证明范围内。H723 实机运行、WCET/RTA、HIL 和飞行验证仍未执行，
+  不得将 Host/交叉编译 PASS 描述为这些验证已完成。
+
+### 当前 disposition
+
+**MR-009：TRIPLE_SELF_REVIEWED / PASS_WITH_DECLARED_SCOPE_LIMITATIONS。**
+不再要求单独外部数学审查；不把本次内部复核表述为独立第三方认证。
+本次只关闭 MR-009 数学复核工作，不推进 M5-07，不改变其他阶段或分支。
