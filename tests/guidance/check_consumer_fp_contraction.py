@@ -102,14 +102,18 @@ MODEL_TOKENS = {
     "gamma_n": [
         "double nu = (double)rounding_count * unit;",
         "nu = nextafter(nu, INFINITY);",
-        "gamma = nu / (1.0 - nu);",
+        "denominator = nextafter(1.0 - nu, -INFINITY);",
+        "if (!(denominator > 0.0) || !isfinite(denominator)) return INFINITY;",
+        "gamma = nu / denominator;",
         "gamma = nextafter(gamma, INFINITY);",
     ],
     "gamma_2_derivation": [
         "double nu2 = 2.0 * 0x1p-24;",
         "nu2 = nextafter(nu2, INFINITY);",
-        "gamma2 = nu2 / (1.0 - nu2);",
-        "gamma2 = nextafter(gamma2, INFINITY);",
+        "denominator = nextafter(1.0 - nu2, -INFINITY);",
+        "if (!(denominator > 0.0) || !isfinite(denominator)) return INFINITY;",
+        "gamma2 = nu2 / denominator;",
+        "return nextafter(gamma2, INFINITY);",
     ],
     "time_term": [
         "delta_s = multiply_upper_nonnegative(gamma2, s_max);",
@@ -167,8 +171,12 @@ def check_model_against_source(source=None):
 
 
 MUTATIONS = (
-    ("gamma_2", "gamma2 = nu2 / (1.0 - nu2);", "gamma2 = 0.0;"),
-    ("gamma_n", "gamma = nu / (1.0 - nu);", "gamma = nu;"),
+    ("gamma_2_denominator", "denominator = nextafter(1.0 - nu2, -INFINITY);",
+     "denominator = 1.0 - nu2;"),
+    ("gamma_2_quotient", "gamma2 = nu2 / denominator;", "gamma2 = nu2;"),
+    ("gamma_n_denominator", "denominator = nextafter(1.0 - nu, -INFINITY);",
+     "denominator = 1.0 - nu;"),
+    ("gamma_n_quotient", "gamma = nu / denominator;", "gamma = nu;"),
     ("interval_bound", "difference = fmax(low_distance, high_distance);",
      "difference = low_distance;"),
     ("s_eval_max", "s_eval_max = add_upper_nonnegative(s_max, delta_s);",
