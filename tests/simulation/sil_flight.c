@@ -889,6 +889,27 @@ static void run_ground_stop_task_smoke(void)
 
   CHECK(task_mission_update_ground_stop_certificate(&output, now, 1) == STATUS_OK);
   certificate = plan_bundle.ground_stop_certificate;
+  {
+    FmsOutputView invalid_output = output;
+    const uint64_t certificate_expiry = certificate.certificate_expires_at_us;
+    CHECK(task_mission_update_ground_stop_certificate(NULL, now + 1000u, 0) ==
+              STATUS_NOT_READY);
+    CHECK(plan_bundle.ground_stop_certificate.header.sequence == certificate.header.sequence &&
+          plan_bundle.ground_stop_certificate.certificate_expires_at_us == certificate_expiry);
+    invalid_output.landed_state.state = LANDED_STATE_IN_AIR;
+    CHECK(task_mission_update_ground_stop_certificate(&invalid_output, now + 2000u, 1) ==
+              STATUS_NOT_PERMITTED);
+    CHECK(plan_bundle.ground_stop_certificate.header.message_type == 0u &&
+          plan_bundle.ground_stop_certificate.certificate_expires_at_us == 0u);
+    CHECK(task_mission_update_ground_stop_certificate(&output, now, 1) == STATUS_OK);
+    certificate = plan_bundle.ground_stop_certificate;
+    CHECK(task_mission_update_ground_stop_certificate(NULL, certificate_expiry + 1u, 0) ==
+              STATUS_NOT_READY);
+    CHECK(plan_bundle.ground_stop_certificate.header.message_type == 0u &&
+          plan_bundle.ground_stop_certificate.certificate_expires_at_us == 0u);
+    CHECK(task_mission_update_ground_stop_certificate(&output, now, 1) == STATUS_OK);
+    certificate = plan_bundle.ground_stop_certificate;
+  }
   CHECK(actuator_update_permit(&permit, now) == STATUS_OK);
   CHECK(certificate.header.message_type == MSG_GROUND_STOP_CERTIFICATE);
 

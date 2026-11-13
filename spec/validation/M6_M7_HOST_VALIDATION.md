@@ -110,7 +110,7 @@ The production software path is now connected in this branch:
 
 - `task_mission_step()` runs the FMS policy, translates an eligible ground-only disarm output with `fms_build_ground_stop_certificate()`, and publishes the certificate in `ControlBundle.ground_stop_certificate`.
 - `task_actuator_step()` consumes the certificate from the runtime bundle, suppresses queued M6 demands while the stop owns output, calls `actuator_guard_ground_stop()`, advances the frame-boundary owner, and publishes the resulting actuator receipt.
-- Certificate publication now uses the shared `task_mission_update_ground_stop_certificate()` helper in both the production mission owner and the SIL fixture. The fixture checks valid publication, rejection of an in-air update without replacing an unexpired certificate, expiry clearing, and republishing.
+- Certificate publication now uses the shared `task_mission_update_ground_stop_certificate()` helper in both the production mission owner and the SIL fixture. The fixture checks valid publication, bounded retention only when there is no current FMS output, immediate clearing when a current in-air output supersedes the ground decision, expiry clearing, and republishing.
 - The SIL task-owner scenario now first supplies a valid 5 N M6 demand alongside an invalid in-air ground-stop candidate. It asserts that the invalid candidate does not suppress the demand. It then revokes the permit, publishes a valid landed/disarmed certificate through the shared helper, and drives the real actuator owner from the committed 5 N frame through multiple bounded ramp frames to the zero-target receipt.
 - The SIL fixture still supplies a constructed `FmsOutputView`; it does **not** drive `task_mission_step()` / `fms_policy_update()` through a live FMS input and command/lifecycle sequence. Full live FMS-task-to-actuator-owner integration coverage therefore remains incomplete.
 
@@ -156,7 +156,7 @@ Production `BENCH_INHIBIT` remains unchanged. Host/SIL evidence is not H723 targ
 
 ### Mission certificate publication seam regression — Run #23 PASS
 
-The SIL smoke now calls the same certificate-publication helper used by `task_mission_step()`. It verifies that a valid landed/disarmed FMS output publishes a certificate, an in-air update cannot replace an unexpired certificate, an expired certificate is cleared when no current FMS output exists, and a fresh valid output can republish it. Run #22 initially failed to compile because the new helper was declared `void` while the test asserted its result, and the SIL `CHECK` macro accepts one argument only. Commit `a8f62f5b270355d699b8a42861198cfa93894337` corrected both issues.
+The SIL smoke calls the same certificate-publication helper used by `task_mission_step()`. Run #23 verified the then-current helper behavior, including retaining an unexpired certificate after an in-air output. A subsequent safety review found that this cache behavior was too permissive: a current, explicitly ineligible FMS output must revoke the old certificate immediately. The follow-up correction is tracked below. Run #22 initially failed to compile because the new helper was declared `void` while the test asserted its result, and the SIL `CHECK` macro accepts one argument only. Commit `a8f62f5b270355d699b8a42861198cfa93894337` corrected both compile issues.
 
 [Run #23](https://github.com/hujunjie-hub/Flight/actions/runs/43375102383), exact commit `a8f62f5b270355d699b8a42861198cfa93894337`: **4/4 jobs SUCCESS**. M4 Host 993/0, M5 Host 9,515/0, M4/M5 integration 1,066/0, M6 MPC 15/0, M6 guard 26/0, M7 guard 274/0, SIL publication/owner smoke 18/0, and ASan/UBSan PASS. This remains a seam test rather than a live `fms_policy_update()` command/lifecycle integration test.
 
@@ -170,3 +170,8 @@ At the time of this check, M6 branch HEAD `41ba12f2d1fbb3b4525407f5b621db8cddc6d
 The actuator owner now suppresses a queued M6 demand only when `actuator_guard_ground_stop()` returns `STATUS_OK`. A malformed, stale or unauthorized certificate candidate cannot take ownership of output. The SIL fixture proves that an invalid in-air candidate does not block a valid 5 N demand, then verifies that a subsequently accepted certificate drives a multi-frame 5 N→0 N ground-stop ramp and terminal zero receipt.
 
 [Run #25](https://github.com/hujunjie-hub/Flight/actions/runs/43375635462), exact commit `41ba12f2d1fbb3b4525407f5b621db8cddc6dbc4`: **4/4 jobs SUCCESS**. M4 Host 993/0, M5 Host 9,515/0, M4/M5 integration 1,066/0, M6 MPC 15/0, M6 guard 26/0, M7 guard 274/0, and ASan/UBSan PASS. The runtime SIL scenario completed **19 checks / 0 failures**, with **18 frame commits** (one 5 N demand plus the bounded ramp frames) and 58 inhibit calls; the final receipt confirmed zero thrust without an apply-time overrun.
+
+
+### Superseded FMS ground-stop certificate revocation (CI pending)
+
+A current FMS output that is not eligible for a ground-stop certificate now clears the cached certificate immediately. Only an absence of current FMS output may retain the previous certificate, and then only until its original expiry. The SIL fixture verifies no-output bounded retention, immediate clearing on a current IN_AIR output, expiry clearing, and fresh republishing. This closes the stale-ground-decision window in the mission certificate cache; the updated workflow run is pending.

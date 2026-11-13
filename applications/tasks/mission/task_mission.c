@@ -23,10 +23,18 @@ static Status task_mission_update_ground_stop_certificate(const FmsOutputView *o
   if (output_current) {
     status = output ? fms_build_ground_stop_certificate(output, now, &certificate)
                     : STATUS_INVALID_ARGUMENT;
-  }
-  if (status == STATUS_OK) {
-    plan_bundle.ground_stop_certificate = certificate;
+    if (status == STATUS_OK) {
+      plan_bundle.ground_stop_certificate = certificate;
+    } else {
+      /* A current FMS decision that is not ground-disarm eligible supersedes
+       * the cached decision immediately. Never let an old LANDED certificate
+       * survive a newer IN_AIR/ARMED/otherwise-ineligible output. */
+      memset(&plan_bundle.ground_stop_certificate, 0,
+             sizeof(plan_bundle.ground_stop_certificate));
+    }
   } else if (plan_bundle.ground_stop_certificate.certificate_expires_at_us <= now) {
+    /* If the FMS owner has no current output, retain only within the original
+     * certificate lease; the M7 guard still validates the certificate header. */
     memset(&plan_bundle.ground_stop_certificate, 0,
            sizeof(plan_bundle.ground_stop_certificate));
   }
