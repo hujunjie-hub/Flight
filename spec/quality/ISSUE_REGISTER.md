@@ -35,7 +35,7 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-01 | S2 | Windows 检出把 *.sh 转 CRLF | R2 修复；`tools/check_line_endings.py` | line_endings PASS | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-02 | S2 | Cortex-M7 只编译 8/14 M5 源 | R2 补全 | M5 ARM 14 对象 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-03 | S2 | 历史 packages/SConscript 缺失导致链接阻塞 | R3 安装；2026-11-12/13 三包 commit 锁定并核对安装 HEAD | M5-06 接管复验：M4/M5 测试配置 Flight.elf 链接 PASS；完整 Release 产品链接/目标运行仍需复核 | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-04 | S2 | MR-009 消费曲线/验证曲线数值路径的 binary32 rounded Horner 溢出证明待独立审查 | R30.3 proof/audit `00339febd045a85285a3df571268f3333c867aae`；逐级 rounded product/sum、RN midpoint、gamma 分子上/分母下/商上、阶段 fail-fast、9 mutation audit self-test | S06-115；Host 6/6、M6/M7 5/5、M7 2/2；M5 Host 322,299/0、focused 430/0；FP model MATCH、ARM 两对象 FMA=0 | OPEN / WAITING_INDEPENDENT_REVIEW |
+| FLIGHT-LOCAL-04 | S2 | MR-009 binary32 consumer/validator error envelope：三轮内部数学复核完成（声明范围限制） | R31：修复 velocity/acceleration 时间偏差导数使用未舍入 cf 导数的问题；S06-107 oracle 改为实际 binary32 rounded derivative coefficients；S06-099 增加 h*offset/step Fraction 检查；双源 FP source audit 为 18 mutation cases | Host #43446380866 6/6；M6/M7 #43446380836 5/5；M7 #43446380724 2/2；M5 Host/ASan、MR-009 focused、S06-099/S06-107、ARM FP audit 均 PASS | CLOSED / TRIPLE_SELF_REVIEWED_WITH_SCOPE_LIMITATIONS |
 | FLIGHT-LOCAL-05 | S2 | spec/ABI 证据曾钉住 CRLF 哈希 | R3 efc28d7 LF 重基线 | 当前 CI：Spec Audit 145 types / 8 checks PASS；生产 ABI 144 types / 0 mismatch / 0 unexpected Host/ARM | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-06 | S2 | RT-Thread 三个包曾使用 latest，依赖不可复现 | OWNER 批准后固定三个 40-hex commit；跟踪源与锁文件一致 | `check_rt_packages_lock.py` PASS；14 个负向用例；当前 Host CI 未单独重跑此 job | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-07 | S1 | 验收脚本 assert 可被 -O 剥离 | R2 修复 | test_audit_optimized PASS | FIXED_WAITING_RETEST |
@@ -99,4 +99,15 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 
 验证基线 `b6b2c8d1fbe2483ac76164993e7798a18af1e697` 的三组工作流全部通过：[Host validation 6/6](https://github.com/hujunjie-hub/Flight/actions/runs/43410120128)、[M6/M7 host validation 5/5](https://github.com/hujunjie-hub/Flight/actions/runs/43410120115)、[M7 host validation 2/2](https://github.com/hujunjie-hub/Flight/actions/runs/43410120239)。生产 ABI 144 types / 0 mismatch / 0 unexpected Host/ARM；Spec Audit 145 types / 8 checks PASS；M4/M5/M6/M7 Cortex-M7 模块编译、M6/M7 Host/Sanitizer 和 M4→M7 runtime SIL 均 PASS。
 
-本轮通过不关闭尚需独立复验的问题。FLIGHT-LOCAL-27 因 GroundStopCertificate 双快照重新计入后只估算剩余 8 B，继续 OPEN / RISK；`check_memory_budget.py` 和最终 map 仍待复验。FLIGHT-LOCAL-54 的 enum-size 属性差异仍 OPEN。GitHub Issue 发布状态仍为 `GITHUB_PUBLICATION = PENDING`。M5-06 独立数学审查仍 BLOCKED，M5-07 不得启动。
+本轮通过不关闭尚需独立复验的问题。FLIGHT-LOCAL-27 因 GroundStopCertificate 双快照重新计入后只估算剩余 8 B，继续 OPEN / RISK；`check_memory_budget.py` 和最终 map 仍待复验。FLIGHT-LOCAL-54 的 enum-size 属性差异仍 OPEN。GitHub Issue 发布状态仍为 `GITHUB_PUBLICATION = PENDING`。MR-009 三轮内部数学复核已完成；M5-06 仍受 S06-100..102 与 B07 等独立发布门禁阻塞，M5-07 不得启动。
+
+
+## 2026-11-13 MR-009 R31 三轮内部复核闭环
+
+项目所有者明确取消 MR-009 外部独立数学审查要求，改为三轮内部复核；本记录不声称独立第三方认证。
+
+- 数学轮：修复 velocity/acceleration time-shift derivative bound，使用实际 binary32 rounded vf/af 系数导数；确认 position cf'、Horner 10/12/10、gamma 定向舍入、RN overflow midpoint 与次正规传播。
+- 实现轮：对照 M6 consumer 与 M5 validator 的系数、局部时间和 Horner 运算顺序；双源 FP source audit 覆盖 consumer/validator time-domain、expanded s_eval_max、三组 Horner 与 cf'/vf'/af' 时间导数，18 个 mutation cases。
+- 测试轮：S06-099 60,002 offsets 双时间模型 Fraction 检查；S06-107 oracle 覆盖 rounded derivative coefficients；Host #43446380866 6/6、M6/M7 #43446380836 5/5、M7 #43446380724 2/2 全部 SUCCESS。
+- 代码修正 79f23d0200c31ebe934bfc8793e65d7af1e6bdd4；oracle a55071966209a1af615ff6137963eab4631e8bae；双源/expanded-time audit ad9df36687b68b43f9118ae6e26be8716d900c90；最终审计基线 8dcb60b3ac18e6a763c939d3e810984092cdd321。
+- disposition：**TRIPLE_SELF_REVIEWED / PASS_WITH_DECLARED_SCOPE_LIMITATIONS**。完整 Validator Horner 拒绝分支可达性不作声称；H723 实机、40 ms route preview、S06-100..102、WCET/RTA、HIL、飞行均按各自门禁处理。M5-06 整体仍 BLOCKED，M5-07 不启动。
