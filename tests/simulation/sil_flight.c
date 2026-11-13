@@ -1013,6 +1013,9 @@ static void run_live_fms_first_reference_task_smoke(void)
   if (fms_output.prearm_result.state != PREARM_READY)
     return;
 
+  /* Pre-arm guidance may have produced a hold candidate. The first-reference
+   * clock starts at ARM, so discard pre-arm output before the ARM owner turn. */
+  memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
   sil_refresh_live_fms_inputs();
   arm_request = submit_command_with_target(PRODUCT_CMD_ARM,
       fms_output.prearm_result.check_epoch, 0.0f, NULL);
@@ -1020,6 +1023,7 @@ static void run_live_fms_first_reference_task_smoke(void)
   test_clock.monotonic_us += 10000u;
   sil_refresh_live_fms_inputs();
   task_mission_step();
+  memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
   CHECK(sil_command_has_ack(arm_request, COMMAND_ACK_COMPLETED));
   CHECK(fms_output.state_snapshot.arm_state == ARM_STATE_ARMED);
   if (fms_output.state_snapshot.arm_state != ARM_STATE_ARMED)
