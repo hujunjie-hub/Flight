@@ -796,7 +796,9 @@ static void run_ground_stop_task_smoke(void)
   ActuationPermit permit;
   GroundStopCertificate certificate;
   uint64_t now = test_clock.monotonic_us;
+  uint64_t stop_start = 0u;
   unsigned commits_before = commits;
+  unsigned tick;
 
   memset(&output, 0, sizeof(output));
   memset(&permit, 0, sizeof(permit));
@@ -835,17 +837,26 @@ static void run_ground_stop_task_smoke(void)
   runtime_data.have_demand = 0u;
   runtime_data_unlock();
 
-  /* Exercise the real task owner end-to-end: it consumes the certificate,
-   * calls the M7 frame gate, and polls the DMA-completion receipt. No test-side
-   * direct call to actuator_guard_frame_boundary is permitted here. */
+  /* Exercise the real task owner end-to-end. Advance its 1 ms owner tick;
+   * the M7 2.5 ms frame gate decides when a DShot frame may be committed. */
   turn(task_actuator_entry);
+  stop_start = actuator_guard_ground_stop_start_us();
+  for (tick = 0u; tick < 180u &&
+       runtime_data.receipt.result_code != ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED; ++tick) {
+    test_clock.monotonic_us += 1000u;
+    turn(task_actuator_entry);
+  }
 
   CHECK(commits > commits_before);
+  CHECK(stop_start != 0u);
   CHECK(actuator_guard_state() == ACTUATOR_GUARD_DISARMED);
   CHECK(runtime_data.receipt.result_code == ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED);
   CHECK(runtime_data.receipt.header.message_type == MSG_ACTUATOR_COMMIT_RECEIPT);
   CHECK(runtime_data.receipt.estimated_apply_time_us >=
         runtime_data.receipt.commit_time_us);
+  CHECK(runtime_data.receipt.estimated_apply_time_us - stop_start <=
+        ACTUATOR_GROUND_STOP_MAX_APPLY_US);
+  CHECK((runtime_data.receipt.limit_flags & ACTUATOR_GROUND_STOP_OVERRUN_FLAG) == 0u);
 }
 
 int main(int argc, char **argv)
