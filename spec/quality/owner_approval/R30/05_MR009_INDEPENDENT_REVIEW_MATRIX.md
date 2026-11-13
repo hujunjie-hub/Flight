@@ -111,7 +111,7 @@ on the reviewer's behalf.
 | FP contraction | R31 ARM audit: GCC 14.2.1; validator source SHA256 `8dde57b4570b6dc1cbf82f31b9dc5637e8eec06dd23d7139f560170d461637bd`; consumer source SHA256 `48fa1f629380ce354617af7082e7f19bd81974f00f9b9c126c9b4c690ff1c31b`; `model_check=MATCH`; 18 mutations PASS; both objects `fused_operations=0` | READY | PASS |
 | Rounding mode / FTZ / DAZ | Host negative tests cover FE_DOWNWARD/UPWARD/TOWARDZERO and MXCSR FTZ/DAZ; ARM runtime gate reads FPSCR.RMode/FZ/DN; H723 runtime remains NOT_RUN | HOST_TESTED / ARM_RUNTIME_NOT_RUN | PARTIAL — target gate remains open |
 | M6 interval domain | M5-06 requires 20 ms intervals; `s_eval_max≈0.020000002`; M6 locator rejects offsets beyond the preview horizon; 40 ms route previews are outside M5-06 validation scope | READY | PASS — 20 ms claim only |
-| Full-validator Horner reachability | Direct production-helper branches are tested; no full-validator reachability claim; full-validator coefficient/scaling status tests and legal companion pass | ACCEPTED_LIMITATION | ACCEPTED — no reachability claim |
+| Full-validator Horner reachability | Direct production-helper branches are tested; no full-validator reachability claim; full-validator coefficient/scaling status tests and legal companion pass | LIMITATION_RECORDED | LIMITATION_RECORDED — no reachability claim |
 
 ## 6. Required result semantics
 
@@ -224,7 +224,7 @@ assigned, and no third-party approval is claimed.
    polynomials; S06-099 now checks both physical time and the exact production
    h*offset/step parameter. The dual-source FP audit checks 18 mutations.
 
-**Accepted explicit limitations:** degree-5/4/3 Horner rejection branches are
+**Explicit scope limitations for independent reviewer assessment:** degree-5/4/3 Horner rejection branches are
 tested through the production helper, not claimed reachable through a complete
 product-domain validator input; H723 FPSCR runtime equivalence remains NOT_RUN;
 40 ms M6 route preview is outside the 20 ms M5-06 proof domain.
