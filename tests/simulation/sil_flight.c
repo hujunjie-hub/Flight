@@ -51,6 +51,7 @@ static ClockInstant test_clock={0x12345678,1000000,1,0};
 static struct imu_raw_sample test_imu;
 static int test_imu_pending;
 static unsigned checks,failures,sem_calls,commits,inhibits;
+static struct dshot_stats sil_dshot_stats;
 static uint16_t simulated_rc_channels[16];
 static int imu_token, dshot_token, timebase_token, gnss_token_dev, rc_token_dev, radio_token_dev, wdt_token;
 static jmp_buf scheduler;
@@ -104,8 +105,12 @@ rt_err_t rt_device_open(rt_device_t d,rt_uint16_t f) {
 rt_err_t rt_device_close(rt_device_t d) { (void)d;return RT_EOK; }
 rt_err_t rt_device_control(rt_device_t d,int c,void *p) {
   if(d==(rt_device_t)&dshot_token) {
-    if(c==DSHOT_CTRL_GET_STATS && p) memset(p,0,sizeof(struct dshot_stats));
-    if(c==DSHOT_CTRL_STOP) ++inhibits;
+    if(c==DSHOT_CTRL_GET_STATS && p) *(struct dshot_stats *)p=sil_dshot_stats;
+    if(c==DSHOT_CTRL_STOP) {
+      ++inhibits;
+      sil_dshot_stats.active=0u;
+      sil_dshot_stats.pending=0u;
+    }
     return RT_EOK;
   }
   if(c==RT_SERIAL_CTRL_GET_CONFIG) ((struct serial_configure *)p)->baud_rate=115200u;
@@ -165,7 +170,13 @@ rt_ssize_t rt_device_write(rt_device_t d,int pos,const void *data,size_t length)
     return length == sizeof(bind) && memcmp(data, bind, sizeof(bind)) == 0 ? (rt_ssize_t)length : 0;
   }
   if(d==(rt_device_t)&dshot_token) {
-    if(length==8) ++commits;
+    if(length==8) {
+      ++commits;
+      sil_dshot_stats.frames++;
+      sil_dshot_stats.completed_frames=sil_dshot_stats.frames;
+      sil_dshot_stats.active=0u;
+      sil_dshot_stats.pending=0u;
+    }
     return (rt_ssize_t)length;
   }
   if(d==(rt_device_t)&radio_token_dev) {

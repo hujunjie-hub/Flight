@@ -28,6 +28,7 @@ struct dshot_stats
 {
     uint32_t faults;
     uint32_t frames;
+    uint32_t completed_frames;
     uint32_t arr;
     uint8_t active;
     uint8_t pending;

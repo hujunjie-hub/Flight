@@ -455,6 +455,7 @@ int runtime_initialize(void)
         .unlock = permit_unlock,
         .inhibit = actuator_device_inhibit,
         .commit = actuator_device_commit,
+        .poll_apply = actuator_device_poll_apply,
         .fault_count = actuator_device_faults,
     };
     ClockInstant clock;

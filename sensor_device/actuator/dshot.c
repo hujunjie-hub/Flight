@@ -59,6 +59,7 @@ static struct
     uint64_t expires;
     volatile uint32_t faults;
     volatile uint32_t frames;
+    volatile uint32_t completed_frames;
 } g_dshot;
 
 static uint32_t g_dshot_buf[DSHOT_BUF_WORDS] DMA_BUFFER;
@@ -154,6 +155,9 @@ void TIM1_UP_IRQHandler(void)
         {
             g_dshot.faults++;
         }
+        /* This counter advances only after the final timer update has stopped
+         * the waveform and all output channels are low. */
+        g_dshot.completed_frames++;
         dshot_stop();
     }
 }
@@ -449,6 +453,7 @@ static rt_err_t dshot_control(rt_device_t dev, int cmd, void *args)
         }
         ((struct dshot_stats *)args)->faults = g_dshot.faults;
         ((struct dshot_stats *)args)->frames = g_dshot.frames;
+        ((struct dshot_stats *)args)->completed_frames = g_dshot.completed_frames;
         ((struct dshot_stats *)args)->arr = g_dshot.arr;
         ((struct dshot_stats *)args)->active = g_dshot.active;
         ((struct dshot_stats *)args)->pending = g_dshot.pending;
