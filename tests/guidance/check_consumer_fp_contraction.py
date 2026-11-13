@@ -146,27 +146,88 @@ MODEL_TOKENS = {
 }
 
 
-def check_model_against_source(source=None):
-    """The report must describe the model that is actually compiled."""
+CONSUMER_MODEL_TOKENS = {
+    "time_conversion": [
+        "float base = (float)local_us * seconds_per_us;",
+        "h = step_us * 1e-6f;",
+        "*local_seconds = control_reference_convert_local_time(",
+    ],
+    "hermite_coefficients": [
+        "float d = (p1[j] - p0[j]) - h * v0[j] - .5f * h * h * a0[j];",
+        "float v = v1[j] - v0[j] - h * a0[j];",
+        "float ac = a1[j] - a0[j];",
+        "c[j][3] = 10 * d / (h * h * h) - 4 * v / (h * h) + ac / (2 * h);",
+        "c[j][4] = -15 * d / (h * h * h * h) + 7 * v / (h * h * h) - ac / (h * h);",
+        "c[j][5] = 6 * d / (h * h * h * h * h) - 3 * v / (h * h * h * h) + ac / (2 * h * h * h);",
+    ],
+    "position_horner": [
+        "out->position_ned_m[j] = ((((c[j][5] * s + c[j][4]) * s + c[j][3]) * s + c[j][2]) * s + c[j][1]) * s + c[j][0];",
+    ],
+    "velocity_horner": [
+        "out->velocity_ned_mps[j] = (((5 * c[j][5] * s + 4 * c[j][4]) * s + 3 * c[j][3]) * s + 2 * c[j][2]) * s + c[j][1];",
+    ],
+    "acceleration_horner": [
+        "out->acceleration_ned_mps2[j] = ((20 * c[j][5] * s + 12 * c[j][4]) * s + 6 * c[j][3]) * s + 2 * c[j][2];",
+    ],
+}
+
+VALIDATOR_REPLICA_TOKENS = {
+    "hermite_coefficients": [
+        "float h2 = h * h;",
+        "float h3 = h2 * h;",
+        "float h4 = h3 * h;",
+        "float h5 = h4 * h;",
+        "float d = ((p1 - p0) - h * v0) - ((0.5f * h) * h) * a0;",
+        "float dv = (v1 - v0) - h * a0;",
+        "float da = a1 - a0;",
+        "c[3] = 10 * d / h3 - 4 * dv / h2 + da / (2 * h);",
+        "c[4] = -15 * d / h4 + 7 * dv / h3 - da / h2;",
+        "c[5] = 6 * d / h5 - 3 * dv / h4 + da / (2 * h3);",
+    ],
+}
+
+def _normalize_source(source):
+    return re.sub(r"\\s+", " ", source)
+
+
+def check_model_against_source(source=None, consumer_source=None):
+    """Check the proof model against both compiled translation units."""
     if source is None:
         source = VALIDATOR.read_text(encoding="utf-8")
+    if consumer_source is None:
+        consumer_source = CONSUMER.read_text(encoding="utf-8")
     missing = []
     for section, tokens in MODEL_TOKENS.items():
         for token in tokens:
             if token not in source:
-                missing.append(f"{section}: {token}")
+                missing.append(f"validator_model/{section}: {token}")
+
+    normalized_consumer = _normalize_source(consumer_source)
+    normalized_validator = _normalize_source(source)
+    for section, tokens in CONSUMER_MODEL_TOKENS.items():
+        for token in tokens:
+            if _normalize_source(token) not in normalized_consumer:
+                missing.append(f"consumer/{section}: {token}")
+    for section, tokens in VALIDATOR_REPLICA_TOKENS.items():
+        for token in tokens:
+            if _normalize_source(token) not in normalized_validator:
+                missing.append(f"validator_replica/{section}: {token}")
+
     import hashlib
-    sources = {}
-    for path in (VALIDATOR, CONSUMER):
-        sources[str(path.relative_to(ROOT)).replace("\\", "/")] = hashlib.sha256(
-            path.read_bytes()).hexdigest()
+    sources = {
+        str(VALIDATOR.relative_to(ROOT)).replace("\\", "/"):
+            hashlib.sha256(source.encode("utf-8")).hexdigest(),
+        str(CONSUMER.relative_to(ROOT)).replace("\\", "/"):
+            hashlib.sha256(consumer_source.encode("utf-8")).hexdigest(),
+    }
     return {
         "status": "MATCH" if not missing else "MISMATCH",
         "source": str(VALIDATOR.relative_to(ROOT)).replace("\\", "/"),
         "source_sha256": sources,
         "missing_tokens": missing,
-        "note": ("Report fields are derived from tokens that must exist in the "
-                 "compiled validator source; a mismatch fails the check."),
+        "note": ("Report fields are accepted only when proof-model tokens, "
+                 "consumer operations and validator replica operations all "
+                 "match the compiled source files."),
     }
 
 
@@ -189,23 +250,50 @@ MUTATIONS = (
 )
 
 
+CONSUMER_MUTATIONS = (
+    ("consumer_time_scale", "float base = (float)local_us * seconds_per_us;",
+     "float base = (float)local_us * 1e-6f;"),
+    ("consumer_position_horner",
+     "((((c[j][5] * s + c[j][4]) * s + c[j][3]) * s + c[j][2]) * s +\n         c[j][1]) * s + c[j][0];",
+     "((((c[j][5] * s + c[j][4]) * s + c[j][3]) * s + c[j][2]) * s +\n         c[j][0]) * s + c[j][1];"),
+    ("consumer_velocity_horner",
+     "(((5 * c[j][5] * s + 4 * c[j][4]) * s + 3 * c[j][3]) * s +\n         2 * c[j][2]) * s + c[j][1];",
+     "(((5 * c[j][5] * s + 4 * c[j][4]) * s + 3 * c[j][3]) * s +\n         c[j][1]) * s + 2 * c[j][2];"),
+    ("consumer_acceleration_horner",
+     "((20 * c[j][5] * s + 12 * c[j][4]) * s + 6 * c[j][3]) * s +\n        2 * c[j][2];",
+     "((20 * c[j][5] * s + 12 * c[j][4]) * s + 2 * c[j][2]) * s +\n        6 * c[j][3];"),
+)
+
+
 def self_test():
-    """Every deliberate mutation of the model must be reported as MISMATCH."""
+    """Every deliberate mutation of either compiled source must be detected."""
     source = VALIDATOR.read_text(encoding="utf-8")
-    good = check_model_against_source(source)
+    consumer_source = CONSUMER.read_text(encoding="utf-8")
+    good = check_model_against_source(source, consumer_source)
     if good["status"] != "MATCH":
-        print(f"FAIL: unmodified source reported {good['status']}")
+        print(f"FAIL: unmodified sources reported {good['status']}: "
+              f"{good['missing_tokens']}")
         return 1
     for name, original, replacement in MUTATIONS:
         if original not in source:
-            print(f"FAIL: mutation target for {name} not found")
+            print(f"FAIL: validator mutation target for {name} not found")
             return 1
         mutated = source.replace(original, replacement, 1)
-        result = check_model_against_source(mutated)
+        result = check_model_against_source(mutated, consumer_source)
         if result["status"] != "MISMATCH":
-            print(f"FAIL: mutation {name} was not detected")
+            print(f"FAIL: validator mutation {name} was not detected")
             return 1
-    print(f"M5_FP_MODEL_SELF_TEST_PASS ({len(MUTATIONS)} mutations detected)")
+    for name, original, replacement in CONSUMER_MUTATIONS:
+        if original not in consumer_source:
+            print(f"FAIL: consumer mutation target for {name} not found")
+            return 1
+        mutated = consumer_source.replace(original, replacement, 1)
+        result = check_model_against_source(source, mutated)
+        if result["status"] != "MISMATCH":
+            print(f"FAIL: consumer mutation {name} was not detected")
+            return 1
+    mutation_count = len(MUTATIONS) + len(CONSUMER_MUTATIONS)
+    print(f"M5_FP_MODEL_SELF_TEST_PASS ({mutation_count} mutations detected)")
     return 0
 
 
