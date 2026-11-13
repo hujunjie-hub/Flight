@@ -223,3 +223,23 @@ Run #29's M4 Host failure was caused by the Host runner omitting the production 
 4. **P1 — M5-06 independent safety approval is BLOCKED.** Independent mathematical review of Hermite→Bernstein conversion, derivative convex-hull bounds and outward interval assumptions, plus broader randomized dynamic uncertainty/acceleration proof coverage, remains open on the separate M5-06 branch. M4/M5 regression passing on this branch is not M5-06 approval.
 
 The M7 PR #4 remains Draft on its own branch and its stated integration blockers are branch-specific; it must not be treated as evidence that the newer M6 branch lacks the production adapter/owner code. Conversely, the M6 branch's Host/SIL pass does not close the physical and independent-review gates above.
+
+
+## Live FMS-to-M7 task integration — Run #33
+
+- Exact tested commit: `f28b7b72500cf892e12c757022819dca5f6f0d66`.
+- Workflow: [M6/M7 Host validation #33](https://github.com/hujunjie-hub/Flight/actions/runs/43381782424), **4/4 jobs SUCCESS**.
+- The new `--live-fms-ground-stop-smoke` drives fresh navigation/actuator/control contracts and operator input through `runtime_submit_request()`, the real request mailbox, `task_mission_step()`, `fms_policy_update()`, the production ground-stop certificate adapter, and `task_actuator_step()`. It does not manufacture an `FmsOutputView`.
+- Live scenario evidence: **455 checks / 0 failures**; LandDetector reported LANDED, PreArm reached READY, the real ground DISARM command was accepted, the mission owner published a certificate with matching authority/directive epochs, and the actuator owner produced `ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED`.
+- Existing non-zero-to-zero ramp scenario remains separate: **27 checks / 0 failures**, 18 frame commits, 58 inhibit calls.
+- Regression gates on the same commit: M4 Host 1,002/0; M5 Host 9,515/0; M4/M5 integration 1,075/0; M6 MPC 15/0; M6 guard 26/0; M7 guard 274/0; M6/M7 ASan/UBSan PASS.
+
+### Updated acceptance status after Run #33
+
+1. **Live FMS-task-to-actuator-owner path for explicit ground DISARM: PASS (Host/SIL).** The prior queue/scheduling gap is closed for this command path.
+2. **First-reference-timeout ground-disarm through the live task queue: OPEN (P0).** M4 Host validates the real FMS timeout decision and certificate adapter, but the new task-level SIL scenario currently covers explicit ground DISARM. Add a separate live timeout scenario with no accepted first reference before the configured deadline.
+3. **DShot apply-time characterization: PARTIAL (P0).** Host observes the driver completion callback; H723 hardware capture is still required to bound actual output-application timing.
+4. **Target and physical validation: NOT_RUN (P1).** H723 product build, WCET/RTA, RAM/stack watermark, waveform/ESC response, HIL, calibration and staged flight remain outstanding. Keep `BENCH_INHIBIT`.
+5. **M5-06 independent safety approval: BLOCKED (P1).** The separate branch's mathematical and dynamic-uncertainty review remains outstanding; M6/M4/M5 Host regression is not a substitute.
+
+No flight-readiness claim is made from this Host/SIL result. The zero-target receipt is a software/bench contract result, not proof of physical motor response.
