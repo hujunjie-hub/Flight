@@ -184,3 +184,42 @@ A current FMS output that is not eligible for a ground-stop certificate now clea
 The M4 Host test `test_first_reference_window_expires_to_ground_stop` validates the real FMS first-reference timeout output: LANDED state, DISARMED state, revoked permit reason, forced-safe decision reason, and a successful `fms_build_ground_stop_certificate()` conversion with matching authority/directive epochs. Run #29 initially exposed that `run_host_tests.sh` did not link the production `ground_stop_adapter.c`; commit `63fa80e960a752bcef97887a16a22a38905bfad2` added the production adapter source to the Host link.
 
 [Run #30](https://github.com/hujunjie-hub/Flight/actions/runs/43376885571), exact commit `63fa80e960a752bcef97887a16a22a38905bfad2`: **4/4 jobs SUCCESS**. M4 Host 1,002/0, M5 Host 9,515/0, M4/M5 integration 1,075/0, M6 MPC 15/0, M6 guard 26/0, M7 guard 274/0, runtime SIL 27/0, and ASan/UBSan PASS. This closes the synthetic-output gap at the FMS-policy-to-adapter boundary. The complete `task_mission_step()` queue/scheduling path remains open.
+
+
+## Latest branch handover — CI #31
+
+- Checked at: 2026-11-13 14:39 +08:00.
+- Latest active branch: `test/fmat-0012-m6-controller`.
+- Exact branch HEAD: `f8a8211bb690fc90cf69d34200af32976f1fcdef`.
+- Latest commit: `docs(validation): record real FMS certificate adapter run 30`.
+- Latest workflow: [M6/M7 Host validation #31](https://github.com/hujunjie-hub/Flight/actions/runs/43377043882), exact HEAD above, **4/4 jobs SUCCESS**.
+
+### Run #31 observed results
+
+| Gate | Result |
+|---|---:|
+| M6 MPC Host | 15 checks / 0 failures |
+| M6 input/time + outer lifecycle guard | 26 checks / 0 failures |
+| M7 actuator guard Host | 274 checks / 0 failures |
+| M4 Host | 1,002 checks / 0 failures |
+| M5 Host | 9,515 checks / 0 failures |
+| M4/M5 integration | 1,075 checks / 0 failures |
+| Runtime task / ground-stop SIL | 27 checks / 0 failures; 18 frame commits, 58 inhibit calls |
+| M6/M7 ASan + UBSan | PASS; M6/M7 suites re-run without failures |
+
+Run #29's M4 Host failure was caused by the Host runner omitting the production `ground_stop_adapter.c` translation unit. Commit `63fa80e960a752bcef97887a16a22a38905bfad2` linked the production adapter; Run #30 and Run #31 then passed. This closes the adapter-link/test-fixture gap, not the remaining full task-flow acceptance gate.
+
+### Current branch lineage (rechecked at HEAD above)
+
+- M6 branch vs M5-06 branch `51e7e923419733f5aa3b21efa1e46588629623ed`: **diverged**; M6 is 58 commits ahead and 395 behind; merge base `edf32b4e39cdae014aa76870dc821882807a6905`.
+- M6 branch vs M7 branch `test/fmat-0013-m7-actuation` at `24eee8acb3c10b79b8e306b00b1725d3fbc2614f`: **diverged**; M6 is 52 commits ahead and 2 behind; merge base `b4ce6d0b3a2429d186fd5ec0563453322731db9b`.
+- These are independent workstreams. Do not merge/rebase either lineage or claim cross-branch acceptance without a reviewed integration plan.
+
+### Remaining work — priority order
+
+1. **P0 — Live FMS-task-to-actuator-owner SIL integration remains OPEN.** The production code path exists: `task_mission_step()` calls `fms_policy_update()`, creates a certificate from its real output and publishes it; `task_actuator_step()` consumes the certificate and invokes the M7 guard. Current SIL proves the real actuator owner and shared certificate-publication helper, but its fixture still constructs `FmsOutputView`; it does not drive the real request queue, mission task scheduling, FMS command/lifecycle sequence and actuator owner as one end-to-end scenario. Add that test before calling the task-to-task path verified.
+2. **P0 — DShot apply-time characterization is PARTIAL.** The timestamp is sampled after the driver reports DMA/frame completion; it is conservative software observation, not a hardware-captured DShot edge timestamp. Characterize the bound on H723 and document the measured timing contract.
+3. **P1 — Target/physical validation is NOT_RUN.** H723/Cortex-M7 product build, WCET/RTA, target RAM/stack watermark, DShot waveform, ESC response, HIL, sensor calibration and staged flight validation remain outstanding. Keep `BENCH_INHIBIT`.
+4. **P1 — M5-06 independent safety approval is BLOCKED.** Independent mathematical review of Hermite→Bernstein conversion, derivative convex-hull bounds and outward interval assumptions, plus broader randomized dynamic uncertainty/acceleration proof coverage, remains open on the separate M5-06 branch. M4/M5 regression passing on this branch is not M5-06 approval.
+
+The M7 PR #4 remains Draft on its own branch and its stated integration blockers are branch-specific; it must not be treated as evidence that the newer M6 branch lacks the production adapter/owner code. Conversely, the M6 branch's Host/SIL pass does not close the physical and independent-review gates above.
