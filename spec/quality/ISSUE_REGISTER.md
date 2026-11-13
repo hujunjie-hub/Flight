@@ -53,7 +53,7 @@ VERIFIED/CLOSED。B01–B07 的详细阻塞视图见 [BLOCKER_BOARD.md](BLOCKER_
 | FLIGHT-LOCAL-19 | S0 | R14b 尾段 Bernstein 当幂基 | R16 fa1de8f | S06-112 1080 checks | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-20 | S1 | S06-108 漏 active 不变；C 注入不真实 | R16 fa1de8f | S06-108/113 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-21 | S2 | 非零错误 profile_hash 未拒绝 | R16 fa1de8f | S06-111 negative | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-22 | S1 | Validator 最坏栈 4,248 B > 4,096 B | 未修复；B06 | analysis_p2 R17 | OPEN / BLOCKED |
+| FLIGHT-LOCAL-22 | S1 | 非优化 `-O0` 专用镜像的 Validator 最坏链 4,248 B > 4,096 B | 按 Release `-O2` 复测专用镜像，3,864 B / 4,096 B；保留 `-O0` 失败 | B06，台账 2026-11-13 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-23 | S2 | R15 工具链 SHA/archive 字段不一致 | R16/R17 归档流程 | R16 manifest/bundle | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-24 | S1 | R16 选了 4,128 的短路径；R17 真实路径 4,232；R18 SP 修正 4,248 | R17 分析修正 | 本文件/analysis_p2 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-25 | S0 | H723 栈水位/WCET/RTA/HIL/实机避障 NOT_RUN | 无硬件；B07 | NOT_RUN | BLOCKED |

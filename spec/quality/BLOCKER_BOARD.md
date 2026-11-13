@@ -73,13 +73,15 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 | 解除条件 | 独立数学审查逐项 APPROVED；S06-100..102 状态明确。 |
 | 下一步 | 提交证明文件、R28 测试日志和 B06 分析给审查者。 |
 
-## B06 Validator 栈预算 BLOCKED
+## B06 Validator 栈预算
+
+2026-11-13 使用同一提交分别复跑。Release `-O2` 专用镜像为 **PASS / COMPLETE**，3,864 / 4,096 B，余额 232 B。非优化 `-O0` 复现 **BLOCKED / UNKNOWN**，已知链 4,248 B。FLIGHT-LOCAL-22 为 `FIXED_WAITING_RETEST`。部署相关的调用者、异常栈和板上栈水位仍待 B07 验证。下表保留 R29 的 `-O0` 分析。
 
 | 字段 | 内容 |
 |---|---|
 | Issue | FLIGHT-LOCAL-22 / FLIGHT-LOCAL-24 |
 | 状态 | **BLOCKED**；已知下界 **4,248 B > 4,096 B**，超出 152 B；R29 设计评审见 `spec/quality/owner_approval/R29/04_B06_STACK_REMEDIATION_DESIGN.md`。 |
-| 当前链 | validate 1,112 + build_curve 2,824 + interval_scale 112 + interval_mul 88 + interval_bounds 64 + interval_invalid 48 = 4,248 B。 |
+| 历史链 | validate 1,112 + build_curve 2,824 + interval_scale 112 + interval_mul 88 + interval_bounds 64 + interval_invalid 48 = 4,248 B。 |
 | 第二/动态/静态 | 3,288 B / 1,944 B / 1,408 B（R16 链）；本轮未把它们相加。 |
 | 调用图 | `build/validation/regenerated/r29_stack_analysis.json`：状态 BLOCKED，callgraph_status UNKNOWN；libm `fmin/fmax/nextafter` 及动态/间接边显式记录，未知不得 PASS。 |
 | 未计入 | 调用者、异常/中断上下文、libm 实际帧、尾调用变化、target runtime；4,248 B 仍是下界。 |
