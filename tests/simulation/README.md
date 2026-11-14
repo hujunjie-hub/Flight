@@ -99,4 +99,4 @@ $sim = (Resolve-Path 'build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FM
 pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -FmtHilPort 14653 -FmtStateTimeoutMs 350 -FmtGraphicsAdapter 1 -FmtHover 0.62 -ConfirmLoopbackAddress
 ```
 
-该入口一次构建 SIL、分别启动 Land/Return/Mission 的新 FMT-SIM 进程（场景退出后关闭或按 PID 强制结束并等待进程退出），生成 RUN_ID、Manifest、原始日志、SHA256SUMS 和回传 ZIP。正式关闭门禁固定目标分支 `opt/stage-02-m5-06-safety-validator`、UDP 14653、350 ms、hover 0.62、显式确认 127.0.0.1 loopback、干净工作区及本地 HEAD 与 upstream tracking HEAD 一致；更换端口或只跑单场景仅用于诊断，不具备 Issue 关闭资格。详细判据见 [本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。
+该入口一次构建 SIL、分别启动 Land/Return/Mission 的新 FMT-SIM 进程（场景退出后关闭或按 PID 强制结束并等待进程退出），生成 RUN_ID、Manifest、原始日志、SHA256SUMS 和回传 ZIP。正式关闭门禁固定目标分支 `opt/stage-02-m5-06-safety-validator`、UDP 14653、350 ms、hover 0.62、显式确认 127.0.0.1 loopback、干净工作区及本地 HEAD 与脚本刚 fetch 的 `origin/opt/stage-02-m5-06-safety-validator` 一致；更换端口或只跑单场景仅用于诊断，不具备 Issue 关闭资格。详细判据见 [本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。

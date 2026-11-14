@@ -85,6 +85,12 @@ $dirty = $gitStatus.Count -gt 0
 if ($dirty -and -not $AllowDirty) {
     throw 'Working tree is not clean. Commit or otherwise preserve local changes; use -AllowDirty only for diagnostic runs (not issue closure evidence).'
 }
+$fetchOutput = @(& git -C $repoRoot fetch --prune origin 2>&1)
+$fetchExit = $LASTEXITCODE
+if ($fetchExit -ne 0) {
+    $fetchDetail = ($fetchOutput | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
+    throw "git fetch --prune origin failed (exit $fetchExit): $fetchDetail"
+}
 $upstream = (& git -C $repoRoot rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null)
 $upstreamExit = $LASTEXITCODE
 $upstreamHead = ''
@@ -92,7 +98,10 @@ if ($upstreamExit -eq 0 -and $upstream) {
     $upstream = $upstream.Trim()
     $upstreamHead = (& git -C $repoRoot rev-parse $upstream).Trim()
 }
-$upstreamMatchesHead = -not [string]::IsNullOrWhiteSpace($upstreamHead) -and $upstreamHead -eq $head
+$expectedUpstream = "origin/$expectedBranch"
+$upstreamIsExpected = $upstream -eq $expectedUpstream
+$upstreamMatchesHead = $upstreamIsExpected -and
+    -not [string]::IsNullOrWhiteSpace($upstreamHead) -and $upstreamHead -eq $head
 
 $pwshCommand = Get-Command pwsh -ErrorAction Stop | Select-Object -First 1
 $pwshPath = $pwshCommand.Source
@@ -286,13 +295,14 @@ if ($buildStatus -ne 'PASS') { $closureReasons += 'SIL build did not pass.' }
 if (-not $allScenarioPass) { $closureReasons += 'One or more requested scenarios did not pass.' }
 if ($dirty -or $gitStatusAfter.Count -gt 0) { $closureReasons += 'Git working tree was dirty before or after the run.' }
 if ($branch -ne $expectedBranch) { $closureReasons += 'Branch does not match the required branch.' }
-if (-not $upstreamMatchesHead) { $closureReasons += 'Local HEAD does not match the fetched upstream tracking HEAD.' }
+if (-not $upstreamIsExpected) { $closureReasons += 'Branch upstream is not origin/opt/stage-02-m5-06-safety-validator.' }
+if (-not $upstreamMatchesHead) { $closureReasons += 'Local HEAD does not match the freshly fetched upstream tracking HEAD.' }
 if (-not $worktreeStable) { $closureReasons += 'Branch, HEAD or working-tree state changed during the run.' }
 $strictGateEligible = $overall -eq 'PASS' -and $Scenario -eq 'All' -and
     $FmtStateTimeoutMs -eq 350 -and $FmtHilPort -eq 14653 -and
     [Math]::Abs($FmtHover - 0.62) -le 0.000000001 -and $ConfirmLoopbackAddress -and
     -not $dirty -and $gitStatusAfter.Count -eq 0 -and
-    $branch -eq $expectedBranch -and $upstreamMatchesHead -and $worktreeStable
+    $branch -eq $expectedBranch -and $upstreamIsExpected -and $upstreamMatchesHead -and $worktreeStable
 
 $logRecords = @()
 foreach ($scenarioResult in $scenarioResults) {
@@ -333,8 +343,12 @@ $manifest = [ordered]@{
     dirty_worktree_before = $dirty
     dirty_worktree_after = $gitStatusAfter.Count -gt 0
     worktree_stable = $worktreeStable
+    git_fetch_remote = 'origin'
+    git_fetch_exit_code = $fetchExit
     upstream = [string]$upstream
+    expected_upstream = $expectedUpstream
     upstream_head = [string]$upstreamHead
+    upstream_is_expected = $upstreamIsExpected
     upstream_matches_head = $upstreamMatchesHead
     fmt_sim_exe = [System.IO.Path]::GetFileName($simPath)
     fmt_sim_sha256 = (Get-Sha256 $simPath)
@@ -372,6 +386,7 @@ $summaryLines = @(
     "- Overall: $overall",
     "- Issue closure eligible: $strictGateEligible",
     "- Branch / HEAD: $branch / $head",
+    "- Fetched origin successfully: $($fetchExit -eq 0)",
     "- Upstream matches HEAD: $upstreamMatchesHead",
     "- Worktree stable through run: $worktreeStable",
     "- FMT-SIM executable SHA256: $(Get-Sha256 $simPath)",

@@ -168,7 +168,7 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
 
 - 所有需要 Windows 原生 FMT-SIM 引擎的动态场景由项目 Owner 在本机执行；远程 Agent 不代跑、不推断、不伪造 FMT-SIM 结果。R16/R17 中关于未发布 GitHub Issue 的限制是历史规则；当前发布状态以第 13 节和 ISSUE_REGISTER 顶部为准。
 - Agent 继续负责生产代码修改、Host/Host SIL/集成/Sanitizer、静态检查、CI、失败分析、回归测试、SPEC/Issue 更新和分支提交。
-- FMT-SIM 的正式命令、配置、350 ms 门槛、日志与 SHA256 归档、失败回传、Agent 后续处理顺序，统一以 spec/validation/FMT_SIM_LOCAL_HANDOFF.md 和 tests/simulation/run_fmt_sim_regression.ps1 为准；严格关闭审查还要求目标分支、UDP 14653、hover 0.62、显式 `-ConfirmLoopbackAddress`、干净工作区和本地 HEAD 与 upstream tracking HEAD 一致。
+- FMT-SIM 的正式命令、配置、350 ms 门槛、日志与 SHA256 归档、失败回传、Agent 后续处理顺序，统一以 spec/validation/FMT_SIM_LOCAL_HANDOFF.md 和 tests/simulation/run_fmt_sim_regression.ps1 为准；严格关闭审查还要求目标分支、UDP 14653、hover 0.62、显式 `-ConfirmLoopbackAddress`、干净工作区和本地 HEAD 与脚本刚 fetch 的 `origin/opt/stage-02-m5-06-safety-validator` 一致。
 - 本机运行必须记录 branch、完整 HEAD、FMT-SIM binary/settings SHA256、运行参数、逐场景退出码和原始日志 SHA256；批量入口对每个场景使用独立 FMT-SIM 进程，并在退出时按 PID 确认关闭；未提供证据的字段写 NOT_RUN / UNKNOWN。
 - #17/#18/#19 只有在对应原生场景完成其终端回执、连续 LANDED 证据、DISARMED 回执及 350 ms 状态流条件后，才可进入复核；Host/CI PASS 不替代原生 FMT-SIM 复测。
 - FMT-SIM 软件仿真不替代 B07 的 H723 目标运行、物理 HIL、WCET/RTA、目标栈水位或飞行验收。
