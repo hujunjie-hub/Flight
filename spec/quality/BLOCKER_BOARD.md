@@ -74,26 +74,26 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；Git
 | 已测试 | Host #43446380866 6/6、M6/M7 #43446380836 5/5、M7 #43446380724 2/2；M5 Host/ASan、MR-009 focused、S06-099 60,002 offsets 双模型 Fraction、S06-107 rounded-derivative oracle、18 mutation FP audit、ARM 两对象无 FMA、Cortex-M7 模块编译均 PASS。 |
 | 尚未声称 | degree 5/4/3 Horner 拒绝点完整 validator 输入可达性不作声称；H723 FPSCR 实机等价仍 NOT_RUN；M6 40 ms route preview 不在 M5-06 20 ms 证明域。 |
 | 证据 | Proof：spec/history/implementation/guidance/M5_06_6_MR009_PROOF.md；Matrix：spec/quality/owner_approval/R30/05_MR009_INDEPENDENT_REVIEW_MATRIX.md；CI #43446380866 / #43446380836 / #43446380724。 |
-| 解除条件 | 独立审查者逐项审查并签署 APPROVED；同时 S06-100..102、B06/B07 等其余 M5-06 发布门禁仍须分别完成。 |
+| 解除条件 | MR-009 的独立审查豁免仅覆盖该 Issue；S06-100..102、B06/B07 等其余 M5-06 发布门禁仍须分别完成。 |
 | 下一步 | 保留 R30/R31 proof、矩阵、代码差异与 CI 证据；按 B06/B07 等独立门禁继续验收，不推进 M5-07。 |
 
 ## B06 Validator 栈预算
 
-2026-11-13 使用同一提交分别复跑。Release `-O2` 专用镜像为 **PASS / COMPLETE**，3,864 / 4,096 B，余额 232 B。非优化 `-O0` 复现 **BLOCKED / UNKNOWN**，已知链 4,248 B。FLIGHT-LOCAL-22 为 `FIXED_WAITING_RETEST`。部署相关的调用者、异常栈和板上栈水位仍待 B07 验证。下表保留 R29 的 `-O0` 分析。
+2026-11-14 使用两份 Cortex-M7 专用镜像重建并完成调用图复核。Release `-O2` 为 **PASS / COMPLETE**，3,576 / 4,096 B；非优化 `-O0` 为 **PASS / COMPLETE**，3,968 / 4,096 B，余量 128 B。FLIGHT-LOCAL-22/24 的历史超限结论已由当前静态链修正；部署相关调用者、中断上下文和板上栈水位仍由 B07 单独验证。
 
 | 字段 | 内容 |
 |---|---|
 | Issue | FLIGHT-LOCAL-22 / FLIGHT-LOCAL-24 |
-| 状态 | **BLOCKED**；已知下界 **4,248 B > 4,096 B**，超出 152 B；R29 设计评审见 `spec/quality/owner_approval/R29/04_B06_STACK_REMEDIATION_DESIGN.md`。 |
+| 状态 | **PASS / COMPLETE（静态专用镜像）**；`-O2` 3,576 B，`-O0` 3,968 B，均小于 4,096 B；`-O0` 余量 128 B。板上调用者/异常/中断余量和运行时水位仍 NOT_RUN。 |
 | 历史链 | validate 1,112 + build_curve 2,824 + interval_scale 112 + interval_mul 88 + interval_bounds 64 + interval_invalid 48 = 4,248 B。 |
 | 第二/动态/静态 | 3,288 B / 1,944 B / 1,408 B（R16 链）；本轮未把它们相加。 |
-| 调用图 | `build/validation/regenerated/r29_stack_analysis.json`：状态 BLOCKED，callgraph_status UNKNOWN；libm `fmin/fmax/nextafter` 及动态/间接边显式记录，未知不得 PASS。 |
-| 未计入 | 调用者、异常/中断上下文、libm 实际帧、尾调用变化、target runtime；4,248 B 仍是下界。 |
-| 静态余量 | 历史基线为 48,920 / 49,152 B；加入 2×112 B GroundStopCertificate 后估算余量 **8 B**，需重跑 memory-budget 与最终 map；任何静态增长必须重算，不得扩大 48 KiB 上限。 |
+| 调用图 | 2026-11-14 两份专用镜像调用图均 COMPLETE；所有可达调用边纳入静态最大链，动态/间接边缺失不得 PASS。 |
+| 未计入 | 部署调用者、异常/中断上下文、目标运行时栈水位；这些由 B07 目标板实测，不混入专用静态镜像链。 |
+| 静态余量 | 当前 Release map 为 48,888 / 49,152 B，余量 **264 B**，低于 1 KiB 警戒线；继续监控，不扩大 48 KiB 上限。 |
 | 方案 A | 单轴 helper 拆分：降低 build_curve 帧，但增加调用深度与 WCET；需真实 .su/objdump 重算。 |
 | 方案 B | 区间数组复用：降低帧但增加生命周期/重入风险，需 ABI 与并发评审。 |
-| 方案 C | 固定 workspace：把临时数组移出栈，增加静态 RAM；与 232 B 余量冲突，必须 OWNER 批准。 |
-| 结论 | 三方案均未实施；未经 OWNER 审批不得做架构级 RAM 调整。M5-06 不得进入 4,096 B Planner Worker。 |
+| 方案 C | 固定 workspace：把临时数组移出栈，增加静态 RAM；与 264 B 余量冲突，必须 OWNER 批准。 |
+| 结论 | 三方案均未实施；当前静态专用镜像链满足 4,096 B 上限，但 B07 的目标调用者/异常栈/实测水位仍未通过前，不得宣称目标栈验收完成。 |
 | 解除条件 | 真实调用链 ≤ 4,096 B 且保留调用者/中断余量；独立复核 `.su`/反汇编。 |
 
 ## B07 H723 实机验证 NOT_RUN
@@ -124,4 +124,4 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；Git
 | [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / FIX NOT YET DYNAMICALLY RETESTED | Owner 本机按 350 ms 运行；Return 完成、连续 LANDED、DISARMED 和完整日志 |
 | [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / FIX NOT YET DYNAMICALLY RETESTED | Owner 本机按 350 ms 运行；双航点完成、Return、终端回执、连续 LANDED、DISARMED 和完整日志 |
 
-后续原生 FMT-SIM 均由项目 Owner 在 Windows 本机执行，远程 Agent 不代跑。Agent 负责代码修复、Host/SIL/CI、日志分析和分支交付。命令、环境指纹、归档和回传规则见 [FMT-SIM 本机复测交接方案](../validation/FMT_SIM_LOCAL_HANDOFF.md)；批量入口为 `tests/simulation/run_fmt_sim_regression.ps1`。三项 Issue 在本机证据回传并复核前保持 OPEN；不得用 Host/CI PASS 或 650 ms 诊断运行关闭。
+后续原生 FMT-SIM 均由项目 Owner 在 Windows 本机执行，远程 Agent 不代跑。Agent 负责代码修复、Host/SIL/CI、日志分析和分支交付。命令、环境指纹、归档和回传规则见 [FMT-SIM 本机复测交接方案](../validation/FMT_SIM_LOCAL_HANDOFF.md)；批量入口为 `tests/simulation/run_fmt_sim_regression.ps1`。严格关闭资格另要求 hover 0.62、显式 `-ConfirmLoopbackAddress`、UDP 14653 和 350 ms。三项 Issue 在本机证据回传并复核前保持 OPEN；不得用 Host/CI PASS 或 650 ms 诊断运行关闭。

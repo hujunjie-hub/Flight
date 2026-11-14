@@ -73,10 +73,10 @@ git rev-parse '@{u}'
 
 ```powershell
 $sim = (Resolve-Path 'build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FMT_SIM.exe').Path
-pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -FmtHilPort 14653 -FmtStateTimeoutMs 350 -FmtGraphicsAdapter 1 -FmtHover 0.62
+pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -FmtHilPort 14653 -FmtStateTimeoutMs 350 -FmtGraphicsAdapter 1 -FmtHover 0.62 -ConfirmLoopbackAddress
 ```
 
-若 FMT-SIM 安装路径不同，只修改 `$sim`；MinGW 路径不同时使用 `-GccDir`。批量入口默认拒绝错误分支、dirty worktree、缺少 upstream tracking ref 或本地 HEAD 与 upstream HEAD 不一致。它也会检查 settings.jason 中指定端口恰好匹配一架 HIL/UDP 载具且 Autobound=true；回环地址 127.0.0.1 仍需按本方案人工核对。
+若 FMT-SIM 安装路径不同，只修改 `$sim`；MinGW 路径不同时使用 `-GccDir`。批量入口默认拒绝错误分支、dirty worktree、缺少 upstream tracking ref 或本地 HEAD 与 upstream HEAD 不一致。正式关闭资格还要求命令显式带 `-ConfirmLoopbackAddress`（表示 Owner 已人工确认 settings 中的地址为 127.0.0.1）、hover 保持 0.62、端口 14653 和 350 ms；否则只生成诊断证据。它也会检查 settings.jason 中指定端口恰好匹配一架 HIL/UDP 载具且 Autobound=true；回环地址 127.0.0.1 仍需按本方案人工核对。
 
 批量入口调用 `run_sil.ps1 -BuildOnly` 构建一次，再通过 `run_sil.ps1 -ReuseBuild` 执行各场景；每个场景有独立 OutDir 和 FMT-SIM 引擎进程。即使一个场景失败，也会继续收集其余场景，逐项记录退出码，不覆盖之前 RUN_ID。
 
@@ -88,7 +88,7 @@ pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $si
 pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -Scenario Mission
 ```
 
-单场景运行只用于定位问题，即使 PASS 也不能关闭整组 ENG-07 门禁。650 ms 或 1000 ms 可用于诊断链路，不属于严格 350 ms 验收，不得用于关闭 #17/#18/#19。
+单场景运行只用于定位问题，即使 PASS 也不能关闭整组 ENG-07 门禁。650 ms 或 1000 ms 可用于诊断链路，不属于严格 350 ms 验收，不得用于关闭 #17/#18/#19。若未显式带 `-ConfirmLoopbackAddress`，或 hover 不是 0.62，也只能作为诊断运行。
 
 每次运行的原始目录为：
 
@@ -118,7 +118,7 @@ build/validation/fmt-sim-local/FMT-SIM-LOCAL-<UTC时间>-<HEAD前8位>/
 
 脚本还会在原始目录旁生成同名 ZIP 和独立的 .sha256 sidecar，控制台输出 RUN_ID、ARCHIVE 和 ARCHIVE_SHA256。ZIP 仅用于本机证据回传；如需纳入正式项目归档，仍须另按 ARCHIVE_METADATA_PROTOCOL.md 执行，不把该 ZIP 自动视为正式项目归档。
 
-Manifest 记录 schema、RUN_ID、branch、完整 commit、dirty before/after、upstream HEAD 一致性、FMT-SIM EXE/settings SHA256、HIL 端口、图形适配器、hover、状态超时、工具链版本、构建结果、逐场景开始/结束时间、退出码、checks/failures、最长成功状态间隔和原始日志 SHA256。不会复制 FMT-SIM 安装文件或完整 settings 配置进归档。
+Manifest 记录 schema、RUN_ID、branch、完整 commit、dirty before/after、upstream HEAD 一致性、FMT-SIM EXE/settings SHA256、HIL 端口、图形适配器、hover、Owner 对 127.0.0.1 loopback 的显式确认、状态超时、工具链版本、构建结果、逐场景开始/结束时间、退出码、checks/failures、最长成功状态间隔和原始日志 SHA256。不会复制 FMT-SIM 安装文件或完整 settings 配置进归档。
 
 ## 5. 三个场景的验收条件
 

@@ -22,7 +22,7 @@
 
 状态必须按 [Issue 工作流](ISSUE_WORKFLOW.md) 更新；关闭前必须完成 [Issue 关闭清单](ISSUE_CLOSURE_CHECKLIST.md)。
 
-GitHub Issues #8–#19 已在线跟踪；未映射的历史本地问题仍按本地状态管理。未完成适用的复验/审查不得 VERIFIED/CLOSED。MR-009/#8 的独立审查要求已由项目方于 2026-11-14 明确豁免，仅限该项，不得扩展到其他安全/数学问题。BLOCKER_BOARD.md 只是本文件的派生视图，不得维护独立状态。
+GitHub Issues #8–#19 已在线跟踪；未映射的历史本地问题仍按本地状态管理。未完成适用的复验/审查不得 VERIFIED/CLOSED。MR-009/#8 的独立审查要求已由项目方于 2026-11-14 明确豁免，仅限该项，不得扩展到其他安全/数学问题。下方带日期的 R16–R31/CI 条目保留当时快照；其中 GITHUB_PUBLICATION=PENDING、MR-009 WAITING_INDEPENDENT_REVIEW 和旧资源数字均非当前状态，当前状态以本段、末尾 ENG-07 当前记录和 BLOCKER_BOARD 顶部摘要为准。BLOCKER_BOARD.md 只是本文件的派生视图，不得维护独立状态。
 
 ## 历史本地正式登记（部分映射 GitHub Issues）
 
@@ -53,12 +53,12 @@ VERIFIED/CLOSED；FLIGHT-LOCAL-04/MR-009 当前为 OWNER_WAIVED_INDEPENDENT_REVI
 | FLIGHT-LOCAL-19 | S0 | R14b 尾段 Bernstein 当幂基 | R16 fa1de8f | S06-112 1080 checks | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-20 | S1 | S06-108 漏 active 不变；C 注入不真实 | R16 fa1de8f | S06-108/113 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-21 | S2 | 非零错误 profile_hash 未拒绝 | R16 fa1de8f | S06-111 negative | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-22 | S1 | 非优化 `-O0` 专用镜像的 Validator 最坏链 4,248 B > 4,096 B | 按 Release `-O2` 复测专用镜像，3,864 B / 4,096 B；保留 `-O0` 失败 | B06，台账 2026-11-13 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-22 | S1 | 历史 `-O0` Validator 最坏链 4,248 B 超过 4,096 B | 2026-11-14 重建 `-O2` / `-O0` 专用镜像并完成调用图复核 | `-O2` 3,576/4,096 B；`-O0` 3,968/4,096 B；调用图 COMPLETE，`-O0` 余量 128 B | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-23 | S2 | R15 工具链 SHA/archive 字段不一致 | R16/R17 归档流程 | R16 manifest/bundle | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-24 | S1 | R16 选了 4,128 的短路径；R17 真实路径 4,232；R18 SP 修正 4,248 | R17 分析修正 | 本文件/analysis_p2 | FIXED_WAITING_RETEST |
+| FLIGHT-LOCAL-24 | S1 | 历史 R16/R17/R18 栈路径漏计，曾报告 4,128/4,232/4,248 B | 2026-11-14 专用镜像重建并完成调用图分析 | `-O2` 3,576/4,096 B；`-O0` 3,968/4,096 B；调用图 COMPLETE | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-25 | S0 | H723 栈水位/WCET/RTA/HIL/实机避障 NOT_RUN | 无硬件；B07 | NOT_RUN | BLOCKED |
 | FLIGHT-LOCAL-26 | S1 | `roll_map_to_position` 旧栈拷贝 32,840 B，Planner 产品化阻断 | R18/R19 逐轴原地滚动；R22 完整 40+64+24=128 B | 1000-case random + deterministic；legacy 32,840 B Host-only | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-27 | S2 | ICD+M4 静态余量在加入 GroundStopCertificate 双快照后估算仅 8 B | 不扩大 48 KiB 上限；当前表已计入 2×112 B，必须重跑预算与最终 map | 旧基线 232 B；扣除新增 224 B 后估算 8 B；本轮待重新执行 `check_memory_budget.py` | OPEN / RISK |
+| FLIGHT-LOCAL-27 | S2 | ICD+M4 静态 RAM 余量低于 1 KiB 警戒线 | 删除重复 mission staging 后重新核对 Release map 和预算 | 48,888/49,152 B，余量 264 B；仍须监控后续增长 | OPEN / RISK |
 | FLIGHT-LOCAL-28 | S1 | S06-112 把所有 C API 拒绝都计为预期 fail-closed，可能掩盖合法样本意外拒绝 | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 状态码区分；次正规仅接受 NUMERIC | S06-112 140 legal/20 subnormal status=2 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-29 | S2 | R18 地图原地滚动报告 104 B，漏算 map_cell_at 24 B；真实 128 B | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 反汇编/.su 修正 | roll 40 + axis 64 + map_cell_at 24 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-30 | S2 | R18 Manifest 归档字段/外部 sidecar 未闭环 | R19 8b112f0279735f4f9977f4314b81dccf203b14c3 archive script + external report | r19 archive report/sidecar | FIXED_WAITING_RETEST |
@@ -115,9 +115,9 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 
 ## ENG-07 原生 FMT-SIM 本机复测登记
 
+- 最新验证工具/交接 HEAD：`e2b35ceb34b3d4d090d8daa1c705b5779d7ccd82`；产品代码修复基线：`ce00ff9f0a8eb4989d1a171c3322f3640de2965c`。
 - 在线跟踪：GitHub Issues [#17 Land](https://github.com/hujunjie-hub/Flight/issues/17)、[#18 Return](https://github.com/hujunjie-hub/Flight/issues/18)、[#19 Mission](https://github.com/hujunjie-hub/Flight/issues/19)。
-- 当前修复代码基线：ce00ff9f0a8eb4989d1a171c3322f3640de2965c；文档/CI 基线：dffba6fd9e2f25e03083439b37a4d557fe11e24d。
-- 当前证据：Host #642 6/6、M6/M7 #130 5/5、M7 #91 2/2 SUCCESS；修复后的原生 FMT-SIM Land/Return/Mission 均 NOT_RUN。
+- 当前证据：[Host #43551514047](https://github.com/hujunjie-hub/Flight/actions/runs/43551514047) 6/6、[M6/M7 #43551514017](https://github.com/hujunjie-hub/Flight/actions/runs/43551514017) 5/5、[M7 #43551514036](https://github.com/hujunjie-hub/Flight/actions/runs/43551514036) 2/2 SUCCESS；M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integration 1,147/0；修复后的原生 FMT-SIM Land/Return/Mission 均 NOT_RUN。
 - 执行责任：项目 Owner 在 Windows 本机执行；远程 Agent 不代跑原生 FMT-SIM。Agent 负责代码、Host/SIL/CI、分析和下一轮修复。
-- 统一方案：spec/validation/FMT_SIM_LOCAL_HANDOFF.md；批量入口 `tests/simulation/run_fmt_sim_regression.ps1` 一次构建并启动三个独立引擎进程。验收固定为隔离 FMT-SIM、UDP 14653、350 ms、干净工作区且 HEAD 与 upstream tracking HEAD 一致；需回传 manifest、summary、完整日志、逐场景退出码、SHA256SUMS 和 ZIP sidecar。
+- 统一方案：spec/validation/FMT_SIM_LOCAL_HANDOFF.md；批量入口 `tests/simulation/run_fmt_sim_regression.ps1` 一次构建并启动三个独立引擎进程。严格关闭资格固定为目标分支、UDP 14653、350 ms、hover 0.62、Owner 显式确认 loopback 127.0.0.1、干净工作区且 HEAD 与 upstream tracking HEAD 一致；需回传 manifest、summary、完整日志、逐场景退出码、SHA256SUMS 和 ZIP sidecar。
 - 状态规则：#17/#18/#19 继续 OPEN；收到修复后本机证据并逐项复核前，不标 VERIFIED/CLOSED。Host/CI PASS 不替代原生 FMT-SIM；FMT-SIM PASS 不替代 B07 H723 实机/HIL/WCET/栈水位/飞行证据。

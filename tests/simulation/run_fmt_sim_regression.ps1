@@ -21,6 +21,7 @@ param(
     [ValidateRange(0.1, 0.95)][double]$FmtHover = 0.62,
     [ValidateRange(350, 1000)][int]$FmtStateTimeoutMs = 350,
     [ValidateSet('All', 'Land', 'Return', 'Mission')][string]$Scenario = 'All',
+    [switch]$ConfirmLoopbackAddress,
     [switch]$AllowDirty
 )
 
@@ -279,12 +280,17 @@ $closureReasons = @()
 if ($Scenario -ne 'All') { $closureReasons += 'Only a subset of scenarios was requested.' }
 if ($FmtStateTimeoutMs -ne 350) { $closureReasons += 'State timeout differs from the strict 350 ms gate.' }
 if ($FmtHilPort -ne 14653) { $closureReasons += 'HIL UDP port differs from the required 14653 port.' }
+if ([Math]::Abs($FmtHover - 0.62) -gt 0.000000001) { $closureReasons += 'Hover calibration differs from the required baseline 0.62.' }
+if (-not $ConfirmLoopbackAddress) { $closureReasons += 'Owner has not confirmed the FMT-SIM HIL address is loopback 127.0.0.1.' }
+if ($buildStatus -ne 'PASS') { $closureReasons += 'SIL build did not pass.' }
+if (-not $allScenarioPass) { $closureReasons += 'One or more requested scenarios did not pass.' }
 if ($dirty -or $gitStatusAfter.Count -gt 0) { $closureReasons += 'Git working tree was dirty before or after the run.' }
 if ($branch -ne $expectedBranch) { $closureReasons += 'Branch does not match the required branch.' }
 if (-not $upstreamMatchesHead) { $closureReasons += 'Local HEAD does not match the fetched upstream tracking HEAD.' }
 if (-not $worktreeStable) { $closureReasons += 'Branch, HEAD or working-tree state changed during the run.' }
 $strictGateEligible = $overall -eq 'PASS' -and $Scenario -eq 'All' -and
     $FmtStateTimeoutMs -eq 350 -and $FmtHilPort -eq 14653 -and
+    [Math]::Abs($FmtHover - 0.62) -le 0.000000001 -and $ConfirmLoopbackAddress -and
     -not $dirty -and $gitStatusAfter.Count -eq 0 -and
     $branch -eq $expectedBranch -and $upstreamMatchesHead -and $worktreeStable
 
@@ -338,6 +344,7 @@ $manifest = [ordered]@{
     fmt_hil_port = $FmtHilPort
     graphics_adapter = $FmtGraphicsAdapter
     hover = $FmtHover
+    loopback_address_confirmed = [bool]$ConfirmLoopbackAddress
     state_timeout_ms = $FmtStateTimeoutMs
     scenarios_requested = $selectedScenarios
     tool_versions = $toolVersions
@@ -371,6 +378,7 @@ $summaryLines = @(
     "- Settings SHA256: $(Get-Sha256 $settingsPath)",
     "- HIL port / timeout: $FmtHilPort / $FmtStateTimeoutMs ms",
     "- Graphics adapter / hover: $FmtGraphicsAdapter / $FmtHover",
+    "- Owner confirmed 127.0.0.1 loopback: $ConfirmLoopbackAddress",
     '',
     '| Scenario | Result | Exit | Checks | Failures | Longest state gap | settle lines |',
     '|---|---:|---:|---:|---:|---:|---:|'
