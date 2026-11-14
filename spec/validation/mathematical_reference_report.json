@@ -40,10 +40,10 @@
     }
   ],
   "inputs_sha256": {
-    "spec/02_接口契约与公共数据规范.md": "e8fec710b1d1bf1bbda70e6a7cb6bf284c02117b9e8b6c84090127eb513cc5eb",
-    "spec/04_飞控核心模块与控制系统设计.md": "dfe6653a7c97dca6b1f020c503f22d236e07f343d5beccaebf344bd3930b795b",
+    "spec/02_接口契约与公共数据规范.md": "bd76fa776c2620f6bbf6496d4551bae9fc14d8a370b4a4b6817489aac7ce59fc",
+    "spec/04_飞控核心模块与控制系统设计.md": "e6fde4fcbfdd26385e37af414ddad6d4724f95fef1e0e6fc96b7bf3467ad73c7",
     "spec/05_传感器采集时间基准与GNSS独立运行.md": "dff1ef239a01b6d4877742c344a76caedae5d83b4087246a52d4306ac344c003",
-    "spec/07_实时调度与板级硬件资源设计.md": "e7d49474c934368416b463dd3e8ae6d67082ade6f0542d6dc68617125488df3c",
+    "spec/07_实时调度与板级硬件资源设计.md": "daa963e43052ca98fb532441974597805923b75970d629420762a505f12ce33d",
     "spec/08_产品配置插件与参数管理.md": "990787de51c9bdb96260a54781c1233db9116695fb93d40114218758bd876fad"
   }
 }
