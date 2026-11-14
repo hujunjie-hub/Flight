@@ -1370,12 +1370,11 @@ static uint8_t curve_bounds(
       velocity_mid_abs = add_upper_nonnegative(
           interval_abs_max(velocity_mid_interval),
           curve->eval_velocity_error[axis]);
-      position_rounding2 = sum_square_upper(position_rounding2, position_error);
-      velocity_rounding2 = sum_square_upper(velocity_rounding2, velocity_error);
+      /* Both errors act on the same coordinate and may have the same sign. */
       position_rounding2 = sum_square_upper(position_rounding2,
-          curve->eval_position_error[axis]);
+          add_upper_nonnegative(position_error, curve->eval_position_error[axis]));
       velocity_rounding2 = sum_square_upper(velocity_rounding2,
-          curve->eval_velocity_error[axis]);
+          add_upper_nonnegative(velocity_error, curve->eval_velocity_error[axis]));
       velocity_mid2 = sum_square_upper(velocity_mid2, velocity_mid_abs);
     }
 
@@ -2295,7 +2294,9 @@ uint8_t m5_trajectory_safety_test_curve_bounds(
     float position_low[3],
     float position_high[3],
     float *speed_bound,
-    float *acceleration_bound)
+    float *acceleration_bound,
+    float *position_error_m,
+    float *velocity_error_mps)
 {
   MotionReferencePoint start, end;
   M5SafetyBezier bezier;
@@ -2337,6 +2338,8 @@ uint8_t m5_trajectory_safety_test_curve_bounds(
   }
   *speed_bound = bounds.speed_bound;
   *acceleration_bound = bounds.acceleration_bound;
+  if (position_error_m != NULL) *position_error_m = bounds.position_rounding_error_m;
+  if (velocity_error_mps != NULL) *velocity_error_mps = bounds.velocity_rounding_error_mps;
   return 1u;
 }
 

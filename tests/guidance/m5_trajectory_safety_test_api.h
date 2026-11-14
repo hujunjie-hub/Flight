@@ -32,7 +32,9 @@ uint8_t m5_trajectory_safety_test_curve_bounds(
     float position_low[3],
     float position_high[3],
     float *speed_bound,
-    float *acceleration_bound);
+    float *acceleration_bound,
+    float *position_error_m,
+    float *velocity_error_mps);
 
 /* Continuous third-derivative bound over [u0,u1] plus the consumer gamma_2
    tail, per axis. */

@@ -2301,7 +2301,7 @@ static void test_m5_safety_bernstein_bounds_randomized(void)
 
     CHECK(m5_trajectory_safety_test_curve_bounds(
         p0, v0, a0, p1, v1, a1, duration, u0, u1,
-        position_low, position_high, &speed_bound, &acceleration_bound));
+        position_low, position_high, &speed_bound, &acceleration_bound, NULL, NULL));
 
     for (sample = 0u; sample <= 64u; ++sample) {
       double fraction = (double)sample / 64.0;
@@ -2346,7 +2346,7 @@ static void test_m5_safety_bernstein_zero_curve_enclosure(void)
 
   CHECK(m5_trajectory_safety_test_curve_bounds(
       zero, zero, zero, zero, zero, zero, 0.02f, 0.0f, 1.0f,
-      low, high, &speed, &acceleration));
+      low, high, &speed, &acceleration, NULL, NULL));
   for (axis = 0u; axis < 3u; ++axis) {
     CHECK(low[axis] <= 0.0f);
     CHECK(high[axis] >= 0.0f);
@@ -2363,16 +2363,16 @@ static void test_m5_safety_bernstein_bounds_invalid_inputs(void)
   float low[3], high[3], speed, acceleration;
   CHECK(!m5_trajectory_safety_test_curve_bounds(
       p0, v0, a0, p0, v0, a0, 1.0f, 0.5f, 0.5f,
-      low, high, &speed, &acceleration));
+      low, high, &speed, &acceleration, NULL, NULL));
   CHECK(!m5_trajectory_safety_test_curve_bounds(
       p0, v0, a0, p0, v0, a0, 0.0f, 0.0f, 1.0f,
-      low, high, &speed, &acceleration));
+      low, high, &speed, &acceleration, NULL, NULL));
   CHECK(!m5_trajectory_safety_test_curve_bounds(
       p0, v0, a0, p0, v0, a0, 1.0f, -0.1f, 0.5f,
-      low, high, &speed, &acceleration));
+      low, high, &speed, &acceleration, NULL, NULL));
   CHECK(!m5_trajectory_safety_test_curve_bounds(
       p0, v0, a0, p0, v0, a0, 1.0f, 0.0f, 1.1f,
-      low, high, &speed, &acceleration));
+      low, high, &speed, &acceleration, NULL, NULL));
   {
     float position[3], velocity[3], acceleration_values[3];
     CHECK(!m5_trajectory_safety_test_curve_eval(
@@ -6095,6 +6095,40 @@ static void test_m5_safety_s06_102_geofence_differential(void)
         == M5_SAFETY_PASS);
 }
 
+/* The analytic midpoint lies between binary32 values. Compare the actual
+   production geometry radius to the axis-aligned sum of the two error terms. */
+static void test_m5_safety_s06_116_midpoint_radius(void)
+{
+  SafetyFx fx;
+  const ProductMotionPoint *a, *b;
+  const float h = (float)PRODUCT_PREVIEW_STEP_US * 1e-6f;
+  double exact, midpoint_rounding;
+  float position_low[3], position_high[3], speed, acceleration;
+  float geometry_position, geometry_velocity;
+  float eval_position, eval_velocity, eval_acceleration;
+
+  safety_product_differential_reference(&fx, -0x1.f5a83ap-2f, 0.0f, 0u, 0x1.0cp-12f);
+  /* Isolate north so the standalone consumer radius equals its north error. */
+  fx.reference.anchor.point.position_ned_m[2] = 0.0f;
+  fx.reference.points[0].point.position_ned_m[2] = 0.0f;
+  a = &fx.reference.anchor.point;
+  b = &fx.reference.points[0].point;
+  exact = safety_differential_exact_max(&fx, 0u);
+  midpoint_rounding = fabs((double)(float)exact - exact);
+  CHECK(midpoint_rounding > 0.0);
+  CHECK(m5_trajectory_safety_test_curve_envelope(
+      a->position_ned_m, a->velocity_ned_mps, a->acceleration_ned_mps2,
+      b->position_ned_m, b->velocity_ned_mps, b->acceleration_ned_mps2,
+      h, 0.0f, 1.0f, &eval_position, &eval_velocity, &eval_acceleration));
+  CHECK(m5_trajectory_safety_test_curve_bounds(
+      a->position_ned_m, a->velocity_ned_mps, a->acceleration_ned_mps2,
+      b->position_ned_m, b->velocity_ned_mps, b->acceleration_ned_mps2,
+      h, 0.0f, 1.0f, position_low, position_high, &speed, &acceleration,
+      &geometry_position, &geometry_velocity));
+  CHECK((double)geometry_position >= midpoint_rounding + eval_position);
+  CHECK(geometry_velocity >= eval_velocity);
+}
+
 /* S06-110: production jerk enforcement (spec/02 JERK bit). */
 static void test_m5_safety_jerk_envelope(void)
 {
@@ -6601,6 +6635,7 @@ int main(void)
     {"m5_safety_s06_100_static_differential", test_m5_safety_s06_100_static_differential},
     {"m5_safety_s06_101_dynamic_differential", test_m5_safety_s06_101_dynamic_differential},
     {"m5_safety_s06_102_geofence_differential", test_m5_safety_s06_102_geofence_differential},
+    {"m5_safety_s06_116_midpoint_radius", test_m5_safety_s06_116_midpoint_radius},
     {"m5_safety_jerk_envelope", test_m5_safety_jerk_envelope},
     {"m5_safety_jerk_interval_bound", test_m5_safety_jerk_interval_bound},
     {"m5_safety_jerk_bound_covers_analytic", test_m5_safety_jerk_bound_covers_analytic},

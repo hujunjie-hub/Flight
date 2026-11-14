@@ -634,6 +634,15 @@
       "oracle": "Three full-validator numerical rejections, three Horner helper rejections and one full-validator legal companion",
       "source": "tests/guidance/test_m5_main.c",
       "full_validator_horner_reachability": "PENDING_INDEPENDENT_REVIEW"
+    },
+    {
+      "id": "S06-116",
+      "name": "MR-009 same-axis geometry rounding composition",
+      "seed": "NOT_APPLICABLE",
+      "checks": 9,
+      "status_at_code_baseline": "PASS",
+      "oracle": "Production geometry radius encloses the analytic midpoint conversion error plus the binary32 consumer envelope",
+      "source": "tests/guidance/test_m5_main.c"
     }
   ],
   "overall_m5_06_status": {
