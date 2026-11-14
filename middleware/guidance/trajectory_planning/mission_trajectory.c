@@ -235,6 +235,14 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
         for (i = 0; i < 3; ++i) envelope.vehicle_extension.max_velocity_ned_mps[i] =
             fminf(envelope.vehicle_extension.max_velocity_ned_mps[i], limit);
         limited.safety_envelope = &envelope; in = &limited;
+    } else if (guidance_has_landing_plane(in)) {
+        /* M6 reconstructs each 20 ms interval from float boundary states. Keep
+         * landing-curve jerk 25% below the product envelope to preserve margin
+         * against consumer-side reconstruction and quantization. */
+        envelope = *in->safety_envelope; limited = *in;
+        for (i = 0; i < 3; ++i)
+            envelope.vehicle_extension.max_jerk_ned_mps3[i] *= GUIDANCE_LANDING_JERK_MARGIN;
+        limited.safety_envelope = &envelope; in = &limited;
     }
     if ((in->geofence_count && !guidance_home_ok(in)) || !target(in, s, goal, &yaw)) {
         *reason = GUIDANCE_PLAN_REASON_GEOFENCE_INVALID; *constraint = GUIDANCE_PLAN_CONSTRAINT_GEOFENCE; return STATUS_INVALID_ARGUMENT;

@@ -38,6 +38,8 @@ CONTRACT_STATIC_ASSERT(GUIDANCE_MAX_DURATION_US == 6200000u,
 #define GUIDANCE_LANDING_CONTACT_HEIGHT_M 0.06f
 /* Start limiting descent early enough to decelerate before entering contact range. */
 #define GUIDANCE_LANDING_BRAKE_HEIGHT_M 0.20f
+/* Margin for M6's 20 ms float-boundary reconstruction of the landing curve. */
+#define GUIDANCE_LANDING_JERK_MARGIN 0.75f
 /* After reaching the Home plane at zero vertical speed, probe below it slowly.
  * The 4 s rest-to-rest probe remains inside M5's 6.2 s bounded horizon. */
 #define GUIDANCE_LANDING_PROBE_DURATION_S 4.0f
