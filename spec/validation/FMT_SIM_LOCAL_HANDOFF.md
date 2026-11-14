@@ -6,8 +6,6 @@
 >
 > 当前代码修复基线：**ce00ff9f0a8eb4989d1a171c3322f3640de2965c**
 >
-> 当前交接文档基线：**dffba6fd9e2f25e03083439b37a4d557fe11e24d**
->
 > 本方案只覆盖 Windows 原生 FMT-SIM + Flight Host SIL 软件动态复测；不代表 H723 真机、台架 HIL、WCET/RTA、目标栈水位或飞行验收。
 
 ## 1. 执行责任与长期约定
@@ -46,10 +44,10 @@ Host 证据包括 M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integ
 
 ## 3. 本机运行前置条件
 
-1. Windows 工作站；从 Flight 仓库根目录运行 PowerShell 7（pwsh）。
-2. 当前分支为 opt/stage-02-m5-06-safety-validator，工作区干净；运行前记录实际 HEAD，不要只记录分支名。
+1. Windows 工作站；从 Flight 仓库根目录运行 PowerShell 7（pwsh）。批量入口会用 PowerShell Parser 检查 run_sil.ps1 语法。
+2. 当前分支为 opt/stage-02-m5-06-safety-validator，工作区干净；运行前执行 git fetch origin，确认本地 HEAD 与 upstream tracking HEAD 一致，不要只记录分支名。
 3. 本机已配置 MinGW，默认路径为 D:\STM32CubeCLT\mingw64\bin；若安装位置不同，调整命令中的 GccDir。
-4. 使用隔离的 FMT-SIM 安装，不要指向生产/飞行实例。默认路径示例：
+4. 使用隔离的 FMT-SIM 安装，不要指向生产/飞行实例。正式批量入口只记录 EXE 文件名与 SHA256，不复制 FMT-SIM 二进制。默认路径示例：
 
    build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FMT_SIM.exe
 
@@ -60,94 +58,67 @@ Host 证据包括 M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integ
 
 ## 4. 一次性执行 Land / Return / Mission
 
-以下命令从 Flight 仓库根目录在 PowerShell 7 中执行。若 FMT-SIM 安装路径不同，只修改 $sim；若 MinGW 路径不同，只修改 $gccDir。
+先更新到当前分支的最新远端 HEAD，并确认工作区干净：
 
-~~~~powershell
-$ErrorActionPreference = 'Continue'
+```powershell
+git fetch origin
+git switch opt/stage-02-m5-06-safety-validator
+git pull --ff-only
+git status --short
+git rev-parse HEAD
+git rev-parse '@{u}'
+```
 
-$branch = (git branch --show-current).Trim()
-$head = (git rev-parse HEAD).Trim()
-if ($branch -ne 'opt/stage-02-m5-06-safety-validator') { throw "Wrong branch: $branch" }
-$dirtyBefore = @(git status --porcelain)
-if ($dirtyBefore.Count -ne 0) { throw 'Working tree must be clean before the FMT-SIM acceptance run' }
+从 Flight 仓库根目录执行正式批量入口。它先构建一次 SIL 可执行文件，再按 Land → Return → Mission 顺序分别启动和关闭全新的 FMT-SIM 进程：
 
-$sim = (Resolve-Path -LiteralPath 'build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FMT_SIM.exe').Path
-$simDir = Split-Path -Parent $sim
-$simRoot = Split-Path -Parent (Split-Path -Parent $simDir)
-$settings = Join-Path $simRoot 'Content/Settings/settings.jason'
-if (-not (Test-Path -LiteralPath $settings -PathType Leaf)) { throw "Missing FMT-SIM settings: $settings" }
+```powershell
+$sim = (Resolve-Path 'build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FMT_SIM.exe').Path
+pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -FmtHilPort 14653 -FmtStateTimeoutMs 350 -FmtGraphicsAdapter 1 -FmtHover 0.62
+```
 
-$gccDir = 'D:\STM32CubeCLT\mingw64\bin'
-$runId = 'M5-06-FMT-SIM-LOCAL-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
-$runRoot = Join-Path (Get-Location).Path "build/validation/fmt-sim-local/$runId"
-New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
+若 FMT-SIM 安装路径不同，只修改 `$sim`；MinGW 路径不同时使用 `-GccDir`。批量入口默认拒绝错误分支、dirty worktree、缺少 upstream tracking ref 或本地 HEAD 与 upstream HEAD 不一致。它也会检查 settings.jason 中指定端口恰好匹配一架 HIL/UDP 载具且 Autobound=true。
 
-$results = @()
-foreach ($scenario in @('Land', 'Return', 'Mission')) {
-    $outDir = Join-Path $runRoot $scenario
-    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-    & pwsh -NoProfile -File (Join-Path (Get-Location).Path 'tests/simulation/run_sil.ps1') -GccDir $gccDir -OutDir $outDir -FmtSimExe $sim -FmtHilPort 14653 -FmtScenario $scenario -FmtStateTimeoutMs 350 -FmtGraphicsAdapter 1 -FmtHover 0.62
-    $exitCode = $LASTEXITCODE
-    "exit_code=$exitCode" | Set-Content -LiteralPath (Join-Path $outDir 'exit.txt') -Encoding utf8
-    $results += [pscustomobject]@{
-        scenario = $scenario
-        exit_code = $exitCode
-        log = (Join-Path $outDir 'sil_flight.log')
-        engine_log = (Join-Path $outDir 'fmt_sim_engine.log')
-    }
-}
+批量入口调用 `run_sil.ps1 -BuildOnly` 构建一次，再通过 `run_sil.ps1 -ReuseBuild` 执行各场景；每个场景有独立 OutDir 和 FMT-SIM 引擎进程。即使一个场景失败，也会继续收集其余场景，逐项记录退出码，不覆盖之前 RUN_ID。
 
-$logHashes = @(
-    Get-ChildItem -LiteralPath $runRoot -File -Recurse |
-    Where-Object { $_.Name -in @('sil_flight.log', 'fmt_sim_engine.log', 'exit.txt') } |
-    ForEach-Object {
-        [pscustomobject]@{
-            path = $_.FullName.Substring($runRoot.Length + 1)
-            size_bytes = $_.Length
-            sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
-        }
-    }
-)
+单场景诊断可执行：
 
-$manifest = [ordered]@{
-    schema = 'FMT_SIM_LOCAL_HANDOFF_V1'
-    run_id = $runId
-    branch = $branch
-    commit = $head
-    dirty_before = $dirtyBefore
-    dirty_after = @(git status --porcelain)
-    fmt_sim_exe = $sim
-    fmt_sim_sha256 = (Get-FileHash -LiteralPath $sim -Algorithm SHA256).Hash
-    settings_path = $settings
-    settings_sha256 = (Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash
-    gcc_dir = $gccDir
-    fmt_hil_port = 14653
-    state_timeout_ms = 350
-    graphics_adapter = 1
-    hover = 0.62
-    scenarios = $results
-    logs = $logHashes
-}
-$manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $runRoot 'manifest.json') -Encoding utf8
+```powershell
+pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -Scenario Land
+pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -Scenario Return
+pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -Scenario Mission
+```
 
-$archive = "$runRoot.zip"
-Compress-Archive -Path (Join-Path $runRoot '*') -DestinationPath $archive -CompressionLevel Optimal -Force
-$archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
+单场景运行只用于定位问题，即使 PASS 也不能关闭整组 ENG-07 门禁。650 ms 或 1000 ms 可用于诊断链路，不属于严格 350 ms 验收，不得用于关闭 #17/#18/#19。
 
-$results | Format-Table -AutoSize
-Write-Host "RUN_ID=$runId"
-Write-Host "ARCHIVE=$archive"
-Write-Host "ARCHIVE_SHA256=$archiveHash"
-~~~~
+每次运行的原始目录为：
 
-该命令会对每个场景分别编译并运行，保留独立目录：
+```text
+build/validation/fmt-sim-local/FMT-SIM-LOCAL-<UTC时间>-<HEAD前8位>/
+  manifest.json
+  manifest.sha256
+  summary.md
+  SHA256SUMS.txt
+  build/
+    sil_flight.exe
+    sil_flight.log
+    build.stdout.log
+    build.stderr.log
+  Land/
+    sil_flight.exe
+    sil_flight.log
+    fmt_sim_engine.log
+    exit.txt
+    runner.stdout.log
+    runner.stderr.log
+  Return/
+    ...
+  Mission/
+    ...
+```
 
-- Land/sil_flight.log、Land/fmt_sim_engine.log、Land/exit.txt
-- Return/sil_flight.log、Return/fmt_sim_engine.log、Return/exit.txt
-- Mission/sil_flight.log、Mission/fmt_sim_engine.log、Mission/exit.txt
-- 根目录 manifest.json：记录分支、HEAD、工作区状态、FMT-SIM 可执行文件和设置文件 SHA256、端口、超时、图形适配器、各场景退出码及日志 SHA256。
+脚本还会在原始目录旁生成同名 ZIP 和独立的 .sha256 sidecar，控制台输出 RUN_ID、ARCHIVE 和 ARCHIVE_SHA256。ZIP 仅用于本机证据回传；如需纳入正式项目归档，仍须另按 ARCHIVE_METADATA_PROTOCOL.md 执行，不把该 ZIP 自动视为正式项目归档。
 
-脚本即使某个场景失败也会继续执行剩余场景，便于一次收集完整矩阵；每个场景的退出码单独记录。任何场景失败都不能判为整组 PASS。
+Manifest 记录 schema、RUN_ID、branch、完整 commit、dirty before/after、upstream HEAD 一致性、FMT-SIM EXE/settings SHA256、HIL 端口、图形适配器、hover、状态超时、工具链版本、构建结果、逐场景开始/结束时间、退出码、checks/failures、最长成功状态间隔和原始日志 SHA256。不会复制 FMT-SIM 安装文件或完整 settings 配置进归档。
 
 ## 5. 三个场景的验收条件
 

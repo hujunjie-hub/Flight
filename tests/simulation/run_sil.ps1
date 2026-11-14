@@ -9,6 +9,7 @@
     Usage:
         pwsh tests/simulation/run_sil.ps1
         pwsh tests/simulation/run_sil.ps1 -GccDir D:\STM32CubeCLT\mingw64\bin
+        pwsh tests/simulation/run_sil.ps1 -ReuseBuild -OutDir <scenario-output-dir>
 #>
 
 [CmdletBinding()]
@@ -23,11 +24,13 @@ param(
     [ValidateRange(350, 1000)][int]$FmtStateTimeoutMs = 350,
     [ValidateRange(0, 65535)][int]$GroundPort = 0,
     [switch]$SkipAbiLock,
-    [switch]$BuildOnly
+    [switch]$BuildOnly,
+    [switch]$ReuseBuild
 )
 
 $ErrorActionPreference = 'Stop'
 if ($FmtSimExe -and -not $FmtHilPort) { throw '-FmtSimExe requires -FmtHilPort' }
+if ($ReuseBuild -and $BuildOnly) { throw '-ReuseBuild cannot be combined with -BuildOnly' }
 if ($GroundPort -and $GroundPort -eq $FmtHilPort) {
     throw '-GroundPort and -FmtHilPort must use different ports'
 }
@@ -118,35 +121,43 @@ if ($GroundPort) {
     $sources += Join-Path $repoRoot 'tests/simulation/ground_log.c'
 }
 
-$objects = @()
-"== compile ==" | Set-Content -LiteralPath $log -Encoding utf8
-foreach ($source in $sources) {
-    $relative = $source.Substring($repoRoot.Length + 1)
-    $obj = Join-Path $OutDir (($relative -replace '[\\/]', '_') + '.o')
-    $isCpp = $source.EndsWith('.cpp')
-    $compiler = if ($isCpp) { Join-Path $GccDir 'g++.exe' } else { Join-Path $GccDir 'gcc.exe' }
-    $flags = @(
-        $(if ($isCpp) { '-std=c++14' } else { '-std=c99' }), '-O2', '-g', '-Wall', '-Wextra',
-        '-Wno-unused-function', '-fno-short-enums', '-DFLIGHT_HOST_TEST', '-DFLIGHT_HOST_SIL'
-    )
-    if ($GroundPort) { $flags += '-DFLIGHT_GROUND_STATION' }
-    if ($SkipAbiLock) { $flags += '-DFLIGHT_SKIP_ABI_LOCK' }
-    if ($relative -notmatch 'osqp') { $flags += '-Werror' }
-    if ((Split-Path $source -Leaf) -in @('adis16505.c', 'bmp585.c')) {
-        $flags += '-DFLIGHT_DRIVER_CODEC_TEST'
-    }
-    if ($isCpp) { $flags += @('-fno-exceptions', '-fno-rtti', '-fno-threadsafe-statics') }
-    $flags += $includes | ForEach-Object { "-I$_" }
-    & $compiler @flags -c $source -o $obj 2>&1 | Tee-Object -FilePath $log -Append
-    if ($LASTEXITCODE -ne 0) { throw "compile failed: $relative" }
-    $objects += $obj
-}
-
-"== link ==" | Add-Content -LiteralPath $log -Encoding utf8
 $exe = Join-Path $OutDir 'sil_flight.exe'
-& (Join-Path $GccDir 'g++.exe') -static -static-libgcc -static-libstdc++ @objects -lm -lws2_32 -o $exe 2>&1 |
-    Tee-Object -FilePath $log -Append
-if ($LASTEXITCODE -ne 0) { throw 'link failed' }
+if ($ReuseBuild) {
+    if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+        throw "Reusable SIL executable not found: $exe"
+    }
+    "== reuse build ==" | Set-Content -LiteralPath $log -Encoding utf8
+    "exe=$exe" | Add-Content -LiteralPath $log -Encoding utf8
+} else {
+    $objects = @()
+    "== compile ==" | Set-Content -LiteralPath $log -Encoding utf8
+    foreach ($source in $sources) {
+        $relative = $source.Substring($repoRoot.Length + 1)
+        $obj = Join-Path $OutDir (($relative -replace '[\\/]', '_') + '.o')
+        $isCpp = $source.EndsWith('.cpp')
+        $compiler = if ($isCpp) { Join-Path $GccDir 'g++.exe' } else { Join-Path $GccDir 'gcc.exe' }
+        $flags = @(
+            $(if ($isCpp) { '-std=c++14' } else { '-std=c99' }), '-O2', '-g', '-Wall', '-Wextra',
+            '-Wno-unused-function', '-fno-short-enums', '-DFLIGHT_HOST_TEST', '-DFLIGHT_HOST_SIL'
+        )
+        if ($GroundPort) { $flags += '-DFLIGHT_GROUND_STATION' }
+        if ($SkipAbiLock) { $flags += '-DFLIGHT_SKIP_ABI_LOCK' }
+        if ($relative -notmatch 'osqp') { $flags += '-Werror' }
+        if ((Split-Path $source -Leaf) -in @('adis16505.c', 'bmp585.c')) {
+            $flags += '-DFLIGHT_DRIVER_CODEC_TEST'
+        }
+        if ($isCpp) { $flags += @('-fno-exceptions', '-fno-rtti', '-fno-threadsafe-statics') }
+        $flags += $includes | ForEach-Object { "-I$_" }
+        & $compiler @flags -c $source -o $obj 2>&1 | Tee-Object -FilePath $log -Append
+        if ($LASTEXITCODE -ne 0) { throw "compile failed: $relative" }
+        $objects += $obj
+    }
+
+    "== link ==" | Add-Content -LiteralPath $log -Encoding utf8
+    & (Join-Path $GccDir 'g++.exe') -static -static-libgcc -static-libstdc++ @objects -lm -lws2_32 -o $exe 2>&1 |
+        Tee-Object -FilePath $log -Append
+    if ($LASTEXITCODE -ne 0) { throw 'link failed' }
+}
 if ($BuildOnly) {
     "Built $exe"
     return

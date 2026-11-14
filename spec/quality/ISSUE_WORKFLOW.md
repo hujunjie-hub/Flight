@@ -127,7 +127,7 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
 
 ## 13. R19 发布状态规则
 
-- 当前 `GITHUB_PUBLICATION = PENDING`；`spec/quality/ISSUE_REGISTER.md` 是正式本地登记，
+- 当前 `GITHUB_PUBLICATION = PARTIAL`；GitHub Issues #8–#19 已在线跟踪；`spec/quality/ISSUE_REGISTER.md` 是正式登记，
   `BLOCKER_BOARD.md` 只是派生视图。
 - 未授权时不得创建/声称 GitHub Issue 编号，不得把本地状态写成 CLOSED。
 - 授权后才可把本地条目同步到 GitHub Issues，并保持状态一致；GitHub 在线 Issue
@@ -161,14 +161,14 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
 - `prepare_archive_metadata.py` 在 ZIP 创建前从真实 Git 动态生成 archive head、remote、ahead、tooling/collector/script commits 和 tool source identity。
 - ZIP 自身 SHA256/size 只能写入外部 report 和 `.sha256` sidecar，不得嵌入 ZIP 内部 Manifest。
 - R29 checker 必须拒绝旧 R28 后置元数据模式；UNKNOWN/BLOCKED 不得 PASS。
-- B01/B02/B03 未经 OWNER 批准保持 FAIL；B05/MR-009 在 R31 内部预审后仍为 WAITING_INDEPENDENT_REVIEW，须由独立审查者逐项签署；其他安全问题同样遵循独立审查要求。
+- B01/B02/B03 的历史审批和当前状态以最新阻塞板为准；B05/MR-009 的独立审查要求已由项目方于 2026-11-14 明确豁免，仅限该项；其他安全问题仍遵循独立审查要求。
 
 
 ## 16. 原生 FMT-SIM 本机复测责任与交接
 
 - 所有需要 Windows 原生 FMT-SIM 引擎的动态场景由项目 Owner 在本机执行；远程 Agent 不代跑、不推断、不伪造 FMT-SIM 结果。
 - Agent 继续负责生产代码修改、Host/Host SIL/集成/Sanitizer、静态检查、CI、失败分析、回归测试、SPEC/Issue 更新和分支提交。
-- FMT-SIM 的正式命令、配置、350 ms 门槛、日志与 SHA256 归档、失败回传、Agent 后续处理顺序，统一以 spec/validation/FMT_SIM_LOCAL_HANDOFF.md 为准。
+- FMT-SIM 的正式命令、配置、350 ms 门槛、日志与 SHA256 归档、失败回传、Agent 后续处理顺序，统一以 spec/validation/FMT_SIM_LOCAL_HANDOFF.md 和 tests/simulation/run_fmt_sim_regression.ps1 为准；关闭审查还要求本地 HEAD 与 upstream tracking HEAD 一致。
 - 本机运行必须记录 branch、完整 HEAD、FMT-SIM binary/settings SHA256、运行参数、逐场景退出码和原始日志 SHA256；未提供证据的字段写 NOT_RUN / UNKNOWN。
 - #17/#18/#19 只有在对应原生场景完成其终端回执、连续 LANDED 证据、DISARMED 回执及 350 ms 状态流条件后，才可进入复核；Host/CI PASS 不替代原生 FMT-SIM 复测。
 - FMT-SIM 软件仿真不替代 B07 的 H723 目标运行、物理 HIL、WCET/RTA、目标栈水位或飞行验收。

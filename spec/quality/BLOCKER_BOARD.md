@@ -12,7 +12,7 @@ code-validation HEAD `8dcb60b3ac18e6a763c939d3e810984092cdd321`；
 ahead 动态计算；branch `opt/stage-02-m5-06-safety-validator`。
 
 本文件结论来自历史本地验证记录与本轮 GitHub Actions 远程 Host/SIL/Cortex-M7 编译证据；均不是 H723 实机、HIL、
-WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
+WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；GitHub Issues #8–#19 已在线跟踪，历史本地编号仅按明确映射关联。
 
 ## B01 Spec Audit FAIL
 
@@ -69,13 +69,13 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 | 字段 | 内容 |
 |---|---|
 | Issue | FLIGHT-LOCAL-04 |
-| 状态 | **WAITING_INDEPENDENT_REVIEW**；R31 三轮内部工作仅为作者侧预审，不替代独立审查。 |
+| 状态 | **OWNER_WAIVED_INDEPENDENT_REVIEW / TECHNICAL_REVIEW_COMPLETED_WITH_CORRECTION**；项目方 2026-11-14 明确豁免该项独立审查，复核发现已修正；不声称第三方独立 APPROVED。 |
 | 已实现 | R30.3 rounded Horner product/sum recurrence、RN overflow midpoint fail-closed、gamma 定向舍入、正规/次正规误差界、系数构造/速度缩放/加速度缩放首个非有限值短路；R31 修复 velocity/acceleration time-shift derivative 使用实际 rounded vf/af 系数。 |
 | 已测试 | Host #43446380866 6/6、M6/M7 #43446380836 5/5、M7 #43446380724 2/2；M5 Host/ASan、MR-009 focused、S06-099 60,002 offsets 双模型 Fraction、S06-107 rounded-derivative oracle、18 mutation FP audit、ARM 两对象无 FMA、Cortex-M7 模块编译均 PASS。 |
 | 尚未声称 | degree 5/4/3 Horner 拒绝点完整 validator 输入可达性不作声称；H723 FPSCR 实机等价仍 NOT_RUN；M6 40 ms route preview 不在 M5-06 20 ms 证明域。 |
 | 证据 | Proof：spec/history/implementation/guidance/M5_06_6_MR009_PROOF.md；Matrix：spec/quality/owner_approval/R30/05_MR009_INDEPENDENT_REVIEW_MATRIX.md；CI #43446380866 / #43446380836 / #43446380724。 |
 | 解除条件 | 独立审查者逐项审查并签署 APPROVED；同时 S06-100..102、B06/B07 等其余 M5-06 发布门禁仍须分别完成。 |
-| 下一步 | 将 R30/R31 proof、矩阵、代码差异与 CI 证据交给独立审查者；审查完成前保持 WAITING_INDEPENDENT_REVIEW 和 M5-06 BLOCKED，不推进 M5-07。 |
+| 下一步 | 保留 R30/R31 proof、矩阵、代码差异与 CI 证据；按 B06/B07 等独立门禁继续验收，不推进 M5-07。 |
 
 ## B06 Validator 栈预算
 
@@ -124,4 +124,4 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 | [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / FIX NOT YET DYNAMICALLY RETESTED | Owner 本机按 350 ms 运行；Return 完成、连续 LANDED、DISARMED 和完整日志 |
 | [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / FIX NOT YET DYNAMICALLY RETESTED | Owner 本机按 350 ms 运行；双航点完成、Return、终端回执、连续 LANDED、DISARMED 和完整日志 |
 
-后续原生 FMT-SIM 均由项目 Owner 在 Windows 本机执行，远程 Agent 不代跑。Agent 负责代码修复、Host/SIL/CI、日志分析和分支交付。命令、环境指纹、归档和回传规则见 [FMT-SIM 本机复测交接方案](../validation/FMT_SIM_LOCAL_HANDOFF.md)。三项 Issue 在本机证据回传并复核前保持 OPEN；不得用 Host/CI PASS 或 650 ms 诊断运行关闭。
+后续原生 FMT-SIM 均由项目 Owner 在 Windows 本机执行，远程 Agent 不代跑。Agent 负责代码修复、Host/SIL/CI、日志分析和分支交付。命令、环境指纹、归档和回传规则见 [FMT-SIM 本机复测交接方案](../validation/FMT_SIM_LOCAL_HANDOFF.md)；批量入口为 `tests/simulation/run_fmt_sim_regression.ps1`。三项 Issue 在本机证据回传并复核前保持 OPEN；不得用 Host/CI PASS 或 650 ms 诊断运行关闭。

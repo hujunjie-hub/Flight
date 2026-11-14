@@ -138,7 +138,7 @@ The Return trace showed 0.358 m/s at 0.105 m above Home. A 0.06 m-only speed cap
 
 Host CI on ce00ff9 PASS: Host validation #43547565040, M6/M7 host validation #43547564966, M7 host validation #43547564942. M4 1,074/0; M5 324,792/0; MR-009 focused 430/0; M4/M5 integration 1,147/0; M5 ASan/UBSan 324,792/0; integration sanitizer 1,147/0.
 
-Native FMT-SIM must still be rerun before #17/#18 can close.
+Native FMT-SIM must still be rerun locally before #17/#18/#19 can close.
 
 
 ## ENG-07 原生 FMT-SIM 本机复测责任与证据入口
@@ -146,3 +146,8 @@ Native FMT-SIM must still be rerun before #17/#18 can close.
 按项目方要求，后续 Windows 原生 FMT-SIM 动态复测统一由项目 Owner 在本机完成；远程 Agent 负责代码修改、Host/SIL/CI 和失败分析，不代跑原生引擎。正式操作及证据格式见 [FMT-SIM 本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。
 
 当前代码修复基线为 ce00ff9，文档/CI 基线为 dffba6f。Host #642、M6/M7 #130、M7 #91 均通过；修复后的原生 FMT-SIM 尚未复测。#17 Land、#18 Return、#19 Mission 保持 OPEN，待 Owner 在本机以同一隔离安装、UDP 14653、350 ms 门槛顺序运行，并回传 manifest、完整日志和 SHA256。Host/CI 通过不关闭动态仿真 Issue；FMT-SIM 通过也不代表 H723 实机、物理 HIL 或飞行通过。
+
+
+## ENG-07 Native FMT-SIM: local execution tool
+
+The project owner runs all native Windows FMT-SIM scenarios locally. The formal batch runner `tests/simulation/run_fmt_sim_regression.ps1` builds SIL once, starts a fresh simulator process for Land, Return and Mission, and emits a unique manifest, raw logs, SHA256SUMS and a handoff ZIP. A clean checkout and local HEAD matching the upstream tracking HEAD are required for issue-closure eligibility. Issues #17/#18/#19 remain OPEN until the returned local evidence is reviewed. See [FMT_SIM_LOCAL_HANDOFF.md](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md).

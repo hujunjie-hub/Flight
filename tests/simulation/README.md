@@ -88,3 +88,15 @@ Land、Return、Mission 的 Windows 原生 FMT-SIM 动态验收由项目 Owner �
 正式操作手册（分支检查、隔离实例配置、350 ms 固定门槛、三场景顺序命令、manifest/日志 SHA256、验收条件和回传流程）见 [FMT-SIM 本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。
 
 注意：此处原生 FMT-SIM 与不启动引擎的 Host SIL 不同。不要将 650 ms 诊断运行报告为 350 ms 验收通过；不要提交 FMT-SIM 二进制或包含凭据的本机配置。
+
+
+## ENG-07 原生 FMT-SIM 正式批量入口
+
+从最新分支拉取后，在本地 Windows PowerShell 7 执行：
+
+```powershell
+$sim = (Resolve-Path 'build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FMT_SIM.exe').Path
+pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim
+```
+
+该入口一次构建 SIL、分别启动 Land/Return/Mission 的新 FMT-SIM 进程，生成 RUN_ID、Manifest、原始日志、SHA256SUMS 和回传 ZIP。要求干净工作区、目标分支及本地 HEAD 与 upstream tracking HEAD 一致。单场景只用于诊断。详细判据见 [本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。
