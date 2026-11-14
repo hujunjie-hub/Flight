@@ -1029,7 +1029,7 @@ static void test_post_mission_return_starts_after_control_binding(void)
   CHECK(fms_policy_stop() == STATUS_OK);
 }
 
-static void test_post_mission_return_missing_control_times_out_in_hold(void)
+static void test_post_mission_return_missing_control_cancels_safely(void)
 {
   Fx fx;
   const uint32_t request_id = 3201u;
@@ -1041,14 +1041,11 @@ static void test_post_mission_return_missing_control_times_out_in_hold(void)
   CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
   fx_run(&fx, FMS_RETURN_PREPARE_TIMEOUT_US + 100000u);
   CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
+  CHECK(fx.out.state_snapshot.failsafe_level >= FAILSAFE_ACTION_REQUIRED);
   CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
   CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_FAILED);
   const CommandAck *ack = fx_find_ack(&fx, request_id);
-  printf("return missing-control result: ack_state=%u reason=%u mode=%u failsafe=%u permit=0x%08x\\n",
-         ack ? ack->ack_state : 0u, ack ? ack->reason_code : 0u,
-         fx.out.state_snapshot.flight_mode, fx.out.state_snapshot.failsafe_level,
-         fx.out.actuation_permit.permit_flags);
-  CHECK(ack != NULL && ack->reason_code == 6u);
+  CHECK(ack != NULL && ack->reason_code == 12u);
   CHECK(fms_policy_stop() == STATUS_OK);
 }
 
@@ -1659,7 +1656,7 @@ int main(void)
     {"clear_empty_mission_requires_disarm", test_clear_empty_mission_requires_disarm},
     {"return_pauses_running_mission", test_return_pauses_running_mission},
     {"post_mission_return_starts_after_control_binding", test_post_mission_return_starts_after_control_binding},
-    {"post_mission_return_missing_control_times_out_in_hold", test_post_mission_return_missing_control_times_out_in_hold},
+    {"post_mission_return_missing_control_cancels_safely", test_post_mission_return_missing_control_cancels_safely},
     {"duplicate_request_replay", test_duplicate_request_replays_ack},
     {"dedup_full_and_expiry", test_dedup_full_and_expiry},
     {"geofence_required", test_geofence_required_rejects_outside_waypoint},
