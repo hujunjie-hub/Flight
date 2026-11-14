@@ -343,8 +343,25 @@ static void test_landing_contact_latches_horizontal_hold(void)
   CHECK(fx_step(&fx) == STATUS_OK);
   const uint32_t epoch = fx.out.guidance_status.reference_epoch;
 
+  /* The first contact observation is only a settling hint. M5 must stop
+   * chasing Home before M4's stricter LANDED dwell has completed. */
   fx.has_landed = 1u;
+  fx.landed.state = LANDED_STATE_UNKNOWN;
+  fx.landed.evidence_mask = LANDED_EVIDENCE_GROUND_CONTACT;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.feasibility.feasible);
+  CHECK(fx.out.guidance_status.reference_epoch == epoch);
+  CHECK(fx.out.reference.points[23].point.position_ned_m[0] > 1.80f);
+  CHECK(fx.out.reference.points[23].point.position_ned_m[0] < 2.20f);
+  CHECK(fx.out.reference.points[23].point.position_ned_m[1] < -0.80f);
+  CHECK(fx.out.reference.points[23].point.position_ned_m[1] > -1.20f);
+  CHECK(fabsf(fx.out.reference.points[23].point.position_ned_m[2] -
+              fx.nav.core.position_ned_m[2]) < 0.05f);
+
+  /* M4 may later publish LANDED; the measured contact target must not move. */
   fx.landed.state = LANDED_STATE_LANDED;
+  fx.landed.evidence_mask = LANDED_EVIDENCE_GROUND_CONTACT |
+                            LANDED_EVIDENCE_VERTICAL_STABLE;
   CHECK(fx_step(&fx) == STATUS_OK);
   CHECK(fx.out.feasibility.feasible);
   CHECK(fx.out.guidance_status.reference_epoch == epoch);
@@ -353,9 +370,9 @@ static void test_landing_contact_latches_horizontal_hold(void)
   CHECK(fx.out.reference.points[23].point.position_ned_m[1] < -0.80f);
   CHECK(fx.out.reference.points[23].point.position_ned_m[1] > -1.20f);
 
-  /* The touchdown hold remains latched if the LANDED snapshot briefly drops;
-   * the vehicle must not resume chasing Home XY while M4 finishes disarming. */
+  /* The contact hold remains latched if the snapshot briefly drops. */
   fx.landed.state = LANDED_STATE_UNKNOWN;
+  fx.landed.evidence_mask = 0u;
   CHECK(fx_step(&fx) == STATUS_OK);
   CHECK(fx.out.feasibility.feasible);
   CHECK(fx.out.guidance_status.reference_epoch == epoch);

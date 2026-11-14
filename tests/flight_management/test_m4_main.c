@@ -1344,6 +1344,31 @@ static void test_actuator_loss_terminal_and_latched(void)
   CHECK(fms_policy_stop() == STATUS_OK);
 }
 
+static void test_contact_candidate_does_not_authorize_disarm(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx)); fx_arm(&fx); fx_control_active(&fx, 94);
+  fx.nav.core.velocity_ned_mps[0] = 0.25f;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.landed_state.state == LANDED_STATE_UNKNOWN);
+  CHECK((fx.out.landed_state.evidence_mask & LANDED_EVIDENCE_GROUND_CONTACT) != 0u);
+  CHECK(fx.out.landed_state.stable_duration_ms == 0u);
+  CHECK(fx_send_simple(&fx, PRODUCT_CMD_DISARM) == COMMAND_ACK_REJECTED);
+  CHECK(fx.out.state_snapshot.arm_state == ARM_STATE_ARMED);
+
+  /* Once the measured motion is stable for the full dwell, normal DISARM is
+   * permitted; the contact hint itself never bypasses this authorization. */
+  fx.nav.core.velocity_ned_mps[0] = 0.0f;
+  fx_run(&fx, 2600000u);
+  CHECK(fx.out.landed_state.state == LANDED_STATE_LANDED);
+  CHECK((fx.out.landed_state.evidence_mask &
+         (LANDED_EVIDENCE_GROUND_CONTACT | LANDED_EVIDENCE_VERTICAL_STABLE)) ==
+        (LANDED_EVIDENCE_GROUND_CONTACT | LANDED_EVIDENCE_VERTICAL_STABLE));
+  CHECK(fx_send_simple(&fx, PRODUCT_CMD_DISARM) == COMMAND_ACK_COMPLETED);
+  CHECK(fx.out.state_snapshot.arm_state == ARM_STATE_DISARMED);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
 static void test_lost_contact_evidence_clears_landed(void)
 {
   Fx fx;
@@ -1667,6 +1692,7 @@ int main(void)
     {"forced_land_cancels_return", test_forced_land_cancels_return},
     {"safety_handoff_missing_control_expires", test_safety_handoff_missing_control_expires},
     {"actuator_loss_terminal", test_actuator_loss_terminal_and_latched},
+    {"contact_candidate_not_disarm_authority", test_contact_candidate_does_not_authorize_disarm},
     {"lost_contact_clears_landed", test_lost_contact_evidence_clears_landed},
     {"mission_arrival_3d", test_mission_arrival_requires_height_and_vertical_speed},
     {"takeoff_explicit_target", test_takeoff_publishes_explicit_home_relative_target},

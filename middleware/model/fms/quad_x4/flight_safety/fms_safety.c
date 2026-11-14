@@ -106,7 +106,7 @@ void fms_land_tick(FmsEngine *e, const FmsInputs *in)
 
   if (in->ground_contact == GROUND_CONTACT_CONTACT && ground_stable != 0u) {
     desired = LANDED_STATE_LANDED;
-    evidence = 0x1u | 0x2u; /* Ground contact and stable navigation evidence. */
+    evidence = LANDED_EVIDENCE_GROUND_CONTACT | LANDED_EVIDENCE_VERTICAL_STABLE;
     confidence = 0.95f;
   } else if (in->ground_contact == GROUND_CONTACT_NO_CONTACT) {
     desired = LANDED_STATE_IN_AIR; /* explicit contact evidence beats speed heuristics */
@@ -116,6 +116,17 @@ void fms_land_tick(FmsEngine *e, const FmsInputs *in)
     desired = LANDED_STATE_IN_AIR;
     evidence = 0x2u;
     confidence = 0.6f;
+  } else if (in->ground_contact == GROUND_CONTACT_CONTACT && in->cap_ok != 0u &&
+             (in->nav->core.valid_mask & in->cap->capability_mask &
+              (NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY)) ==
+                 (NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY) &&
+             fms_finite(in->nav->core.velocity_ned_mps[0]) &&
+             fms_finite(in->nav->core.velocity_ned_mps[1]) &&
+             vz_valid != 0u && fabsf(vz) <= 0.3f) {
+    /* Advisory contact candidate only. LANDED and DISARM still require the
+     * unchanged velocity/acceleration gates and full 2 s stable dwell. */
+    evidence = LANDED_EVIDENCE_GROUND_CONTACT;
+    confidence = 0.5f;
   }
 
   if (e->flight.flight_mode == FLIGHT_MODE_AUTO_LAND && desired == LANDED_STATE_IN_AIR &&
@@ -137,7 +148,11 @@ void fms_land_tick(FmsEngine *e, const FmsInputs *in)
   if (desired == LANDED_STATE_UNKNOWN) {
     if (e->land.state != LANDED_STATE_UNKNOWN) e->land.revision++;
     e->land.state = e->land.candidate = LANDED_STATE_UNKNOWN;
-    e->land.evidence_mask = 0; e->land.confidence = 0; e->land.stable_ms = 0;
+    /* Preserve a fresh physical-contact hint for M5 ground-settling only.
+     * UNKNOWN never authorizes ARM/DISARM or a ground-stop certificate. */
+    e->land.evidence_mask = evidence;
+    e->land.confidence = confidence;
+    e->land.stable_ms = 0u;
     e->land.candidate_since_us = in->now_us; e->land.since_us = in->now_us;
     return;
   }

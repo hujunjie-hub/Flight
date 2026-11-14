@@ -96,6 +96,15 @@ static uint8_t landing_confirmed(const GuidanceInput *in)
         in->landed_state->state == LANDED_STATE_LANDED);
 }
 
+static uint8_t landing_contact_observed(const GuidanceInput *in)
+{
+    return (uint8_t)(in->landed_state != NULL &&
+        guidance_header_ok(&in->landed_state->header, &in->navigation->header,
+                          MSG_LANDED_STATE_SNAPSHOT, in->evaluation_time_us) &&
+        in->landed_state->state == LANDED_STATE_UNKNOWN &&
+        (in->landed_state->evidence_mask & LANDED_EVIDENCE_GROUND_CONTACT) != 0u);
+}
+
 static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, float goal[3])
 {
     const float home_down = in->directive->payload.home.position_ned_m[2];
@@ -109,19 +118,19 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
         (in->control_time_us - s->plan_start_us) * 1e-6f >= s->plan_duration_s);
 
     if (s->landing_stage == LANDING_CONTACT_HOLD) {
-        /* Keep the touchdown XY target latched even if the LANDED snapshot
-         * briefly drops while M4 completes its disarm handoff. */
+        /* Keep the measured contact point latched through the FMS dwell and
+         * disarm handoff, even if the contact/LANDED evidence briefly drops. */
         memcpy(goal, s->ctx.target_ned, sizeof(s->ctx.target_ned));
         return;
     }
-    if (landing_confirmed(in)) {
-        /* Stop chasing the exact Home XY point after physical contact. The
-         * measured touchdown point becomes the hold target while the existing
-         * vertical probe reference remains unchanged for the disarm handoff. */
+    if (landing_confirmed(in) || landing_contact_observed(in)) {
+        /* Physical contact is an early M5 settling hint, not disarm authority.
+         * Stop chasing Home XY and stop the below-plane probe at the measured
+         * contact point; M4 alone decides LANDED after its unchanged 2 s dwell. */
         s->landing_stage = LANDING_CONTACT_HOLD;
-        goal[0] = position[0];
-        goal[1] = position[1];
-        goal[2] = s->plan_valid ? s->ctx.target_ned[2] : position[2];
+        memcpy(goal, position, sizeof(s->ctx.target_ned));
+        memcpy(s->ctx.target_ned, goal, sizeof(s->ctx.target_ned));
+        s->plan_valid = 0u;
         return;
     }
 
@@ -305,7 +314,7 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
      * waypoint has been reached and during the final Home segment. */
     if (guidance_has_landing_plane(in) &&
         (s->landing_stage == LANDING_BRAKE || s->landing_stage == LANDING_FINAL ||
-         s->landing_stage == LANDING_PROBE)) {
+         s->landing_stage == LANDING_PROBE || s->landing_stage == LANDING_CONTACT_HOLD)) {
         for (i = 0; i < 3; ++i)
             planning_config.payload.max_jerk_ned_mps3[i] *= GUIDANCE_LANDING_JERK_MARGIN;
     }
