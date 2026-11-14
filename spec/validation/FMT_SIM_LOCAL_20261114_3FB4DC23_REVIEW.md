@@ -115,6 +115,6 @@ $sim = (Resolve-Path 'build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FM
 pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -FmtHilPort 14653 -FmtStateTimeoutMs 350 -FmtGraphicsAdapter 1 -FmtHover 0.62 -ConfirmLoopbackAddress
 ```
 
-本次最新 main 基线为 507133064b5f9c4176ff793ede8fa6e8a42fcad1。必须运行完整 Land → Return → Mission；不得更改 350 ms、UDP 14653、hover 0.62 或安全阈值。回传 ZIP 与 SHA256 sidecar。R37 全部场景通过前，不关闭 #17/#18/#19/#24，也不宣称 ENG-07 完成。
+生产代码修复提交为 507133064b5f9c4176ff793ede8fa6e8a42fcad1。R37 必须先 fetch 最新 origin/main 并记录实际 HEAD（后续文档提交可能使 HEAD 超过该代码提交），再运行完整 Land → Return → Mission；不得把 5071330 直接当作当前测试 HEAD，也不得更改 350 ms、UDP 14653、hover 0.62 或安全阈值。回传 ZIP 与 SHA256 sidecar。R37 全部场景通过前，不关闭 #17/#18/#19/#24，也不宣称 ENG-07 完成。
 
 FMT-SIM 是带 HIL 链路的 software SIL，不代表 H723 实机、物理台架 HIL、WCET/RTA、栈水位或飞行放行。
