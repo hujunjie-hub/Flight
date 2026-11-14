@@ -1,6 +1,6 @@
 # 飞行与策略仿真验证矩阵
 
-本文件的 PASS 记录均绑定各自历史 RUN_ID。最新原生复测 R34 在 main HEAD `85f02af5` 上完成：Land 33,837/4、Return 33,346/4、Mission 49,123/5，三场景均 FAIL；Mission 最后 0.50 m 下降速度为 0.674 m/s。R34 后 main 提交 `c9cd1792` 修复 M5 contact-hold 重新规划，提交 `d8ea0f05` 将水平对准与垂直下降拆分为独立阶段；精确修复代码 HEAD `d8ea0f05` 的 Host/M6-M7/M7 CI 分别 6/6、5/5、2/2 SUCCESS。修复后的原生 FMT-SIM 尚待 Owner 在 Windows 本机重跑，#17/#18/#19/#21/#22 均保持 OPEN。R33 及更早的 PASS 记录均为历史证据，不代表 R34 后代码已通过原生复测。
+本文件的 PASS 记录均绑定各自历史 RUN_ID。最新原生复测 R34 在 main HEAD `85f02af5` 上完成：Land 33,837/4、Return 33,346/4、Mission 49,123/5，三场景均 FAIL；Mission 最后 0.50 m 下降速度为 0.674 m/s。R34 后 main 提交 `c9cd1792` 修复 M5 contact-hold 重新规划，提交 `d8ea0f05` 将水平对准与垂直下降拆分为独立阶段；精确修复代码 HEAD `d8ea0f05` 的 Host/M6-M7/M7 CI 分别 6/6、5/5、2/2 SUCCESS。修复后的原生 FMT-SIM 尚待 Owner 在 Windows 本机重跑；#17/#18/#19/#21/#23 保持 OPEN，#22 的 advisory handoff 已在 R34 观察到 evidence=0x1 到达 M5，仍待独立安全复核。R33 及更早的 PASS 记录均为历史证据，不代表 R34 后代码已通过原生复测。
 历史整链记录使用 `SIM_CONTROLLED_STOP` Host 构建和隔离的 FMT-SIM Ground 场景。
 H723 的运行配置仍使用 `BENCH_INHIBIT`。设备固件、UART/DMA、板上时序和实机运动
 留在各自的验证门禁。
@@ -207,4 +207,4 @@ R34 RUN_ID `FMT-SIM-LOCAL-20261114T125449954Z-85f02af5` 的正式门禁、worktr
 
 三个场景在 contact=1、landed=UNKNOWN、evidence=0x1 时触发 M5 guidance reason=1550；Land / Return 为 SPEED constraint，Mission 为 ACCELERATION constraint。control rejected=-11 后 FMS 进入 terminal failsafe。Mission 最后 0.50 m 下降速度 0.674 m/s；返航 touchdown 0.050 m，两个航点最近距离 0.205 / 0.283 m。
 
-修复提交 `c9cd1792` 保留当前 M5 有效参考作为 contact-hold 重规划起点；`d8ea0f05` 将着陆拆成水平对准（保持当前高度）、0.60 m 进近架、0.20 m 制动、Home 平面和探针；Host 测试注入 raw nav 垂向速度/加速度瞬态。精确 fixed-code HEAD 的 Host/M6-M7/M7 CI 均 PASS。原生 FMT-SIM 尚未在新 HEAD 上复测；#17/#18/#19/#21/#22 均 OPEN。完整报告见 [R34 review](../../spec/validation/FMT_SIM_LOCAL_20261114_85F02AF5_REVIEW.md)。
+修复提交 `c9cd1792` 保留当前 M5 有效参考作为 contact-hold 重规划起点；`d8ea0f05` 将着陆拆成水平对准（保持当前高度）、0.60 m 进近架、0.20 m 制动、Home 平面和探针；Host 测试注入 raw nav 垂向速度/加速度瞬态。精确 fixed-code HEAD 的 Host/M6-M7/M7 CI 均 PASS。原生 FMT-SIM 尚未在新 HEAD 上复测；#17/#18/#19/#21/#23 均 OPEN；#22 的 handoff 已由 R34 观察到 evidence=0x1 到达 M5，仍待独立安全复核。完整报告见 [R34 review](../../spec/validation/FMT_SIM_LOCAL_20261114_85F02AF5_REVIEW.md)。

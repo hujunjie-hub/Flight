@@ -49,7 +49,7 @@ Test-only follow-up `2f8118f1b149183e5df2d6e9c9941a52bd52562e` expands `landing_
 
 接地候选修复 `419f56962f74fd9d89bc62cfc11ee0923910177c` / nav guard `15a33756d4e269800e6778c6180f7086179c9429` 后，最新测试提交 `3270cff5aec26e3ae0717c62d2d78e9f30752020` 的 CI：Host #43593701736（6/6）、M6/M7 #43593701892（5/5）、M7 #43593701803（2/2）全部 SUCCESS；M4 1,042/0、M5 327,030/0、M4/M5 integration 969/0、MR-009 focused 430/0、M7 274/0。
 
-**R34 归档并非最新 M5 修复后的复测。** R34 测试 HEAD `85f02af5` 早于 `c9cd1792` / `d8ea0f05`；当前固定代码基线 `d8ea0f05` 的原生 FMT-SIM 仍 NOT_RUN。#17/#18/#19/#21/#22 均保持 OPEN，不能以 Host/CI PASS 代替原生三场景结果。
+**R34 归档并非最新 M5 修复后的复测。** R34 测试 HEAD `85f02af5` 早于 `c9cd1792` / `d8ea0f05`；当前固定代码基线 `d8ea0f05` 的原生 FMT-SIM 仍 NOT_RUN。#17/#18/#19/#21/#23 等待完整原生三场景复测；#22 的 M4 advisory contact handoff 已在 R34 观察到 evidence=0x1 到达 M5，但仍等待独立安全复核。不能以 Host/CI PASS 代替原生三场景结果。
 
 ## 3. 本机运行前置条件
 

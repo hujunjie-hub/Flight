@@ -111,12 +111,13 @@ CI 不启动 Windows 原生 FMT-SIM，不能替代本轮修复后的动态复测
 
 ## 6. Issue 状态与下一步
 
-- #17 Land：R34 FAIL，contact-hold 重规划修复已提交，待原生复测。
-- #18 Return：R34 FAIL，contact-hold 重规划修复已提交，待原生复测。
+- #17 Land：R34 FAIL，M5 contact-hold 重规划修复已提交，待原生复测。
+- #18 Return：R34 FAIL，M5 contact-hold 重规划修复已提交，待原生复测。
 - #19 Mission：R34 FAIL，终端故障与近地速度超限均待原生复测。
-- #21 Mission near-ground speed：R34 实测 0.674 m/s，超过 0.40 m/s；已通过分离水平对准与垂直下降的 M5 修复，待原生复测。
-- #22 contact/LANDED handoff：R34 确认 advisory contact 已到 M5，但 M5 从 raw nav 瞬态重新规划导致拒绝；修复已提交，待原生复测。
+- #21 Mission near-ground speed：R34 实测 0.674 m/s，超过 0.40 m/s；分阶段着陆修复已提交，待原生复测。
+- #22 M4 advisory contact handoff：R34 确认 contact=1、landed=UNKNOWN、evidence=0x1 已到达 M5；R33 的 handoff 缺陷已由 `419f5696` / `15a33756` 修复，仍待独立安全复核。
+- #23 M5 contact-hold replan：R34 确认 handoff 后的 M5 重规划从 raw nav 瞬态起算并触发 reason 1550；`c9cd1792` / `d8ea0f05` 修复已提交，待原生复测。
 
-**所有 #17/#18/#19/#21/#22 继续 OPEN。** Owner 下一轮必须先 fetch 最新 main，再运行完整 Land → Return → Mission 批量入口；不可只跑单场景，不可提高 350 ms 门槛，不可放宽安全阈值。
+**#17/#18/#19/#21/#22/#23 均保持 OPEN。** 其中 #17/#18/#19/#21/#23 等待完整原生复测；#22 等待独立安全复核。Owner 下一轮必须先 fetch 最新 main，再运行完整 Land → Return → Mission 批量入口；不可只跑单场景，不可提高 350 ms 门槛，不可放宽安全阈值。
 
 FMT-SIM 软件 SIL 不替代 B07 H723 目标板运行、物理 HIL、WCET/RTA、目标 RAM/stack watermark、执行器响应或飞行证据。

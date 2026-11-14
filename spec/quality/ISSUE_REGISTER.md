@@ -1,6 +1,6 @@
 # Flight 问题登记清单入口
 
-本文件是当前本地正式问题登记入口。`GITHUB_PUBLICATION = PARTIAL`：GitHub Issues #8–#19、#21–#22 已用于当前部分问题在线跟踪；历史 FLIGHT-LOCAL 编号不保证与线上 Issue 一一映射，只有明确登记的映射有效。不得虚构 GitHub Issue 编号，也不得出现本地 CLOSED、GitHub OPEN 的状态冲突。
+本文件是当前本地正式问题登记入口。`GITHUB_PUBLICATION = PARTIAL`：GitHub Issues #8–#19、#21–#23 已用于当前部分问题在线跟踪；历史 FLIGHT-LOCAL 编号不保证与线上 Issue 一一映射，只有明确登记的映射有效。不得虚构 GitHub Issue 编号，也不得出现本地 CLOSED、GitHub OPEN 的状态冲突。
 
 - [全部开放问题](https://github.com/hujunjie-hub/Flight/issues?q=is%3Aissue+is%3Aopen)
 - [开放的安全问题](https://github.com/hujunjie-hub/Flight/issues?q=is%3Aissue+is%3Aopen+label%3Akind%3Asafety)
@@ -22,7 +22,7 @@
 
 状态必须按 [Issue 工作流](ISSUE_WORKFLOW.md) 更新；关闭前必须完成 [Issue 关闭清单](ISSUE_CLOSURE_CHECKLIST.md)。
 
-GitHub Issues #8–#19、#21–#22 已在线跟踪；#8 已因项目方明确豁免独立审查且技术复核完成而关闭（不代表第三方独立 APPROVED）。未映射的历史 FLIGHT-LOCAL 编号仍按本地状态管理；未完成适用的复验/审查不得 VERIFIED/CLOSED。MR-009/#8 的豁免仅限该项，不得扩展到其他安全/数学问题。下方带日期的 R16–R31/CI 条目保留当时快照；其中 GITHUB_PUBLICATION=PENDING、MR-009 WAITING_INDEPENDENT_REVIEW 和旧资源数字均非当前状态，当前状态以本段、末尾 ENG-07 当前记录和 BLOCKER_BOARD 顶部摘要为准。BLOCKER_BOARD.md 只是本文件的派生视图，不得维护独立状态。
+GitHub Issues #8–#19、#21–#23 已在线跟踪；#8 已因项目方明确豁免独立审查且技术复核完成而关闭（不代表第三方独立 APPROVED）。未映射的历史 FLIGHT-LOCAL 编号仍按本地状态管理；未完成适用的复验/审查不得 VERIFIED/CLOSED。MR-009/#8 的豁免仅限该项，不得扩展到其他安全/数学问题。下方带日期的 R16–R31/CI 条目保留当时快照；其中 GITHUB_PUBLICATION=PENDING、MR-009 WAITING_INDEPENDENT_REVIEW 和旧资源数字均非当前状态，当前状态以本段、末尾 ENG-07 当前记录和 BLOCKER_BOARD 顶部摘要为准。BLOCKER_BOARD.md 只是本文件的派生视图，不得维护独立状态。
 
 ## 历史本地正式登记（部分映射 GitHub Issues）
 
@@ -130,7 +130,7 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 - `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b` 将 LAND/RETURN 分成水平对准（保持当前高度）、垂直下降至 0.60 m、0.20 m 制动、Home 平面和探针阶段；M4 安全门槛未放宽。
 - 测试提交 `1f9b4ecdbbe90b3e8be9439ec2170478a8083de2` 增加接地瞬态 raw nav 速度/加速度回归，以及水平未对准时保持当前高度的测试。
 - 精确 HEAD `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b` 的 CI：Host [#43599814765](https://github.com/hujunjie-hub/Flight/actions/runs/43599814765) 6/6、M6/M7 [#43599814768](https://github.com/hujunjie-hub/Flight/actions/runs/43599814768) 5/5、M7 [#43599814733](https://github.com/hujunjie-hub/Flight/actions/runs/43599814733) 2/2 SUCCESS；M4 969/0、M5 329,654/0、M5 ASan/UBSan 329,654/0、M4/M5 integration 1,042/0、integration sanitizer 1,042/0、MR-009 focused 430/0，Cortex-M7 M4/M5/M6/M7 production compile PASS。
-- R34 测试 HEAD 早于上述 M5 修复；`d8ea0f05` 之后的原生 FMT-SIM 尚 NOT_RUN。#17/#18/#19/#21/#22 全部继续 OPEN。
+- R34 测试 HEAD 早于上述 M5 修复；`d8ea0f05` 之后的原生 FMT-SIM 尚 NOT_RUN。#17/#18/#19/#21/#22/#23 均保持 OPEN。#22 单独跟踪 M4 advisory contact evidence handoff：R34 已确认 evidence=0x1 到达 M5，等待独立安全复核；#23 跟踪 handoff 后 M5 contact-hold 重规划拒绝，修复已提交，等待完整原生复测。
 
 ### R33 历史归档（不是最新代码结果）
 
