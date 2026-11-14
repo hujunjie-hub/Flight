@@ -62,6 +62,25 @@ contact transient, a baro step at touchdown, or an attitude excursion). It sets
 the trigger but not the defect: a filter that cannot recover from a single bad
 innovation is unsafe regardless of the trigger.
 
+### 2.1 Deterministic reproduction (2026-11-15)
+
+`tests/estimator_backend/test_nis_recovery.cpp` (commit `4a3fdfaa`) drives the
+production port ABI and records the deadlock:
+
+```
+first displaced fix (40 m, 0.2 m std): result=5 nis=69932240.851060 nis_rejected 0 -> 1
+after 20 displaced fixes over 20 s:    accepted=1 rejected=21 recovered=0 last_nis=3018.585036
+```
+
+Twenty seconds of covariance growth brought NIS from 6.99e7 down to 3.0e3, which
+is still 266 times the dof-3 threshold: the gate cannot re-open by itself. The
+test is the red baseline for Stage B (the `recovered` and `gnss_pos_updates`
+assertions are the lines a fix must flip).
+
+Related gap: the estimator suite is not executed by any CI workflow
+([FLIGHT-35](https://github.com/hujunjie-hub/Flight/issues/35)), which is why this
+defect was never observed automatically.
+
 ## 3. Trigger candidates (Stage A confirms which one fired)
 
 The NIS deadlock explains the divergence; it does not explain which event produced
