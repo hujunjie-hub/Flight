@@ -1,10 +1,10 @@
 # ENG-07 原生 FMT-SIM 本机复测交接方案
 
-> 状态：**OWNER_LOCAL_RUN_REQUIRED / R36_FAIL_ON_3FB4DC23_BASELINE / R37_RETEST_LATEST_MAIN_REQUIRED**
+> 状态：**R37 已在 main `2d219ead`（含 `866f2d79`/`50713306`）完成 350 ms 三场景复测：Land 水平门槛已达标但 accel 差 0.029；Return 新回归 #25（RETURN handoff 约 2 m 被拒、terminal failsafe）；Mission 落点 0.504 m 超 0.50 限值 4 mm**
 >
 > 适用分支：**main**
 >
-> 当前最新代码基线：**507133064b5f9c4176ff793ede8fa6e8a42fcad1**；R36 后 M5 水平对准/制动门槛修复：**866f2d79dff583280b9b1e6f657eb29959b46df5** / **507133064b5f9c4176ff793ede8fa6e8a42fcad1**；此前接地候选交接、contact-hold 与低速门控修复保留在历史记录中。运行前必须 fetch 最新 origin/main。
+> 当前最新代码基线：**507133064b5f9c4176ff793ede8fa6e8a42fcad1**；M5 水平对准/制动门槛修复：**866f2d79dff583280b9b1e6f657eb29959b46df5** / **507133064b5f9c4176ff793ede8fa6e8a42fcad1**；最新本机复测 HEAD：**2d219ead6e3bcdbc5adff2fb7dfa365ab2a15bbb**（运行前必须 fetch 最新 origin/main）
 >
 > 本方案只覆盖 Windows 原生 FMT-SIM + Flight Host SIL 软件动态复测；不代表 H723 真机、台架 HIL、WCET/RTA、目标栈水位或飞行验收。
 
@@ -224,3 +224,12 @@ R34 后 main 修复：
 - `1f9b4ecdbbe90b3e8be9439ec2170478a8083de2`：增加 raw nav 垂向速度 0.128 m/s / 加速度 2.95 m/s² 接地瞬态回归，并验证水平未对准时保持当前高度。
 
 精确 fixed-code HEAD `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b` 的 CI：Host #43599814765 6/6、M6/M7 #43599814768 5/5、M7 #43599814733 2/2 SUCCESS；M4 969/0、M5 329,654/0、M5 ASan/UBSan 329,654/0、M4/M5 integration 与 sanitizer 各 1,042/0、MR-009 focused 430/0，Cortex-M7 production-module compile PASS。CI 不启动原生 FMT-SIM；Owner 必须 fetch 最新 main 后重跑完整正式批量入口。
+
+## 2026-11-15 R37 水平刹停修复后本机复测（main / 2d219ead）
+
+- RUN_ID `FMT-SIM-LOCAL-20261114T160601185Z-2d219ead`；测试 HEAD `2d219ead6e3bcdbc5adff2fb7dfa365ab2a15bbb`（含 `866f2d79`、`50713306`）；`main`/`origin/main` 一致，clean/stable，350 ms / UDP 14653 / hover 0.62 / loopback 满足；构建 PASS；manifest `dca7ed70…`、ZIP `f08b3923…`，102 项匹配。
+- 结果：Land **FAIL 48,801/3**、Return **FAIL 17,088/6**、Mission **FAIL 67,112/4**；合计 133,001 checks / 13 failures。
+- Land：无 failsafe，末端 `nav_vh=0.166`（已达标）、`nav_ad=0.529`（超 0.5 门槛 0.029），LANDED 未锁存；近地 0.315 m/s。
+- Return：**新回归 #25**。RETURN 后约 80 ms、真值高度约 1.99 m（`contact=2 landed=2`）报 `guidance=4/1550`（JERK→SPEED），估计垂向加速度约 8.62 m/s²；permit 撤销、`t=11.200 s` `FAILSAFE_TERMINAL`（cause 18），RETURN ACK 取消，场景 12.2 s 结束。
+- Mission：近地 0.340 m/s、两航点、无 failsafe 通过；返航落点 **0.504 m** 超 0.50 m 限值（`FAIL 1732`），LANDED 未锁存（末端 `nav_vh=0.236`）。
+- 下一轮方向：优先修复 #25 的 RETURN handoff 瞬态敏感（用已验参考而不是瞬时样本重建/校验），并为 ~8 m/s² 垂向瞬态加 Host 回归；随后处理 #23 的 LANDED（Land accel 0.029 余量、Mission 水平 0.236）与 Mission 4 mm 落点。修复后仍在干净 latest `main` 上完整复测。详见 [R37 归档复核报告](FMT_SIM_LOCAL_20261114_2D219EAD_REVIEW.md)。

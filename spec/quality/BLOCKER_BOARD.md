@@ -128,12 +128,14 @@
 
 | Issue | 场景 | 当前状态 | 执行责任 / 解除证据 |
 |---|---|---|---|
-| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / R35 FAIL; LOW-SPEED CONTACT-HOLD GATE COMMITTED; R36 PENDING | R35 48,801/4; near-ground 0.340 m/s PASS; contact hint arrived at ~0.248 m/s horizontal and was latched too early; final contact lost, no terminal/disarm ACK |
-| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R35 FAIL; LOW-SPEED CONTACT-HOLD GATE COMMITTED; R36 PENDING | R35 39,389/4; near-ground 0.316 m/s PASS; contact hint at ~0.200 m/s; t=25.800 s guidance 1550/JERK rejection, control -11, terminal failsafe |
-| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R35 FAIL; LOW-SPEED CONTACT-HOLD GATE COMMITTED; R36 PENDING | R35 67,112/3; near-ground 0.330 m/s PASS; waypoints 0.257/0.327 m and touchdown 0.219 m PASS; terminal/disarm ACK still missing |
-| [#21](https://github.com/hujunjie-hub/Flight/issues/21) | Mission near-ground speed | OPEN / R35 METRIC PASS; FULL-MISSION CLOSURE PENDING | R35 Land/Return/Mission final-0.50 m peaks 0.340/0.316/0.330 m/s, all <=0.40; Mission still fails terminal/disarm, so existing full-batch closure rule keeps this OPEN |
-| [#22](https://github.com/hujunjie-hub/Flight/issues/22) | M4 advisory contact handoff | OPEN / R34+R35 CONFIRM EVIDENCE=0x1 REACHES M5; INDEPENDENT REVIEW PENDING | R33 evidence=0x0 handoff gap fixed by `419f5696` / `15a33756`; R34/R35 confirm contact candidate evidence reaches M5. The subsequent M5 early-consumption / replan failure is tracked separately in #23 |
-| [#23](https://github.com/hujunjie-hub/Flight/issues/23) | M5 contact-hold replan | OPEN / R35 EARLY CONTACT LATCH / JERK FAILURE REPRODUCED; FIX `69626899` COMMITTED; R36 PENDING | M5 now requires measured + active-reference horizontal/vertical speed <=0.15 m/s before consuming advisory contact; confirmed LANDED preserves current plan target |
+| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / R37 FAIL; LANDED ACCEL MARGIN | 48,801/3; `nav_vh=0.166` OK but `nav_ad=0.529` > 0.5 gate; no failsafe |
+| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R37 NEW REGRESSION #25 | 17,088/6; RETURN handoff rejected at ~1.99 m, terminal failsafe |
+| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R37 FAIL: 4 mm TOUCHDOWN MISS | 67,112/4; `return_error=0.504 m` > 0.50; LANDED missing (`nav_vh=0.236`) |
+| [#21](https://github.com/hujunjie-hub/Flight/issues/21) | Mission near-ground speed | OPEN / R37 PASS LAND+MISSION | Land 0.315, Mission 0.340 m/s; Return not measurable (#25) |
+| [#22](https://github.com/hujunjie-hub/Flight/issues/22) | M4 advisory contact handoff | OPEN / INDEPENDENT REVIEW PENDING | M4 advisory evidence reaches M5; LANDED gate handled in #23 |
+| [#23](https://github.com/hujunjie-hub/Flight/issues/23) | M5 contact-hold / LANDED | OPEN / R37 LANDED STILL MISSING | Land blocked by `aD=0.529`, Mission by `vh=0.236`; contact-hold gate still deadlocks |
+| [#24](https://github.com/hujunjie-hub/Flight/issues/24) | Landing descends before horizontal settled | OPEN / R37 PARTIAL | horizontal gate cleared for Land (`vh=0.166`); new #25 and LANDED remain |
+| [#25](https://github.com/hujunjie-hub/Flight/issues/25) | RETURN handoff re-plan regression | OPEN / NEW (S1/M5) | `guidance=4/1550` at ~2 m with `a_z≈8.6`; terminal failsafe |
 
 CI on exact new fixed-code HEAD `69626899249e1fd926a0a903447f2ad763f24ba1`: Host [#43603447251](https://github.com/hujunjie-hub/Flight/actions/runs/43603447251) 6/6, M6/M7 [#43603447288](https://github.com/hujunjie-hub/Flight/actions/runs/43603447288) 5/5, M7 [#43603447340](https://github.com/hujunjie-hub/Flight/actions/runs/43603447340) 2/2 SUCCESS. M4 969/0; M5 329,670/0; M5 ASan/UBSan 329,670/0; M4/M5 integration and sanitizer 1,042/0 each; MR-009 focused 430/0; Spec Audit round 3 and Cortex-M7 production-module compile PASS. These CI workflows do not launch native FMT-SIM. #17/#18/#19/#21/#23 remain OPEN pending complete R36 Owner-local batch on latest main; #22 remains OPEN pending independent safety review.
 

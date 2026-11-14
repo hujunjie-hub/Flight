@@ -218,3 +218,15 @@ R34 RUN_ID `FMT-SIM-LOCAL-20261114T125449954Z-85f02af5` 的正式门禁、worktr
 三个场景在 contact=1、landed=UNKNOWN、evidence=0x1 时触发 M5 guidance reason=1550；Land / Return 为 SPEED constraint，Mission 为 ACCELERATION constraint。control rejected=-11 后 FMS 进入 terminal failsafe。Mission 最后 0.50 m 下降速度 0.674 m/s；返航 touchdown 0.050 m，两个航点最近距离 0.205 / 0.283 m。
 
 修复提交 `c9cd1792` 保留当前 M5 有效参考作为 contact-hold 重规划起点；`d8ea0f05` 将着陆拆成水平对准（保持当前高度）、0.60 m 进近架、0.20 m 制动、Home 平面和探针；Host 测试注入 raw nav 垂向速度/加速度瞬态。精确 fixed-code HEAD 的 Host/M6-M7/M7 CI 均 PASS。原生 FMT-SIM 尚未在新 HEAD 上复测；#17/#18/#19/#21/#23 均 OPEN；#22 的 handoff 已由 R34 观察到 evidence=0x1 到达 M5，仍待独立安全复核。完整报告见 [R34 review](../../spec/validation/FMT_SIM_LOCAL_20261114_85F02AF5_REVIEW.md)。
+
+## ENG-07 R37 FMT-SIM local run on `2d219ead` — new RETURN handoff regression, 4 mm touchdown miss
+
+RUN_ID `FMT-SIM-LOCAL-20261114T160601185Z-2d219ead`, tested `main` HEAD `2d219ead6e3bcdbc5adff2fb7dfa365ab2a15bbb` (`866f2d79` brake horizontal motion before descent, `50713306` keep brake inside horizontal settle envelope), clean/stable worktree, `HEAD == origin/main`, build PASS, UDP 14653, 350 ms, hover 0.62, explicit loopback. Manifest `dca7ed70…`, ZIP `f08b3923…`, all 102 hashes verified.
+
+| Scenario | Checks | Failures | Near-ground descent |
+|---|---:|---:|---:|
+| Land | 48,801 | 3 | 0.315 m/s |
+| Return | 17,088 | 6 | n/a (aborted at ~2 m) |
+| Mission | 67,112 | 4 | 0.340 m/s |
+
+Land's horizontal term is fixed (`nav_vh=0.166` at the end) but LANDED still fails because `nav_ad=0.529` is just above the 0.5 m/s² gate. Mission passes the near-ground bound and waypoints but its return touchdown is `0.504 m` against the 0.50 m limit (4 mm), and LANDED still never latches (`nav_vh=0.236`). Return hit a new regression: about 80 ms after the RETURN command, at truth height ~1.99 m and with `contact=2 landed=2`, M5 reports `guidance=4/1550` (JERK then SPEED) while the estimated vertical acceleration spikes to ~8.62 m/s²; permit revoked, `t=11.200 s` `FAILSAFE_TERMINAL` (cause 18), RETURN ACK cancelled. This is new issue #25 (a handoff-transient sensitivity of the horizontal-brake/staging change), separate from the #23 contact-hold chain. No threshold or assertion was relaxed. [Full R37 archive review](../../spec/validation/FMT_SIM_LOCAL_20261114_2D219EAD_REVIEW.md).

@@ -1,6 +1,6 @@
 # Flight 问题登记清单入口
 
-本文件是当前本地正式问题登记入口。`GITHUB_PUBLICATION = PARTIAL`：GitHub Issues #8–#19、#21–#24 已用于当前部分问题在线跟踪；历史 FLIGHT-LOCAL 编号不保证与线上 Issue 一一映射，只有明确登记的映射有效。不得虚构 GitHub Issue 编号，也不得出现本地 CLOSED、GitHub OPEN 的状态冲突。
+本文件是当前本地正式问题登记入口。`GITHUB_PUBLICATION = PARTIAL`：GitHub Issues #8–#19、#21–#25 已用于当前部分问题在线跟踪；历史 FLIGHT-LOCAL 编号不保证与线上 Issue 一一映射，只有明确登记的映射有效。不得虚构 GitHub Issue 编号，也不得出现本地 CLOSED、GitHub OPEN 的状态冲突。
 
 - [全部开放问题](https://github.com/hujunjie-hub/Flight/issues?q=is%3Aissue+is%3Aopen)
 - [开放的安全问题](https://github.com/hujunjie-hub/Flight/issues?q=is%3Aissue+is%3Aopen+label%3Akind%3Asafety)
@@ -202,3 +202,14 @@ Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析
 - 修复 main commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`：增加 0.50 m / 0.40 m/s 速度约束；LANDED 后锁存 touchdown XY 并在快照短暂丢失时保持；SIL 增加 landed stable/evidence/confidence 和 near-ground peak 日志。
 - Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` passed Host validation [#43574875444](https://github.com/hujunjie-hub/Flight/actions/runs/43574875444) 6/6, M6/M7 [#43574875363](https://github.com/hujunjie-hub/Flight/actions/runs/43574875363) 5/5 and M7 [#43574875394](https://github.com/hujunjie-hub/Flight/actions/runs/43574875394) 2/2. M5 Host and ASan/UBSan each passed 326,004/0; M4 Host 945/0; M4/M5 integration and its sanitizer each 1,018/0; MR-009 focused 430/0. New tests `landing_alignment_and_speed` and `landing_contact_latches_xy` passed.
 - #17 Land、#18 Return 在 R32 各自场景 PASS，但整份 manifest `issue_closure_eligible=false`，因为 #19 Mission 仍 FAIL；三个 Issue 继续 OPEN，等待修复后完整三场景复测。R32 完整证据见 [R32 report](../validation/FMT_SIM_LOCAL_20261114_E470F00C_REVIEW.md)。
+
+## 2026-11-15 R37 原生 FMT-SIM 复测（main / 2d219ead）
+
+- RUN_ID `FMT-SIM-LOCAL-20261114T160601185Z-2d219ead`；测试 HEAD `2d219ead6e3bcdbc5adff2fb7dfa365ab2a15bbb`（含 `866f2d79`、`50713306`）；`main`/`origin/main` 一致，clean/stable，正式 350 ms / UDP 14653 / hover 0.62 / loopback 满足。
+- 结果：Land **FAIL 48,801/3**、Return **FAIL 17,088/6**、Mission **FAIL 67,112/4**；合计 133,001 checks / 13 failures。
+- Land：无 failsafe，末端 `nav_vh=0.166`（达标）但 `nav_ad=0.529` 超 0.5 门槛，LANDED 未锁存；近地 0.315 m/s 通过。
+- Return：**新回归 [#25](https://github.com/hujunjie-hub/Flight/issues/25)**。RETURN 后约 80 ms、真值高度约 1.99 m 处报 `guidance=4/1550`（JERK→SPEED），估计垂向加速度约 8.62 m/s²；permit 撤销、`t=11.200 s` 进入 `FAILSAFE_TERMINAL`（cause 18），RETURN ACK 取消。
+- Mission：近地 0.340 m/s、两航点与无 failsafe 均通过，但返航落点 **0.504 m** 超 0.50 m 限值（`FAIL 1732`），LANDED 未锁存（末端 `nav_vh=0.236`）。
+- 问题：#25 新登记（S1/M5）；#24 部分有效；#23 仍阻塞 LANDED；#19 增加 4 mm 落点超限；#17/#18 保持 OPEN；#21 Land/Mission 通过、Return 不可测。均未 VERIFIED/CLOSED。
+- 证据：manifest SHA256 `dca7ed70…`；ZIP SHA256 `f08b39235e99265abed27520b84a8998a569e3fdd552d93fd534431fd213073c`；内部 102 项全部匹配；日志 SHA256 Land `1cf9b825…`、Return `04eba8b6…`、Mission `793cc286…`。详见 [R37 归档复核报告](../validation/FMT_SIM_LOCAL_20261114_2D219EAD_REVIEW.md)。
+- 未放宽任何阈值、断言或场景输入。
