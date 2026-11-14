@@ -151,3 +151,8 @@ Native FMT-SIM must still be rerun locally before #17/#18/#19 can close.
 ## ENG-07 Native FMT-SIM: local execution tool
 
 The project owner runs all native Windows FMT-SIM scenarios locally. The formal batch runner `tests/simulation/run_fmt_sim_regression.ps1` builds SIL once, starts a fresh simulator process for Land, Return and Mission, and emits a unique manifest, raw logs, SHA256SUMS and a handoff ZIP. Each simulator process is closed by its owned PID before the next scenario starts. The strict gate requires hover 0.62, an explicit owner loopback confirmation, a clean checkout and local HEAD matching the upstream tracking HEAD for issue-closure eligibility. Issues #17/#18/#19 remain OPEN until the returned local evidence is reviewed. See [FMT_SIM_LOCAL_HANDOFF.md](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md).
+
+
+## ENG-07 R30 archive intake — stale code baseline
+
+The owner returned R30 archive SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae9909063`; ZIP and all 31 internal hashes validate. The five diagnostic runs all failed (201,306 checks / 29 failures). However, the tested commit is `3299a4f`, 181 commits behind current branch HEAD `9063f310`; its worktree was dirty and the package lacks the formal batch-runner manifest and loopback-confirmation evidence. This does not retest the ENG-07 fixes now on the branch. No production code change is justified from this stale run. Keep #17/#18/#19 OPEN and rerun from a clean current-HEAD clone using `run_fmt_sim_regression.ps1`. See [the full R30 archive review](../../spec/validation/FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md).

@@ -162,3 +162,10 @@ build/validation/fmt-sim-local/<RUN_ID>.zip
 6. 推送修复分支，交付新的精确 HEAD 和本地复测步骤。用户再次在本机运行 FMT-SIM；未取得新日志前，#17/#18/#19 保持 OPEN。
 
 **禁止状态跃迁：** Host/SIL/CI PASS 不会自动关闭 #17/#18/#19；本机 FMT-SIM 未运行时必须记为 NOT_RUN；FMT-SIM 软件仿真 PASS 也不能关闭 B07 的 H723 实机/HIL/WCET/栈水位/飞行门禁。
+
+
+## 8. R30 归档接收与复核结论
+
+2026-11-14 已收到 `FMT-SIM-R30-20261114.zip`。ZIP/sidecar 与内部 31 项 SHA256 均匹配，但归档测试 HEAD 为 `3299a4f0702083ca4374ccc978edccb5d0c900da`，而复核时 GitHub 当前目标分支 HEAD 为 `9063f31053ac301b71c806858a67e84f69402414`（前进 181 commits）。旧包工作区 DIRTY、upstream 记录过期，且使用直接 `run_sil.ps1` 场景命令，没有正式批量入口 manifest 和显式 loopback 确认。因此它是旧代码诊断，不是修复后验收；五个有效场景均 FAIL，#17/#18/#19 仍 OPEN。详细逐场景数据和未证实假设见 [R30 归档复核报告](FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md)。
+
+**不要在原有 DIRTY 工作区执行 reset/clean。** 请保留旧归档，在新的干净克隆检出最新目标分支后运行本节第 4 节的正式批量入口；脚本会自行 fetch 并拒绝 HEAD/upstream 不一致、dirty worktree 或缺少 `-ConfirmLoopbackAddress` 的关闭资格。

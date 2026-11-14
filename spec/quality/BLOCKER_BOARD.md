@@ -120,8 +120,11 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；Git
 
 | Issue | 场景 | 当前状态 | 执行责任 / 解除证据 |
 |---|---|---|---|
-| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / FIX NOT YET DYNAMICALLY RETESTED | Owner 本机按 350 ms 运行；终端命令回执、连续 LANDED、DISARMED 和完整日志 |
-| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / FIX NOT YET DYNAMICALLY RETESTED | Owner 本机按 350 ms 运行；Return 完成、连续 LANDED、DISARMED 和完整日志 |
-| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / FIX NOT YET DYNAMICALLY RETESTED | Owner 本机按 350 ms 运行；双航点完成、Return、终端回执、连续 LANDED、DISARMED 和完整日志 |
+| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / R30 OLD-HEAD DIAGNOSTIC FAIL; POST-FIX NOT RETESTED | R30 tested 3299a4f, 5 failures; rerun current HEAD with formal 350 ms gate |
+| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R30 OLD-HEAD DIAGNOSTIC FAIL; POST-FIX NOT RETESTED | R30 tested 3299a4f, 6 failures; rerun current HEAD with formal 350 ms gate |
+| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R30 OLD-HEAD DIAGNOSTIC FAIL; POST-FIX NOT RETESTED | R30 tested 3299a4f, 9 failures; rerun current HEAD with formal 350 ms gate |
 
 最新已完成自动化验证的代码 HEAD `5a8e2c3079d230bbb5ca90ebbf229552487c2be9` 的 Host validation #43552823302（6/6）、M6/M7 #43552823284（5/5）、M7 #43552823258（2/2）均 SUCCESS；M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integration 1,147/0、M5 ASan/UBSan 324,792/0；PowerShell Parser 对两个本地 runner 均 PASS。以上 CI 不启动原生 FMT-SIM。后续原生 FMT-SIM 均由项目 Owner 在 Windows 本机执行，远程 Agent 不代跑。Agent 负责代码修复、Host/SIL/CI、日志分析和分支交付。命令、环境指纹、归档和回传规则见 [FMT-SIM 本机复测交接方案](../validation/FMT_SIM_LOCAL_HANDOFF.md)；批量入口为 `tests/simulation/run_fmt_sim_regression.ps1`。严格关闭资格另要求 hover 0.62、显式 `-ConfirmLoopbackAddress`、UDP 14653 和 350 ms。三项 Issue 在本机证据回传并复核前保持 OPEN；不得用 Host/CI PASS 或 650 ms 诊断运行关闭。
+
+
+R30 archive SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae9909063` is verified, but its tested HEAD `3299a4f` is 181 commits behind the reviewed current branch HEAD `9063f310`; worktree DIRTY and formal manifest/loopback gate evidence absent. Five diagnostic scenarios failed (29 assertions total). Do not close or repeat code fixes from this old result; wait for a clean current-HEAD formal rerun. [Full archive review](../validation/FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md).

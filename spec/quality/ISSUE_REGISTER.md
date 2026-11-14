@@ -121,3 +121,12 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 - 执行责任：项目 Owner 在 Windows 本机执行；远程 Agent 不代跑原生 FMT-SIM。Agent 负责代码、Host/SIL/CI、分析和下一轮修复。
 - 统一方案：spec/validation/FMT_SIM_LOCAL_HANDOFF.md；批量入口 `tests/simulation/run_fmt_sim_regression.ps1` 一次构建并启动三个独立引擎进程。严格关闭资格固定为目标分支、UDP 14653、350 ms、hover 0.62、Owner 显式确认 loopback 127.0.0.1、干净工作区且 HEAD 与脚本刚 fetch 的 origin tracking HEAD 一致；需回传 manifest、summary、完整日志、逐场景退出码、SHA256SUMS 和 ZIP sidecar。
 - 状态规则：#17/#18/#19 继续 OPEN；收到修复后本机证据并逐项复核前，不标 VERIFIED/CLOSED。Host/CI PASS 不替代原生 FMT-SIM；FMT-SIM PASS 不替代 B07 H723 实机/HIL/WCET/栈水位/飞行证据。
+
+
+## 2026-11-14 R30 归档复核登记
+
+- 归档：`FMT-SIM-R30-20261114.zip`；SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae9909063`；sidecar 匹配，内部 31 项哈希全部匹配。
+- 测试 HEAD：`3299a4f0702083ca4374ccc978edccb5d0c900da`；工作区 DIRTY，归档 upstream `51e7e923...`。复核时 GitHub 当前目标分支 HEAD `9063f31053ac301b71c806858a67e84f69402414`，较测试 HEAD 前进 181 commits，包含后续 ENG-07 修复。
+- 结果：Land 5、Return 6、Mission 9、Land single 5、Land Beach 4 failures；共 201,306 checks / 29 failures。最长状态间隔 67.1–208.4 ms，低于 350 ms。
+- 分类：`DIAGNOSTIC_ONLY / STALE_HEAD / DIRTY_WORKTREE / FORMAL_MANIFEST_MISSING`。不构成修复后复测，不关闭 #17/#18/#19；不基于此旧 HEAD 重复修改生产代码。
+- 下一步：新建干净克隆检出当前分支，使用 `tests/simulation/run_fmt_sim_regression.ps1`，显式 `-ConfirmLoopbackAddress`，并回传 manifest、summary、完整日志和 ZIP sidecar。详细记录见 [R30 归档复核报告](../validation/FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md)。
