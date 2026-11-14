@@ -9,6 +9,11 @@ EXTERN_C_BEGIN
  * not a copy. */
 void mpc_note_worker(uint64_t now_us, int ready);
 #define CONTROL_GRAVITY_MPS2 9.80665f
+/* FLIGHT-29: navigation accelerations the airframe cannot produce are failed
+ * closed instead of being converted into attitude commands. Kept far above the
+ * vehicle envelope (4 m/s^2 per axis in the SIM_ONLY fixture) and any
+ * ground-impact transient, and far below a diverged estimator. */
+#define CONTROL_MAX_PLAUSIBLE_NAV_ACCEL_MPS2 20.0f
 #define MPC_VARIABLE_COUNT 15
 #define MPC_CONSTRAINT_COUNT 190
 typedef struct {

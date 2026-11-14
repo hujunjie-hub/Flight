@@ -359,6 +359,22 @@ int main(void) {
     c.capability.available_mask = 7u;
     CHECK(validate(&c) == STATUS_OUT_OF_RANGE, "three-channel capability accepted");
 
+    /* M6-24: an estimator that reports a physically impossible acceleration
+     * must fail closed instead of being converted into attitude commands
+     * (FLIGHT-29 measured -80.7 / -137.6 m/s^2 while every validity bit was
+     * still set). */
+    build_context(&c, g_now, GUIDANCE_REFERENCE_TRAJECTORY);
+    c.nav.core.acceleration_ned_mps2[1] = 25.0f;
+    CHECK(validate(&c) == STATUS_MODEL_OUT_OF_DOMAIN,
+          "physically impossible navigation acceleration accepted");
+
+    /* The bound must stay clear of a normal flight acceleration. */
+    build_context(&c, g_now, GUIDANCE_REFERENCE_TRAJECTORY);
+    c.nav.core.acceleration_ned_mps2[0] = 4.0f;
+    c.nav.core.acceleration_ned_mps2[2] = -4.0f;
+    CHECK(validate(&c) == STATUS_OK,
+          "a normal flight acceleration was rejected by the plausibility bound");
+
     /* M6-17..M6-23: outer worker lifecycle, plan TTL and deadline accounting. */
     test_outer_update_lifecycle();
 

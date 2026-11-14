@@ -187,6 +187,20 @@ Status controller_validate_input(const ControllerInput *in, uint32_t *epoch,
       !finite_array(n->core.q_nb_wxyz, 4) ||
       !finite_array(n->core.body_rate_frd_radps, 3))
     return STATUS_NOT_READY;
+  /* FLIGHT-29: the estimator can report a physically impossible acceleration
+   * while keeping every validity bit set (observed -80.7 and -137.6 m/s^2).
+   * Commanding it turns the estimate error into attitude commands and the
+   * airframe follows the diverged estimate. 20 m/s^2 is far above the vehicle
+   * envelope and any ground-impact transient the model can produce, and far
+   * below a diverged estimator, so fail closed instead. */
+  if ((n->core.valid_mask & NAV_VALID_ACCELERATION) != 0u) {
+    const float *nav_acceleration = n->core.acceleration_ned_mps2;
+    if (!finite_array(nav_acceleration, 3) ||
+        fabsf(nav_acceleration[0]) > CONTROL_MAX_PLAUSIBLE_NAV_ACCEL_MPS2 ||
+        fabsf(nav_acceleration[1]) > CONTROL_MAX_PLAUSIBLE_NAV_ACCEL_MPS2 ||
+        fabsf(nav_acceleration[2]) > CONTROL_MAX_PLAUSIBLE_NAV_ACCEL_MPS2)
+      return STATUS_MODEL_OUT_OF_DOMAIN;
+  }
   {
     const ProductSafetyEnvelopePayload *e =
         &in->safety_envelope->vehicle_extension;
