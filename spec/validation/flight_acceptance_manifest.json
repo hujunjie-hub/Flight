@@ -803,15 +803,21 @@
   "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
   "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112 three separate bounds)",
   "stack_budget": {
-    "validator_worst_chain_bytes": 3864,
+    "validator_worst_chain_bytes": 3576,
     "planner_worker_limit_bytes": 4096,
     "status": "PASS_STATIC_RELEASE_IMAGE",
     "roll_map_to_position_bytes": 128,
     "roll_map_reference_stack_only_bytes": 32840,
-    "chain": "m5_trajectory_safety_validate -> build_curve -> consumer_eval_error_bound -> add_upper_nonnegative -> nextafter",
+    "chain": "m5_trajectory_safety_validate -> build_curve -> consumer_eval_error_bound -> binary32_rounded_upper_nonnegative -> nextafter",
     "callgraph_status": "COMPLETE",
     "reachable_unknown_call_edges": 0,
-    "analysis": "build/validation/priority-20261113/b06-o2.json",
+    "analysis": "build/validation/software-closure/stack-o2-reconciled.json",
+    "nonoptimized": {
+      "status": "PASS",
+      "known_lower_bound_bytes": 3968,
+      "callgraph_status": "COMPLETE",
+      "analysis": "build/validation/software-closure/stack-o0-reconciled.json"
+    },
     "historical_nonoptimized": {
       "status": "BLOCKED",
       "known_lower_bound_bytes": 4248,

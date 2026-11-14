@@ -1041,7 +1041,7 @@ static uint8_t build_curve(
 {
   double t0 = segment_duration_s * (double)u0;
   double dt = segment_duration_s * ((double)u1 - (double)u0);
-  double t_power[6], dt_power[6];
+  double t_power[6];
   unsigned axis, i, k, j;
   if (!(dt > 0.0) || !isfinite(dt) || !isfinite(t0)) return 0u;
   /* Store an outward physical span. The consumer polynomial is evaluated from
@@ -1051,14 +1051,11 @@ static uint8_t build_curve(
   if (!isfinite(curve->start_time_s) || !isfinite(curve->end_time_s))
     return 0u;
   t_power[0] = 1.0;
-  dt_power[0] = 1.0;
-  for (i = 1u; i <= 5u; ++i) {
-    t_power[i] = t_power[i - 1u] * t0;
-    dt_power[i] = dt_power[i - 1u] * dt;
-  }
+  for (i = 1u; i <= 5u; ++i) t_power[i] = t_power[i - 1u] * t0;
 
   for (axis = 0u; axis < 3u; ++axis) {
     double c[6], local_power[6] = {0};
+    double dt_power = 1.0;
     double p0 = a->point.position_ned_m[axis];
     double v0 = a->point.velocity_ned_mps[axis];
     double a0 = a->point.acceleration_ned_mps2[axis];
@@ -1082,7 +1079,8 @@ static uint8_t build_curve(
 
     for (k = 0u; k <= 5u; ++k) {
       for (i = k; i <= 5u; ++i)
-        local_power[k] += c[i] * choose[i][k] * t_power[i - k] * dt_power[k];
+        local_power[k] += c[i] * choose[i][k] * t_power[i - k] * dt_power;
+      if (k < 5u) dt_power *= dt;
     }
     for (j = 0u; j <= 5u; ++j) {
       double value = 0.0;
@@ -1105,8 +1103,8 @@ static uint8_t build_curve(
       M5SafetyInterval v1_i = interval_exact(v1);
       M5SafetyInterval a1_i = interval_exact(a1);
       M5SafetyInterval dp_i, dv_i, da_i, c_i[6];
-      M5SafetyInterval t0_i, dt_i, t_power_i[6], dt_power_i[6];
-      M5SafetyInterval local_power_i[6], bezier_i[6];
+      M5SafetyInterval t0_i, dt_i, t_power_i[6];
+      M5SafetyInterval local_power_i[6], dt_power_i;
       M5SafetyInterval predicted_i;
 
       if (h2.valid == 0u || h3.valid == 0u ||
@@ -1142,37 +1140,35 @@ static uint8_t build_curve(
       dt_i = interval_mul(hp,
           interval_sub(interval_exact((double)u1), interval_exact((double)u0)));
       t_power_i[0] = interval_exact(1.0);
-      dt_power_i[0] = interval_exact(1.0);
-      for (i = 1u; i <= 5u; ++i) {
-        t_power_i[i] = interval_mul(t_power_i[i - 1u], t0_i);
-        dt_power_i[i] = interval_mul(dt_power_i[i - 1u], dt_i);
-      }
+      dt_power_i = interval_exact(1.0);
+      for (i = 1u; i <= 5u; ++i) t_power_i[i] = interval_mul(t_power_i[i - 1u], t0_i);
       for (k = 0u; k <= 5u; ++k) {
         local_power_i[k] = interval_exact(0.0);
         for (i = k; i <= 5u; ++i) {
           M5SafetyInterval term = interval_mul(c_i[i],
               interval_exact(choose[i][k]));
           term = interval_mul(term, t_power_i[i - k]);
-          term = interval_mul(term, dt_power_i[k]);
+          term = interval_mul(term, dt_power_i);
           local_power_i[k] = interval_add(local_power_i[k], term);
         }
+        if (k < 5u) dt_power_i = interval_mul(dt_power_i, dt_i);
       }
       for (j = 0u; j <= 5u; ++j) {
-        bezier_i[j] = interval_exact(0.0);
+        M5SafetyInterval bezier_i = interval_exact(0.0);
         for (k = 0u; k <= j; ++k) {
           M5SafetyInterval term = interval_mul(local_power_i[k],
               interval_exact(choose[j][k]));
           term = interval_div(term, interval_exact(choose[5][k]));
-          bezier_i[j] = interval_add(bezier_i[j], term);
+          bezier_i = interval_add(bezier_i, term);
         }
-        if (bezier_i[j].valid == 0u || c_i[0].valid == 0u ||
+        if (bezier_i.valid == 0u || c_i[0].valid == 0u ||
             c_i[1].valid == 0u || c_i[2].valid == 0u ||
             c_i[3].valid == 0u || c_i[4].valid == 0u ||
             c_i[5].valid == 0u || t_power_i[j].valid == 0u) return 0u;
         curve->position_low[axis][j] =
-            fmin(bezier_i[j].low, curve->position[axis][j]);
+            fmin(bezier_i.low, curve->position[axis][j]);
         curve->position_high[axis][j] =
-            fmax(bezier_i[j].high, curve->position[axis][j]);
+            fmax(bezier_i.high, curve->position[axis][j]);
       }
 
       /* MR-009: bound the binary32 consumer evaluation of this axis against

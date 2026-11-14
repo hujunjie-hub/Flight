@@ -2,9 +2,9 @@
 
 > **2026-11-13 MR-009 R31 内部预审 CI 快照（代码/证明基线 8dcb60b3ac18e6a763c939d3e810984092cdd321）**：Host validation #43446380866（6/6）、M6/M7 #43446380836（5/5）、M7 #43446380724（2/2）全部 SUCCESS。M5 Host regression、M5 ASan/UBSan、MR-009 focused、S06-099/S06-107、Spec Audit、生产 ABI、18 mutation FP audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer 均 PASS。
 
-> **当前阻塞状态**：B01/B02 当前 CI 通过；B03 包锁已固定但本轮未单独重跑 package-lock job；B04 完整 Release 产品链接/目标运行仍需确认；B05 MR-009 内部预审与修正完成，但独立数学审查仍 WAITING，不等于 M5-06 整体验收；B06 -O2 静态最坏链 3,864/4,096 B PASS、-O0 历史分析 UNKNOWN；B07 H723 实机、WCET/RTA、RAM/stack watermark、HIL 与飞行 NOT_RUN。S06-100..102 仍 NOT_RUN；M5-07 不启动。
+> **当前状态（2026-11-14）**：B01～B04 的本地规范/生产 ABI/安装包锁/默认 Release 链接通过。B05 MR-009 按项目方指示完成技术复核，S06-100～102 Host 与 ASan/UBSan 通过。B06 的 Cortex-M7 专用镜像静态链为 `-O2` 3,576/4,096 B、`-O0` 3,968/4,096 B，均 COMPLETE。B07 实机、WCET/RTA、栈水位、台架 HIL 与飞行仍 NOT_RUN。M5-07 未启动。
 
-> **资源更新**：ICD/M4 参考表已加入两个 `GroundStopCertificate` 快照（2×112 B）；按上轮 232 B 余量扣除 224 B 后估算仅余 8 B。FLIGHT-LOCAL-27 继续 OPEN / RISK，必须重跑 `tests/guidance/check_memory_budget.py` 和最终 map。下方 R29/B01–B06 细节保留为历史记录，不作为当前状态。
+> **开放风险**：ICD+M4 余量 264 B（FLIGHT-13）；Release 的工具链枚举属性仍有 228 条链接警告（FLIGHT-14）。下方 B01～B06 的表格保留各原始验证时点。
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
 RUN_ID `M5-06-R31-20261113`；validated code `8dcb60b3ac18e6a763c939d3e810984092cdd321`；
