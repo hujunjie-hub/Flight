@@ -2,7 +2,8 @@
 #include <string.h>
 #include "guidance_update/guidance_internal.h"
 
-enum { LANDING_APPROACH = 1, LANDING_BRAKE = 2, LANDING_FINAL = 3, LANDING_PROBE = 4 };
+enum { LANDING_APPROACH = 1, LANDING_BRAKE = 2, LANDING_FINAL = 3, LANDING_PROBE = 4,
+       LANDING_CONTACT_HOLD = 5 };
 
 static uint8_t finite3(const float v[3])
 { return (uint8_t)(isfinite(v[0]) && isfinite(v[1]) && isfinite(v[2])); }
@@ -107,10 +108,19 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
         in->control_time_us >= s->plan_start_us &&
         (in->control_time_us - s->plan_start_us) * 1e-6f >= s->plan_duration_s);
 
+    if (s->landing_stage == LANDING_CONTACT_HOLD) {
+        /* Keep the touchdown XY target latched even if the LANDED snapshot
+         * briefly drops while M4 completes its disarm handoff. */
+        memcpy(goal, s->ctx.target_ned, sizeof(s->ctx.target_ned));
+        return;
+    }
     if (landing_confirmed(in)) {
-        /* Keep the established reference while FMS completes its disarm
-         * handoff; if no plan exists, hold the measured contact position. */
-        s->landing_stage = LANDING_PROBE;
+        /* Stop chasing the exact Home XY point after physical contact. The
+         * measured touchdown point becomes the hold target while the existing
+         * vertical probe reference remains unchanged for the disarm handoff. */
+        s->landing_stage = LANDING_CONTACT_HOLD;
+        goal[0] = position[0];
+        goal[1] = position[1];
         goal[2] = s->plan_valid ? s->ctx.target_ned[2] : position[2];
         return;
     }

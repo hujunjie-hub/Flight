@@ -55,41 +55,35 @@ uint8_t guidance_has_landing_plane(const GuidanceInput *in)
            guidance_home_ok(in);
 }
 
-uint8_t guidance_landing_speed_ok(const GuidanceInput *in, const GuidanceQuintic *down,
-                                  float t0, float t1)
+static uint8_t guidance_landing_speed_below_plane(const GuidanceQuintic *down,
+                                                        float t0, float t1,
+                                                        float plane_down, float max_speed)
 {
-    float lo, hi;
-    const float brake_down = in->directive->payload.home.position_ned_m[2] -
-                             GUIDANCE_LANDING_BRAKE_HEIGHT_M;
-    float start_down, end_down, check_t;
+    float lo, hi, start_down, end_down, check_t;
     unsigned iteration;
-    if (!guidance_has_landing_plane(in))
-        return 1u;
     if (!guidance_quintic_bounds(down, t0, t1, 0, &lo, &hi))
         return 0u;
-    if (hi < brake_down)
+    if (hi < plane_down)
         return 1u;
 
     start_down = guidance_quintic_eval(down, t0, 0);
     end_down = guidance_quintic_eval(down, t1, 0);
     if (!isfinite(start_down) || !isfinite(end_down))
         return 0u;
-    /* Allow a faster approach above the braking band. Within the final 20 cm,
-     * constrain speed early enough to enter the 6 cm contact-sensor band safely. */
+
     check_t = t0;
-    if (start_down < brake_down) {
+    if (start_down < plane_down) {
         float left = t0, right = t1, velocity_lo, velocity_hi;
-        /* Prove the curve is nondecreasing in NED-down before deciding whether it
-         * crossed the band. If it is monotone and the endpoint is still above the
-         * band, the conservative Bernstein position hull alone is not a crossing. */
+        /* Prove monotone NED-down motion before locating the first crossing.
+         * A conservative position hull alone must not imply a crossing. */
         if (!guidance_quintic_bounds(down, t0, t1, 1, &velocity_lo, &velocity_hi) ||
             velocity_lo < -1e-5f)
             return 0u;
-        if (end_down < brake_down)
+        if (end_down < plane_down)
             return 1u;
         for (iteration = 0; iteration < 16u; ++iteration) {
             const float mid = 0.5f * (left + right);
-            if (guidance_quintic_eval(down, mid, 0) >= brake_down)
+            if (guidance_quintic_eval(down, mid, 0) >= plane_down)
                 right = mid;
             else
                 left = mid;
@@ -97,8 +91,23 @@ uint8_t guidance_landing_speed_ok(const GuidanceInput *in, const GuidanceQuintic
         check_t = right;
     }
     return guidance_quintic_bounds(down, check_t, t1, 1, &lo, &hi) &&
-           lo >= -GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS - 1e-5f &&
-           hi <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-5f;
+           lo >= -max_speed - 1e-5f && hi <= max_speed + 1e-5f;
+}
+
+uint8_t guidance_landing_speed_ok(const GuidanceInput *in, const GuidanceQuintic *down,
+                                  float t0, float t1)
+{
+    const float home_down = in->directive->payload.home.position_ned_m[2];
+    if (!guidance_has_landing_plane(in))
+        return 1u;
+    /* Match the native FMT-SIM acceptance window: the last 0.50 m is limited
+     * to 0.40 m/s, then the final 0.20 m is limited to 0.12 m/s. */
+    return guidance_landing_speed_below_plane(
+               down, t0, t1, home_down - GUIDANCE_LANDING_CAPTURE_HEIGHT_M,
+               GUIDANCE_LANDING_APPROACH_MAX_VERTICAL_SPEED_MPS) &&
+           guidance_landing_speed_below_plane(
+               down, t0, t1, home_down - GUIDANCE_LANDING_BRAKE_HEIGHT_M,
+               GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS);
 }
 
 static float absmin(float lo, float hi)

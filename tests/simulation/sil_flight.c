@@ -733,8 +733,11 @@ static void sil_print_state(const char *tag)
   printf("    nav cap=0x%04x pos_std=%.2f heading_std=%.2f\n",
          (unsigned)ncap.capability_mask, (double)ncap.horizontal_position_std_m,
          (double)ncap.heading_std_rad);
-  printf("    landed=%u guidance=%u reason=%u feasible=%u\n",
+  printf("    landed=%u stable_ms=%u evidence=0x%x confidence=%.2f guidance=%u reason=%u feasible=%u\n",
          (unsigned)fms_output.landed_state.state,
+         (unsigned)fms_output.landed_state.stable_duration_ms,
+         (unsigned)fms_output.landed_state.evidence_mask,
+         (double)fms_output.landed_state.confidence_0_to_1,
          (unsigned)plan_bundle.guidance.guidance_status.guidance_state,
          (unsigned)plan_bundle.guidance.guidance_status.reason_code,
          (unsigned)plan_bundle.guidance.feasibility.feasible);
@@ -1289,6 +1292,8 @@ int main(int argc, char **argv)
   float peak_height = 0;
   float hold_error = 0;
   float near_ground_max_down = 0;
+  unsigned near_ground_peak_ms = 0u;
+  float near_ground_peak_height = 0.0f;
   float waypoint_error[2] = {INFINITY, INFINITY};
   int logged_control_rejection = 0;
   int fmt_timeout = 0;
@@ -1416,8 +1421,14 @@ int main(int argc, char **argv)
       last_fmt_us = test_clock.monotonic_us + 500u;
       fmt_frames += frames;
       peak_height = fmaxf(peak_height, fmt_height());
-      if (terminal_request != 0u && fmt_height() >= 0.0f && fmt_height() <= 0.5f)
-        near_ground_max_down = fmaxf(near_ground_max_down, fmt_state.velocity_ned_mps[2]);
+      if (terminal_request != 0u && fmt_height() >= 0.0f && fmt_height() <= 0.5f) {
+        const float down_speed = fmt_state.velocity_ned_mps[2];
+        if (down_speed > near_ground_max_down) {
+          near_ground_max_down = down_speed;
+          near_ground_peak_ms = ms;
+          near_ground_peak_height = fmt_height();
+        }
+      }
       if (fms_output.mission_status.mission_state == MISSION_STATE_RUNNING) {
         for (unsigned i = 0; i < 2; ++i) {
           const float north = fmt_state.position_ned_m[0] - fmt_origin.position_ned_m[0];
@@ -1573,7 +1584,7 @@ int main(int argc, char **argv)
         const ActuationPermit *permit = &fms_output.actuation_permit;
         const ProductHomeTargetSnapshot *home = &fms_output.directive.payload.home;
         printf("[settle] t=%u mode=%u op=%u guide_mode=%u home_valid=%u home=%.3f,%.3f,%.3f "
-               "contact=%u landed=%u height=%.4f p=%.4f,%.4f,%.4f "
+               "contact=%u landed=%u landed_stable_ms=%u landed_evidence=0x%x landed_confidence=%.2f height=%.4f p=%.4f,%.4f,%.4f "
                "v=%.4f,%.4f,%.4f a=%.4f,%.4f,%.4f truth_v=%.4f,%.4f,%.4f "
                "scope=%u control_sample=%llu control_publish=%llu permit_sample=%llu permit_publish=%llu "
                "ref_kind=%u ref_epoch=%u guidance=%u/%u feas_reason=%u constraint=%u\n", ms,
@@ -1582,7 +1593,10 @@ int main(int argc, char **argv)
                (unsigned)fms_output.directive.guidance_mode_code, (unsigned)home->validity,
                (double)home->position_ned_m[0], (double)home->position_ned_m[1],
                (double)home->position_ned_m[2], flight_sil_ground_contact(),
-               (unsigned)fms_output.landed_state.state, (double)fmt_height(),
+               (unsigned)fms_output.landed_state.state,
+               (unsigned)fms_output.landed_state.stable_duration_ms,
+               (unsigned)fms_output.landed_state.evidence_mask,
+               (double)fms_output.landed_state.confidence_0_to_1, (double)fmt_height(),
                (double)nav->position_ned_m[0], (double)nav->position_ned_m[1],
                (double)nav->position_ned_m[2], (double)nav->velocity_ned_mps[0],
                (double)nav->velocity_ned_mps[1], (double)nav->velocity_ned_mps[2],
@@ -1691,6 +1705,8 @@ int main(int argc, char **argv)
            fmt_frames, fmt_active_frames, (double)peak_height, (double)hold_error);
     printf("[fmt] measured maximum descent in the last 0.5 m: %.3f m/s\n",
            (double)near_ground_max_down);
+    printf("[fmt] near-ground peak t=%u ms height=%.3f m\n",
+           near_ground_peak_ms, (double)near_ground_peak_height);
     printf("[fmt] wall timeout %.0f ms, longest successful state gap %.1f ms\n",
            (double)fmt_wall_timeout_us / 1000.0, (double)fmt_longest_gap_us / 1000.0);
     printf("[fmt] land_position_reference_seen=%d return_mode_seen=%d\n",

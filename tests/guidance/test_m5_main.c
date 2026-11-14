@@ -60,10 +60,12 @@ typedef struct {
   AuthorizedMissionSnapshot mission;
   ActuationPermit permit;
   ProductGeofenceSnapshot fence;
+  LandedStateSnapshot landed;
   uint16_t fence_count;
   uint8_t has_mission;
   uint8_t has_permit;
   uint8_t has_fence;
+  uint8_t has_landed;
   GuidanceOutput out;
 } Fx;
 
@@ -193,6 +195,9 @@ static void fx_fill(Fx *fx)
   if (fx->has_permit != 0u) {
     fill_header(&fx->permit.header, MSG_ACTUATION_PERMIT, SOURCE_M4, fx->now);
   }
+  if (fx->has_landed != 0u) {
+    fill_header(&fx->landed.header, MSG_LANDED_STATE_SNAPSHOT, SOURCE_M4, fx->now);
+  }
 }
 
 static void fx_input(Fx *fx, GuidanceInput *in)
@@ -204,6 +209,7 @@ static void fx_input(Fx *fx, GuidanceInput *in)
   in->authority_status = &fx->auth;
   in->authorized_mission = fx->has_mission ? &fx->mission : NULL;
   in->active_permit = fx->has_permit ? &fx->permit : NULL;
+  in->landed_state = fx->has_landed ? &fx->landed : NULL;
   if (fx->has_fence != 0u) {
     in->geofences = &fx->fence;
     in->geofence_count = fx->fence_count;
@@ -275,6 +281,7 @@ static void test_landing_aligns_and_limits_final_descent(void)
 
   fx.nav.core.position_ned_m[0] = 0.0f;
   unsigned low_points = 0;
+  unsigned capture_points = 0;
   uint8_t failure_logged = 0u;
   /* Allow the approach, braking waypoint, Home-plane arrival and 4 s probe. */
   for (unsigned i = 0; i < 1200; ++i) {
@@ -299,6 +306,11 @@ static void test_landing_aligns_and_limits_final_descent(void)
     }
     CHECK(fx.out.feasibility.feasible && fx.out.guidance_status.reference_epoch == epoch);
     const ProductMotionPoint *point = &fx.out.reference.points[23].point;
+    if (point->position_ned_m[2] >= -GUIDANCE_LANDING_CAPTURE_HEIGHT_M) {
+      ++capture_points;
+      CHECK(fabsf(point->velocity_ned_mps[2]) <=
+            GUIDANCE_LANDING_APPROACH_MAX_VERTICAL_SPEED_MPS + 1e-5f);
+    }
     if (point->position_ned_m[2] >= -GUIDANCE_LANDING_BRAKE_HEIGHT_M) {
       ++low_points;
       CHECK(fabsf(point->velocity_ned_mps[2]) <=
@@ -314,9 +326,39 @@ static void test_landing_aligns_and_limits_final_descent(void)
     memcpy(fx.nav.core.acceleration_ned_mps2, anchor->acceleration_ned_mps2,
            sizeof(fx.nav.core.acceleration_ned_mps2));
   }
+  CHECK(capture_points > 0);
   CHECK(low_points > 0);
   CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[2] -
               GUIDANCE_LANDING_PROBE_M) < 0.001f);
+  CHECK(guidance_stop() == STATUS_OK);
+}
+
+static void test_landing_contact_latches_horizontal_hold(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx.dir.operation_code = PRODUCT_OP_RETURN;
+  fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
+  fx.nav.core.position_ned_m[0] = 2.0f;
+  fx.nav.core.position_ned_m[2] = -0.016f;
+  fx.nav.core.velocity_ned_mps[0] = -0.40f;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  const uint32_t epoch = fx.out.guidance_status.reference_epoch;
+
+  fx.has_landed = 1u;
+  fx.landed.state = LANDED_STATE_LANDED;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.feasibility.feasible);
+  CHECK(fx.out.guidance_status.reference_epoch == epoch);
+  CHECK(fx.out.reference.points[23].point.position_ned_m[0] > 1.80f);
+
+  /* The touchdown hold remains latched if the LANDED snapshot briefly drops;
+   * the vehicle must not resume chasing Home XY while M4 finishes disarming. */
+  fx.landed.state = LANDED_STATE_UNKNOWN;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.feasibility.feasible);
+  CHECK(fx.out.guidance_status.reference_epoch == epoch);
+  CHECK(fx.out.reference.points[23].point.position_ned_m[0] > 1.80f);
   CHECK(guidance_stop() == STATUS_OK);
 }
 
@@ -6579,6 +6621,7 @@ int main(void)
   } tests[] = {
     {"hold_reference_shape", test_hold_reference_shape},
     {"landing_alignment_and_speed", test_landing_aligns_and_limits_final_descent},
+    {"landing_contact_latches_xy", test_landing_contact_latches_horizontal_hold},
     {"trajectory_handoff_acceleration", test_trajectory_handoff_uses_active_reference_acceleration},
     {"vertical_land_reports_constraint", test_vertical_land_reports_actual_constraint},
     {"vertical_land_handoff_acceleration", test_vertical_land_handoff_uses_active_reference_acceleration},

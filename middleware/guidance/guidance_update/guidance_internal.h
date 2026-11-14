@@ -31,12 +31,16 @@ CONTRACT_STATIC_ASSERT(GUIDANCE_MAX_DURATION_US == 6200000u,
  * detector could never confirm LANDED. Both landing builders descend through
  * the plane by this bounded probe; the ground contact model stops the airframe. */
 #define GUIDANCE_LANDING_PROBE_M 0.25f
-/* FMS LandDetector requires |vertical speed| <= 0.15 m/s; keep the planned
- * near-home envelope at 0.12 m/s to leave tracking margin. */
+/* The native FMT-SIM acceptance checks the complete final 0.50 m band;
+ * cap approach descent there at 0.40 m/s before entering the tighter brake band. */
+#define GUIDANCE_LANDING_CAPTURE_HEIGHT_M 0.50f
+#define GUIDANCE_LANDING_APPROACH_MAX_VERTICAL_SPEED_MPS 0.40f
+/* FMS LandDetector requires |vertical speed| <= 0.15 m/s; keep the final
+ * 0.20 m reference at 0.12 m/s to leave tracking margin. */
 #define GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS 0.12f
 /* The Host/SIL contact oracle asserts physical contact within 6 cm. */
 #define GUIDANCE_LANDING_CONTACT_HEIGHT_M 0.06f
-/* Start limiting descent early enough to decelerate before entering contact range. */
+/* Start the final low-speed brake band before entering contact range. */
 #define GUIDANCE_LANDING_BRAKE_HEIGHT_M 0.20f
 /* Margin for M6's 20 ms float-boundary reconstruction of the landing curve. */
 #define GUIDANCE_LANDING_JERK_MARGIN 0.75f
