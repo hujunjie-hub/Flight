@@ -79,13 +79,14 @@ uint8_t guidance_landing_speed_ok(const GuidanceInput *in, const GuidanceQuintic
     check_t = t0;
     if (start_down < brake_down) {
         float left = t0, right = t1, velocity_lo, velocity_hi;
-        /* A single bisection is valid only when the segment is nondecreasing in
-         * NED-down. If the Bernstein position bound enters the contact band but
-         * the endpoint does not, or monotonicity cannot be proved, fail closed. */
-        if (end_down < brake_down ||
-            !guidance_quintic_bounds(down, t0, t1, 1, &velocity_lo, &velocity_hi) ||
+        /* Prove the curve is nondecreasing in NED-down before deciding whether it
+         * crossed the band. If it is monotone and the endpoint is still above the
+         * band, the conservative Bernstein position hull alone is not a crossing. */
+        if (!guidance_quintic_bounds(down, t0, t1, 1, &velocity_lo, &velocity_hi) ||
             velocity_lo < -1e-5f)
             return 0u;
+        if (end_down < brake_down)
+            return 1u;
         for (iteration = 0; iteration < 16u; ++iteration) {
             const float mid = 0.5f * (left + right);
             if (guidance_quintic_eval(down, mid, 0) >= brake_down)
