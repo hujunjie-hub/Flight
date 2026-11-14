@@ -207,7 +207,8 @@ def main() -> int:
     ap.add_argument("--repo", default=".")
     ap.add_argument("--manifest", default="spec/validation/flight_acceptance_manifest.json")
     ap.add_argument("--run-id", required=True)
-    ap.add_argument("--expected-branch", default="opt/stage-02-m5-06-safety-validator")
+    ap.add_argument("--expected-branch", default="main",
+                    help="delivery branch; main is the only remote branch since 2026-11-14")
     ap.add_argument("--validated-code", default="",
                     help="bind this 40-hex commit as validated_code_commit instead of "
                          "inheriting the previous round's value")

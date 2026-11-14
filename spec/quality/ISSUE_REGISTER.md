@@ -242,30 +242,32 @@ Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析
 
 `GITHUB_PUBLICATION = PARTIAL`。下表是本文件承诺的本地编号与线上 Issue 映射；未列出的 #9–#12 目前没有对应的 FLIGHT-LOCAL 编号，不得臆造。
 
-| 本地编号 | GitHub Issue | 关系 |
+| GitHub Issue | 本地编号 | 关系 |
 |---|---|---|
-| FLIGHT-LOCAL-04 | [#8](https://github.com/hujunjie-hub/Flight/issues/8) | 已关闭（OWNER_WAIVED_INDEPENDENT_REVIEW） |
-| FLIGHT-LOCAL-12 | [#15](https://github.com/hujunjie-hub/Flight/issues/15) | 同一差分碰撞夹具问题 |
-| FLIGHT-LOCAL-25 | [#16](https://github.com/hujunjie-hub/Flight/issues/16) | B07 目标/HIL 未执行 |
-| FLIGHT-LOCAL-27 | [#13](https://github.com/hujunjie-hub/Flight/issues/13) | ICD+M4 静态余量风险 |
-| FLIGHT-LOCAL-54 | [#14](https://github.com/hujunjie-hub/Flight/issues/14) | Release enum-size ABI 差异 |
-| — | [#17](https://github.com/hujunjie-hub/Flight/issues/17) | ENG-07 Land 终端 |
-| — | [#18](https://github.com/hujunjie-hub/Flight/issues/18) | ENG-07 Return 终端 |
-| — | [#19](https://github.com/hujunjie-hub/Flight/issues/19) | ENG-07 Mission 终端 |
-| — | [#21](https://github.com/hujunjie-hub/Flight/issues/21) | 近地下降速度指标 |
-| — | [#22](https://github.com/hujunjie-hub/Flight/issues/22) | M4 advisory contact handoff |
-| — | [#23](https://github.com/hujunjie-hub/Flight/issues/23) | contact-hold 拒绝/锁存 |
-| — | [#24](https://github.com/hujunjie-hub/Flight/issues/24) | 下降先于水平收敛 |
-| — | [#25](https://github.com/hujunjie-hub/Flight/issues/25) | RETURN handoff 回归 |
-| — | [#26](https://github.com/hujunjie-hub/Flight/issues/26) | M6 近地极限环（R40 新增） |
-| — | [#27](https://github.com/hujunjie-hub/Flight/issues/27) | 固化证据不可复现（R40 新增；对象新鲜度项已修 `dd1ef142`） |
-| — | [#28](https://github.com/hujunjie-hub/Flight/issues/28) | 仅记录在 spec/09 的验收工作流（R40 新增） |
-| — | [#29](https://github.com/hujunjie-hub/Flight/issues/29) | 导航估计与真值发散（R41 新增；已加 SIL 检测器与 M6 fail-closed 门控） |
-| — | [#30](https://github.com/hujunjie-hub/Flight/issues/30) | Bootloader 验收（TEST-V191-BOOT，由 #28 拆分） |
-| — | [#31](https://github.com/hujunjie-hub/Flight/issues/31) | MAVLink 安全验收（TEST-V191-MAVSEC，由 #28 拆分） |
-| — | [#32](https://github.com/hujunjie-hub/Flight/issues/32) | 非安全设置持久化（TEST-V191-PARAM，由 #28 拆分） |
-| — | [#33](https://github.com/hujunjie-hub/Flight/issues/33) | 长航段任务/返航分段（TEST-M5-TIME-LATTICE，由 #28 拆分） |
-| — | [#34](https://github.com/hujunjie-hub/Flight/issues/34) | 组合软件故障注入（spec/09 4.3，由 #28 拆分） |
+| [#8](https://github.com/hujunjie-hub/Flight/issues/8) | FLIGHT-LOCAL-04 | 已关闭（OWNER_WAIVED_INDEPENDENT_REVIEW） |
+| [#15](https://github.com/hujunjie-hub/Flight/issues/15) | FLIGHT-LOCAL-12 | 同一差分碰撞夹具问题 |
+| [#16](https://github.com/hujunjie-hub/Flight/issues/16) | FLIGHT-LOCAL-25 | B07 目标/HIL 未执行 |
+| [#13](https://github.com/hujunjie-hub/Flight/issues/13) | FLIGHT-LOCAL-27 | ICD+M4 静态余量风险 |
+| [#14](https://github.com/hujunjie-hub/Flight/issues/14) | FLIGHT-LOCAL-54 | Release enum-size ABI 差异 |
+| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | — | ENG-07 Land 终端 |
+| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | — | ENG-07 Return 终端 |
+| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | — | ENG-07 Mission 终端 |
+| [#21](https://github.com/hujunjie-hub/Flight/issues/21) | — | 近地下降速度指标 |
+| [#22](https://github.com/hujunjie-hub/Flight/issues/22) | — | M4 advisory contact handoff |
+| [#23](https://github.com/hujunjie-hub/Flight/issues/23) | — | contact-hold 拒绝/锁存 |
+| [#24](https://github.com/hujunjie-hub/Flight/issues/24) | — | 下降先于水平收敛 |
+| [#25](https://github.com/hujunjie-hub/Flight/issues/25) | — | RETURN handoff 回归 |
+| [#26](https://github.com/hujunjie-hub/Flight/issues/26) | — | M6 近地极限环（R40 新增） |
+| [#27](https://github.com/hujunjie-hub/Flight/issues/27) | — | 固化证据不可复现（R40 新增；对象新鲜度项已修 `dd1ef142`） |
+| [#28](https://github.com/hujunjie-hub/Flight/issues/28) | — | 仅记录在 spec/09 的验收工作流（R40 新增） |
+| [#29](https://github.com/hujunjie-hub/Flight/issues/29) | — | 导航估计与真值发散（R41 新增；已加 SIL 检测器与 M6 fail-closed 门控） |
+| [#30](https://github.com/hujunjie-hub/Flight/issues/30) | — | Bootloader 验收（TEST-V191-BOOT，由 #28 拆分） |
+| [#31](https://github.com/hujunjie-hub/Flight/issues/31) | — | MAVLink 安全验收（TEST-V191-MAVSEC，由 #28 拆分） |
+| [#32](https://github.com/hujunjie-hub/Flight/issues/32) | — | 非安全设置持久化（TEST-V191-PARAM，由 #28 拆分） |
+| [#33](https://github.com/hujunjie-hub/Flight/issues/33) | — | 长航段任务/返航分段（TEST-M5-TIME-LATTICE，由 #28 拆分） |
+| [#34](https://github.com/hujunjie-hub/Flight/issues/34) | — | 组合软件故障注入（spec/09 4.3，由 #28 拆分） |
+
+> 注意事项：映射表首列必须是 Issue 链接，不得以 `| FLIGHT-LOCAL-` 开头；`tools/check_validation_evidence.py` 用该前缀识别正式登记表并检查编号唯一性。
 
 ## 2026-11-15 ENG-07 R41：导航发散与消费端门控
 
