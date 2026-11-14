@@ -162,3 +162,13 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
 - ZIP 自身 SHA256/size 只能写入外部 report 和 `.sha256` sidecar，不得嵌入 ZIP 内部 Manifest。
 - R29 checker 必须拒绝旧 R28 后置元数据模式；UNKNOWN/BLOCKED 不得 PASS。
 - B01/B02/B03 未经 OWNER 批准保持 FAIL；B05/MR-009 在 R31 内部预审后仍为 WAITING_INDEPENDENT_REVIEW，须由独立审查者逐项签署；其他安全问题同样遵循独立审查要求。
+
+
+## 16. 原生 FMT-SIM 本机复测责任与交接
+
+- 所有需要 Windows 原生 FMT-SIM 引擎的动态场景由项目 Owner 在本机执行；远程 Agent 不代跑、不推断、不伪造 FMT-SIM 结果。
+- Agent 继续负责生产代码修改、Host/Host SIL/集成/Sanitizer、静态检查、CI、失败分析、回归测试、SPEC/Issue 更新和分支提交。
+- FMT-SIM 的正式命令、配置、350 ms 门槛、日志与 SHA256 归档、失败回传、Agent 后续处理顺序，统一以 spec/validation/FMT_SIM_LOCAL_HANDOFF.md 为准。
+- 本机运行必须记录 branch、完整 HEAD、FMT-SIM binary/settings SHA256、运行参数、逐场景退出码和原始日志 SHA256；未提供证据的字段写 NOT_RUN / UNKNOWN。
+- #17/#18/#19 只有在对应原生场景完成其终端回执、连续 LANDED 证据、DISARMED 回执及 350 ms 状态流条件后，才可进入复核；Host/CI PASS 不替代原生 FMT-SIM 复测。
+- FMT-SIM 软件仿真不替代 B07 的 H723 目标运行、物理 HIL、WCET/RTA、目标栈水位或飞行验收。

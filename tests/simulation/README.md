@@ -79,3 +79,12 @@ python tests/simulation/golden/generate_golden.py
 
 这些项在 `doc/simulation/HIL_LINK.md` 第 6 节按 `NOT_RUN` 记录，不得据本测试
 宣称 HIL 通过或飞行放行。
+
+
+## ENG-07 原生 FMT-SIM 验收（项目 Owner 本机执行）
+
+Land、Return、Mission 的 Windows 原生 FMT-SIM 动态验收由项目 Owner 在本机执行；远程 Agent 不代跑原生 FMT-SIM。Agent 负责代码修复、Host/SIL/CI、诊断和下一轮本机命令。
+
+正式操作手册（分支检查、隔离实例配置、350 ms 固定门槛、三场景顺序命令、manifest/日志 SHA256、验收条件和回传流程）见 [FMT-SIM 本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。
+
+注意：此处原生 FMT-SIM 与不启动引擎的 Host SIL 不同。不要将 650 ms 诊断运行报告为 350 ms 验收通过；不要提交 FMT-SIM 二进制或包含凭据的本机配置。

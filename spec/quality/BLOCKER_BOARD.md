@@ -114,3 +114,14 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 - `FIXED_WAITING_RETEST` 不等于 VERIFIED；安全/数学问题的 `VERIFIED/CLOSED` 必须由独立审查者依据证据确认。内部预审不能替代独立复验。
 - S06-100..102 的 Host 证据已更新。MR-009 的单次技术复核完成并修复发现项。M5-06 仍受 B07 门禁阻塞。
 - R27 文档、R27 快照和 R22 原始字节保留为 HISTORICAL/NOT_RECOVERABLE，不得覆盖。
+
+
+## ENG-07 原生 FMT-SIM 动态复测交接（Owner 本机）
+
+| Issue | 场景 | 当前状态 | 执行责任 / 解除证据 |
+|---|---|---|---|
+| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / FIX NOT YET DYNAMICALLY RETESTED | Owner 本机按 350 ms 运行；终端命令回执、连续 LANDED、DISARMED 和完整日志 |
+| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / FIX NOT YET DYNAMICALLY RETESTED | Owner 本机按 350 ms 运行；Return 完成、连续 LANDED、DISARMED 和完整日志 |
+| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / FIX NOT YET DYNAMICALLY RETESTED | Owner 本机按 350 ms 运行；双航点完成、Return、终端回执、连续 LANDED、DISARMED 和完整日志 |
+
+后续原生 FMT-SIM 均由项目 Owner 在 Windows 本机执行，远程 Agent 不代跑。Agent 负责代码修复、Host/SIL/CI、日志分析和分支交付。命令、环境指纹、归档和回传规则见 [FMT-SIM 本机复测交接方案](../validation/FMT_SIM_LOCAL_HANDOFF.md)。三项 Issue 在本机证据回传并复核前保持 OPEN；不得用 Host/CI PASS 或 650 ms 诊断运行关闭。

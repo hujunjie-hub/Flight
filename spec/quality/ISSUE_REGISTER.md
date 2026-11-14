@@ -111,3 +111,13 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 - 测试轮：S06-099 60,002 offsets 双时间模型 Fraction 检查；S06-107 oracle 覆盖 rounded derivative coefficients；Host #43446380866 6/6、M6/M7 #43446380836 5/5、M7 #43446380724 2/2 全部 SUCCESS。
 - 代码修正 79f23d0200c31ebe934bfc8793e65d7af1e6bdd4；oracle a55071966209a1af615ff6137963eab4631e8bae；双源/expanded-time audit ad9df36687b68b43f9118ae6e26be8716d900c90；最终审计基线 8dcb60b3ac18e6a763c939d3e810984092cdd321。
 - disposition：**INTERNAL_PRE_REVIEW_COMPLETE / WAITING_INDEPENDENT_REVIEW**。完整 Validator Horner 拒绝分支可达性不作声称；H723 实机、40 ms route preview、S06-100..102、WCET/RTA、HIL、飞行均按各自门禁处理。M5-06 整体仍 BLOCKED，M5-07 不启动。独立审查者尚未指定，必须逐项完成 R30 matrix 并签署最终结论。
+
+
+## ENG-07 原生 FMT-SIM 本机复测登记
+
+- 在线跟踪：GitHub Issues [#17 Land](https://github.com/hujunjie-hub/Flight/issues/17)、[#18 Return](https://github.com/hujunjie-hub/Flight/issues/18)、[#19 Mission](https://github.com/hujunjie-hub/Flight/issues/19)。
+- 当前修复代码基线：ce00ff9f0a8eb4989d1a171c3322f3640de2965c；文档/CI 基线：dffba6fd9e2f25e03083439b37a4d557fe11e24d。
+- 当前证据：Host #642 6/6、M6/M7 #130 5/5、M7 #91 2/2 SUCCESS；修复后的原生 FMT-SIM Land/Return/Mission 均 NOT_RUN。
+- 执行责任：项目 Owner 在 Windows 本机执行；远程 Agent 不代跑原生 FMT-SIM。Agent 负责代码、Host/SIL/CI、分析和下一轮修复。
+- 统一方案：spec/validation/FMT_SIM_LOCAL_HANDOFF.md。验收固定为隔离 FMT-SIM、UDP 14653、350 ms、三个场景顺序运行；需回传 manifest、完整日志、逐场景退出码及 SHA256。
+- 状态规则：#17/#18/#19 继续 OPEN；收到修复后本机证据并逐项复核前，不标 VERIFIED/CLOSED。Host/CI PASS 不替代原生 FMT-SIM；FMT-SIM PASS 不替代 B07 H723 实机/HIL/WCET/栈水位/飞行证据。
