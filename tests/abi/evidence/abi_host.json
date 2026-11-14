@@ -21,10 +21,10 @@
     "middleware/contracts/base_types/contract_version.h": "6c1a2aaef949e6b9441a0f4044f2df41352ccc0953b8918abe95db29318b5df5",
     "middleware/contracts/base_types/common_base.h": "b28c37f625060e249254f4140a17668279baa86b9899a87511ee459a17b89102",
     "middleware/contracts/ports/control_model_types.h": "bb36451790060d8b0a7588617f5dc2f18277cf63dbd78edee8cf2e0b847d43f2",
-    "middleware/contracts/messages/common_messages.h": "db86708a0a1d55729445cab9fe5763c5b6f82fad2016b34a821d51431740d68c",
+    "middleware/contracts/messages/common_messages.h": "faac987c7d235e9040a808ee3203d3b248b83220f06c3748e32f7644c9104f27",
     "middleware/contracts/ports/port_types.h": "b64d0c331a5da74fc5a7dadd427505e152203fc1d897abcfd4291a83c5dadb46",
     "middleware/contracts/ports/port_api.h": "2a641af4578ad8634ccca91c87f6efe3fea7f617b0d15dda6fff672de565ee8c",
-    "middleware/contracts/messages/message_ids.h": "4574ec4874d59a6f64f5feeb92338f09c37430795668e5918fb6d8a6c10fda46",
+    "middleware/contracts/messages/message_ids.h": "a1b04e10d5e8f3a839179e2ab86e56496ea289e33ca704e523cbefd6a35e361a",
     "middleware/contracts/product_contract/product_contract.h": "3b9957b6f8229be9db50b26fd44076bf333142eb2e9e439be030962c07d4d444"
   },
   "status": "PASS",
@@ -36,11 +36,11 @@
     "-Wall",
     "-Wextra",
     "-Werror",
-    "-IE:\\Flight\\Flight-M5-06-VERIFY\\middleware\\contracts"
+    "-ID:\\STM32Project\\Flight\\middleware\\contracts"
   ],
-  "abi_hash": "0edc9d8baaca7a826d9e807132f0cf232fd55f7a9b646d4d9a82aab4c288eacf",
-  "types": 143,
-  "fields": 986,
+  "abi_hash": "402764a0f9caa5b59e99408752ad6a625a600dbb8d1f9c085d03b5fea29fb83a",
+  "types": 144,
+  "fields": 993,
   "layout": {
     "ContractHeader": {
       "kind": "struct",
@@ -781,6 +781,20 @@
         "committed_demand": 144
       },
       "size": 168,
+      "alignment": 8
+    },
+    "GroundStopCertificate": {
+      "kind": "struct",
+      "fields": {
+        "header": 0,
+        "stop_code": 88,
+        "lifecycle": 90,
+        "ramp_nps": 92,
+        "authority_epoch": 96,
+        "directive_epoch": 100,
+        "certificate_expires_at_us": 104
+      },
+      "size": 112,
       "alignment": 8
     },
     "ActuatorStatus": {

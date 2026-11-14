@@ -11,16 +11,16 @@
 
 | Target | Pointer bits | ABI hash |
 |---|---|---|
-| ARM Cortex-M7 EABI hard-float | 32 | `12b64f6368aad4b96b5bdd21f382a1babc810a2df96680af7853273e2e7f66c4` |
-| x86_64 MinGW Host | 64 | `0edc9d8baaca7a826d9e807132f0cf232fd55f7a9b646d4d9a82aab4c288eacf` |
+| ARM Cortex-M7 EABI hard-float | 32 | `da2707e9a59b8ed745570a26fc9c80f9361c5ad03799737e230ba6df8926e4ac` |
+| x86_64 MinGW Host | 64 | `402764a0f9caa5b59e99408752ad6a625a600dbb8d1f9c085d03b5fea29fb83a` |
 
 Canonical ABI text is `TYPE/FIELD` ordered by type name and field name; see
 `tests/abi/abi_report.py::canonical_abi`.
 
 ## Types and fields
 
-- Public types probed: **143**
-- Public fields probed: **986**
+- Public types probed: **144**
+- Public fields probed: **993**
 - Private types excluded: `MpcOutputSnapshot`
 
 ## Key sizes (ARM / Host, bytes)
@@ -41,17 +41,17 @@ Canonical ABI text is `TYPE/FIELD` ordered by type name and field name; see
 ## Cross-check against spec/validation/abi_layout.json
 
 - Status: **PASS**
-- Compared types: **143**
-- Compared field offsets: **981**
+- Compared types: **144**
+- Compared field offsets: **988**
 - Mismatches: **0**
 - Missing types: **0**
 - Extra types: **0**
-- Spec compiler: arm-none-eabi-gcc.exe (GNU Tools for STM32 14.3.rel1.20251027-0700) 14.3.1 20250623
+- Spec compiler: arm-none-eabi-gcc (15:14.2.rel1-1) 14.2.1 20241119
 
 
 ## Host vs ARM layout delta
 
-- Identical layouts: **139**
+- Identical layouts: **140**
 - Pointer-dependent layouts (expected): **4**
 - Unexpected differences: **0**
 
@@ -68,7 +68,7 @@ process and have separate ARM and Host layouts.
 
 ## Message registry
 
-- Registry entries: **55**, macros checked: **55**
+- Registry entries: **56**, macros checked: **56**
 - Problems: **0**
 
 ## Header hygiene and self-containment
@@ -88,7 +88,7 @@ process and have separate ARM and Host layouts.
 
 - Lock file: `middleware/contracts/product_contract/abi_lock.h`
 - Status: **PASS**
-- Message registry SHA256 bound by the lock: `dd06554c240567d5f81b51e4aed39336ccf3e469c6c95a952d1a2d766bbc49e7`
+- Message registry SHA256 bound by the lock: `27738a85e59d7232256158fe9ce70563e41c35fb074c2f2c0871eea1b678c148`
 
 ## Artifacts
 

@@ -3,15 +3,15 @@
   "status": "PASS",
   "failures": [],
   "abi_hashes": {
-    "arm": "12b64f6368aad4b96b5bdd21f382a1babc810a2df96680af7853273e2e7f66c4",
-    "host": "0edc9d8baaca7a826d9e807132f0cf232fd55f7a9b646d4d9a82aab4c288eacf"
+    "arm": "da2707e9a59b8ed745570a26fc9c80f9361c5ad03799737e230ba6df8926e4ac",
+    "host": "402764a0f9caa5b59e99408752ad6a625a600dbb8d1f9c085d03b5fea29fb83a"
   },
   "spec_layout_comparison": {
     "spec_file": "spec/validation/abi_layout.json",
-    "spec_sha256": "a49633d8b9e83fbfcd7ec8beee6b4b93574f93288a58286780df24d319defcc5",
-    "spec_compiler": "arm-none-eabi-gcc.exe (GNU Tools for STM32 14.3.rel1.20251027-0700) 14.3.1 20250623",
-    "compared_types": 143,
-    "compared_field_offsets": 981,
+    "spec_sha256": "24756e40b75ca620684d44cfe8d1729ddc830bcb7da1a08b29531bb7876342a2",
+    "spec_compiler": "arm-none-eabi-gcc (15:14.2.rel1-1) 14.2.1 20241119",
+    "compared_types": 144,
+    "compared_field_offsets": 988,
     "excluded_private_types": [
       "MpcOutputSnapshot"
     ],
@@ -22,7 +22,7 @@
   },
   "warnings": [],
   "host_arm_comparison": {
-    "identical_types": 139,
+    "identical_types": 140,
     "differing_types": [
       {
         "type": "ControllerInput",
@@ -107,9 +107,9 @@
   },
   "message_registry_check": {
     "registry_file": "spec/contracts/message_registry.json",
-    "registry_sha256": "dd06554c240567d5f81b51e4aed39336ccf3e469c6c95a952d1a2d766bbc49e7",
-    "registered_messages": 55,
-    "macros_checked": 55,
+    "registry_sha256": "27738a85e59d7232256158fe9ce70563e41c35fb074c2f2c0871eea1b678c148",
+    "registered_messages": 56,
+    "macros_checked": 56,
     "problems": [],
     "status": "PASS"
   },
@@ -140,7 +140,7 @@
     "status": "PASS",
     "problems": [],
     "lock_file": "middleware/contracts/product_contract/abi_lock.h",
-    "lock_sha256": "3c91341263d86fb62394b004abc1d6856168346d0181b08f5fdc3f056503559f"
+    "lock_sha256": "d2a7feff095110562e2b36d02c4008b510a2615fbcc0a55a83f6e343edfbc1fb"
   },
   "private_types_excluded": [
     "MpcOutputSnapshot"

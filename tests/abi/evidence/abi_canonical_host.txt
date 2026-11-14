@@ -399,6 +399,14 @@ F GnssTimeObservation.time_epoch 20
 F GnssTimeObservation.time_scale 28
 F GnssTimeObservation.utc_time_ns 0
 F GnssTimeObservation.validity_flags 30
+T GroundStopCertificate 112 8 struct
+F GroundStopCertificate.authority_epoch 96
+F GroundStopCertificate.certificate_expires_at_us 104
+F GroundStopCertificate.directive_epoch 100
+F GroundStopCertificate.header 0
+F GroundStopCertificate.lifecycle 90
+F GroundStopCertificate.ramp_nps 92
+F GroundStopCertificate.stop_code 88
 T GuidanceFeasibility 112 8 struct
 F GuidanceFeasibility.earliest_violation_offset_us 104
 F GuidanceFeasibility.feasible 96

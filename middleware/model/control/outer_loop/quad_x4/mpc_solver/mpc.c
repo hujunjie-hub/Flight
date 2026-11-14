@@ -33,9 +33,14 @@ static OSQPFloat lower[190], upper[190];
 
 /* Per-job evidence.  The buffer exists only in Host builds; the firmware keeps
  * the aggregate counters and reports zero records.  Recording happens after the
- * decision it documents, so no control path depends on it. */
+ * decision it documents, so no control path depends on it.
+ *
+ * The 34 s FMT-SIM acceptance scenario produces ~1.4 k jobs (50 Hz worker), so a
+ * 1024-entry buffer silently dropped the tail and the MATLAB evidence gate
+ * refused to reconcile the aggregates.  2048 keeps a full accounting for the
+ * whole scenario with headroom; the target build allocates nothing here. */
 #if defined(FLIGHT_HOST_TEST)
-#define MPC_DIAG_CAPACITY 1024u
+#define MPC_DIAG_CAPACITY 2048u
 static MpcJobRecord mpc_job_records[MPC_DIAG_CAPACITY];
 static uint32_t mpc_job_record_written;
 #else

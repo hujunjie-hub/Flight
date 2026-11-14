@@ -12,8 +12,8 @@ CONTRACT_STATIC_ASSERT(PRODUCT_PROFILE_ID == 0x00010001u, "profile id");
 CONTRACT_STATIC_ASSERT(ABI_LOCK_PORT_API_REVISION == PORT_API_REVISION, "lock port revision");
 CONTRACT_STATIC_ASSERT(ABI_LOCK_PRODUCT_CONTRACT_REVISION == PRODUCT_CONTRACT_REVISION, "lock product revision");
 CONTRACT_STATIC_ASSERT(ABI_LOCK_CONTRACT_HEADER_BYTES == sizeof(ContractHeader), "lock header size");
-CONTRACT_STATIC_ASSERT(ABI_LOCK_TYPE_COUNT == 143u, "lock type count");
-CONTRACT_STATIC_ASSERT(ABI_LOCK_FIELD_COUNT == 986u, "lock field count");
+CONTRACT_STATIC_ASSERT(ABI_LOCK_TYPE_COUNT == 144u, "lock type count");
+CONTRACT_STATIC_ASSERT(ABI_LOCK_FIELD_COUNT == 993u, "lock field count");
 
 #if defined(__GNUC__)
 #define ABI_USED __attribute__((used))
@@ -506,6 +506,15 @@ ABI_USED const unsigned int abi_values[] = {
   (unsigned int)offsetof(ActuatorCommitReceipt, output_policy_id),
   (unsigned int)offsetof(ActuatorCommitReceipt, result_code),
   (unsigned int)offsetof(ActuatorCommitReceipt, committed_demand),
+  (unsigned int)sizeof(GroundStopCertificate),
+  (unsigned int)CONTRACT_ALIGNOF(GroundStopCertificate),
+  (unsigned int)offsetof(GroundStopCertificate, header),
+  (unsigned int)offsetof(GroundStopCertificate, stop_code),
+  (unsigned int)offsetof(GroundStopCertificate, lifecycle),
+  (unsigned int)offsetof(GroundStopCertificate, ramp_nps),
+  (unsigned int)offsetof(GroundStopCertificate, authority_epoch),
+  (unsigned int)offsetof(GroundStopCertificate, directive_epoch),
+  (unsigned int)offsetof(GroundStopCertificate, certificate_expires_at_us),
   (unsigned int)sizeof(ActuatorStatus),
   (unsigned int)CONTRACT_ALIGNOF(ActuatorStatus),
   (unsigned int)offsetof(ActuatorStatus, header),
