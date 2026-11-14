@@ -39,6 +39,51 @@ def copy(path, dest):
     dest.write_bytes((ROOT / path).read_bytes())
 
 
+def parse_blockers():
+    """Read the live B01-B07 status from the derived blocker board."""
+    board = ROOT / "spec/quality/BLOCKER_BOARD.md"
+    blockers = {}
+    if not board.is_file():
+        return blockers
+    current = None
+    for line in board.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^##\s+(B0\d)\b", line)
+        if m:
+            current = m.group(1)
+            blockers.setdefault(current, "UNKNOWN")
+            continue
+        if current and re.match(r"^\|\s*状态\s*\|", line):
+            cells = [cell.strip() for cell in line.strip("|").split("|")]
+            if len(cells) >= 2:
+                blockers[current] = cells[1].replace("**", "")
+                current = None
+    return blockers
+
+
+def validation_summary():
+    """Summarise the last local regression instead of a frozen R28 ledger."""
+    path = ROOT / "build/m4_m5_implementation/evidence/validation.json"
+    if not path.is_file():
+        return {"status": "NOT_RUN", "run_id": None, "code_commit": None,
+                "passed": [], "failed": [], "sha256": None, "path": None}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    steps = data.get("commands") or data.get("steps") or data.get("tests") or []
+    passed, failed = [], []
+    for step in steps:
+        name = step.get("name") or step.get("test_id") or "?"
+        if "status" in step:
+            ok = step["status"] == "PASS"
+        else:
+            ok = step.get("exit_code") == 0
+        (passed if ok else failed).append(name)
+    return {"status": data.get("status", "UNKNOWN"),
+            "run_id": data.get("run_id"),
+            "code_commit": data.get("code_commit"),
+            "passed": passed, "failed": failed,
+            "sha256": sha(path),
+            "path": str(path.relative_to(ROOT)).replace("\\", "/")}
+
+
 def main():
     global RUN_ID, OUT, CODE, REMOTE
     parser = argparse.ArgumentParser(description=__doc__)
@@ -91,47 +136,40 @@ def main():
     write(OUT / "modified_files_manifest.json", json.dumps(mod_manifest, indent=2) + "\n")
     write(OUT / "untracked_manifest.json", json.dumps(unt_manifest, indent=2) + "\n")
 
-    results_path = ROOT / "build/validation/regenerated/r28_test_results.json"
-    results = json.loads(results_path.read_text(encoding="utf-8")) if results_path.is_file() else {"tests": []}
+    validation = validation_summary()
     test_progress = {
         "run_id": RUN_ID,
         "code_commit": CODE,
-        "test_results_path": "build/validation/regenerated/r28_test_results.json",
-        "test_results_sha256": sha(results_path) if results_path.is_file() else None,
-        "counts": {},
-        "tests": results.get("tests", []),
+        "validation_run_id": validation["run_id"],
+        "validation_code_commit": validation["code_commit"],
+        "validation_status": validation["status"],
+        "test_results_path": validation["path"],
+        "test_results_sha256": validation["sha256"],
+        "counts": {"PASS": len(validation["passed"]),
+                   "NOT_PASS": len(validation["failed"])},
+        "passed": validation["passed"],
+        "not_passed": validation["failed"],
     }
-    for test in results.get("tests", []):
-        key = test.get("status", "UNKNOWN")
-        test_progress["counts"][key] = test_progress["counts"].get(key, 0) + 1
     write(OUT / "test_progress.json", json.dumps(test_progress, indent=2) + "\n")
     write(OUT / "active_processes.json", json.dumps({"run_id": RUN_ID, "processes": []}, indent=2) + "\n")
 
-    blocker = {
-        "run_id": RUN_ID,
-        "B01": "FAIL/BLOCKED",
-        "B02": "FAIL/BLOCKED",
-        "B03": "FAIL/BLOCKED",
-        "B04": "BLOCKED",
-        "B05": "WAITING_INDEPENDENT_REVIEW",
-        "B06": "BLOCKED (4248 B > 4096 B; callgraph UNKNOWN)",
-        "B07": "NOT_RUN",
-        "FLIGHT-LOCAL-35": "FIXED_WAITING_RETEST",
-        "FLIGHT-LOCAL-36": "FIXED_WAITING_RETEST",
-        "FLIGHT-LOCAL-37": "FIXED_WAITING_RETEST",
-        "FLIGHT-LOCAL-38": "FIXED_WAITING_RETEST",
-        "FLIGHT-LOCAL-39": "FIXED_WAITING_RETEST",
-        "FLIGHT-LOCAL-40": "FIXED_WAITING_RETEST",
-        "FLIGHT-LOCAL-41": "BLOCKED / R22 bytes NOT_RECOVERABLE",
-    }
+    blocker = {"run_id": RUN_ID}
+    blocker.update(parse_blockers())
     write(OUT / "blocker_snapshot.json", json.dumps(blocker, indent=2) + "\n")
 
-    write(OUT / "next_actions.md", """# Next actions
+    def _open(value):
+        text = value.strip()
+        return not (text.startswith("PASS") or text.startswith("OWNER_WAIVED")
+                    or text.startswith("RESOLVED"))
+    open_blockers = [f"{k}={v[:40]}" for k, v in blocker.items()
+                     if k != "run_id" and _open(v)]
+    write(OUT / "next_actions.md", f"""# Next actions
 
-1. Run `python tools/check_validation_evidence.py --check all` after the archive report exists.
-2. Build the R28 ZIP and bundle from the archive head; write the external report.
-3. Re-run archive, handover and manifest checks against the final metadata commit.
-4. Do not start M5-07 before M5-06 acceptance and MR-009 independent APPROVAL.
+1. Read `SESSION_HANDOVER.md`, `handover_state.json` and `test_progress.json`.
+2. Re-run `python tests/guidance/run_validation.py --run-id <id> --code-commit <sha>`
+   and compare with the recorded validation run ({validation["run_id"]}).
+3. Current non-PASS blockers: {', '.join(open_blockers) if open_blockers else 'none'}.
+4. Do not start M5-07 before M5-06 acceptance and independent review.
 """)
     write(OUT / "NEXT_SESSION_START_PROMPT.txt", f"""You are a new local Agent for Flight.
 Read build/validation/handover/{RUN_ID}/SESSION_HANDOVER.md and handover_state.json first.
@@ -146,13 +184,11 @@ Do not modify code before the ACK. Do not reset/clean/stash/push/rebase.
         "branch": branch,
         "head": head,
         "validated_code_commit": CODE,
-        "tooling_commit": "5e1b8e5d6ea10d0620004f23567b2502c8aae1c4",
         "remote_head": remote,
         "ahead": ahead,
-        "r27_archive_head": "753c45994cb9cba12d60ce58acb04a9dcaa9b97a",
-        "r27_zip_sha256": "8482a166deb44d0ebca1b2c372d6635b32c57f8225f6744064d5363fb4ae9819",
         "modified_count": len(modified),
         "untracked_count": len(untracked),
+        "validation": {k: validation[k] for k in ("status", "run_id", "code_commit", "sha256")},
         "test_counts": test_progress["counts"],
         "blockers": blocker,
         "handover_status": "HANDOVER_READY",
@@ -160,31 +196,31 @@ Do not modify code before the ACK. Do not reset/clean/stash/push/rebase.
     write(OUT / "handover_state.json", json.dumps(state, indent=2) + "\n")
 
     sections = {
-        "A": "项目目标：M5-06 安全验证器与 Host/SIL 证据闭环，不进入 M5-07。",
-        "B": "当前阶段：R28 严格证据、MR-009 测试、B06 分析与归档准备。",
+        "A": "项目目标：M5-06 安全验证器与 Host/SIL 证据闭环；M5-07 在验收与独立复核前不得启动。",
+        "B": f"当前阶段：ENG-07 终端链（FLIGHT-17/18/19/21/23/24）受 FLIGHT-26（近地极限环）与 FLIGHT-29（导航发散）阻塞，其余非真机项已闭环。",
         "C": f"当前 RUN_ID：{RUN_ID}。",
         "D": f"当前 Git Branch：{branch}。",
         "E": f"当前 HEAD：{head}。",
         "F": f"Validated Code Commit：{CODE}。",
-        "G": "Tooling Commit：5e1b8e5d6ea10d0620004f23567b2502c8aae1c4。",
+        "G": f"最后一次本地回归：{validation['run_id']} / {validation['status']}（{len(validation['passed'])} PASS，{len(validation['failed'])} 非 PASS）。",
         "H": f"Remote HEAD：{remote}。",
         "I": f"Ahead：{ahead}。",
-        "J": f"工作区：{len(modified)} 个 tracked modified，{len(untracked)} 个 untracked；均为 R27 失败证据/保留文件。",
-        "K": "已完成：交接规范、strict collector、统一 checker、MR-009 专用测试、B06 分析、R28 文档与测试台账。",
-        "L": "未完成：最终 ZIP/Bundle/外部报告；TAKEOVER_ACK；最终全量 checker/archive 复验。",
-        "M": "当前失败：spec_layout、packages_lock、production_abi。",
-        "N": "当前阻塞：B01-B07；FLIGHT-LOCAL-41 R22 原始字节；S06-100..102。",
-        "O": "已运行测试：见 test_progress.json 与 r28_test_results.json。",
-        "P": f"测试结果 SHA256：{test_progress['test_results_sha256']}；原始日志路径见每条 test 记录。",
+        "J": f"工作区：{len(modified)} 个 tracked modified，{len(untracked)} 个 untracked。",
+        "K": "已完成：文档冲突与 Issue 映射、未登记项登记（#27–#34）、证据哈希重基与 ABI 证据中性化、memory-budget 新鲜度门控、CONTACT_HOLD 静态保持、SIL 导航发散检测、M6 导航加速度 fail-closed、T01–T30 本地回归全绿。",
+        "L": f"未完成：FLIGHT-26 内环阻尼与 FLIGHT-29 估计器修复待批准；H723/HIL/WCET/栈水位/飞行 NOT_RUN；独立复核未指派。",
+        "M": f"当前非 PASS 步骤：{', '.join(validation['failed']) if validation['failed'] else '无'}。",
+        "N": "当前阻塞：" + (', '.join(open_blockers) if open_blockers else '无') + "。",
+        "O": f"已运行测试：{validation['path']}（SHA256 {validation['sha256']}）。",
+        "P": f"测试结果 SHA256：{test_progress['test_results_sha256']}。",
         "Q": "正在运行/中断进程：无；见 active_processes.json。",
         "R": "修改文件列表：见 modified_files_manifest.json（含原始字节副本）。",
         "S": "未跟踪文件列表：见 untracked_manifest.json（含原始字节副本）。",
-        "T": "不允许修改：main、PR #2、正式 Spec/ABI/ICD/RT-Thread lock、4,096 B 栈预算、安全阈值、R27 归档原始字节。",
-        "U": "下一步命令：生成 R28 ZIP/Bundle/报告；然后运行 `python tools/check_validation_evidence.py --check all`。",
-        "V": "风险：Host/SIL 不等于 H723；B06 UNKNOWN 边；R22 bytes 不可恢复；归档元数据提交不能伪装成 ZIP 内容。",
-        "W": "新 Agent 接管步骤：读取本文件、handover_state.json、重算所有 SHA、核对 Git 和测试日志，再写 TAKEOVER_ACK.md。",
+        "T": "不允许修改：main、正式 Spec/ABI/ICD/RT-Thread lock、4,096 B 栈预算、M4/M5 安全阈值、FMS 授权边界。",
+        "U": "下一步命令：按 next_actions.md；先复跑 T01–T30 再复跑原生 FMT-SIM 三场景。",
+        "V": "风险：Host/SIL/ARM 编译不等于 H723 实机；FLIGHT-26/29 未修复前 Mission 与 LANDED 验收不可信。",
+        "W": "新 Agent 接管步骤：读取本文件、handover_state.json、重算 SHA、核对 Git 与测试日志，再写 TAKEOVER_ACK.md。",
     }
-    text = "# R28 SESSION HANDOVER\n\n"
+    text = "# SESSION HANDOVER\n\n"
     text += f"Status: **HANDOVER_READY**\n\n"
     for key in "ABCDEFGHIJKLMNOPQRSTUVW":
         text += f"## {key}. {sections[key]}\n\n"

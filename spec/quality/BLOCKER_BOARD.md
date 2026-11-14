@@ -25,7 +25,7 @@
 | 字段 | 内容 |
 |---|---|
 | Issue | FLIGHT-LOCAL-05 |
-| 状态 | **BLOCKED / FAIL** |
+| 状态 | **PASS（2026-11-15，T12 spec_layout）**；历史：BLOCKED / FAIL |
 | 根因 | `dialect_report.json` 钉住 CRLF 变体哈希；Git/LF 工作区是另一哈希。文本未变，属于行尾表示差异。 |
 | 证据 | `python spec/tools/audit_spec.py --round 3 --label m4-m5-implementation` exit 1；`build/m4_m5_implementation/evidence/spec_layout.log`。 |
 | 安全影响 | 规范证据不可复现；不直接改变轨迹计算。 |
@@ -37,7 +37,7 @@
 | 字段 | 内容 |
 |---|---|
 | Issue | FLIGHT-LOCAL-05（ABI 面） |
-| 状态 | **BLOCKED / FAIL** |
+| 状态 | **PASS（2026-11-15，T17 生产 ABI 144 types / lock PASS）**；历史：BLOCKED / FAIL |
 | 根因 | `abi_lock.h` 的 message registry hash 钉住 CRLF；LF blob 不同。布局比较 143 类型、981 偏移、0 mismatch。 |
 | 证据 | `python tests/abi/abi_report.py` exit 1；`build/m4_m5_implementation/evidence/production_abi.log`。 |
 | 安全影响 | ABI 锁失效会掩盖真实接口变化；不得用改锁掩盖结构差异。 |
@@ -49,7 +49,7 @@
 | 字段 | 内容 |
 |---|---|
 | Issue | FLIGHT-LOCAL-06 |
-| 状态 | **BLOCKED / FAIL** |
+| 状态 | **PASS（2026-11-15，T14 `--installed` problems 为空）**；历史：BLOCKED / FAIL |
 | 根因 | CMSIS_CORE、STM32H7_CMSIS_DRIVER、STM32H7_HAL_DRIVER 仍为 `latest`，无 40-hex commit。 |
 | 证据 | `python tools/check_rt_packages_lock.py` exit 1；`build/m4_m5_implementation/evidence/packages_lock.log`。 |
 | 安全影响 | 固件依赖不可复现，阻断链接证据。 |
@@ -61,7 +61,7 @@
 | 字段 | 内容 |
 |---|---|
 | Issue | FLIGHT-LOCAL-03 |
-| 状态 | **BLOCKED** |
+| 状态 | **PASS（2026-11-15，T18 默认 Release 链接 exit 0）**；历史：BLOCKED |
 | 根因 | 依赖 B03；`packages/SConscript` 不存在，`packages/` 是 gitignored。 |
 | 证据 | `python tests/guidance/check_target_build.py` exit 2；`build/m4_m5_implementation/evidence/scons_link.log`。 |
 | 安全影响 | 无链接产物，不能声称固件可构建/可放行。 |
