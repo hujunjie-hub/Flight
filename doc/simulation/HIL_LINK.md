@@ -191,3 +191,10 @@ HIL link uart2: rx 12345 frames / 987654 bytes, 0 discarded bytes, tx 5432 frame
    `2e480058…`）。重新生成需要 `--emit-lock` 并同步规范基线，属于 ABI 正式
    制品变更，未在本次 HIL 任务中代为执行。
 
+
+
+## 7. ENG-07 原生 FMT-SIM 本机验收责任
+
+ENG-07 的 Windows 原生 FMT-SIM Land、Return、Mission 动态复测由项目 Owner 本机执行，远程 Agent 不启动原生 FMT-SIM。Agent 负责代码修复、Host/Host SIL/CI、分析用户回传的原始日志并交付下一轮本机复测命令。正式执行、350 ms 门槛、环境指纹、证据归档和回传流程见 [FMT-SIM 本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。
+
+原生场景验收固定使用隔离 FMT-SIM Ground/HIL 配置和 UDP 14653，Land、Return、Mission 顺序执行。不得以 650 ms 诊断模式替代 350 ms 严格验收，也不得将 Host SIL/FMT-SIM 结果描述为 H723 真机或物理飞行通过。

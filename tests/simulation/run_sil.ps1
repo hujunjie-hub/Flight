@@ -9,6 +9,7 @@
     Usage:
         pwsh tests/simulation/run_sil.ps1
         pwsh tests/simulation/run_sil.ps1 -GccDir D:\STM32CubeCLT\mingw64\bin
+        pwsh tests/simulation/run_sil.ps1 -ReuseBuild -OutDir <scenario-output-dir>
 #>
 
 [CmdletBinding()]
@@ -23,16 +24,38 @@ param(
     [ValidateRange(350, 1000)][int]$FmtStateTimeoutMs = 350,
     [ValidateRange(0, 65535)][int]$GroundPort = 0,
     [switch]$SkipAbiLock,
-    [switch]$BuildOnly
+    [switch]$BuildOnly,
+    [switch]$ReuseBuild
 )
 
 $ErrorActionPreference = 'Stop'
 if ($FmtSimExe -and -not $FmtHilPort) { throw '-FmtSimExe requires -FmtHilPort' }
+if ($ReuseBuild -and $BuildOnly) { throw '-ReuseBuild cannot be combined with -BuildOnly' }
 if ($GroundPort -and $GroundPort -eq $FmtHilPort) {
     throw '-GroundPort and -FmtHilPort must use different ports'
 }
 
 $scriptDir = $PSScriptRoot
+$simPath = $null
+if ($FmtSimExe) {
+    $simPath = (Resolve-Path -LiteralPath $FmtSimExe).Path
+    $simDirectory = Get-Item -LiteralPath (Split-Path $simPath)
+    if ($simDirectory.Name -ne 'Win64' -or $simDirectory.Parent.Name -ne 'Binaries') {
+        throw 'Pass the FMT-SIM executable under Binaries/Win64'
+    }
+    $settingsPath = Join-Path $simDirectory.Parent.Parent.FullName 'Content/Settings/settings.jason'
+    if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
+        throw "FMT-SIM settings missing: $settingsPath"
+    }
+    $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+    $hilVehicles = @($settings.Vehicles | Where-Object {
+        $_.SimMode -eq 'HIL' -and $_.MavproxyFCS.Interface -eq 'UDP' -and
+            $_.MavproxyFCS.LocalPort -eq $FmtHilPort
+    })
+    if ($hilVehicles.Count -ne 1) {
+        throw "Configure one FMT-SIM HIL vehicle on UDP port $FmtHilPort in $settingsPath"
+    }
+}
 $layoutRoot = Get-Item -LiteralPath $PSScriptRoot
 while (-not (Test-Path -LiteralPath (Join-Path $layoutRoot.FullName 'SConstruct'))) {
     if ($null -eq $layoutRoot.Parent) { throw 'Flight root not found' }
@@ -98,35 +121,43 @@ if ($GroundPort) {
     $sources += Join-Path $repoRoot 'tests/simulation/ground_log.c'
 }
 
-$objects = @()
-"== compile ==" | Set-Content -LiteralPath $log -Encoding utf8
-foreach ($source in $sources) {
-    $relative = $source.Substring($repoRoot.Length + 1)
-    $obj = Join-Path $OutDir (($relative -replace '[\\/]', '_') + '.o')
-    $isCpp = $source.EndsWith('.cpp')
-    $compiler = if ($isCpp) { Join-Path $GccDir 'g++.exe' } else { Join-Path $GccDir 'gcc.exe' }
-    $flags = @(
-        $(if ($isCpp) { '-std=c++14' } else { '-std=c99' }), '-O2', '-g', '-Wall', '-Wextra',
-        '-Wno-unused-function', '-fno-short-enums', '-DFLIGHT_HOST_TEST', '-DFLIGHT_HOST_SIL'
-    )
-    if ($GroundPort) { $flags += '-DFLIGHT_GROUND_STATION' }
-    if ($SkipAbiLock) { $flags += '-DFLIGHT_SKIP_ABI_LOCK' }
-    if ($relative -notmatch 'osqp') { $flags += '-Werror' }
-    if ((Split-Path $source -Leaf) -in @('adis16505.c', 'bmp585.c')) {
-        $flags += '-DFLIGHT_DRIVER_CODEC_TEST'
-    }
-    if ($isCpp) { $flags += @('-fno-exceptions', '-fno-rtti', '-fno-threadsafe-statics') }
-    $flags += $includes | ForEach-Object { "-I$_" }
-    & $compiler @flags -c $source -o $obj 2>&1 | Tee-Object -FilePath $log -Append
-    if ($LASTEXITCODE -ne 0) { throw "compile failed: $relative" }
-    $objects += $obj
-}
-
-"== link ==" | Add-Content -LiteralPath $log -Encoding utf8
 $exe = Join-Path $OutDir 'sil_flight.exe'
-& (Join-Path $GccDir 'g++.exe') -static -static-libgcc -static-libstdc++ @objects -lm -lws2_32 -o $exe 2>&1 |
-    Tee-Object -FilePath $log -Append
-if ($LASTEXITCODE -ne 0) { throw 'link failed' }
+if ($ReuseBuild) {
+    if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+        throw "Reusable SIL executable not found: $exe"
+    }
+    "== reuse build ==" | Set-Content -LiteralPath $log -Encoding utf8
+    "exe=$exe" | Add-Content -LiteralPath $log -Encoding utf8
+} else {
+    $objects = @()
+    "== compile ==" | Set-Content -LiteralPath $log -Encoding utf8
+    foreach ($source in $sources) {
+        $relative = $source.Substring($repoRoot.Length + 1)
+        $obj = Join-Path $OutDir (($relative -replace '[\\/]', '_') + '.o')
+        $isCpp = $source.EndsWith('.cpp')
+        $compiler = if ($isCpp) { Join-Path $GccDir 'g++.exe' } else { Join-Path $GccDir 'gcc.exe' }
+        $flags = @(
+            $(if ($isCpp) { '-std=c++14' } else { '-std=c99' }), '-O2', '-g', '-Wall', '-Wextra',
+            '-Wno-unused-function', '-fno-short-enums', '-DFLIGHT_HOST_TEST', '-DFLIGHT_HOST_SIL'
+        )
+        if ($GroundPort) { $flags += '-DFLIGHT_GROUND_STATION' }
+        if ($SkipAbiLock) { $flags += '-DFLIGHT_SKIP_ABI_LOCK' }
+        if ($relative -notmatch 'osqp') { $flags += '-Werror' }
+        if ((Split-Path $source -Leaf) -in @('adis16505.c', 'bmp585.c')) {
+            $flags += '-DFLIGHT_DRIVER_CODEC_TEST'
+        }
+        if ($isCpp) { $flags += @('-fno-exceptions', '-fno-rtti', '-fno-threadsafe-statics') }
+        $flags += $includes | ForEach-Object { "-I$_" }
+        & $compiler @flags -c $source -o $obj 2>&1 | Tee-Object -FilePath $log -Append
+        if ($LASTEXITCODE -ne 0) { throw "compile failed: $relative" }
+        $objects += $obj
+    }
+
+    "== link ==" | Add-Content -LiteralPath $log -Encoding utf8
+    & (Join-Path $GccDir 'g++.exe') -static -static-libgcc -static-libstdc++ @objects -lm -lws2_32 -o $exe 2>&1 |
+        Tee-Object -FilePath $log -Append
+    if ($LASTEXITCODE -ne 0) { throw 'link failed' }
+}
 if ($BuildOnly) {
     "Built $exe"
     return
@@ -144,12 +175,7 @@ $runArgs = if ($GroundPort) {
 }
 $simProcess = $null
 try {
-    if ($FmtSimExe) {
-        $simPath = (Resolve-Path -LiteralPath $FmtSimExe).Path
-        $simDirectory = Get-Item -LiteralPath (Split-Path $simPath)
-        if ($simDirectory.Name -ne 'Win64' -or $simDirectory.Parent.Name -ne 'Binaries') {
-            throw 'Pass the FMT-SIM executable under Binaries/Win64'
-        }
+    if ($simPath) {
         $network = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
         if ($network.GetActiveUdpListeners().Port -contains $FmtHilPort) {
             throw "UDP port $FmtHilPort is already in use"
@@ -173,11 +199,24 @@ try {
     & $exe @runArgs 2>&1 | Tee-Object -FilePath $log -Append
     $code = $LASTEXITCODE
 } finally {
-    if ($simProcess -and -not $simProcess.HasExited -and $simProcess.Path -eq $simPath) {
-        [void]$simProcess.CloseMainWindow()
-        if (-not $simProcess.WaitForExit(3000)) {
-            Stop-Process -InputObject $simProcess
-            [void]$simProcess.WaitForExit(3000)
+    if ($simProcess) {
+        try {
+            if (-not $simProcess.HasExited) {
+                [void]$simProcess.CloseMainWindow()
+            }
+            if (-not $simProcess.HasExited -and -not $simProcess.WaitForExit(3000)) {
+                Stop-Process -Id $simProcess.Id -Force -ErrorAction SilentlyContinue
+                if (-not $simProcess.WaitForExit(5000)) {
+                    throw "FMT-SIM process $($simProcess.Id) did not exit after forced termination"
+                }
+            }
+        } catch {
+            if (-not $simProcess.HasExited) {
+                Stop-Process -Id $simProcess.Id -Force -ErrorAction SilentlyContinue
+                if (-not $simProcess.WaitForExit(5000)) {
+                    throw "FMT-SIM process $($simProcess.Id) could not be stopped: $($_.Exception.Message)"
+                }
+            }
         }
     }
 }

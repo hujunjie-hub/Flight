@@ -26,6 +26,25 @@
 #define GUIDANCE_MAX_DURATION_S ((float)GUIDANCE_MAX_DURATION_US * 1e-6f)
 CONTRACT_STATIC_ASSERT(GUIDANCE_MAX_DURATION_US == 6200000u,
                        "M5 planning horizon must remain 6.2 seconds");
+/* FMAT-0008: a landing reference that stops exactly on the Home plane hovers
+ * above the landing surface whenever the vertical estimate drifted, so the land
+ * detector could never confirm LANDED. Both landing builders descend through
+ * the plane by this bounded probe; the ground contact model stops the airframe. */
+#define GUIDANCE_LANDING_PROBE_M 0.25f
+/* FMS LandDetector requires |vertical speed| <= 0.15 m/s; keep the planned
+ * near-home envelope at 0.12 m/s to leave tracking margin. */
+#define GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS 0.12f
+/* The Host/SIL contact oracle asserts physical contact within 6 cm. */
+#define GUIDANCE_LANDING_CONTACT_HEIGHT_M 0.06f
+/* Start limiting descent early enough to decelerate before entering contact range. */
+#define GUIDANCE_LANDING_BRAKE_HEIGHT_M 0.20f
+/* Margin for M6's 20 ms float-boundary reconstruction of the landing curve. */
+#define GUIDANCE_LANDING_JERK_MARGIN 0.75f
+/* After reaching the Home plane at zero vertical speed, M5 executes one bounded
+ * 4 s rest-to-rest probe below it. This remains inside the 6.2 s planning horizon. */
+#define GUIDANCE_LANDING_PROBE_DURATION_S 4.0f
+/* Retained as a conservative per-update descent increment for future consumers. */
+#define GUIDANCE_LANDING_STEP_M 0.03f
 #define GUIDANCE_MAX_DURATION_ATTEMPTS 16u
 #define GUIDANCE_VALIDATION_WORK_UNITS 256u
 #define GUIDANCE_VALIDATION_MAX_DEPTH 5u
@@ -165,7 +184,9 @@ uint8_t guidance_handoff_acceleration(const GuidanceState *state, const Guidance
 Status guidance_build_trajectory(GuidanceState *state, const GuidanceInput *in, GuidanceOutput *out,
                              const float *handoff_acceleration, uint16_t *reason, uint16_t *constraint);
 Status guidance_build_pilot(GuidanceState *state, const GuidanceInput *in, GuidanceOutput *out);
-Status guidance_build_vertical_land(GuidanceState *state, const GuidanceInput *in, GuidanceOutput *out);
+Status guidance_build_vertical_land(GuidanceState *state, const GuidanceInput *in, GuidanceOutput *out,
+                                    const float *handoff_acceleration, uint16_t *reason,
+                                    uint16_t *constraint);
 void guidance_publish_header(const GuidanceInput *in, GuidanceState *state, ContractHeader *header,
                           uint16_t type, uint16_t kind);
 void guidance_quintic_hermite_eval(float p0, float v0, float a0, float p1, float v1, float a1,

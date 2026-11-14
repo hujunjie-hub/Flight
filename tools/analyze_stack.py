@@ -86,6 +86,7 @@ def parse_disassembly(text):
                 "start": int(header.group(1), 16),
                 "sp": 0,
                 "max_sp": 0,
+                "instructions": [],
                 "calls": [],
                 "tail_calls": [],
                 "unknown_calls": [],
@@ -108,8 +109,11 @@ def parse_disassembly(text):
         mnemonic = mnemonic.split(".")[0]
         operands = insn[len(insn.split()[0]):].strip() if insn.split() else ""
         entry = functions[current]
+        if mnemonic and not mnemonic.startswith("."):
+            entry["instructions"].append((mnemonic, operands, entry["sp"]))
 
-        if mnemonic in ("push", "vpush", "stmdb"):
+        if mnemonic in ("push", "vpush") or (
+                mnemonic == "stmdb" and operands.startswith("sp!,")):
             regs = re.search(r"\{([^}]*)\}", operands)
             if regs:
                 word = 8 if mnemonic == "vpush" else 4
@@ -134,7 +138,8 @@ def parse_disassembly(text):
             if re.search(r"\br\d+|\bip\b|\blr\b", operands):
                 entry["unknown_calls"].append("dynamic sp adjustment")
                 entry["dynamic_sp"] = True
-        elif mnemonic in ("pop", "vpop", "ldmia"):
+        elif mnemonic in ("pop", "vpop") or (
+                mnemonic == "ldmia" and operands.startswith("sp!,")):
             regs = re.search(r"\{([^}]*)\}", operands)
             if regs:
                 word = 8 if mnemonic == "vpop" else 4

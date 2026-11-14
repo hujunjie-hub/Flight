@@ -2,9 +2,8 @@
 # analyse the whole image. This closes the "external libm edge" gap of the
 # single-object analyzer: every reachable call resolves to a real function.
 #
-# Evidence only. The image is NOT the product firmware (B03/B04 still block the
-# RT-Thread package tree and the product link), and a static image analysis is
-# NOT an H723 stack watermark, WCET, RTA, HIL or flight result.
+# Evidence only. This validator image is linked separately from the product
+# firmware. It measures static stack use for the linked call graph.
 param(
   [string]$Optimization = '-O2',
   [string]$OutJson = 'build/validation/regenerated/stack_image.json',

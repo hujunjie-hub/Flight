@@ -96,3 +96,20 @@ Agent may update proof text and add tests. Agent must not mark MR-009 APPROVED.
 The independent reviewer must fill each row, identify assumptions and sign the
 final conclusion. Until then B05 remains WAITING_INDEPENDENT_REVIEW and M5-06
 cannot be accepted.
+
+## 7. S06-114 local branch evidence
+
+`m5_safety_mr009_consumer_rejection_stages` records the first consumer numerical
+failure in the calling thread. Three fixtures call the full validator with the
+product preview step and zero initial position, velocity and acceleration.
+The first preview point changes only in X. The test identifies coefficient
+construction, velocity scaling and acceleration scaling separately, and
+requires `NUMERIC_FAILURE`, reason `NUMERIC` and `passed == 0` in all three.
+The companion case uses the same fixture with a zero X displacement and passes.
+
+Position, velocity and acceleration Horner overflow guards are exercised through
+the test API with degree 5, 4 and 3 inputs respectively. Those inputs have two
+adjacent `FLT_MAX` coefficients and exercise the existing helper at 0.02 s.
+Full-validator reachability for these three Horner rejection sites remains a
+review obligation. The Cortex-M7 validator object compiled without the test
+macro has the same SHA256 as the prior build. Reviewer results remain pending.

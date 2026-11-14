@@ -271,16 +271,27 @@ Status guidance_update(const GuidanceInput *in, GuidanceOutput *out)
                    kind, GUIDANCE_PLAN_REASON_NONE, GUIDANCE_ITEM_RESULT_TRACKING);
     guidance_fill_feasibility(in, &g_m5, out, 1u, GUIDANCE_PLAN_REASON_NONE, GUIDANCE_PLAN_CONSTRAINT_NONE);
   } else {
-    st = kind == GUIDANCE_REFERENCE_ALTITUDE_AUTOMATIC ? guidance_build_vertical_land(&g_m5, in, out) :
+    uint16_t reason = GUIDANCE_PLAN_REASON_NONE;
+    uint16_t constraint = GUIDANCE_PLAN_CONSTRAINT_NONE;
+    st = kind == GUIDANCE_REFERENCE_ALTITUDE_AUTOMATIC ?
+        guidance_build_vertical_land(&g_m5, in, out, seed_acceleration, &reason, &constraint) :
         guidance_build_pilot(&g_m5, in, out);
     if (st != STATUS_OK) {
+      if (reason == GUIDANCE_PLAN_REASON_NONE) {
+        reason = (st == STATUS_NUMERIC_ERROR) ? GUIDANCE_PLAN_REASON_NUMERIC
+                                              : GUIDANCE_PLAN_REASON_ENVELOPE_INVALID;
+      }
+      if (constraint == GUIDANCE_PLAN_CONSTRAINT_NONE) {
+        constraint = GUIDANCE_PLAN_CONSTRAINT_DYNAMICS;
+      }
       g_m5.reject_count++;
-      guidance_fill_status(&g_m5, in, out, GUIDANCE_STATE_REJECTED, kind,
-                     (st == STATUS_NUMERIC_ERROR) ? GUIDANCE_PLAN_REASON_NUMERIC
-                                                  : GUIDANCE_PLAN_REASON_ENVELOPE_INVALID,
-                     GUIDANCE_ITEM_RESULT_REJECTED);
-      guidance_fill_feasibility(in, &g_m5, out, 0u, GUIDANCE_PLAN_REASON_ENVELOPE_INVALID,
-                          GUIDANCE_PLAN_CONSTRAINT_DYNAMICS);
+      g_m5.plan_valid = g_m5.ctx.valid = 0u;
+      g_m5.health.health_state = 3u;
+      g_m5.health.last_error_code = reason;
+      g_m5.health.consecutive_error_count++;
+      guidance_fill_status(&g_m5, in, out, GUIDANCE_STATE_REJECTED, kind, reason,
+                           GUIDANCE_ITEM_RESULT_REJECTED);
+      guidance_fill_feasibility(in, &g_m5, out, 0u, reason, constraint);
       g_m5.active = 0u;
       return STATUS_OK;
     }

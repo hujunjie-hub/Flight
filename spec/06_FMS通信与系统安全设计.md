@@ -477,6 +477,12 @@ M4是Geofence唯一Owner；M5只读消费`ProductGeofenceSnapshot`。围栏Revis
 
 所有状态迁移在M4单线程/事件序列化上下文内提交。
 
+#### 3.2 M4→M7 GroundStopCertificate 当前实现约束
+
+`ARMED → DISARMING → DISARMED` 是 FMS 状态机的受控停机状态迁移；当前证书 producer 采用更严格的签发条件，并不是在刚进入 DISARMING 时就签发。`fms_build_ground_stop_certificate()` 只接受 `LANDED + DISARMED`、`output_policy_id=2 (SIM_CONTROLLED_STOP)`、新鲜且 epoch 匹配的 M4 DecisionEvent，以及同一 FMS 输出中已撤销的 M4 Permit。当前只为“首次参考超时地面上锁”和“显式 Disarm”两类决策签发；空中 failsafe 撤销绝不生成地面 ramp。证书的 `lifecycle` 当前固定为 `LANDED`，有效期 200 ms；虽然公共类型和 M7 guard 接受 `DISARMING` 枚举，当前 producer 尚未发出该值。
+
+M4 `task_mission_step()` 将证书写入 ControlBundle；当前 FMS 输出不符合签发条件时清除缓存，无新输出时只允许原始租约自然到期。M7 `task_actuator_step()` 只有在 `actuator_guard_ground_stop()` 接受证书后才抑制队列中的 M6 Demand；接受后由输出守卫独占帧、执行有界 ramp，驱动异步完成轮询确认后发布 receipt，零目标 receipt 才锁存 DISARMED。该实现只适用于 Host/SIL `SIM_CONTROLLED_STOP`；H723 使用 `BENCH_INHIBIT`，物理输出保持禁止。Host/SIL 通过不能替代 H723 输出时序、ESC 响应、HIL 或飞行验收。
+
 参考/Permit切换规则唯一引用02：M5候选READY足以供M4签发匹配Permit，M6在READY+匹配Permit下可执行，M5随后确认ACTIVE，不能互相等待ACTIVE。普通重规划可维持原有效bundle至新bundle完整提交；安全撤销立即发布，新旧epoch不得混用。
 
 首次地面解锁可先签IDLE_ONLY scope的短lease（reference_epoch=0），M7只执行已验证地面arming-idle策略，不接受M6控制Demand。收到候选READY且全套条件有效后再签CONTROL_ACTIVE scope、非零reference_epoch的Permit；Takeoff/运动任务必须等该链路建立。每次IDLE_ONLY lease≤25ms，仅凭新鲜地面证据续租；自ARMING请求起绝对100ms内未建立CONTROL_ACTIVE或失去LANDED证据，拒绝运动并按地面受控Disarm/产品策略处理，不无限续租IDLE_ONLY。空中模式切换先准备可用参考再提交普通模式；必须立即撤销的安全事件优先撤销，随后执行已批准SAFE_ACTION，不能用等待新参考来延长旧权限。

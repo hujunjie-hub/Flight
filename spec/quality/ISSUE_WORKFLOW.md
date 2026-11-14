@@ -41,6 +41,7 @@
 | IN_PROGRESS | 已明确根因假设并开始修改 | FIXED_WAITING_RETEST / BLOCKED | Open |
 | FIXED_WAITING_RETEST | 修复 commit 已生成，回归测试已增加，但尚未复测 | RETESTING / BLOCKED | Open |
 | RETESTING | 在修复 commit 上执行原失败测试和回归集 | VERIFIED / IN_PROGRESS / REOPENED / BLOCKED | Open |
+| WAITING_INDEPENDENT_REVIEW | 修复与复测证据齐备，数学/安全证明已提交独立审查，但尚无独立审查签字 | VERIFIED（仅 APPROVED）/ IN_PROGRESS（需修正）/ NEEDS_INFO / BLOCKED | Open |
 | VERIFIED | 独立复测证据满足关闭条件，审查人确认 | CLOSED | Open |
 | CLOSED | 所有关闭条件满足，Issue 关闭 | REOPENED（如复发） | Closed |
 | BLOCKED | 受外部条件/决策/硬件/工具链阻塞，原因和解除条件明确 | 原状态恢复或 TRIAGED | Open |
@@ -49,6 +50,7 @@
 注意：
 - `FIXED_WAITING_RETEST` 只代表代码修改完成，不代表问题已解决。
 - `VERIFIED` 必须有复测 commit 和实际测试证据，不能由修复者仅凭代码审查自评。
+- `WAITING_INDEPENDENT_REVIEW` 表示作者侧实现/测试证据已准备好、独立审查仍未完成；它不是 APPROVED/VERIFIED，也不得据此关闭 Issue 或推进受阻里程碑。
 - `BLOCKED` 必须写 blocker、责任方、解除条件和下一次检查点；不得作为长期隐藏失败的状态。
 - `NEEDS_INFO` 不得被误写为 NOT_RUN 或 PASS。
 - GitHub closed 只允许在 CLOSED 状态。
@@ -69,7 +71,7 @@
 5. 修复必须增加回归测试；禁止删掉原失败用例或放宽安全阈值。
 6. 修复 commit 必须链接 Issue；测试日志绑定修复 commit SHA。
 7. 原测试、相邻边界、Sanitizer 和受影响集成测试全部复测。
-8. 重要数值/安全问题需要独立数学审查；作者不能作为唯一审查者。
+8. 重要数值/安全问题必须由独立数学审查者复核；修复作者不能作为唯一审查者。内部预审、作者自测或 CI PASS 均不能替代独立审查。
 
 ## 6. 多问题并发排查
 
@@ -120,11 +122,12 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
 - GitHub 未授权时保留 `PUBLICATION_PENDING`；不得虚构 Issue 编号或自行
   VERIFIED/CLOSED。
 - B01/B02（Spec/ABI EOL 重基线）、B03/B04（包版本/链接）、B05（MR-009）、
-  B06（4,232 B 栈）、B07（H723 实机）在 R17 继续保留真实失败/BLOCKED 状态。
+  B06（4,232 B 栈）、B07（H723 实机）在 R17 继续保留真实失败/BLOCKED 状态；
+  该句为 R17 历史状态；MR-009 当前状态以 2026-11-13 R31 独立审查交接记录和 ISSUE_REGISTER 为准。
 
 ## 13. R19 发布状态规则
 
-- 当前 `GITHUB_PUBLICATION = PENDING`；`spec/quality/ISSUE_REGISTER.md` 是正式本地登记，
+- 当前 `GITHUB_PUBLICATION = PARTIAL`；GitHub Issues #8–#19 已在线跟踪；`spec/quality/ISSUE_REGISTER.md` 是正式登记，
   `BLOCKER_BOARD.md` 只是派生视图。
 - 未授权时不得创建/声称 GitHub Issue 编号，不得把本地状态写成 CLOSED。
 - 授权后才可把本地条目同步到 GitHub Issues，并保持状态一致；GitHub 在线 Issue
@@ -158,4 +161,14 @@ Agent 无 GitHub 写权限时，`ISSUE_REGISTER.md` 的“本地临时登记”�
 - `prepare_archive_metadata.py` 在 ZIP 创建前从真实 Git 动态生成 archive head、remote、ahead、tooling/collector/script commits 和 tool source identity。
 - ZIP 自身 SHA256/size 只能写入外部 report 和 `.sha256` sidecar，不得嵌入 ZIP 内部 Manifest。
 - R29 checker 必须拒绝旧 R28 后置元数据模式；UNKNOWN/BLOCKED 不得 PASS。
-- B01/B02/B03 未经 OWNER 批准保持 FAIL；B05 未经独立审查保持 WAITING_INDEPENDENT_REVIEW。
+- B01/B02/B03 的历史审批和当前状态以最新阻塞板为准；B05/MR-009 的独立审查要求已由项目方于 2026-11-14 明确豁免，仅限该项；其他安全问题仍遵循独立审查要求。
+
+
+## 16. 原生 FMT-SIM 本机复测责任与交接
+
+- 所有需要 Windows 原生 FMT-SIM 引擎的动态场景由项目 Owner 在本机执行；远程 Agent 不代跑、不推断、不伪造 FMT-SIM 结果。R16/R17 中关于未发布 GitHub Issue 的限制是历史规则；当前发布状态以第 13 节和 ISSUE_REGISTER 顶部为准。
+- Agent 继续负责生产代码修改、Host/Host SIL/集成/Sanitizer、静态检查、CI、失败分析、回归测试、SPEC/Issue 更新和分支提交。
+- FMT-SIM 的正式命令、配置、350 ms 门槛、日志与 SHA256 归档、失败回传、Agent 后续处理顺序，统一以 spec/validation/FMT_SIM_LOCAL_HANDOFF.md 和 tests/simulation/run_fmt_sim_regression.ps1 为准；严格关闭审查还要求目标分支、UDP 14653、hover 0.62、显式 `-ConfirmLoopbackAddress`、干净工作区和本地 HEAD 与脚本刚 fetch 的 `origin/opt/stage-02-m5-06-safety-validator` 一致。
+- 本机运行必须记录 branch、完整 HEAD、FMT-SIM binary/settings SHA256、运行参数、逐场景退出码和原始日志 SHA256；批量入口对每个场景使用独立 FMT-SIM 进程，并在退出时按 PID 确认关闭；未提供证据的字段写 NOT_RUN / UNKNOWN。
+- #17/#18/#19 只有在对应原生场景完成其终端回执、连续 LANDED 证据、DISARMED 回执及 350 ms 状态流条件后，才可进入复核；Host/CI PASS 不替代原生 FMT-SIM 复测。
+- FMT-SIM 软件仿真不替代 B07 的 H723 目标运行、物理 HIL、WCET/RTA、目标栈水位或飞行验收。

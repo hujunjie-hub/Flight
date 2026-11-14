@@ -59,19 +59,75 @@ def load_su(su_dir):
     return frames
 
 
+def incoming_argument_bytes(instructions):
+    """Recognize an unconditional GCC Thumb-2 split-argument copy.
+
+    GCC's ARM .su excludes the space for the register portion of an incoming
+    aggregate. The linked SP maximum still includes it. Require an initial
+    allocation and a store of the argument registers into that exact space.
+    """
+    if not instructions:
+        return 0
+    mnemonic, operands, _ = instructions[0]
+    initial = re.fullmatch(r"sp, (?:sp, )?#(8|16)", operands)
+    if mnemonic != "sub" or not initial:
+        return 0
+    size = int(initial.group(1))
+    registers = "r2, r3" if size == 8 else "r0, r1, r2, r3"
+    frame = None
+    address = None
+    for mnemonic, operands, sp in instructions[1:]:
+        # Recognize only the straight-line prologue before any call or branch.
+        if frame is None and (mnemonic in ("push", "vpush") or
+                (mnemonic == "stmdb" and operands.startswith("sp!,")) or
+                (mnemonic in ("sub", "subw") and
+                 re.fullmatch(r"sp, (?:sp, )?#\d+", operands))):
+            continue
+        set_frame = re.fullmatch(r"r7, sp, #(\d+)", operands)
+        set_address = re.fullmatch(r"(r[0-3]|ip), r7, #(\d+)", operands)
+        if mnemonic in ("add", "addw") and set_frame and frame is None:
+            frame = -sp + int(set_frame.group(1))
+        elif mnemonic in ("add", "addw") and set_address and frame is not None:
+            register, offset = set_address.groups()
+            if register in registers.split(", "):
+                break
+            address = (register, frame + int(offset))
+            continue
+        elif mnemonic in ("sub", "subw") and address:
+            register, value = address
+            subtract = re.fullmatch(rf"{register}, {register}, #(\d+)", operands)
+            if not subtract:
+                break
+            address = (register, value - int(subtract.group(1)))
+            continue
+        elif mnemonic == "stmia" and address:
+            register, offset = address
+            return size if offset == -size and operands == f"{register}, {{{registers}}}" else 0
+        elif (mnemonic not in ("str", "vstr") or frame is None or
+              not re.fullmatch(r"(?:r[0-3]|[ds]\d+), \[r[0-7](?:, #-?\d+)?\]", operands)):
+            break
+        address = None
+    return 0
+
+
 def analyze(dis_text, su_frames, root_name=ROOT_FN, limit=LIMIT):
     funcs, _ = A.parse_disassembly(dis_text)
     if not funcs:
         return {"status": "UNKNOWN", "reason": "no functions in disassembly"}
     frames = {}
     mismatches = []
+    argument_saves = {}
     for name, info in funcs.items():
         sp = max(info["max_sp"], info["sp"])
         frames[name] = {"sp": sp, "su": su_frames.get(name, {}).get("su_bytes"),
                         "kind": su_frames.get(name, {}).get("kind")}
         su = frames[name]["su"]
         if su is not None and su != sp:
-            mismatches.append({"function": name, "su": su, "sp": sp, "delta": sp - su})
+            delta = sp - su
+            if delta > 0 and delta == incoming_argument_bytes(info["instructions"]):
+                argument_saves[name] = delta
+            else:
+                mismatches.append({"function": name, "su": su, "sp": sp, "delta": delta})
     edges = {}
     unknown = []
     for name, info in funcs.items():
@@ -173,6 +229,7 @@ def analyze(dis_text, su_frames, root_name=ROOT_FN, limit=LIMIT):
         "recursion": cycles,
         "recursion_reachable": cycles_reachable,
         "su_vs_sp_mismatches": mismatches,
+        "incoming_argument_save_bytes": argument_saves,
         "frames": {name: {"sp": info["sp"], "su": info["su"]}
                    for name, info in sorted(frames.items(), key=lambda kv: -kv[1]["sp"])},
         "edges": edges,
@@ -249,6 +306,35 @@ def self_test():
     cases += 1
     if mismatch["status"] != "UNKNOWN" or not mismatch["su_vs_sp_mismatches"]:
         failures.append("reachable .su mismatch did not make the result UNKNOWN")
+    # GCC may omit the register arguments copied below the incoming SP from
+    # its .su estimate. The measured frame must still include those bytes.
+    spill = dis.replace("  10:\tb510      \tpush\t{r4, lr}\n",
+                        "  10:\tb082      \tsub\tsp, #8\n"
+                        "  12:\tb580      \tpush\t{r7, lr}\n"
+                        "  14:\taf01      \tadd\tr7, sp, #4\n"
+                        "  16:\tf107 0104 \tadd.w\tr1, r7, #4\n"
+                        "  1a:\te881 000c \tstmia.w\tr1, {r2, r3}\n")
+    adjusted = analyze(spill, {"helper": {"su_bytes": 8, "kind": "static"}},
+                       root_name="root", limit=4096)
+    cases += 1
+    if adjusted["status"] != "PASS" or adjusted["known_lower_bound_bytes"] != 28:
+        failures.append("register argument spill did not reconcile the frame")
+    for bad in (spill.replace("r1, r7, #4", "r1, r7, #0"),
+                spill.replace("{r2, r3}", "{r1, r3}"),
+                spill.replace("stmia.w\tr1,", "stmia.w\tr0,")):
+        adjusted = analyze(bad, {"helper": {"su_bytes": 8, "kind": "static"}},
+                           root_name="root", limit=4096)
+        cases += 1
+        if adjusted["status"] != "UNKNOWN":
+            failures.append("unexplained frame discrepancy was accepted")
+    loads = dis.replace("   4:\tf000 fffa \tbl\t0 <helper>",
+                        "   4:\te8b1 000c \tldmia.w\tr1!, {r2, r3}\n"
+                        "   6:\tb082      \tsub\tsp, #8\n"
+                        "   8:\tf000 fffa \tbl\t0 <helper>")
+    adjusted = analyze(loads, {"root": {"su_bytes": 20}}, root_name="root", limit=4096)
+    cases += 1
+    if adjusted["status"] != "PASS" or adjusted["known_lower_bound_bytes"] != 28:
+        failures.append("load through r1 was counted as an SP adjustment")
     dynamic = analyze(dis, {"root": {"su_bytes": 12, "kind": "dynamic"}},
                       root_name="root", limit=4096)
     cases += 1

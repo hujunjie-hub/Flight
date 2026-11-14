@@ -55,6 +55,9 @@ gcc "${cflags[@]}" -fPIC -shared -Wl,--no-undefined \
 
 "${out}/m5_host_tests"
 
+# Run the focused MR-009 branch and consumer-path tests in the same CI job.
+bash tests/guidance/run_mr009_focus.sh
+
 python3 tests/guidance/verify_norm_bounds.py "${out}/libm5_safety_oracle.so"
 python3 tests/guidance/verify_dynamic_prediction.py "${out}/libm5_safety_oracle.so"
 python3 tests/guidance/verify_curve_eval_gap.py "${out}/libm5_safety_oracle.so"

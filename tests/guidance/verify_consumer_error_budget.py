@@ -6,7 +6,8 @@ reference and splits the error into
 
     E_coefficient : |float-coefficient polynomial - exact polynomial| at s_c
     E_horner      : |C output - float-coefficient polynomial at s_c|
-    E_time        : |exact(s_c) - exact(s_exact)|,  s_exact = local_us / 1e6
+    E_time        : |consumer_poly(s_c) - consumer_poly(s_exact)|,
+                    using the derivative of each rounded consumer coefficient set
 
 and checks the triangle inequality against the measured total. Continuous
 budgets per component use Bernstein control points on [0, s_eval] with
@@ -118,6 +119,19 @@ def series(coefficients, order):
     return out
 
 
+def rounded_derivative_series(coefficients, order):
+    """Consumer derivative coefficients, rounded individually to binary32."""
+    out = []
+    for i in range(order, len(coefficients)):
+        factor = 1
+        for k in range(order):
+            factor *= (i - k)
+        # A binary32 coefficient times this small integer is exactly formed in
+        # binary64 before the single binary32 rounding used by the C consumer.
+        out.append(Fraction(f32(float(coefficients[i]) * float(factor))))
+    return out
+
+
 class Probes:
     def __init__(self, path):
         library = ctypes.CDLL(path)
@@ -196,21 +210,22 @@ def main():
             for order in range(3):
                 squares = [Fraction(0)]
                 for axis in range(3):
-                    difference = [coefficients[axis][k] - exact[axis][k]
-                                  for k in range(6)]
-                    if order:
-                        difference = series(difference, order)
-                        c_series = series(coefficients[axis], order)
-                    else:
-                        c_series = coefficients[axis]
+                    c_series = (coefficients[axis] if order == 0 else
+                                rounded_derivative_series(coefficients[axis], order))
+                    exact_series = series(exact[axis], order)
+                    difference = [c_series[k] - exact_series[k]
+                                  for k in range(len(c_series))]
                     coefficient = bernstein(difference, s_eval)
                     magnitude = sum(abs(c_series[k]) * s_eval ** k
                                     for k in range(len(c_series)))
                     horner = gamma_up(ROUNDINGS[order]) * magnitude
                     subnormal = (Fraction(ROUNDINGS[order], 1 << 149) *
                                  max(Fraction(1), s_eval) ** ROUNDINGS[order])
+                    # The time-shift derivative is that of the actual consumer
+                    # polynomial: position coefficients, rounded velocity
+                    # coefficients, or rounded acceleration coefficients.
                     time = GAMMA2 * t_max * bernstein(
-                        series(coefficients[axis], order + 1), s_eval)
+                        series(c_series, 1), s_eval)
                     component_max[order]["coefficient"] = max(
                         component_max[order]["coefficient"], float(coefficient))
                     component_max[order]["horner"] = max(

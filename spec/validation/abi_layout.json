@@ -2,11 +2,11 @@
   "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
   "scope": "SPEC_ARM_ABI_COMPILE",
   "production_firmware_validation": "NOT_RUN",
-  "icd_sha256": "e8fec710b1d1bf1bbda70e6a7cb6bf284c02117b9e8b6c84090127eb513cc5eb",
-  "private_control_spec_sha256": "dfe6653a7c97dca6b1f020c503f22d236e07f343d5beccaebf344bd3930b795b",
-  "compiler": "arm-none-eabi-gcc.exe (GNU Tools for STM32 14.3.rel1.20251027-0700) 14.3.1 20250623",
-  "c_blocks_total": 42,
-  "quad_c_blocks": 40,
+  "icd_sha256": "bd76fa776c2620f6bbf6496d4551bae9fc14d8a370b4a4b6817489aac7ce59fc",
+  "private_control_spec_sha256": "e6fde4fcbfdd26385e37af414ddad6d4724f95fef1e0e6fc96b7bf3467ad73c7",
+  "compiler": "arm-none-eabi-gcc (15:14.2.rel1-1) 14.2.1 20241119",
+  "c_blocks_total": 43,
+  "quad_c_blocks": 41,
   "commands": [
     {
       "language": "c11",
@@ -20,7 +20,7 @@
         "-Werror",
         "-fno-short-enums"
       ],
-      "values_sha256": "fd602f8a9024fb0e09fd31bfef0c8f02cb4d6c1eef18b591f14c78735eb1ec08"
+      "values_sha256": "d902717def64b37a973d24854c2c11facc60b65d071c0e5ae0e0bb9ef668c1f4"
     },
     {
       "language": "c++14",
@@ -36,7 +36,7 @@
         "-fno-exceptions",
         "-fno-rtti"
       ],
-      "values_sha256": "fd602f8a9024fb0e09fd31bfef0c8f02cb4d6c1eef18b591f14c78735eb1ec08"
+      "values_sha256": "d902717def64b37a973d24854c2c11facc60b65d071c0e5ae0e0bb9ef668c1f4"
     }
   ],
   "layouts": {
@@ -1609,6 +1609,17 @@
       "offset:seed_position_ned_m": 172,
       "offset:seed_velocity_ned_mps": 184,
       "offset:solver_status": 196
+    },
+    "GroundStopCertificate": {
+      "size": 112,
+      "alignment": 8,
+      "offset:header": 0,
+      "offset:stop_code": 88,
+      "offset:lifecycle": 90,
+      "offset:ramp_nps": 92,
+      "offset:authority_epoch": 96,
+      "offset:directive_epoch": 100,
+      "offset:certificate_expires_at_us": 104
     }
   }
 }

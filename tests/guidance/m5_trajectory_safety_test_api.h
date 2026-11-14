@@ -32,7 +32,9 @@ uint8_t m5_trajectory_safety_test_curve_bounds(
     float position_low[3],
     float position_high[3],
     float *speed_bound,
-    float *acceleration_bound);
+    float *acceleration_bound,
+    float *position_error_m,
+    float *velocity_error_mps);
 
 /* Continuous third-derivative bound over [u0,u1] plus the consumer gamma_2
    tail, per axis. */
@@ -107,6 +109,24 @@ double m5_trajectory_safety_test_consumer_error_bound(
     double s_max,
     const double exact_low[6],
     const double exact_high[6]);
+
+typedef enum {
+  M5_TEST_CONSUMER_REJECT_NONE = 0,
+  M5_TEST_CONSUMER_REJECT_COEFFICIENTS,
+  M5_TEST_CONSUMER_REJECT_VELOCITY_SCALING,
+  M5_TEST_CONSUMER_REJECT_ACCELERATION_SCALING,
+  M5_TEST_CONSUMER_REJECT_POSITION_HORNER,
+  M5_TEST_CONSUMER_REJECT_VELOCITY_HORNER,
+  M5_TEST_CONSUMER_REJECT_ACCELERATION_HORNER
+} M5SafetyTestConsumerRejectStage;
+
+/* Reset/read the first rejection and a test-only 0/1 hit vector indexed by
+   M5SafetyTestConsumerRejectStage. No trace state exists without the test API. */
+#define M5_TEST_CONSUMER_REJECT_STAGE_COUNT 7u
+void m5_trajectory_safety_test_reset_consumer_rejection(void);
+M5SafetyTestConsumerRejectStage m5_trajectory_safety_test_consumer_rejection(void);
+void m5_trajectory_safety_test_consumer_rejection_counts(
+    uint32_t counts[M5_TEST_CONSUMER_REJECT_STAGE_COUNT]);
 
 uint8_t m5_trajectory_safety_test_rounding_bounds(
     double value, float *lower, float *upper);

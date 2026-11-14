@@ -1,8 +1,8 @@
 {
   "generator": "pymavlink==2.4.49",
-  "input": "spec\\contracts\\FCU.xml",
-  "input_sha256": "1be7adc3b849bc89f812ad66353368ae2c8c6290f2ea97168ee710a7145446ed",
-  "output_sha256": "12302f339b8b535d57cc6222b6b0534a46bc57b93f2fd57563359e65a87fd88d",
+  "input": "spec/contracts/FCU.xml",
+  "input_sha256": "17d6e980731244852e415eb7cb7a124033160ccd7119f751c0dbe52078ce4321",
+  "output_sha256": "1eb51a89f8edb57843829a9f7de941b792aa76de74796f59ffea821f3d6370fd",
   "messages": [
     {
       "id": 43000,

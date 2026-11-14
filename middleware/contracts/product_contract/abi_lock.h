@@ -4,7 +4,7 @@
  * QUAD_X4 Schema 6.0 ABI lock for baseline V1.9.1-GLOBAL-AUDIT-R3.
  * Producer: tests/abi/abi_report.py --emit-lock
  * Canonical input SHA256 (production headers):
- *   f9297fd67e906602d37e44bcbd70eca49638681cbd5e2ce2e2e3ddf33f439768
+ *   f20330c5513b9364666da2a1c68af6f349ab3bd22c23f48ae77976d32fbf43b0
  *
  * Any change to a public type size/alignment/field offset, or to the message
  * type registry, changes these values.  Regeneration is an ICD change
@@ -22,10 +22,10 @@
 #define ABI_LOCK_PRODUCT_CONTRACT_REVISION 0x00010906u
 #define ABI_LOCK_PROFILE_ID 0x00010001u
 #define ABI_LOCK_CONTRACT_HEADER_BYTES 88u
-#define ABI_LOCK_TYPE_COUNT 143u
-#define ABI_LOCK_FIELD_COUNT 986u
-#define ABI_LOCK_MESSAGE_REGISTRY_SHA256 "dd06554c240567d5f81b51e4aed39336ccf3e469c6c95a952d1a2d766bbc49e7"
-#define ABI_LOCK_ARM_HASH "12b64f6368aad4b96b5bdd21f382a1babc810a2df96680af7853273e2e7f66c4"
-#define ABI_LOCK_HOST_HASH "0edc9d8baaca7a826d9e807132f0cf232fd55f7a9b646d4d9a82aab4c288eacf"
+#define ABI_LOCK_TYPE_COUNT 144u
+#define ABI_LOCK_FIELD_COUNT 993u
+#define ABI_LOCK_MESSAGE_REGISTRY_SHA256 "27738a85e59d7232256158fe9ce70563e41c35fb074c2f2c0871eea1b678c148"
+#define ABI_LOCK_ARM_HASH "da2707e9a59b8ed745570a26fc9c80f9361c5ad03799737e230ba6df8926e4ac"
+#define ABI_LOCK_HOST_HASH "402764a0f9caa5b59e99408752ad6a625a600dbb8d1f9c085d03b5fea29fb83a"
 
 #endif /* ABI_LOCK_H */

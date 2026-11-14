@@ -63,7 +63,7 @@ git rev-parse HEAD
 
 如果本地存在未提交改动，先报告文件清单和 diff 摘要；不得自动 reset、clean、stash、覆盖用户文件。若远端分支已变更，先比较提交，不得使用强制覆盖。
 
-本轮基线分支为 `opt/stage-02-m5-06-safety-validator`，PR #2 保持 Open / Draft，目标分支为 `opt/stage-01-host-validation`。若后续 PR/分支变化，以 GitHub 当前状态为准，不得硬编码旧 SHA。
+本轮基线分支为 `opt/stage-02-m5-06-safety-validator`。截至 2026-11-13，PR #2 为 CLOSED / UNMERGED，目标分支为 `opt/stage-01-host-validation`；本轮只更新 stage-02，不重开或合并该 PR。若后续 PR/分支变化，以 GitHub 当前状态为准，不得硬编码旧 SHA。
 
 ### 3.3 Windows 换行修复（每次新检出必须确认）
 
@@ -133,6 +133,9 @@ wsl.exe -d Ubuntu-26.04 -- bash tests/flight_management/run_host_tests.sh
 wsl.exe -d Ubuntu-26.04 -- bash tests/guidance/run_host_tests.sh
 wsl.exe -d Ubuntu-26.04 -- bash tests/guidance/run_integration_tests.sh
 wsl.exe -d Ubuntu-26.04 -- bash tests/guidance/arm_build_check.sh
+wsl.exe -d Ubuntu-26.04 -- bash tests/control/run_host_tests.sh
+wsl.exe -d Ubuntu-26.04 -- bash tests/actuation/run_host_tests.sh
+wsl.exe -d Ubuntu-26.04 -- bash tests/simulation/run_sil.sh
 wsl.exe -d Ubuntu-26.04 -- python3 tests/algorithms/run_tests.py --target host
 wsl.exe -d Ubuntu-26.04 -- python3 tests/algorithms/run_tests.py --target arm
 ```
@@ -143,6 +146,15 @@ M5 Sanitizer：
 wsl.exe -d Ubuntu-26.04 -- bash -lc 'EXTRA_CFLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer" bash tests/guidance/run_host_tests.sh'
 wsl.exe -d Ubuntu-26.04 -- bash -lc 'EXTRA_CFLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer" bash tests/guidance/run_integration_tests.sh'
 ```
+
+M6/M7 Sanitizer：
+
+```powershell
+wsl.exe -d Ubuntu-26.04 -- bash -lc 'EXTRA_CFLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer" bash tests/control/run_host_tests.sh'
+wsl.exe -d Ubuntu-26.04 -- bash -lc 'EXTRA_CFLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer" bash tests/actuation/run_host_tests.sh'
+```
+
+`tests/simulation/run_sil.sh` 使用真实 runtime task owner 验证 M4→M7 ground-stop 软件链路；它是 Host/SIL 证据，不是 H723 实机或飞行验收。
 
 注意：`tests/guidance/arm_build_check.sh` 会将 M5-06 Host/SIL-only 验证器编译为 Cortex-M7 object，仅用于编译器/架构兼容性检查，不链接进产品。必须与 MPC RAM 检查、生产固件链接、WCET/RTA、目标板实测分开报告。
 

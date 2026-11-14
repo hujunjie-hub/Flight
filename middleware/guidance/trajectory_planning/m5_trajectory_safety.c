@@ -48,6 +48,36 @@ _Static_assert(sizeof(double) == sizeof(uint64_t),
    the validator into the H723 product image. */
 #include "fms_contract/fms_model.h"
 #include "flight_policy/fms_policy.h"
+#include "m5_trajectory_safety_test_api.h"
+
+static _Thread_local M5SafetyTestConsumerRejectStage consumer_rejection;
+static _Thread_local uint32_t consumer_rejection_counts[
+    M5_TEST_CONSUMER_REJECT_STAGE_COUNT];
+
+static void trace_consumer_rejection(M5SafetyTestConsumerRejectStage stage)
+{
+  unsigned index = (unsigned)stage;
+  if (index > 0u && index < M5_TEST_CONSUMER_REJECT_STAGE_COUNT)
+    consumer_rejection_counts[index] = 1u;
+  if (consumer_rejection == M5_TEST_CONSUMER_REJECT_NONE)
+    consumer_rejection = stage;
+}
+
+#define M5_TRACE_NONFINITE(value, stage) \
+  do { if (!isfinite(value)) trace_consumer_rejection(stage); } while (0)
+static void trace_consumer_horner_rejection(unsigned degree)
+{
+  switch (degree) {
+    case 5u: trace_consumer_rejection(M5_TEST_CONSUMER_REJECT_POSITION_HORNER); break;
+    case 4u: trace_consumer_rejection(M5_TEST_CONSUMER_REJECT_VELOCITY_HORNER); break;
+    case 3u: trace_consumer_rejection(M5_TEST_CONSUMER_REJECT_ACCELERATION_HORNER); break;
+    default: break;
+  }
+}
+#define M5_TRACE_HORNER(degree) trace_consumer_horner_rejection(degree)
+#else
+#define M5_TRACE_NONFINITE(value, stage) ((void)0)
+#define M5_TRACE_HORNER(degree) ((void)0)
 #endif
 
 _Static_assert(PRODUCT_PREVIEW_STEP_US <= 1000000u,
@@ -273,16 +303,42 @@ static double multiply_upper_nonnegative(double a, double b)
   return nextafter(product, INFINITY);
 }
 
-/* gamma_2 = 2u/(1-2u), u = 2^-24, rounded upward. One definition so the
-   time-evaluation model has a single source. */
+/*
+ * Upper bound the magnitude of one round-to-nearest binary32 result.
+ *
+ * For a normal exact result, |fl(x)| <= (1+u)|x|, u=2^-24.
+ * For a subnormal exact result, |fl(x)| <= |x| + 2^-149. The split below
+ * covers both cases. The caller must first prove that the exact operation
+ * cannot cross the round-to-nearest overflow midpoint; after that proof the
+ * actual result is finite, so capping this bound at FLT_MAX is sound.
+ */
+static double binary32_rounded_upper_nonnegative(double exact_upper)
+{
+  double rounded_upper;
+  if (!(exact_upper >= 0.0) || !isfinite(exact_upper)) return INFINITY;
+  if (exact_upper == 0.0) return 0.0;
+  if (exact_upper < (double)FLT_MIN) {
+    rounded_upper = add_upper_nonnegative(exact_upper, 0x1p-149);
+  } else {
+    rounded_upper = multiply_upper_nonnegative(exact_upper, 1.0 + 0x1p-24);
+  }
+  if (!isfinite(rounded_upper)) return INFINITY;
+  return (rounded_upper > (double)FLT_MAX)
+      ? (double)FLT_MAX : rounded_upper;
+}
+
+/* gamma_2 = 2u/(1-2u), u = 2^-24, evaluated outward:
+   numerator up, denominator down, quotient up. */
 static double gamma2_upper(void)
 {
   double nu2 = 2.0 * 0x1p-24;
+  double denominator;
   double gamma2;
   nu2 = nextafter(nu2, INFINITY);
-  gamma2 = nu2 / (1.0 - nu2);
-  gamma2 = nextafter(gamma2, INFINITY);
-  return gamma2;
+  denominator = nextafter(1.0 - nu2, -INFINITY);
+  if (!(denominator > 0.0) || !isfinite(denominator)) return INFINITY;
+  gamma2 = nu2 / denominator;
+  return nextafter(gamma2, INFINITY);
 }
 
 static double sum_square_upper(double sum, double value)
@@ -753,12 +809,18 @@ static double evaluate_bernstein(const double *control, unsigned degree, double 
  * consumer_power_coefficients() replicates the consumer's binary32 coefficient
  * computation operation for operation. consumer_eval_error_bound() then bounds
  *   (a) the difference between the consumer's coefficients and the exact ones,
- *   (b) the Horner evaluation rounding, and
- *   (c) up to four fused multiply-add operations that the production build may
- *       emit because -ffp-contract is not pinned there yet (MR-009 item 5).
- * The bound is evaluated at s_max = h * u1 and is therefore valid for the whole
- * sub-interval; subdivision cannot reduce a systematic bias, which is why this
- * term must not be absorbed by clearance_margin_m.
+ *   (b) the separate binary32 Horner multiply/add roundings.
+ *
+ * The M6 production flags in rtconfig.py pin -ffp-contract=off,
+ * -frounding-math and -fexcess-precision=standard. The CI gate also compiles
+ * control_reference.c with those exact production flags and scans the emitted
+ * Cortex-M7 object for fused multiply/add instructions. A future toolchain or
+ * flag change that emits one fails the gate and requires a new proof review.
+ * The coefficient/Horner bound is evaluated through s_eval_max =
+ * s_max + gamma_2*s_max, where s_max = h*u1 bounds the exact sub-interval
+ * time and gamma_2 covers the consumer's rounded local-time conversion.
+ * Subdivision cannot reduce a systematic bias, which is why this term must not
+ * be absorbed by clearance_margin_m.
  */
 static void consumer_power_coefficients(
     const MotionReferencePoint *a,
@@ -787,6 +849,10 @@ static void consumer_power_coefficients(
   c[3] = 10 * d / h3 - 4 * dv / h2 + da / (2 * h);
   c[4] = -15 * d / h4 + 7 * dv / h3 - da / h2;
   c[5] = 6 * d / h5 - 3 * dv / h4 + da / (2 * h3);
+#if defined(FLIGHT_M5_SAFETY_TEST_API)
+  for (unsigned i = 0u; i < 6u; ++i)
+    M5_TRACE_NONFINITE(c[i], M5_TEST_CONSUMER_REJECT_COEFFICIENTS);
+#endif
 }
 
 /*
@@ -819,18 +885,19 @@ static void consumer_power_coefficients(
  *   sum_i max(|cf_i - c_low_i|, |cf_i - c_high_i|) * s_max^i
  *     + gamma_n * sum_i |cf_i| * s_max^i
  *
- * with gamma_n = n*u / (1 - n*u), u = 2^-24, and a small absolute floor for
- * subnormal-range final roundings. gamma_n requires normal-range intermediates
- * and no overflow, so a polynomial whose magnitude term is too small (possible
- * cancellation into the subnormal range) or too large returns +Inf and the
- * caller fails closed. Inputs outside the model are rejected, not guessed.
+ * with gamma_n = n*u / (1 - n*u), u = 2^-24. Each binary32 operation is
+ * bounded by u*|exact| + 2^-149, so the gamma term and the separately
+ * propagated subnormal floor cover normal and subnormal roundings. Before
+ * applying that model, every actual Horner multiply and add is checked against
+ * the binary32 round-to-nearest overflow midpoint. Inputs outside the model
+ * are rejected, not guessed.
  */
 static double consumer_eval_error_bound(
     const float consumer[6],
     const M5SafetyInterval exact[6],
     unsigned degree,
     unsigned rounding_count,
-    double s_max)
+    double s_eval_max)
 {
   const double unit = 0x1p-24; /* binary32 unit roundoff, round-to-nearest */
   double coefficient_term = 0.0;
@@ -839,7 +906,7 @@ static double consumer_eval_error_bound(
   double gamma, result;
   unsigned i;
 
-  if (!(s_max >= 0.0) || !isfinite(s_max) || rounding_count == 0u)
+  if (!(s_eval_max >= 0.0) || !isfinite(s_eval_max) || rounding_count == 0u)
     return INFINITY;
   for (i = 0u; i <= degree; ++i) {
     double cf = (double)consumer[i];
@@ -854,19 +921,55 @@ static double consumer_eval_error_bound(
         multiply_upper_nonnegative(difference, power));
     magnitude_term = add_upper_nonnegative(magnitude_term,
         multiply_upper_nonnegative(magnitude, power));
-    power = multiply_upper_nonnegative(power, s_max);
+    power = multiply_upper_nonnegative(power, s_eval_max);
   }
   if (!isfinite(coefficient_term) || !isfinite(magnitude_term))
     return INFINITY;
   {
-    /* Horner intermediate H_k = |c_k| + s_max * H_(k+1), outward at every step. */
-    double h = fabs((double)consumer[degree]);
-    if (!isfinite(h)) return INFINITY;
+    /*
+     * Bound the rounded Horner chain, not only its ideal-real recurrence.
+     *
+     * For IEEE binary32 round-to-nearest/ties-to-even, the overflow midpoint
+     * is 2^128 - 2^103. At the midpoint the even result is 2^128, which
+     * overflows to infinity; therefore each exact product and sum upper bound
+     * must be strictly below it.
+     *
+     * R_n = |c_n|
+     * P_k = s_eval_max * R_(k+1)
+     * R_k = |c_k| + round32_upper(P_k)
+     *
+     * round32_upper bounds the actual rounded product/sum and caps at FLT_MAX
+     * only after the corresponding exact operation is proven finite. This
+     * propagates each prior binary32 rounding into the next stage.
+     */
+    const double overflow_midpoint = 0x1p128 - 0x1p103;
+    double rounded_h = fabs((double)consumer[degree]);
+    if (!isfinite(rounded_h)) return INFINITY;
     for (i = degree; i-- > 0u;) {
-      double product = multiply_upper_nonnegative(h, s_max);
-      if (!isfinite(product) || product > (double)FLT_MAX) return INFINITY;
-      h = add_upper_nonnegative(fabs((double)consumer[i]), product);
-      if (!isfinite(h) || h > (double)FLT_MAX) return INFINITY;
+      double product_exact = multiply_upper_nonnegative(rounded_h, s_eval_max);
+      double product_rounded;
+      double sum_exact;
+      if (!isfinite(product_exact) || product_exact >= overflow_midpoint) {
+        M5_TRACE_HORNER(degree);
+        return INFINITY;
+      }
+      product_rounded =
+          binary32_rounded_upper_nonnegative(product_exact);
+      if (!isfinite(product_rounded)) {
+        M5_TRACE_HORNER(degree);
+        return INFINITY;
+      }
+      sum_exact = add_upper_nonnegative(
+          fabs((double)consumer[i]), product_rounded);
+      if (!isfinite(sum_exact) || sum_exact >= overflow_midpoint) {
+        M5_TRACE_HORNER(degree);
+        return INFINITY;
+      }
+      rounded_h = binary32_rounded_upper_nonnegative(sum_exact);
+      if (!isfinite(rounded_h)) {
+        M5_TRACE_HORNER(degree);
+        return INFINITY;
+      }
     }
   }
   if (magnitude_term > 0.0) {
@@ -876,23 +979,26 @@ static double consumer_eval_error_bound(
     if (magnitude_term < (double)FLT_MIN * 1024.0) return INFINITY;
   }
   {
-    /* nu, 1 - nu and the quotient must all round upward: a downward-rounded
-       gamma would under-state the bound. n is exact in binary64 (n <= 12), and
-       the extra nextafter calls make the whole expression outward. */
+    /* gamma_n = nu/(1-nu) is increasing for 0 <= nu < 1. Round nu upward,
+       the denominator downward, and the quotient upward. n is exact in
+       binary64 for the supported counts (10 or 12). */
     double nu = (double)rounding_count * unit;
+    double denominator;
     nu = nextafter(nu, INFINITY);
-    gamma = nu / (1.0 - nu);
+    denominator = nextafter(1.0 - nu, -INFINITY);
+    if (!(denominator > 0.0) || !isfinite(denominator)) return INFINITY;
+    gamma = nu / denominator;
     gamma = nextafter(gamma, INFINITY);
   }
   result = add_upper_nonnegative(coefficient_term,
       multiply_upper_nonnegative(magnitude_term, gamma));
   /* Absolute floor. A rounding at Horner step k is multiplied by s for every
      later step, so its contribution is at most 2^-149 * s^(n-k); the worst
-     case is bounded by n * 2^-149 * max(1, s_max)^n. For s_max <= 1 this is
+     case is bounded by n * 2^-149 * max(1, s_eval_max)^n. For s_eval_max <= 1 this is
      exactly the R5 term n * 2^-149 (no amplification), which is why the
      production validator additionally requires s_eval_max <= 1. */
   {
-    double scale = s_max > 1.0 ? s_max : 1.0; /* max(1, s_max) */
+    double scale = s_eval_max > 1.0 ? s_eval_max : 1.0; /* max(1, s_eval_max) */
     double amplification = 1.0;
     unsigned step;
     for (step = 0u; step < rounding_count; ++step)
@@ -935,7 +1041,7 @@ static uint8_t build_curve(
 {
   double t0 = segment_duration_s * (double)u0;
   double dt = segment_duration_s * ((double)u1 - (double)u0);
-  double t_power[6], dt_power[6];
+  double t_power[6];
   unsigned axis, i, k, j;
   if (!(dt > 0.0) || !isfinite(dt) || !isfinite(t0)) return 0u;
   /* Store an outward physical span. The consumer polynomial is evaluated from
@@ -945,14 +1051,11 @@ static uint8_t build_curve(
   if (!isfinite(curve->start_time_s) || !isfinite(curve->end_time_s))
     return 0u;
   t_power[0] = 1.0;
-  dt_power[0] = 1.0;
-  for (i = 1u; i <= 5u; ++i) {
-    t_power[i] = t_power[i - 1u] * t0;
-    dt_power[i] = dt_power[i - 1u] * dt;
-  }
+  for (i = 1u; i <= 5u; ++i) t_power[i] = t_power[i - 1u] * t0;
 
   for (axis = 0u; axis < 3u; ++axis) {
     double c[6], local_power[6] = {0};
+    double dt_power = 1.0;
     double p0 = a->point.position_ned_m[axis];
     double v0 = a->point.velocity_ned_mps[axis];
     double a0 = a->point.acceleration_ned_mps2[axis];
@@ -976,7 +1079,8 @@ static uint8_t build_curve(
 
     for (k = 0u; k <= 5u; ++k) {
       for (i = k; i <= 5u; ++i)
-        local_power[k] += c[i] * choose[i][k] * t_power[i - k] * dt_power[k];
+        local_power[k] += c[i] * choose[i][k] * t_power[i - k] * dt_power;
+      if (k < 5u) dt_power *= dt;
     }
     for (j = 0u; j <= 5u; ++j) {
       double value = 0.0;
@@ -999,8 +1103,8 @@ static uint8_t build_curve(
       M5SafetyInterval v1_i = interval_exact(v1);
       M5SafetyInterval a1_i = interval_exact(a1);
       M5SafetyInterval dp_i, dv_i, da_i, c_i[6];
-      M5SafetyInterval t0_i, dt_i, t_power_i[6], dt_power_i[6];
-      M5SafetyInterval local_power_i[6], bezier_i[6];
+      M5SafetyInterval t0_i, dt_i, t_power_i[6];
+      M5SafetyInterval local_power_i[6], dt_power_i;
       M5SafetyInterval predicted_i;
 
       if (h2.valid == 0u || h3.valid == 0u ||
@@ -1036,37 +1140,35 @@ static uint8_t build_curve(
       dt_i = interval_mul(hp,
           interval_sub(interval_exact((double)u1), interval_exact((double)u0)));
       t_power_i[0] = interval_exact(1.0);
-      dt_power_i[0] = interval_exact(1.0);
-      for (i = 1u; i <= 5u; ++i) {
-        t_power_i[i] = interval_mul(t_power_i[i - 1u], t0_i);
-        dt_power_i[i] = interval_mul(dt_power_i[i - 1u], dt_i);
-      }
+      dt_power_i = interval_exact(1.0);
+      for (i = 1u; i <= 5u; ++i) t_power_i[i] = interval_mul(t_power_i[i - 1u], t0_i);
       for (k = 0u; k <= 5u; ++k) {
         local_power_i[k] = interval_exact(0.0);
         for (i = k; i <= 5u; ++i) {
           M5SafetyInterval term = interval_mul(c_i[i],
               interval_exact(choose[i][k]));
           term = interval_mul(term, t_power_i[i - k]);
-          term = interval_mul(term, dt_power_i[k]);
+          term = interval_mul(term, dt_power_i);
           local_power_i[k] = interval_add(local_power_i[k], term);
         }
+        if (k < 5u) dt_power_i = interval_mul(dt_power_i, dt_i);
       }
       for (j = 0u; j <= 5u; ++j) {
-        bezier_i[j] = interval_exact(0.0);
+        M5SafetyInterval bezier_i = interval_exact(0.0);
         for (k = 0u; k <= j; ++k) {
           M5SafetyInterval term = interval_mul(local_power_i[k],
               interval_exact(choose[j][k]));
           term = interval_div(term, interval_exact(choose[5][k]));
-          bezier_i[j] = interval_add(bezier_i[j], term);
+          bezier_i = interval_add(bezier_i, term);
         }
-        if (bezier_i[j].valid == 0u || c_i[0].valid == 0u ||
+        if (bezier_i.valid == 0u || c_i[0].valid == 0u ||
             c_i[1].valid == 0u || c_i[2].valid == 0u ||
             c_i[3].valid == 0u || c_i[4].valid == 0u ||
             c_i[5].valid == 0u || t_power_i[j].valid == 0u) return 0u;
         curve->position_low[axis][j] =
-            fmin(bezier_i[j].low, curve->position[axis][j]);
+            fmin(bezier_i.low, curve->position[axis][j]);
         curve->position_high[axis][j] =
-            fmax(bezier_i[j].high, curve->position[axis][j]);
+            fmax(bezier_i.high, curve->position[axis][j]);
       }
 
       /* MR-009: bound the binary32 consumer evaluation of this axis against
@@ -1092,7 +1194,7 @@ static uint8_t build_curve(
       {
         float cf[6], vf[6], af[6];
         M5SafetyInterval vc[6], ac[6];
-        double s_max = h * (double)u1;
+        double s_max = multiply_upper_nonnegative(h, (double)u1);
         double gamma2 = gamma2_upper();
         double delta_s, s_eval_max;
 
@@ -1110,6 +1212,10 @@ static uint8_t build_curve(
         if (!isfinite(s_eval_max)) return 0u;
 
         consumer_power_coefficients(a, b, (float)h, axis, cf);
+        /* Stop at coefficient construction failure; do not contaminate later
+           derivative/Horner branch traces with non-finite coefficients. */
+        for (k = 0u; k < 6u; ++k)
+          if (!isfinite(cf[k])) return 0u;
         curve->jerk_power[axis][0] = 6.0 * (double)cf[3];
         curve->jerk_power[axis][1] = 24.0 * (double)cf[4];
         curve->jerk_power[axis][2] = 60.0 * (double)cf[5];
@@ -1121,13 +1227,20 @@ static uint8_t build_curve(
         }
         for (k = 0u; k < 5u; ++k) {
           vf[k] = (float)(k + 1u) * cf[k + 1u];
+          M5_TRACE_NONFINITE(vf[k], M5_TEST_CONSUMER_REJECT_VELOCITY_SCALING);
+          if (!isfinite(vf[k])) return 0u;
           vc[k] = interval_scale(c_i[k + 1u], (double)(k + 1u));
         }
         for (k = 0u; k < 4u; ++k) {
           af[k] = (float)((k + 1u) * (k + 2u)) * cf[k + 2u];
+          M5_TRACE_NONFINITE(af[k], M5_TEST_CONSUMER_REJECT_ACCELERATION_SCALING);
+          if (!isfinite(af[k])) return 0u;
           ac[k] = interval_scale(c_i[k + 2u],
                                  (double)((k + 1u) * (k + 2u)));
         }
+        /* The time-shift derivative belongs to each consumer output polynomial.
+           vf/af contain the consumer's rounded coefficient scaling; differentiating
+           cf twice/three times would silently omit that rounding. */
         curve->eval_position_error[axis] = add_upper_nonnegative(
             consumer_eval_error_bound(cf, c_i, 5u,
                 M5_CONSUMER_POSITION_ROUNDINGS, s_eval_max),
@@ -1137,12 +1250,12 @@ static uint8_t build_curve(
             consumer_eval_error_bound(vf, vc, 4u,
                 M5_CONSUMER_VELOCITY_ROUNDINGS, s_eval_max),
             multiply_upper_nonnegative(delta_s,
-                polynomial_derivative_magnitude(cf, 5u, 2u, s_eval_max)));
+                polynomial_derivative_magnitude(vf, 4u, 1u, s_eval_max)));
         curve->eval_acceleration_error[axis] = add_upper_nonnegative(
             consumer_eval_error_bound(af, ac, 3u,
                 M5_CONSUMER_ACCELERATION_ROUNDINGS, s_eval_max),
             multiply_upper_nonnegative(delta_s,
-                polynomial_derivative_magnitude(cf, 5u, 3u, s_eval_max)));
+                polynomial_derivative_magnitude(af, 3u, 1u, s_eval_max)));
         if (!isfinite(curve->eval_position_error[axis]) ||
             !isfinite(curve->eval_velocity_error[axis]) ||
             !isfinite(curve->eval_acceleration_error[axis])) return 0u;
@@ -1253,12 +1366,11 @@ static uint8_t curve_bounds(
       velocity_mid_abs = add_upper_nonnegative(
           interval_abs_max(velocity_mid_interval),
           curve->eval_velocity_error[axis]);
-      position_rounding2 = sum_square_upper(position_rounding2, position_error);
-      velocity_rounding2 = sum_square_upper(velocity_rounding2, velocity_error);
+      /* Both errors act on the same coordinate and may have the same sign. */
       position_rounding2 = sum_square_upper(position_rounding2,
-          curve->eval_position_error[axis]);
+          add_upper_nonnegative(position_error, curve->eval_position_error[axis]));
       velocity_rounding2 = sum_square_upper(velocity_rounding2,
-          curve->eval_velocity_error[axis]);
+          add_upper_nonnegative(velocity_error, curve->eval_velocity_error[axis]));
       velocity_mid2 = sum_square_upper(velocity_mid2, velocity_mid_abs);
     }
 
@@ -2147,7 +2259,23 @@ M5TrajectorySafetyStatus m5_trajectory_safety_validate(
 
 
 #if defined(FLIGHT_M5_SAFETY_TEST_API)
-#include "m5_trajectory_safety_test_api.h"
+void m5_trajectory_safety_test_reset_consumer_rejection(void)
+{
+  consumer_rejection = M5_TEST_CONSUMER_REJECT_NONE;
+  memset(consumer_rejection_counts, 0, sizeof(consumer_rejection_counts));
+}
+
+M5SafetyTestConsumerRejectStage m5_trajectory_safety_test_consumer_rejection(void)
+{
+  return consumer_rejection;
+}
+
+void m5_trajectory_safety_test_consumer_rejection_counts(
+    uint32_t counts[M5_TEST_CONSUMER_REJECT_STAGE_COUNT])
+{
+  if (counts != NULL)
+    memcpy(counts, consumer_rejection_counts, sizeof(consumer_rejection_counts));
+}
 
 uint8_t m5_trajectory_safety_test_curve_bounds(
     const float start_position[3],
@@ -2162,7 +2290,9 @@ uint8_t m5_trajectory_safety_test_curve_bounds(
     float position_low[3],
     float position_high[3],
     float *speed_bound,
-    float *acceleration_bound)
+    float *acceleration_bound,
+    float *position_error_m,
+    float *velocity_error_mps)
 {
   MotionReferencePoint start, end;
   M5SafetyBezier bezier;
@@ -2204,6 +2334,8 @@ uint8_t m5_trajectory_safety_test_curve_bounds(
   }
   *speed_bound = bounds.speed_bound;
   *acceleration_bound = bounds.acceleration_bound;
+  if (position_error_m != NULL) *position_error_m = bounds.position_rounding_error_m;
+  if (velocity_error_mps != NULL) *velocity_error_mps = bounds.velocity_rounding_error_mps;
   return 1u;
 }
 

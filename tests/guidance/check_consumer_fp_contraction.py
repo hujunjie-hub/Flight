@@ -2,9 +2,9 @@
 
 The validator replicates `control_sample_reference()`'s binary32 Horner chain.
 That replication is only meaningful if neither translation unit contracts
-`a*b + c` into a fused multiply-add with a different rounding sequence. The
-production build takes its flags from rtconfig.py (no -ffp-contract pin), so
-this check compiles:
+`a*b + c` into a fused multiply-add with a different rounding sequence. The production build takes its flags from rtconfig.py, which pins
+-ffp-contract=off, -frounding-math and -fexcess-precision=standard. This check
+compiles:
 
 * the M6 consumer with the production flags;
 * the M5-06 validator with the Cortex-M7 check flags from
@@ -44,7 +44,14 @@ INCLUDES = [
     "-Imiddleware/contracts",
     "-Imiddleware/guidance",
 ]
-FUSED = ("vfma", "vfms", "vfnma", "vfnms", "vmla", "vmls")
+FUSED = ("vfma", "vfms", "vfnma", "vfnms")
+# Armv7-M VMLA/VMLS and their negated forms round the product and sum separately.
+NON_FUSED = ("vmla", "vmls", "vnmla", "vnmls")
+FP_INSTRUCTION = re.compile(
+    r"^\s*[0-9a-f]+:\s+[0-9a-f]{4}\s+[0-9a-f]{4}\s+"
+    r"(" + "|".join(FUSED + NON_FUSED) + r")[a-z]{0,2}\.f(?:16|32|64)\b",
+    re.IGNORECASE,
+)
 
 
 def find_tool(name):
@@ -72,6 +79,15 @@ def validator_flags():
     return flags
 
 
+def count_fp_instructions(disassembly):
+    counts = dict.fromkeys(FUSED + NON_FUSED, 0)
+    for line in disassembly.splitlines():
+        match = FP_INSTRUCTION.match(line)
+        if match:
+            counts[match.group(1).lower()] += 1
+    return counts
+
+
 def build_and_scan(gcc, objdump, source, flags, object_name):
     obj = OUT / object_name
     command = [str(gcc)] + flags + INCLUDES + [
@@ -82,18 +98,18 @@ def build_and_scan(gcc, objdump, source, flags, object_name):
         raise SystemExit(f"compile failed for {source.name}")
     disassembly = subprocess.run([str(objdump), "-d", str(obj)], cwd=ROOT,
                                  capture_output=True, text=True, check=True).stdout
-    counts = {mnemonic: 0 for mnemonic in FUSED}
-    for line in disassembly.splitlines():
-        for mnemonic in FUSED:
-            if ("\t" + mnemonic) in line or (" " + mnemonic + ".") in line:
-                counts[mnemonic] += 1
+    counts = count_fp_instructions(disassembly)
+    fused = {mnemonic: counts[mnemonic] for mnemonic in FUSED}
+    non_fused = {mnemonic: counts[mnemonic] for mnemonic in NON_FUSED}
     return {
         "source": str(source.relative_to(ROOT)).replace("\\", "/"),
         "object": str(obj.relative_to(ROOT)).replace("\\", "/"),
         "object_sha256": hashlib.sha256(obj.read_bytes()).hexdigest(),
         "flags": " ".join(flags),
-        "fused_operations": sum(counts.values()),
-        "mnemonics": counts,
+        "fused_operations": sum(fused.values()),
+        "mnemonics": fused,
+        "non_fused_operations": sum(non_fused.values()),
+        "non_fused_mnemonics": non_fused,
     }
 
 
@@ -102,19 +118,39 @@ MODEL_TOKENS = {
     "gamma_n": [
         "double nu = (double)rounding_count * unit;",
         "nu = nextafter(nu, INFINITY);",
-        "gamma = nu / (1.0 - nu);",
+        "denominator = nextafter(1.0 - nu, -INFINITY);",
+        "if (!(denominator > 0.0) || !isfinite(denominator)) return INFINITY;",
+        "gamma = nu / denominator;",
         "gamma = nextafter(gamma, INFINITY);",
     ],
     "gamma_2_derivation": [
         "double nu2 = 2.0 * 0x1p-24;",
         "nu2 = nextafter(nu2, INFINITY);",
-        "gamma2 = nu2 / (1.0 - nu2);",
-        "gamma2 = nextafter(gamma2, INFINITY);",
+        "denominator = nextafter(1.0 - nu2, -INFINITY);",
+        "if (!(denominator > 0.0) || !isfinite(denominator)) return INFINITY;",
+        "gamma2 = nu2 / denominator;",
+        "return nextafter(gamma2, INFINITY);",
     ],
     "time_term": [
         "delta_s = multiply_upper_nonnegative(gamma2, s_max);",
         "s_eval_max = add_upper_nonnegative(s_max, delta_s);",
         "multiply_upper_nonnegative(delta_s,",
+    ],
+    "expanded_consumer_interval": [
+        "double s_max = multiply_upper_nonnegative(h, (double)u1);",
+        "consumer_eval_error_bound(cf, c_i, 5u,",
+        "consumer_eval_error_bound(vf, vc, 4u,",
+        "consumer_eval_error_bound(af, ac, 3u,",
+        "polynomial_derivative_magnitude(cf, 5u, 1u, s_eval_max)",
+        "polynomial_derivative_magnitude(vf, 4u, 1u, s_eval_max)",
+        "polynomial_derivative_magnitude(af, 3u, 1u, s_eval_max)",
+    ],
+    "horner_uses_expanded_interval": [
+        "double s_eval_max)",
+        "if (!(s_eval_max >= 0.0) || !isfinite(s_eval_max) || rounding_count == 0u)",
+        "power = multiply_upper_nonnegative(power, s_eval_max);",
+        "product_exact = multiply_upper_nonnegative(rounded_h, s_eval_max);",
+        "double scale = s_eval_max > 1.0 ? s_eval_max : 1.0;",
     ],
     "interval_coefficients": [
         "low_distance = fabs(cf - exact[i].low);",
@@ -142,33 +178,101 @@ MODEL_TOKENS = {
 }
 
 
-def check_model_against_source(source=None):
-    """The report must describe the model that is actually compiled."""
+CONSUMER_MODEL_TOKENS = {
+    "time_conversion": [
+        "float base = (float)local_us * seconds_per_us;",
+        "h = step_us * 1e-6f;",
+        "*local_seconds = control_reference_convert_local_time(",
+    ],
+    "hermite_coefficients": [
+        "float d = (p1[j] - p0[j]) - h * v0[j] - .5f * h * h * a0[j];",
+        "float v = v1[j] - v0[j] - h * a0[j];",
+        "float ac = a1[j] - a0[j];",
+        "c[j][3] = 10 * d / (h * h * h) - 4 * v / (h * h) + ac / (2 * h);",
+        "c[j][4] = -15 * d / (h * h * h * h) + 7 * v / (h * h * h) - ac / (h * h);",
+        "c[j][5] = 6 * d / (h * h * h * h * h) - 3 * v / (h * h * h * h) + ac / (2 * h * h * h);",
+    ],
+    "position_horner": [
+        "out->position_ned_m[j] = ((((c[j][5] * s + c[j][4]) * s + c[j][3]) * s + c[j][2]) * s + c[j][1]) * s + c[j][0];",
+    ],
+    "velocity_horner": [
+        "out->velocity_ned_mps[j] = (((5 * c[j][5] * s + 4 * c[j][4]) * s + 3 * c[j][3]) * s + 2 * c[j][2]) * s + c[j][1];",
+    ],
+    "acceleration_horner": [
+        "out->acceleration_ned_mps2[j] = ((20 * c[j][5] * s + 12 * c[j][4]) * s + 6 * c[j][3]) * s + 2 * c[j][2];",
+    ],
+}
+
+VALIDATOR_REPLICA_TOKENS = {
+    "time_domain": [
+        "float h = (float)step_us * 1e-6f;",
+    ],
+    "hermite_coefficients": [
+        "float h2 = h * h;",
+        "float h3 = h2 * h;",
+        "float h4 = h3 * h;",
+        "float h5 = h4 * h;",
+        "float d = ((p1 - p0) - h * v0) - ((0.5f * h) * h) * a0;",
+        "float dv = (v1 - v0) - h * a0;",
+        "float da = a1 - a0;",
+        "c[3] = 10 * d / h3 - 4 * dv / h2 + da / (2 * h);",
+        "c[4] = -15 * d / h4 + 7 * dv / h3 - da / h2;",
+        "c[5] = 6 * d / h5 - 3 * dv / h4 + da / (2 * h3);",
+    ],
+}
+
+def _normalize_source(source):
+    return re.sub(r"\s+", " ", source)
+
+
+def check_model_against_source(source=None, consumer_source=None):
+    """Check the proof model against both compiled translation units."""
     if source is None:
         source = VALIDATOR.read_text(encoding="utf-8")
+    if consumer_source is None:
+        consumer_source = CONSUMER.read_text(encoding="utf-8")
     missing = []
     for section, tokens in MODEL_TOKENS.items():
         for token in tokens:
             if token not in source:
-                missing.append(f"{section}: {token}")
+                missing.append(f"validator_model/{section}: {token}")
+
+    normalized_consumer = _normalize_source(consumer_source)
+    normalized_validator = _normalize_source(source)
+    for section, tokens in CONSUMER_MODEL_TOKENS.items():
+        for token in tokens:
+            if _normalize_source(token) not in normalized_consumer:
+                missing.append(f"consumer/{section}: {token}")
+    for section, tokens in VALIDATOR_REPLICA_TOKENS.items():
+        for token in tokens:
+            if _normalize_source(token) not in normalized_validator:
+                missing.append(f"validator_replica/{section}: {token}")
+
     import hashlib
-    sources = {}
-    for path in (VALIDATOR, CONSUMER):
-        sources[str(path.relative_to(ROOT)).replace("\\", "/")] = hashlib.sha256(
-            path.read_bytes()).hexdigest()
+    sources = {
+        str(VALIDATOR.relative_to(ROOT)).replace("\\", "/"):
+            hashlib.sha256(source.encode("utf-8")).hexdigest(),
+        str(CONSUMER.relative_to(ROOT)).replace("\\", "/"):
+            hashlib.sha256(consumer_source.encode("utf-8")).hexdigest(),
+    }
     return {
         "status": "MATCH" if not missing else "MISMATCH",
         "source": str(VALIDATOR.relative_to(ROOT)).replace("\\", "/"),
         "source_sha256": sources,
         "missing_tokens": missing,
-        "note": ("Report fields are derived from tokens that must exist in the "
-                 "compiled validator source; a mismatch fails the check."),
+        "note": ("Report fields are accepted only when proof-model tokens, "
+                 "consumer operations and validator replica operations all "
+                 "match the compiled source files."),
     }
 
 
 MUTATIONS = (
-    ("gamma_2", "gamma2 = nu2 / (1.0 - nu2);", "gamma2 = 0.0;"),
-    ("gamma_n", "gamma = nu / (1.0 - nu);", "gamma = nu;"),
+    ("gamma_2_denominator", "denominator = nextafter(1.0 - nu2, -INFINITY);",
+     "denominator = 1.0 - nu2;"),
+    ("gamma_2_quotient", "gamma2 = nu2 / denominator;", "gamma2 = nu2;"),
+    ("gamma_n_denominator", "denominator = nextafter(1.0 - nu, -INFINITY);",
+     "denominator = 1.0 - nu;"),
+    ("gamma_n_quotient", "gamma = nu / denominator;", "gamma = nu;"),
     ("interval_bound", "difference = fmax(low_distance, high_distance);",
      "difference = low_distance;"),
     ("s_eval_max", "s_eval_max = add_upper_nonnegative(s_max, delta_s);",
@@ -178,26 +282,83 @@ MUTATIONS = (
     ("fp_environment", "vmrs %0, fpscr", "vmrs %0, /* removed */"),
     ("rounding_count", "#define M5_CONSUMER_POSITION_ROUNDINGS 10u",
      "#define M5_CONSUMER_POSITION_ROUNDINGS 9u"),
+    ("horner_expanded_power", "power = multiply_upper_nonnegative(power, s_eval_max);",
+     "power = multiply_upper_nonnegative(power, s_max);"),
+    ("horner_expanded_overflow", "product_exact = multiply_upper_nonnegative(rounded_h, s_eval_max);",
+     "product_exact = multiply_upper_nonnegative(rounded_h, s_max);"),
+    ("position_time_derivative", "polynomial_derivative_magnitude(cf, 5u, 1u, s_eval_max)",
+     "polynomial_derivative_magnitude(cf, 5u, 2u, s_eval_max)"),
+    ("velocity_time_derivative", "polynomial_derivative_magnitude(vf, 4u, 1u, s_eval_max)",
+     "polynomial_derivative_magnitude(cf, 5u, 2u, s_eval_max)"),
+    ("acceleration_time_derivative", "polynomial_derivative_magnitude(af, 3u, 1u, s_eval_max)",
+     "polynomial_derivative_magnitude(cf, 5u, 3u, s_eval_max)"),
+)
+
+
+CONSUMER_MUTATIONS = (
+    ("consumer_time_scale", "float base = (float)local_us * seconds_per_us;",
+     "float base = (float)local_us * 1e-6f;"),
+    ("consumer_position_horner",
+     "((((c[j][5] * s + c[j][4]) * s + c[j][3]) * s + c[j][2]) * s +\n         c[j][1]) * s + c[j][0];",
+     "((((c[j][5] * s + c[j][4]) * s + c[j][3]) * s + c[j][2]) * s +\n         c[j][0]) * s + c[j][1];"),
+    ("consumer_velocity_horner",
+     "(((5 * c[j][5] * s + 4 * c[j][4]) * s + 3 * c[j][3]) * s +\n         2 * c[j][2]) * s + c[j][1];",
+     "(((5 * c[j][5] * s + 4 * c[j][4]) * s + 3 * c[j][3]) * s +\n         c[j][1]) * s + 2 * c[j][2];"),
+    ("consumer_acceleration_horner",
+     "((20 * c[j][5] * s + 12 * c[j][4]) * s + 6 * c[j][3]) * s +\n        2 * c[j][2];",
+     "((20 * c[j][5] * s + 12 * c[j][4]) * s + 2 * c[j][2]) * s +\n        6 * c[j][3];"),
 )
 
 
 def self_test():
-    """Every deliberate mutation of the model must be reported as MISMATCH."""
+    """Every deliberate mutation of either compiled source must be detected."""
+    disassembly = (
+        "   0:\teea1 0b02 \tvfma.f64\td0, d1, d2\n"
+        "   4:\teea1 0ac2 \tvfms.f32\ts0, s1, s2\n"
+        "   8:\tee91 0a82 \tvfnmaeq.f32\ts0, s1, s2\n"
+        "   c:\tee91 0b02 \tvfnms.f64\td0, d1, d2\n"
+        "  10:\tee01 0b02 \tvmla.f64\td0, d1, d2\n"
+        "  14:\tee01 0b42 \tvmls.f64\td0, d1, d2\n"
+        "  18:\tee11 0b42 \tvnmla.f64\td0, d1, d2\n"
+        "  1c:\tee11 0b02 \tvnmls.f64\td0, d1, d2\n"
+        "  20:\t4770      \tbx\tlr @ vfma.f64 is only a comment\n"
+    )
+    counts = count_fp_instructions(disassembly)
+    for mnemonic in ("vfma", "vfms", "vfnma", "vfnms", "vmla", "vmls", "vnmla", "vnmls"):
+        if counts.get(mnemonic) != 1:
+            print(f"FAIL: expected one {mnemonic} instruction, got {counts}")
+            return 1
+    if set(FUSED) != {"vfma", "vfms", "vfnma", "vfnms"}:
+        print(f"FAIL: incorrect fused instruction set: {FUSED}")
+        return 1
+    print("M5_FP_DISASSEMBLY_SELF_TEST_PASS (4 fused, 4 non-fused)")
     source = VALIDATOR.read_text(encoding="utf-8")
-    good = check_model_against_source(source)
+    consumer_source = CONSUMER.read_text(encoding="utf-8")
+    good = check_model_against_source(source, consumer_source)
     if good["status"] != "MATCH":
-        print(f"FAIL: unmodified source reported {good['status']}")
+        print(f"FAIL: unmodified sources reported {good['status']}: "
+              f"{good['missing_tokens']}")
         return 1
     for name, original, replacement in MUTATIONS:
         if original not in source:
-            print(f"FAIL: mutation target for {name} not found")
+            print(f"FAIL: validator mutation target for {name} not found")
             return 1
         mutated = source.replace(original, replacement, 1)
-        result = check_model_against_source(mutated)
+        result = check_model_against_source(mutated, consumer_source)
         if result["status"] != "MISMATCH":
-            print(f"FAIL: mutation {name} was not detected")
+            print(f"FAIL: validator mutation {name} was not detected")
             return 1
-    print(f"M5_FP_MODEL_SELF_TEST_PASS ({len(MUTATIONS)} mutations detected)")
+    for name, original, replacement in CONSUMER_MUTATIONS:
+        if original not in consumer_source:
+            print(f"FAIL: consumer mutation target for {name} not found")
+            return 1
+        mutated = consumer_source.replace(original, replacement, 1)
+        result = check_model_against_source(source, mutated)
+        if result["status"] != "MISMATCH":
+            print(f"FAIL: consumer mutation {name} was not detected")
+            return 1
+    mutation_count = len(MUTATIONS) + len(CONSUMER_MUTATIONS)
+    print(f"M5_FP_MODEL_SELF_TEST_PASS ({mutation_count} mutations detected)")
     return 0
 
 
@@ -230,14 +391,15 @@ def main():
                    else "REVIEW_REQUIRED"),
         "compiler": compiler,
         "error_model": {
+            "gamma_rounding_direction": "nu upward; denominator 1-nu downward; quotient upward",
             "coefficient_term": "outward interval coefficients [low, high], "
-                                "max(|cf - low|, |cf - high|) * s^i",
-            "horner_term": "gamma_n * sum |cf_i| * s^i with gamma_n = n*u/(1-n*u)",
+                                "max(|cf - low|, |cf - high|) * s_eval_max^i",
+            "horner_term": "gamma_n * sum |cf_i| * s_eval_max^i with gamma_n = n*u/(1-n*u)",
             "horner_roundings": {"position": 10, "velocity": 12,
                                  "acceleration": 10},
-            "time_term": "gamma_2 * t_max * |d^k p/ds^k|(s_eval_max) with "
-                         "gamma_2 = 2u/(1-2u), s_exact = local_us/1e6, t_max = step_us/1e6",
-            "evaluation_interval": "s_eval_max = max(t_max, h) + gamma_2*t_max",
+            "time_term": "delta_s * |d^k p/ds^k|(s_eval_max), delta_s = gamma_2_upper*s_max, "
+                         "s_exact = h*local_us/step_us",
+            "evaluation_interval": "s_max = h*u1; s_eval_max = s_max + delta_s; 0 <= u1 <= 1",
             "subnormal_term": "n * 2^-149 * max(1, s_eval_max)^n",
         },
         "model_check": model,
@@ -260,7 +422,8 @@ def main():
     for entry in report["objects"]:
         log_lines.append(
             f"object={entry['object']} sha256={entry['object_sha256']} "
-            f"fused={entry['fused_operations']} flags={entry['flags']}")
+            f"fused={entry['fused_operations']} non_fused={entry['non_fused_operations']} "
+            f"flags={entry['flags']}")
     (OUT / "consumer_fp.log").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
     print(payload)
     return 0 if report["status"] == "PASS" else 1

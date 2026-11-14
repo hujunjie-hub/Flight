@@ -4,8 +4,8 @@
 
     The pristine-upstream comparison needs a checkout of the locked commit
     (8291a93e49de513fe9d21f819500d39082ded611) because Eigen/ThirdParty are not
-    vendored into this repository.  Point -Upstream at such a checkout; the
-    test is reported as SKIPPED when it is absent, never silently passed.
+    vendored into this repository. An explicit -Upstream requires a clean
+    checkout of that commit. Without -Upstream the comparison is optional.
 
     Example:
         git clone https://github.com/i2Nav-WHU/KF-GINS.git C:\tmp\KF-GINS
@@ -31,6 +31,23 @@ while (-not (Test-Path -LiteralPath (Join-Path $layoutRoot.FullName 'SConstruct'
 $repoRoot = $layoutRoot.FullName
 $pluginDir = Join-Path $repoRoot 'middleware\model\ins'
 $pkgDir = Join-Path $pluginDir 'kf_gins'
+$upstreamLock = Get-Content -LiteralPath (Join-Path $pkgDir 'UPSTREAM_LOCK.json') -Raw | ConvertFrom-Json
+$upstreamSources = Join-Path $Upstream 'src'
+$upstreamEigen = Join-Path $Upstream 'ThirdParty\eigen-3.3.9'
+$hasUpstream = (Test-Path -LiteralPath (Join-Path $upstreamSources 'kf-gins\gi_engine.cpp') -PathType Leaf) -and
+               (Test-Path -LiteralPath $upstreamEigen -PathType Container)
+if ($hasUpstream) {
+    $actualCommit = & git -C $Upstream rev-parse --verify HEAD 2>$null
+    if ($LASTEXITCODE -ne 0 -or $actualCommit -cne $upstreamLock.commit) {
+        throw "KF-GINS checkout at $Upstream must match the locked commit $($upstreamLock.commit)."
+    }
+    $changes = & git -C $Upstream status --porcelain --untracked-files=normal
+    if ($LASTEXITCODE -ne 0 -or $changes) {
+        throw "KF-GINS checkout at $Upstream must be clean."
+    }
+} elseif ($PSBoundParameters.ContainsKey('Upstream')) {
+    throw "KF-GINS checkout at $Upstream is incomplete. Required commit: $($upstreamLock.commit)."
+}
 $trimInclude = Join-Path $pkgDir 'trimmed_core\include'
 $trimSources = @((Join-Path $pkgDir 'trimmed_core\src\quad_core.cpp'), (Join-Path $pkgDir 'trimmed_core\src\quad_models.cpp'))
 $pluginSources = @((Join-Path $pkgDir 'backend_adapter/kf_gins_adapter.cpp'), (Join-Path $pkgDir 'backend_adapter/kf_gins_quad_port.cpp'))
@@ -126,9 +143,8 @@ Invoke-Test -Name 'test_contract_coexistence' `
     -Sources (@((Join-Path $testDir 'test_contract_coexistence.cpp')) + $pluginSources + $trimSources) `
     -ExtraFlags @('-fno-exceptions', '-fno-rtti')
 
-$upstreamSources = Join-Path $Upstream 'src'
-$upstreamEigen = Join-Path $Upstream 'ThirdParty\eigen-3.3.9'
-if ((Test-Path (Join-Path $upstreamSources 'kf-gins\gi_engine.cpp')) -and (Test-Path $upstreamEigen)) {
+if ($hasUpstream) {
+    Write-Host "KF-GINS comparison commit: $actualCommit"
     Invoke-Test -Name 'test_upstream_compare' `
         -Includes @($trimInclude, $testDir, $upstreamEigen, $upstreamSources) `
         -Sources (@((Join-Path $testDir 'test_upstream_compare.cpp'),

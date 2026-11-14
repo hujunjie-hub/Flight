@@ -62,6 +62,9 @@ wsl.exe -d Ubuntu-26.04 -- bash tests/guidance/run_integration_tests.sh
 wsl.exe -d Ubuntu-26.04 -- python3 tests/algorithms/run_tests.py --target host
 wsl.exe -d Ubuntu-26.04 -- python3 tests/algorithms/run_tests.py --target arm
 wsl.exe -d Ubuntu-26.04 -- bash tests/guidance/arm_build_check.sh
+wsl.exe -d Ubuntu-26.04 -- bash tests/control/run_host_tests.sh
+wsl.exe -d Ubuntu-26.04 -- bash tests/actuation/run_host_tests.sh
+wsl.exe -d Ubuntu-26.04 -- bash tests/simulation/run_sil.sh
 ```
 
 Sanitizer：
@@ -69,6 +72,8 @@ Sanitizer：
 ```powershell
 wsl.exe -d Ubuntu-26.04 -- bash -lc 'EXTRA_CFLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer" bash tests/guidance/run_host_tests.sh'
 wsl.exe -d Ubuntu-26.04 -- bash -lc 'EXTRA_CFLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer" bash tests/guidance/run_integration_tests.sh'
+wsl.exe -d Ubuntu-26.04 -- bash -lc 'EXTRA_CFLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer" bash tests/control/run_host_tests.sh'
+wsl.exe -d Ubuntu-26.04 -- bash -lc 'EXTRA_CFLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer" bash tests/actuation/run_host_tests.sh'
 ```
 
 `tests/guidance/arm_build_check.sh` 将 M5-06 Host/SIL-only 验证器编译为 Cortex-M7 object，验证目标编译器兼容性；该 object 不进入 H723 产品链接，不构成目标运行、WCET、RTA、实机 RAM/stack 或飞行证据。
@@ -200,7 +205,7 @@ pwsh -NoProfile -File .\tools\archive_validation_run.ps1 -CiRunUrl "https://gith
 
 不要只发“测试通过”或几张截图。
 
-## 8. 最近一次完整 CI 基线（2026-11-10）
+## 8. 历史 CI 基线（2026-11-10；仅对当时 commit 有效）
 
 Host validation #542 对 commit `dafe47b8b17e7f32f676cb258eaa7a407a1dfb90` 的全部 jobs success：
 
@@ -221,3 +226,33 @@ Host validation #542 对 commit `dafe47b8b17e7f32f676cb258eaa7a407a1dfb90` 的�
 CI：[Host validation #542](https://github.com/hujunjie-hub/Flight/actions/runs/42746417706)。
 
 注意：该证据对列出的 commit 有效。S06-081 的 long-double 解析候选 oracle 只针对当前 1D 恒加速度测试模型，不是一般 3D 区间证明。该结果也不代表 H723 目标运行、WCET/RTA、实机 RAM/stack watermark、HIL 或飞行通过。M5-06 整体仍受独立数学审查和后续 M5-07 门禁约束；后续任何新 commit 均须重新核对 CI。
+
+## 9. 规范同步前实现基线（2026-11-13；2a0237）
+
+当前实现基线 `2a0237bf42963f5a4457af24da1b713cd6f957d1`，分支 `opt/stage-02-m5-06-safety-validator`。
+
+| CI | 运行结果 | 覆盖 |
+|---|---|---|
+| [Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/43400605776) | 6/6 jobs SUCCESS | M4/M5 回归、Spec Audit、生产 ABI、Cortex-M7 模块编译 |
+| [M6/M7 host validation](https://github.com/hujunjie-hub/Flight/actions/runs/43400605749) | 5/5 jobs SUCCESS | M6 MPC、M6 guard、M7 guard、Sanitizer、runtime SIL |
+| [M7 host validation](https://github.com/hujunjie-hub/Flight/actions/runs/43400605682) | 2/2 jobs SUCCESS | M7 独立 Host 回归 |
+
+实际检查：M4 1,002/0；M5 322,179/0；M4/M5 Integration 1,075/0；M6 MPC 15/0；M6 guard 26/0；M7 guard 274/0。M5 与 Integration ASan/UBSan 分别为 322,179/0、1,075/0；M6/M7 Sanitizer 三组均为 0 failures。Live FMS→M7 显式 DISARM SIL 455/0，first-reference timeout SIL 467/0，ground-stop ramp SIL 27/0（18 次帧提交、58 次 inhibit）。
+
+生产 ABI：144 types、0 spec mismatches、0 unexpected Host/ARM，lock PASS。Spec Audit：145 types、8 checks，PASS。Cortex-M7 M4/M5/M6/M7 模块编译 PASS；MPC 静态 RAM 29,400 B、worker stack 8,192 B、最大静态 frame 2,024 B。
+
+**范围限制：** 这些结果不是 H723 实机运行、完整产品固件链接、WCET/RTA、实机 RAM/stack watermark、DShot 物理 apply-time、ESC 推力响应、HIL 或飞行证据。M5-06 独立数学审查仍 BLOCKED；M5-07 不得启动。SPEC 同步产生的新 commit 必须重新运行 CI，不能继承本节的旧 SHA PASS。
+
+## 10. 规范同步后 CI 复验（2026-11-13；b6b2c8）
+
+规范同步与 ABI 源文件指纹修正后，验证基线 `b6b2c8d1fbe2483ac76164993e7798a18af1e697`：
+
+| CI | 结果 |
+|---|---|
+| [Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/43410120128) | 6/6 jobs SUCCESS |
+| [M6/M7 host validation](https://github.com/hujunjie-hub/Flight/actions/runs/43410120115) | 5/5 jobs SUCCESS |
+| [M7 host validation](https://github.com/hujunjie-hub/Flight/actions/runs/43410120239) | 2/2 jobs SUCCESS |
+
+M4 Host 1,002/0；M5 Host 322,179/0；M4/M5 Integration 1,075/0；M6 MPC 15/0；M6 guard 26/0；M7 guard 274/0。M4/M5 与 M6/M7 ASan/UBSan 均 0 failures。Live FMS→M7 explicit DISARM SIL 455/0、first-reference timeout SIL 467/0、ground-stop ramp SIL 27/0（18 commits、58 inhibits）。生产 ABI 144 types / 0 mismatch / 0 unexpected Host/ARM；Spec Audit 145 types / 8 checks PASS；M4/M5/M6/M7 Cortex-M7 模块编译 PASS。
+
+H723 实机、WCET/RTA、物理 ESC 响应、HIL、目标 RAM/stack watermark 和飞行仍 NOT_RUN。M5-06 仍 BLOCKED，M5-07 不得启动。FLIGHT-LOCAL-27 仍 OPEN / RISK，静态余量估算 8 B，待重新运行 memory-budget 和最终 map。

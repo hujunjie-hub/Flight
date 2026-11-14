@@ -59,13 +59,46 @@ uint8_t guidance_landing_speed_ok(const GuidanceInput *in, const GuidanceQuintic
                                   float t0, float t1)
 {
     float lo, hi;
+    const float brake_down = in->directive->payload.home.position_ned_m[2] -
+                             GUIDANCE_LANDING_BRAKE_HEIGHT_M;
+    float start_down, end_down, check_t;
+    unsigned iteration;
     if (!guidance_has_landing_plane(in))
         return 1u;
     if (!guidance_quintic_bounds(down, t0, t1, 0, &lo, &hi))
         return 0u;
-    if (hi < in->directive->payload.home.position_ned_m[2] - 0.5f)
+    if (hi < brake_down)
         return 1u;
-    return guidance_quintic_bounds(down, t0, t1, 1, &lo, &hi) && hi <= 0.35f + 1e-5f;
+
+    start_down = guidance_quintic_eval(down, t0, 0);
+    end_down = guidance_quintic_eval(down, t1, 0);
+    if (!isfinite(start_down) || !isfinite(end_down))
+        return 0u;
+    /* Allow a faster approach above the braking band. Within the final 20 cm,
+     * constrain speed early enough to enter the 6 cm contact-sensor band safely. */
+    check_t = t0;
+    if (start_down < brake_down) {
+        float left = t0, right = t1, velocity_lo, velocity_hi;
+        /* Prove the curve is nondecreasing in NED-down before deciding whether it
+         * crossed the band. If it is monotone and the endpoint is still above the
+         * band, the conservative Bernstein position hull alone is not a crossing. */
+        if (!guidance_quintic_bounds(down, t0, t1, 1, &velocity_lo, &velocity_hi) ||
+            velocity_lo < -1e-5f)
+            return 0u;
+        if (end_down < brake_down)
+            return 1u;
+        for (iteration = 0; iteration < 16u; ++iteration) {
+            const float mid = 0.5f * (left + right);
+            if (guidance_quintic_eval(down, mid, 0) >= brake_down)
+                right = mid;
+            else
+                left = mid;
+        }
+        check_t = right;
+    }
+    return guidance_quintic_bounds(down, check_t, t1, 1, &lo, &hi) &&
+           lo >= -GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS - 1e-5f &&
+           hi <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-5f;
 }
 
 static float absmin(float lo, float hi)
@@ -189,6 +222,11 @@ uint8_t guidance_plan_fences(const GuidanceInput *in, const ProductGuidanceConfi
             float clearance = fence_clearance(f, p[0], p[1])-horizontal_guard;
             float min_h = f->min_height_above_home_m+f->vertical_margin_m+vertical_guard;
             float max_h = f->max_height_above_home_m-f->vertical_margin_m-vertical_guard;
+            /* A zero-or-lower fence floor may admit the bounded LAND/RETURN
+             * contact probe. Positive minimum-height fences remain fail-closed. */
+            if (guidance_has_landing_plane(in) &&
+                f->min_height_above_home_m + f->vertical_margin_m <= 0.0f)
+                min_h = fminf(min_h, -GUIDANCE_LANDING_PROBE_M - vertical_guard);
             if (clearance < 0 || home_d-p[2] < min_h || home_d-p[2] > max_h) return 0;
             if (clearance <= sqrtf(dx*dx+dy*dy) || home_d-hi[2] < min_h-1e-5f ||
                 home_d-lo[2] > max_h+1e-5f) proved = 0;

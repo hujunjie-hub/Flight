@@ -19,7 +19,10 @@ size="$(printenv ARM_SIZE || printf '%s' arm-none-eabi-size)"
 objdump="$(printenv ARM_OBJDUMP || printf '%s' arm-none-eabi-objdump)"
 # Default to the product release optimisation level; measuring stack at the
 # compiler default (-O0) is not representative of the shipped code.
-opt="${ARM_OPT:--O2}"
+opt=()
+if [[ -n "${ARM_OPT:-}" ]]; then
+  opt=("$ARM_OPT")
+fi
 command -v "$cc" >/dev/null 2>&1 || {
   echo "ARM compiler not found: $cc" >&2
   exit 2
@@ -39,6 +42,7 @@ mkdir -p "$out"
 flags=(
   -mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard
   -std=c11 -Wall -Wextra -Werror -fno-short-enums -fstack-usage
+  -O2
   -fno-fast-math -fno-unsafe-math-optimizations
   -ffp-contract=off -frounding-math -fexcess-precision=standard
   -Imiddleware/contracts
@@ -74,14 +78,14 @@ objects=()
 for src in "${production_sources[@]}"; do
   obj="$out/$(basename "$src" .c).o"
   echo "CC $src"
-  "$cc" "${flags[@]}" "$opt" -c "$src" -o "$obj"
+  "$cc" "${flags[@]}" "${opt[@]}" -c "$src" -o "$obj"
   objects+=("$obj")
 done
 
 for src in "${host_only_sources[@]}"; do
   obj="$out/$(basename "$src" .c).o"
   echo "CC $src (Host/SIL-only source, Cortex-M7 compile check only)"
-  "$cc" "${flags[@]}" "$opt" -DFLIGHT_M5_HOST_PLANNER -c "$src" -o "$obj"
+  "$cc" "${flags[@]}" "${opt[@]}" -DFLIGHT_M5_HOST_PLANNER -c "$src" -o "$obj"
   objects+=("$obj")
 done
 
@@ -89,19 +93,20 @@ done
 # never consume a .dis older than the .o it describes.
 "$objdump" -d -C "$out/m5_trajectory_safety.o" > "$out/m5_trajectory_safety.dis"
 dis_hash="$(sha256sum "$out/m5_trajectory_safety.dis" | cut -d' ' -f1)"
+code_commit="${FLIGHT_CODE_COMMIT:-$(git rev-parse HEAD)}"
 
 {
-  echo "commit=${FLIGHT_CODE_COMMIT:-$(git rev-parse HEAD)}"
+  echo "commit=$code_commit"
   echo "source_sha256=$(sha256sum middleware/guidance/trajectory_planning/m5_trajectory_safety.c | cut -d' ' -f1)"
   echo "compiler=$("$cc" --version | head -n 1)"
   echo "size_tool=$("$size" --version | head -n 1)"
-  echo "optimization=$opt"
+  echo "optimization=${ARM_OPT:--O2}"
   echo "disassembly=m5_trajectory_safety.dis"
   echo "disassembly_sha256=$dis_hash"
   echo "production_objects=${#production_sources[@]}"
   echo "host_only_objects=${#host_only_sources[@]}"
   printf 'flags='
-  printf '%s ' "${flags[@]}"
+  printf '%s ' "${flags[@]}" "${opt[@]}"
   echo
   echo "M5-06 scope=Host/SIL-only validator object cross-compiled for Cortex-M7; not linked into product"
 } > "$out/toolchain.txt"

@@ -10,9 +10,12 @@
 #include <math.h>
 #include "ports/port_api.h"
 #include "fms_interface.h"
+#include "flight_state_machine/fms_internal.h"
 #ifdef M4_M5_INTEGRATION
 #include "guidance_update/guidance.h"
 #endif
+
+_Static_assert(sizeof(FmsDedupEntry) <= 72u, "FMS dedup entry exceeds its static allocation");
 
 #define T_BOOT 0x1122334455667788ull
 #define T_EPOCH 3u
@@ -54,6 +57,7 @@ typedef struct {
   uint64_t guidance_ttl_us;
   uint8_t guidance_valid;
   uint8_t omit_control;
+  uint32_t control_sample_lag_us;
   uint8_t has_candidate;
   OperationRequest req;
   uint8_t has_req;
@@ -157,6 +161,9 @@ static void fx_fill_headers(Fx *fx)
   fill_header(&fx->rc.header, MSG_COMMUNICATION_LINK_STATUS, 1u, now, 200000u, now);
   fill_header(&fx->gcs.header, MSG_COMMUNICATION_LINK_STATUS, 2u, now, 200000u, now);
   fill_header(&fx->control.header, MSG_CONTROL_CAPABILITY, 23u, now, 100000u, now);
+  if (fx->control_sample_lag_us != 0u && now >= fx->control_sample_lag_us) {
+    fx->control.header.timestamp_sample_us = now - fx->control_sample_lag_us;
+  }
   fill_header(&fx->act_cap.header, MSG_ACTUATOR_CAPABILITY, 24u, now, 100000u, now);
   fill_header(&fx->act_status.header, MSG_ACTUATOR_STATUS, 24u, now, 50000u, now);
   fill_header(&fx->faults.header, MSG_FAULT_SUMMARY, 25u, now, 200000u, now);
@@ -957,6 +964,7 @@ static void test_return_pauses_running_mission(void)
   fx_control_active(&fx, 80u);
   fx_airborne(&fx);
   fx_start_mission(&fx);
+  fx.control_sample_lag_us = 20000u; /* M6 publish follows a slightly older nav sample. */
   CHECK(fx.out.authorized_mission.execution_token != 0u);
   const uint32_t epoch = fx.out.mission_status.mission_epoch;
   fx.nav.core.velocity_ned_mps[0] = 0.3f;
@@ -968,46 +976,46 @@ static void test_return_pauses_running_mission(void)
   CHECK(fx.out.mission_status.mission_state == MISSION_STATE_PAUSED);
   CHECK(fx.out.mission_status.mission_epoch != epoch);
   CHECK(fx.out.authorized_mission.execution_token == 0u);
+
+  /* A new M6 binding for the POS_HOLD directive is sufficient to hand off.
+   * The return trajectory owns deceleration; M4 does not wait for a stationary
+   * hover or a low instantaneous acceleration estimate. */
   fx_control_active(&fx, 82u);
   fx_run(&fx, 1200000u);
-  CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
-  fx.nav.core.velocity_ned_mps[0] = 0.0f;
-  fx_run(&fx, 2200000u);
   CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_AUTO_RETURN);
+
+  memset(fx.nav.core.position_ned_m, 0, sizeof(fx.nav.core.position_ned_m));
+  memset(fx.nav.core.velocity_ned_mps, 0, sizeof(fx.nav.core.velocity_ned_mps));
+  memset(fx.nav.core.acceleration_ned_mps2, 0, sizeof(fx.nav.core.acceleration_ned_mps2));
+  fx.ext.ground_contact_state = GROUND_CONTACT_CONTACT;
+  fx_run(&fx, 2200000u);
+  CHECK(fx.out.landed_state.state == LANDED_STATE_LANDED);
   CHECK(fms_policy_stop() == STATUS_OK);
 }
 
-static void test_post_mission_return_waits_for_stable_hold(void)
+static void test_post_mission_return_starts_after_control_binding(void)
 {
   Fx fx;
   FmsInputView input;
   const uint32_t request_id = 3200u;
   fx_complete_single_waypoint_mission(&fx);
-  fx.nav.core.velocity_ned_mps[0] = 0.3f;
-  CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_ACCEPTED);
-  CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
-  const uint64_t deadline = fx.req.execution_deadline_us;
-
+  fx.control_sample_lag_us = 20000u; /* Bind on M6 processing time, not sensor capture time. */
   fx_control_active(&fx, 81u);
-  fx_run(&fx, 1200000u);
-  CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
-  fx.nav.core.velocity_ned_mps[0] = 0.0f;
-  for (unsigned i = 0; i < 1100000u / STEP_US; ++i) {
-    fx.nav.core.acceleration_ned_mps2[2] = (i % 2u) ? 2.0f : -2.0f;
-    CHECK(fx_step(&fx) == STATUS_OK);
-  }
-  CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
-  for (unsigned elapsed = 0; elapsed < 350000u &&
-       fx.out.state_snapshot.flight_mode != FLIGHT_MODE_AUTO_RETURN; elapsed += STEP_US) {
-    fx.nav.core.acceleration_ned_mps2[2] = (elapsed / STEP_US % 2u) ? 2.0f : -2.0f;
-    CHECK(fx_step(&fx) == STATUS_OK);
-  }
+  fx_run(&fx, 100000u); /* The same directive has a continuous 80 ms M6 binding. */
+
+  /* Deliberately non-stationary: the bounded M5 return trajectory must own
+   * deceleration instead of waiting for a separate hover-stability gate. */
+  fx.nav.core.velocity_ned_mps[0] = 0.3f;
+  fx.nav.core.acceleration_ned_mps2[2] = 2.0f;
+  CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_ACCEPTED);
   CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_AUTO_RETURN);
   CHECK(fx.out.actuation_permit.permit_flags & PERMIT_FLAG_REVOKED);
+  const uint64_t deadline = fx.req.execution_deadline_us;
 
   fx_control_active(&fx, 82u);
   memset(fx.nav.core.position_ned_m, 0, sizeof(fx.nav.core.position_ned_m));
-  fx.nav.core.acceleration_ned_mps2[2] = 0.0f;
+  memset(fx.nav.core.velocity_ned_mps, 0, sizeof(fx.nav.core.velocity_ned_mps));
+  memset(fx.nav.core.acceleration_ned_mps2, 0, sizeof(fx.nav.core.acceleration_ned_mps2));
   fx.ext.ground_contact_state = GROUND_CONTACT_CONTACT;
   fx_run(&fx, 2200000u);
   CHECK(fx.out.landed_state.state == LANDED_STATE_LANDED);
@@ -1021,24 +1029,23 @@ static void test_post_mission_return_waits_for_stable_hold(void)
   CHECK(fms_policy_stop() == STATUS_OK);
 }
 
-static void test_post_mission_return_timeout_preserves_hold(void)
+static void test_post_mission_return_missing_control_cancels_safely(void)
 {
   Fx fx;
   const uint32_t request_id = 3201u;
   fx_complete_single_waypoint_mission(&fx);
-  fx.nav.core.velocity_ned_mps[0] = 0.3f;
-  CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_ACCEPTED);
   fx_control_active(&fx, 81u);
-  fx_run(&fx, 1000000u);
-  for (unsigned i = 0; i < 20u; ++i) {
-    fx.nav.core.velocity_ned_mps[0] = (i % 2u) ? 0.14f : -0.14f;
-    fx_run(&fx, 260000u);
-  }
+  fx_run(&fx, 100000u);
+  fx.omit_control = 1u; /* No current M6 capability may authorize AUTO_RETURN. */
+  CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_ACCEPTED);
   CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
-  CHECK(fx.out.actuation_permit.permit_flags == PERMIT_SCOPE_CONTROL_ACTIVE);
+  fx_run(&fx, FMS_RETURN_PREPARE_TIMEOUT_US + 100000u);
+  CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
+  CHECK(fx.out.state_snapshot.failsafe_level >= FAILSAFE_ACTION_REQUIRED);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
   CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_FAILED);
   const CommandAck *ack = fx_find_ack(&fx, request_id);
-  CHECK(ack != NULL && ack->reason_code == 6u);
+  CHECK(ack != NULL && ack->reason_code == 12u);
   CHECK(fms_policy_stop() == STATUS_OK);
 }
 
@@ -1066,6 +1073,37 @@ static void test_duplicate_request_replays_ack(void)
   CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_REJECTED);
   const CommandAck *ack = fx_find_ack(&fx, id);
   CHECK(ack != NULL && ack->reason_code == 16u);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
+static void test_dedup_full_and_expiry(void)
+{
+  Fx fx;
+  const CommandAck *ack;
+  uint32_t first_id;
+  uint32_t overflow_id;
+
+  CHECK(fx_init(&fx));
+  first_id = fx.next_request_id;
+  for (unsigned i = 0u; i < FMS_DEDUP_CAPACITY; ++i) {
+    const uint32_t id = fx.next_request_id++;
+    CHECK(fx_send(&fx, PRODUCT_CMD_LAND, id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_REJECTED);
+    ack = fx_find_ack(&fx, id);
+    CHECK(ack != NULL && ack->reason_code == 2u); /* Disarmed. */
+  }
+
+  overflow_id = fx.next_request_id++;
+  CHECK(fx_send(&fx, PRODUCT_CMD_LAND, overflow_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_REJECTED);
+  ack = fx_find_ack(&fx, overflow_id);
+  CHECK(ack != NULL && ack->reason_code == 9u); /* Capacity. */
+  CHECK(fx_send(&fx, PRODUCT_CMD_LAND, first_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_REJECTED);
+  ack = fx_find_ack(&fx, first_id);
+  CHECK(ack != NULL && ack->reason_code == 2u); /* Cached rejection. */
+
+  fx_run(&fx, (uint32_t)FMS_DEDUP_TTL_US);
+  CHECK(fx_send(&fx, PRODUCT_CMD_LAND, overflow_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_REJECTED);
+  ack = fx_find_ack(&fx, overflow_id);
+  CHECK(ack != NULL && ack->reason_code == 2u); /* Capacity reclaimed. */
   CHECK(fms_policy_stop() == STATUS_OK);
 }
 
@@ -1171,6 +1209,7 @@ static void test_mission_epoch_required_and_not_stale(void)
 static void test_first_reference_window_expires_to_ground_stop(void)
 {
   Fx fx;
+  GroundStopCertificate certificate;
   uint32_t id;
 
   CHECK(fx_init(&fx));
@@ -1184,7 +1223,19 @@ static void test_first_reference_window_expires_to_ground_stop(void)
   CHECK(fx_step(&fx) == STATUS_OK); /* The first candidate arrives after the absolute deadline. */
   CHECK(fx.out.state_snapshot.arm_state == ARM_STATE_DISARMED);
   CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_NONE);
+  CHECK(fx.out.landed_state.state == LANDED_STATE_LANDED);
   CHECK(fx.out.actuation_permit.permit_flags & PERMIT_FLAG_REVOKED);
+  CHECK(fx.out.actuation_permit.reason_code ==
+        FMS_PERMIT_REVOKE_REASON_FIRST_REFERENCE_GROUND_DISARM);
+  CHECK(fx.out.decision_event.decision_code == DECISION_FORCE_SAFE_ACTION);
+  CHECK(fx.out.decision_event.reason_code ==
+        FMS_DECISION_REASON_FIRST_REFERENCE_GROUND_DISARM);
+  CHECK(fms_build_ground_stop_certificate(&fx.out, fx.now - STEP_US, &certificate) ==
+        STATUS_OK);
+  CHECK(certificate.header.message_type == MSG_GROUND_STOP_CERTIFICATE);
+  CHECK(certificate.lifecycle == ACTUATOR_GROUND_STOP_LIFECYCLE_LANDED);
+  CHECK(certificate.authority_epoch == fx.out.actuation_permit.authority_epoch);
+  CHECK(certificate.directive_epoch == fx.out.actuation_permit.directive_epoch);
   CHECK(fx_step(&fx) == STATUS_OK);
   CHECK(fx.out.actuation_permit.header.valid_until_us == 0u);
   CHECK(fms_policy_stop() == STATUS_OK);
@@ -1454,6 +1505,131 @@ static void test_real_mission_and_vertical_only_fallback(void)
 }
 #endif
 
+/* ------------------------------------------------------------------ */
+/* FMAT-0008: ARM initial control reference race                      */
+/* ------------------------------------------------------------------ */
+
+/* ARM hands control over before the first Control reference exists, so the
+ * first Control capability frames legitimately report a partial DOF mask.
+ * Landing evidence is deliberately left UNKNOWN to mirror the Host MIL, where
+ * the ground stop cannot rescue the ARM frame. */
+static void fx_arm_with_partial_control(Fx *fx)
+{
+  fx->ext.ground_contact_state = GROUND_CONTACT_UNKNOWN;
+  fx_run(fx, 4300000u);
+  CHECK(fx->out.prearm_result.state == PREARM_READY);
+  fx->control.controllable_dof_mask = 0x0u;
+  CHECK(fx_send(fx, PRODUCT_CMD_ARM, fx->next_request_id++,
+                PRODUCT_OPERATION_VALID_PREARM_EPOCH, 0u, 0u, 0u,
+                fx->out.prearm_result.check_epoch, 0.0f) == COMMAND_ACK_COMPLETED);
+  CHECK(fx->out.state_snapshot.arm_state == ARM_STATE_ARMED);
+}
+
+static void test_arm_first_reference_partial_dof_no_terminal(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx_arm_with_partial_control(&fx);
+  /* The ARM frame itself must not latch TERMINAL on a zero DOF mask. */
+  CHECK(fx.out.state_snapshot.failsafe_level != FAILSAFE_TERMINAL);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+  fx_run(&fx, 50000u); /* Still inside the absolute first-reference window. */
+  CHECK(fx.out.state_snapshot.failsafe_level != FAILSAFE_TERMINAL);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+  CHECK(fx.out.state_snapshot.arm_state == ARM_STATE_ARMED);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
+static void test_arm_first_reference_in_window_signs_permit(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx_arm_with_partial_control(&fx);
+  fx_run(&fx, 20000u);
+  /* The first real Control reference lands inside the configured window. */
+  fx.control.controllable_dof_mask = 0x0Fu;
+  fx_control_active(&fx, 71u);
+  CHECK(fx.out.state_snapshot.failsafe_level != FAILSAFE_TERMINAL);
+  CHECK(fx.out.state_snapshot.arm_state == ARM_STATE_ARMED);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
+static void test_arm_first_reference_window_expiry_inhibits_outputs(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx_arm_with_partial_control(&fx);
+  fx_run(&fx, 150000u); /* Past the absolute 100 ms window. */
+  CHECK(fx.out.state_snapshot.failsafe_level >= FAILSAFE_ACTION_REQUIRED);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+  /* A reference that arrives after the deadline may not resurrect a permit. */
+  fx.control.controllable_dof_mask = 0x0Fu;
+  fx_make_guidance(&fx, 72u, GUIDANCE_STATE_READY, GUIDANCE_REFERENCE_TRAJECTORY);
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
+static void test_established_control_link_loss_keeps_terminal(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx_arm(&fx);
+  fx_control_active(&fx, 73u);
+  fx_airborne(&fx);
+  /* Once the link is up a partial DOF mask is a real capability loss, not
+   * initialisation: the window must never soften the established rule. */
+  fx.control.controllable_dof_mask = 0x03u;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.state_snapshot.failsafe_level == FAILSAFE_TERMINAL);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+  fx_run(&fx, 50000u);
+  CHECK(fx.out.state_snapshot.failsafe_level == FAILSAFE_TERMINAL);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
+static void test_expired_reference_cannot_sign_in_window(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx_arm(&fx);
+  fx_make_guidance(&fx, 74u, GUIDANCE_STATE_READY, GUIDANCE_REFERENCE_TRAJECTORY);
+  fx.guidance_ttl_us = 0u; /* Expires at the same instant it is published. */
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+  /* Same reference, valid TTL: the rejection was freshness, not hidden state. */
+  fx.guidance_ttl_us = 100000u;
+  fx_control_active(&fx, 74u);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
+static void test_permit_rebind_keeps_revoked_watermark(void)
+{
+  Fx fx;
+  uint32_t active_epoch, revoked_epoch;
+
+  CHECK(fx_init(&fx));
+  fx_arm(&fx);
+  fx_control_active(&fx, 75u);
+  active_epoch = fx.out.actuation_permit.permit_epoch;
+  CHECK(active_epoch != 0u);
+
+  fx.feas.feasible = 0u;
+  fx.feas.reason_code = 2u;
+  fx.guidance.guidance_state = GUIDANCE_STATE_REJECTED;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.actuation_permit.permit_flags & PERMIT_FLAG_REVOKED);
+  revoked_epoch = fx.out.actuation_permit.permit_epoch;
+  CHECK(revoked_epoch > active_epoch);
+  CHECK(fx_step(&fx) == STATUS_OK); /* Revocation is published exactly once. */
+
+  /* Rebinding with a fresh reference must move forward, never reuse a watermark. */
+  fx_control_active(&fx, 76u);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) != 0u);
+  CHECK(fx.out.actuation_permit.permit_epoch > revoked_epoch);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
 int main(void)
 {
   struct {
@@ -1479,9 +1655,10 @@ int main(void)
     {"operator_home_survives_arm", test_operator_home_survives_arm},
     {"clear_empty_mission_requires_disarm", test_clear_empty_mission_requires_disarm},
     {"return_pauses_running_mission", test_return_pauses_running_mission},
-    {"post_mission_return_waits_for_hold", test_post_mission_return_waits_for_stable_hold},
-    {"post_mission_return_timeout_preserves_hold", test_post_mission_return_timeout_preserves_hold},
+    {"post_mission_return_starts_after_control_binding", test_post_mission_return_starts_after_control_binding},
+    {"post_mission_return_missing_control_cancels_safely", test_post_mission_return_missing_control_cancels_safely},
     {"duplicate_request_replay", test_duplicate_request_replays_ack},
+    {"dedup_full_and_expiry", test_dedup_full_and_expiry},
     {"geofence_required", test_geofence_required_rejects_outside_waypoint},
     {"mission_epoch_binding", test_mission_epoch_required_and_not_stale},
     {"first_reference_window", test_first_reference_window_expires_to_ground_stop},
@@ -1493,6 +1670,12 @@ int main(void)
     {"lost_contact_clears_landed", test_lost_contact_evidence_clears_landed},
     {"mission_arrival_3d", test_mission_arrival_requires_height_and_vertical_speed},
     {"takeoff_explicit_target", test_takeoff_publishes_explicit_home_relative_target},
+    {"arm_first_reference_partial_dof_no_terminal", test_arm_first_reference_partial_dof_no_terminal},
+    {"arm_first_reference_in_window_signs_permit", test_arm_first_reference_in_window_signs_permit},
+    {"arm_first_reference_window_expiry_inhibits_outputs", test_arm_first_reference_window_expiry_inhibits_outputs},
+    {"established_link_loss_keeps_terminal", test_established_control_link_loss_keeps_terminal},
+    {"expired_reference_cannot_sign_in_window", test_expired_reference_cannot_sign_in_window},
+    {"permit_rebind_keeps_revoked_watermark", test_permit_rebind_keeps_revoked_watermark},
 #ifdef M4_M5_INTEGRATION
     {"real_m4_m5_handshake_takeoff", test_real_m4_m5_ready_permit_active_takeoff},
     {"real_mission_vertical_fallback", test_real_mission_and_vertical_only_fallback},

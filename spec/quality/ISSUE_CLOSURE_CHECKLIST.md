@@ -1,6 +1,6 @@
 # Flight Issue 关闭检查清单
 
-只有全部适用项目完成，才允许从 VERIFIED 进入 CLOSED。S0/S1 和安全相关问题不得跳过独立复核。
+只有全部适用项目完成，才允许从 VERIFIED 进入 CLOSED。S0/S1 和安全相关问题不得跳过独立复核；作者侧三轮内部预审、CI PASS 或自测不能替代独立数学审查。
 
 ## A. 问题身份与根因
 
@@ -31,17 +31,17 @@
 
 - [ ] UNKNOWN、STALE、INVALID、数值失败、超时、容量/预算耗尽均按预期 fail-closed。
 - [ ] 已检查相邻边界、精确边界、±1 ULP、时间/epoch/origin/frame 变化（适用时）。
-- [ ] 数学推导有独立复核；采样 oracle 未被描述为形式化证明。
+- [ ] 数学推导有独立复核并取得明确书面结论；采样 oracle 未被描述为形式化证明。
 - [ ] 目标编译、Host/SIL、目标板、HIL、飞行证据范围清晰区分。
 - [ ] 没有把 Host/SIL 或 Cortex-M7 compile 误写为 H723 实机放行。
 
 ## E. 独立审核与关闭
 
 - [ ] 非修复作者复核测试证据。
-- [ ] 安全关键问题取得明确 APPROVED，而非 REVIEW_PENDING。
+- [ ] 安全关键问题取得独立审查者明确 APPROVED，而非 REVIEW_PENDING；修复作者不得作为唯一审查者。
 - [ ] Issue 描述和评论更新修复 SHA、复测 SHA、RUN_ID、日志 SHA256。
 - [ ] spec/09 中相关验收项状态同步（如适用）。
 - [ ] 关闭理由清楚，状态更新为 VERIFIED，再关闭 GitHub Issue。
 - [ ] 如果仍有 blocker、待用户决策或待硬件验证，保持 Open / BLOCKED，不得关闭。
 
-关闭评论必须简明写明：根因、修复、复测命令、实际计数、复测 commit、证据包、独立审核者和未覆盖范围。
+关闭评论必须简明写明：根因、修复、复测命令、实际计数、复测 commit、证据包、独立审核者身份与批准结论，以及未覆盖范围。

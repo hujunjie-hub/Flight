@@ -21,12 +21,20 @@ static void task_mpc_step(void)
         }
         runtime_data_unlock();
     }
+    mpc_note_worker(runtime_now_us(), ready);
     if (ready)
     {
         ControllerInput input;
+        Status status;
         runtime_data_controller_input(&worker_bundle, &input, runtime_now_us());
-        (void)control_outer_update(&input);
+        status = control_outer_update(&input);
         runtime_stats.mpc_updates++;
+        if (status == STATUS_OK) {
+            runtime_stats.mpc_solved++;
+            runtime_stats.mpc_covered_us += (uint64_t)TASK_MPC_PERIOD_MS * 1000u;
+        } else {
+            runtime_stats.mpc_rejected++;
+        }
     }
 }
 
@@ -35,6 +43,7 @@ static uint8_t task_mpc_stack[8192] __attribute__((aligned(8)));
 static void task_mpc_entry(void *parameter)
 {
     rt_tick_t last = rt_tick_get();
+    mpc_note_worker(runtime_now_us(), 2);
     (void)parameter;
     while (runtime_running()) {
         task_mpc_step();

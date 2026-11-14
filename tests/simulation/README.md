@@ -28,6 +28,10 @@ pwsh tests/simulation/run_sil.ps1 -FmtHilPort 14653 -FmtScenario Mission
 pwsh tests/simulation/run_sil.ps1 -FmtSimExe $sim -FmtHilPort 14653 -FmtScenario Mission
 ```
 
+脚本在编译前读取隔离实例的 `Content/Settings/settings.jason`，并检查请求的端口
+恰好对应一架原生 HIL 载具。[settle] 追踪包含指令/制导模式、Home 有效性与坐标、导航位置/速度/加速度、真值速度、
+M6 控制能力采样/发布时间、许可采样/发布时间、制导参考类型/状态/拒绝原因和约束编号。
+
 本机的软件渲染适配器编号为 1。`-FmtGraphicsAdapter` 可按目标 PC 调整，状态流仍按默认 350 ms 验收。
 
 隔离实例的配置和原生状态帧说明见 [联机仿真说明](../../doc/simulation/HIL_LINK.md)。
@@ -75,3 +79,24 @@ python tests/simulation/golden/generate_golden.py
 
 这些项在 `doc/simulation/HIL_LINK.md` 第 6 节按 `NOT_RUN` 记录，不得据本测试
 宣称 HIL 通过或飞行放行。
+
+
+## ENG-07 原生 FMT-SIM 验收（项目 Owner 本机执行）
+
+Land、Return、Mission 的 Windows 原生 FMT-SIM 动态验收由项目 Owner 在本机执行；远程 Agent 不代跑原生 FMT-SIM。Agent 负责代码修复、Host/SIL/CI、诊断和下一轮本机命令。
+
+正式操作手册（分支检查、隔离实例配置、350 ms 固定门槛、三场景顺序命令、manifest/日志 SHA256、验收条件和回传流程）见 [FMT-SIM 本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。
+
+注意：此处原生 FMT-SIM 与不启动引擎的 Host SIL 不同。不要将 650 ms 诊断运行报告为 350 ms 验收通过；不要提交 FMT-SIM 二进制或包含凭据的本机配置。
+
+
+## ENG-07 原生 FMT-SIM 正式批量入口
+
+从最新分支拉取后，在本地 Windows PowerShell 7 执行：
+
+```powershell
+$sim = (Resolve-Path 'build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FMT_SIM.exe').Path
+pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -FmtHilPort 14653 -FmtStateTimeoutMs 350 -FmtGraphicsAdapter 1 -FmtHover 0.62 -ConfirmLoopbackAddress
+```
+
+该入口一次构建 SIL、分别启动 Land/Return/Mission 的新 FMT-SIM 进程（场景退出后关闭或按 PID 强制结束并等待进程退出），生成 RUN_ID、Manifest、原始日志、SHA256SUMS 和回传 ZIP。正式关闭门禁固定目标分支 `opt/stage-02-m5-06-safety-validator`、UDP 14653、350 ms、hover 0.62、显式确认 127.0.0.1 loopback、干净工作区及本地 HEAD 与脚本刚 fetch 的 `origin/opt/stage-02-m5-06-safety-validator` 一致；更换端口或只跑单场景仅用于诊断，不具备 Issue 关闭资格。详细判据见 [本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。

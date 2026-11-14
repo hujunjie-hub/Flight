@@ -1,13 +1,11 @@
 """Build the existing SCons firmware with M4/M5 enabled, without changing defaults.
 
-The temporary rtconfig.h overlay is restored in finally. Function roots keep
-both production Ports in the link despite the BSP's empty application loop.
-No new thread, hardware output or automatic arming is installed by this check.
+The temporary rtconfig.h overlay is restored in finally. Explicit function
+roots ensure both production Ports are in the firmware. The check exercises
+compilation and linking only.
 
-Exit codes: 0 = firmware linked, 1 = build failed, 2 = BLOCKED because the
-RT-Thread packages tree (packages/SConscript) is not part of the repository.
-A blocked check is not a pass; it is reported separately so that CI and local
-evidence never claim a firmware link that did not happen.
+Exit codes: 0 = firmware linked, 1 = build failed, 2 = BLOCKED by missing
+or unverified RT-Thread packages.
 """
 from pathlib import Path
 import hashlib
@@ -19,12 +17,13 @@ import sys
 
 ROOT = next(p for p in Path(__file__).resolve().parents if (p/'SConstruct').is_file())
 OUT = ROOT / "build/m4_m5_implementation/target"
+SCOPE = "FIRMWARE_LINK_WITH_M4_M5_PORT_ROOTS"
 
 
 def blocked(reason):
     OUT.mkdir(parents=True, exist_ok=True)
     report = {"status": "BLOCKED", "blocked_reason": reason,
-        "scope": "FIRMWARE_LINK_WITH_M4_M5_PORT_ROOTS_NO_RUNTIME_DISPATCH",
+        "scope": SCOPE,
         "hardware_execution": "NOT_RUN"}
     (OUT / "target_build.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
@@ -90,15 +89,17 @@ def main():
                 (ROOT / name).write_bytes(previous)
             elif (ROOT / name).is_file():
                 (ROOT / name).unlink()  # exact, named generated output only
-    report = {"command": command, "exit_code": result.returncode,
+    exit_code = int(result.returncode != 0)
+    report = {"status": "FAIL" if exit_code else "PASS", "command": command,
+        "exit_code": exit_code, "scons_exit_code": result.returncode,
         "rtconfig_restored": header.read_bytes() == original,
         "rtconfig_sha256": hashlib.sha256(original).hexdigest(),
-        "scope": "FIRMWARE_LINK_WITH_M4_M5_PORT_ROOTS_NO_RUNTIME_DISPATCH",
+        "scope": SCOPE,
         "hardware_execution": "NOT_RUN"}
     (OUT / "target_build.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(result.stdout[-1600:] + result.stderr[-2400:])
     print(json.dumps(report, indent=2))
-    return result.returncode
+    return exit_code
 
 
 if __name__ == "__main__":

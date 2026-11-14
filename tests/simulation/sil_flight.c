@@ -51,6 +51,7 @@ static ClockInstant test_clock={0x12345678,1000000,1,0};
 static struct imu_raw_sample test_imu;
 static int test_imu_pending;
 static unsigned checks,failures,sem_calls,commits,inhibits;
+static struct dshot_stats sil_dshot_stats;
 static uint16_t simulated_rc_channels[16];
 static int imu_token, dshot_token, timebase_token, gnss_token_dev, rc_token_dev, radio_token_dev, wdt_token;
 static jmp_buf scheduler;
@@ -104,8 +105,12 @@ rt_err_t rt_device_open(rt_device_t d,rt_uint16_t f) {
 rt_err_t rt_device_close(rt_device_t d) { (void)d;return RT_EOK; }
 rt_err_t rt_device_control(rt_device_t d,int c,void *p) {
   if(d==(rt_device_t)&dshot_token) {
-    if(c==DSHOT_CTRL_GET_STATS && p) memset(p,0,sizeof(struct dshot_stats));
-    if(c==DSHOT_CTRL_STOP) ++inhibits;
+    if(c==DSHOT_CTRL_GET_STATS && p) *(struct dshot_stats *)p=sil_dshot_stats;
+    if(c==DSHOT_CTRL_STOP) {
+      ++inhibits;
+      sil_dshot_stats.active=0u;
+      sil_dshot_stats.pending=0u;
+    }
     return RT_EOK;
   }
   if(c==RT_SERIAL_CTRL_GET_CONFIG) ((struct serial_configure *)p)->baud_rate=115200u;
@@ -116,8 +121,14 @@ rt_err_t rt_device_control(rt_device_t d,int c,void *p) {
 rt_err_t rt_device_set_rx_indicate(rt_device_t d,rt_err_t (*cb)(rt_device_t,rt_size_t)) {
   (void)d;(void)cb;return RT_EOK;
 }
+/* Flight's own SIL scenario keeps these deterministic stubs. The Simulink
+ * adapter defines FLIGHT_HOST_REAL_TIME_SERVICE and links the firmware time
+ * service instead, so the MIL exercises systime.c rather than a stub. */
+#ifndef FLIGHT_HOST_REAL_TIME_SERVICE
 Status clock_read(ClockInstant *c) { if(!c)return STATUS_INVALID_ARGUMENT;*c=test_clock;return 0; }
+#endif
 uint64_t board_boot_id(void) { return test_clock.boot_id; }
+#ifndef FLIGHT_HOST_REAL_TIME_SERVICE
 Status clock_now_us(uint64_t *now) { *now=test_clock.monotonic_us;return 0; }
 Status time_get_mapping_status(uint32_t id,ClockDomainMappingStatus *s) { (void)id;memset(s,0,sizeof(*s));return STATUS_NOT_READY; }
 Status time_get_latest_pps(PpsCaptureEvent *out) { (void)out;return STATUS_NOT_READY; }
@@ -132,6 +143,7 @@ Status time_get_status(TimeServiceStatus *out) {
 Status time_get_local_discipline_status(LocalTimebaseDisciplineStatus *out) {
   memset(out,0,sizeof(*out));return STATUS_OK;
 }
+#endif
 rt_err_t rt_device_set_tx_complete(rt_device_t d,rt_err_t (*callback)(rt_device_t,void *)) {
   (void)d;test_tx_complete=callback;return RT_EOK;
 }
@@ -158,7 +170,13 @@ rt_ssize_t rt_device_write(rt_device_t d,int pos,const void *data,size_t length)
     return length == sizeof(bind) && memcmp(data, bind, sizeof(bind)) == 0 ? (rt_ssize_t)length : 0;
   }
   if(d==(rt_device_t)&dshot_token) {
-    if(length==8) ++commits;
+    if(length==8) {
+      ++commits;
+      sil_dshot_stats.frames++;
+      sil_dshot_stats.completed_frames=sil_dshot_stats.frames;
+      sil_dshot_stats.active=0u;
+      sil_dshot_stats.pending=0u;
+    }
     return (rt_ssize_t)length;
   }
   if(d==(rt_device_t)&radio_token_dev) {
@@ -772,6 +790,490 @@ static int start_fmt(const char *port_text, const char *hover_text)
   return 0;
 }
 
+
+static void sil_seed_live_fms_inputs(void)
+{
+  if (!runtime_data_lock(RT_WAITING_FOREVER)) {
+    CHECK(0);
+    return;
+  }
+  memset(&runtime_data.nav, 0, sizeof(runtime_data.nav));
+  memset(&runtime_data.nav_cap, 0, sizeof(runtime_data.nav_cap));
+  memset(&runtime_data.control_cap, 0, sizeof(runtime_data.control_cap));
+  memset(&runtime_data.actuator, 0, sizeof(runtime_data.actuator));
+  memset(&runtime_data.actuator_cap, 0, sizeof(runtime_data.actuator_cap));
+  runtime_data.nav.state_epoch = 7u;
+  runtime_data.nav.origin_id = 42u;
+  runtime_data.nav.core.valid_mask = 0xFFu;
+  runtime_data.nav.core.q_nb_wxyz[0] = 1.0f;
+  runtime_data.nav.core.position_std_m[0] = 0.2f;
+  runtime_data.nav.core.position_std_m[1] = 0.2f;
+  runtime_data.nav.core.position_std_m[2] = 0.3f;
+  runtime_data.nav.core.velocity_std_mps[0] = 0.05f;
+  runtime_data.nav.core.velocity_std_mps[1] = 0.05f;
+  runtime_data.nav.core.velocity_std_mps[2] = 0.05f;
+  runtime_data.nav.core.attitude_std_rad[0] = 0.01f;
+  runtime_data.nav.core.attitude_std_rad[1] = 0.01f;
+  runtime_data.nav.core.attitude_std_rad[2] = 0.02f;
+
+  runtime_data.nav_cap.state_epoch = 7u;
+  runtime_data.nav_cap.origin_id = 42u;
+  runtime_data.nav_cap.capability_mask = 0xFFu;
+  runtime_data.nav_cap.solution_state = 1u;
+  runtime_data.nav_cap.horizontal_position_std_m = 0.3f;
+  runtime_data.nav_cap.vertical_position_std_m = 0.4f;
+  runtime_data.nav_cap.velocity_std_mps = 0.1f;
+  runtime_data.nav_cap.heading_std_rad = 0.05f;
+
+  runtime_data.control_cap.control_layout_id = 1u;
+  runtime_data.control_cap.controllable_dof_mask = 0x0Fu;
+  runtime_data.control_cap.health_state = 2u;
+
+  runtime_data.actuator_cap.actuator_layout_id = PRODUCT_ACTUATOR_LAYOUT_ID;
+  runtime_data.actuator_cap.available_mask = 0x0Fu;
+  runtime_data.actuator_cap.controllable_dof_mask = 0x0Fu;
+  runtime_data.actuator.actuator_layout_id = PRODUCT_ACTUATOR_LAYOUT_ID;
+  runtime_data.actuator.available_mask = 0x0Fu;
+  runtime_data.actuator.fault_mask = 0u;
+
+  runtime_data.bundle_ready = 0u;
+  runtime_data.have_demand = 0u;
+  runtime_data.mission_slot_state = MISSION_SLOT_EMPTY;
+  runtime_data.have_operator = 0u;
+  runtime_data_unlock();
+}
+
+static void sil_refresh_live_fms_inputs(void)
+{
+  const uint64_t now = test_clock.monotonic_us;
+  if (!runtime_data_lock(RT_WAITING_FOREVER)) {
+    CHECK(0);
+    return;
+  }
+  runtime_data.nav.header = h(20u, now + 50000u);
+  runtime_data.nav.header.message_type = MSG_NAVIGATION_SNAPSHOT;
+  runtime_data.nav.header.sequence = ++sil_requests;
+  runtime_data.nav_cap.header = h(20u, now + 50000u);
+  runtime_data.nav_cap.header.message_type = MSG_NAVIGATION_CAPABILITY;
+  runtime_data.nav_cap.header.sequence = ++sil_requests;
+  runtime_data.control_cap.header = h(23u, now + 100000u);
+  runtime_data.control_cap.header.message_type = MSG_CONTROL_CAPABILITY;
+  runtime_data.control_cap.header.sequence = ++sil_requests;
+  runtime_data.actuator.header = h(24u, now + 50000u);
+  runtime_data.actuator.header.message_type = MSG_ACTUATOR_STATUS;
+  runtime_data.actuator.header.sequence = ++sil_requests;
+  runtime_data.actuator_cap.header = h(24u, now + 100000u);
+  runtime_data.actuator_cap.header.message_type = MSG_ACTUATOR_CAPABILITY;
+  runtime_data.actuator_cap.header.sequence = ++sil_requests;
+  runtime_data_unlock();
+  feed_operator(0u, 0.0f);
+}
+
+static int sil_command_has_ack(uint32_t request_id, uint16_t expected_state)
+{
+  for (uint16_t i = 0u; i < fms_output.command_result_count; ++i) {
+    if (fms_output.command_results[i].request_id == request_id)
+      return fms_output.command_results[i].ack_state == expected_state;
+  }
+  return 0;
+}
+
+/* Exercise the real request queue, mission owner, FMS policy and actuator owner
+ * in one process. Unlike the ramp-only smoke, this does not manufacture an
+ * FmsOutputView: the certificate must come from the live DISARM command path. */
+static void run_live_fms_ground_stop_task_smoke(void)
+{
+  uint32_t arm_request, disarm_request;
+  unsigned tick;
+  const unsigned commits_before = commits;
+
+  CHECK(!runtime_bench_inhibit_active());
+  sil_seed_live_fms_inputs();
+
+  /* The real LandDetector requires its acceleration filter warm-up and stable
+   * ground-contact dwell before PreArm can become READY. */
+  for (tick = 0u; tick < 430u; ++tick) {
+    test_clock.monotonic_us += 10000u;
+    sil_refresh_live_fms_inputs();
+    task_mission_step();
+  }
+  printf("live_fms_prearm: landed=%u prearm=%u\n",
+         fms_output.landed_state.state, fms_output.prearm_result.state);
+  CHECK(fms_output.landed_state.state == LANDED_STATE_LANDED);
+  CHECK(fms_output.prearm_result.state == PREARM_READY);
+  if (fms_output.prearm_result.state != PREARM_READY)
+    return;
+
+  sil_refresh_live_fms_inputs();
+  arm_request = submit_command_with_target(PRODUCT_CMD_ARM,
+      fms_output.prearm_result.check_epoch, 0.0f, NULL);
+  CHECK(arm_request != 0u);
+  test_clock.monotonic_us += 10000u;
+  sil_refresh_live_fms_inputs();
+  task_mission_step();
+  CHECK(sil_command_has_ack(arm_request, COMMAND_ACK_COMPLETED));
+  CHECK(fms_output.state_snapshot.arm_state == ARM_STATE_ARMED);
+  if (fms_output.state_snapshot.arm_state != ARM_STATE_ARMED)
+    return;
+
+  /* Give the production guidance update one owner cycle, then request a
+   * ground disarm while the LandDetector still reports LANDED. */
+  test_clock.monotonic_us += 10000u;
+  sil_refresh_live_fms_inputs();
+  task_mission_step();
+  test_clock.monotonic_us += 10000u;
+  sil_refresh_live_fms_inputs();
+  disarm_request = submit_command_with_target(PRODUCT_CMD_DISARM, 0u, 0.0f, NULL);
+  CHECK(disarm_request != 0u);
+  task_mission_step();
+
+  CHECK(sil_command_has_ack(disarm_request, COMMAND_ACK_COMPLETED));
+  CHECK(fms_output.state_snapshot.arm_state == ARM_STATE_DISARMED);
+  CHECK(fms_output.landed_state.state == LANDED_STATE_LANDED);
+  CHECK(fms_output.actuation_permit.permit_flags == PERMIT_FLAG_REVOKED);
+  CHECK(fms_output.actuation_permit.reason_code == FMS_PERMIT_REVOKE_REASON_COMMAND_DISARM);
+  CHECK(runtime_data.bundle.ground_stop_certificate.header.message_type ==
+        MSG_GROUND_STOP_CERTIFICATE);
+  CHECK(runtime_data.bundle.ground_stop_certificate.authority_epoch ==
+        fms_output.actuation_permit.authority_epoch);
+  CHECK(runtime_data.bundle.ground_stop_certificate.directive_epoch ==
+        fms_output.actuation_permit.directive_epoch);
+
+  /* The real actuator task consumes the certificate published by the real
+   * mission task and must produce a terminal zero-target receipt. */
+  for (tick = 0u; tick < 180u &&
+       runtime_data.receipt.result_code != ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED; ++tick) {
+    test_clock.monotonic_us += 1000u;
+    turn(task_actuator_entry);
+  }
+  CHECK(commits >= commits_before + 1u);
+  CHECK(actuator_guard_state() == ACTUATOR_GUARD_DISARMED);
+  CHECK(runtime_data.receipt.result_code == ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED);
+  CHECK(runtime_data.receipt.header.message_type == MSG_ACTUATOR_COMMIT_RECEIPT);
+  CHECK(runtime_data.receipt.committed_demand.motor_thrust_n[0] == 0.0f);
+  CHECK((runtime_data.receipt.limit_flags & ACTUATOR_GROUND_STOP_OVERRUN_FLAG) == 0u);
+  printf("live_fms_ground_stop: landed/disarm certificate -> actuator zero receipt\n");
+}
+
+
+
+static void sil_publish_late_first_reference(void)
+{
+  const uint64_t now = test_clock.monotonic_us;
+  GuidanceStatus *guidance = &plan_bundle.guidance.guidance_status;
+  GuidanceFeasibility *feasibility = &plan_bundle.guidance.feasibility;
+  memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
+  guidance->header = h(22u, now + 100000u);
+  guidance->header.message_type = MSG_GUIDANCE_STATUS;
+  guidance->header.sequence = ++sil_requests;
+  guidance->reference_id = 772u;
+  guidance->reference_epoch = 72u;
+  guidance->state_epoch = runtime_data.nav.state_epoch;
+  guidance->origin_id = runtime_data.nav.origin_id;
+  guidance->authority_epoch = fms_output.state_snapshot.authority_epoch;
+  guidance->directive_epoch = fms_output.state_snapshot.directive_epoch;
+  guidance->mission_epoch = fms_output.mission_status.mission_epoch;
+  guidance->current_item_id = fms_output.mission_status.current_item_id;
+  guidance->execution_token = fms_output.mission_status.execution_token;
+  guidance->guidance_state = GUIDANCE_STATE_READY;
+  guidance->reference_kind = GUIDANCE_REFERENCE_TRAJECTORY;
+  guidance->reference_expires_at_us = now + 100000u;
+
+  feasibility->header = h(22u, now + 100000u);
+  feasibility->header.message_type = MSG_GUIDANCE_FEASIBILITY;
+  feasibility->header.sequence = ++sil_requests;
+  feasibility->reference_id = guidance->reference_id;
+  feasibility->reference_epoch = guidance->reference_epoch;
+  feasibility->feasible = 1u;
+  feasibility->reason_code = 0u;
+}
+
+/* Mirror the M4 first-reference timeout case through the actual mission owner:
+ * keep the vehicle on the ground, withhold every guidance reference for the
+ * absolute 100 ms window, then deliver a valid reference exactly at expiry.
+ * The late reference must not resurrect the permit; M4 must publish the
+ * ground-disarm certificate and the real M7 owner must consume it. */
+static void run_live_fms_first_reference_task_smoke(void)
+{
+  uint32_t arm_request;
+  unsigned tick;
+  const unsigned commits_before = commits;
+
+  CHECK(!runtime_bench_inhibit_active());
+  sil_seed_live_fms_inputs();
+  for (tick = 0u; tick < 430u; ++tick) {
+    test_clock.monotonic_us += 10000u;
+    sil_refresh_live_fms_inputs();
+    /* Match the FMS unit fixture: no reference is available before ARM. */
+    memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
+    task_mission_step();
+    memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
+  }
+  printf("live_first_reference_prearm: landed=%u prearm=%u\n",
+         fms_output.landed_state.state, fms_output.prearm_result.state);
+  CHECK(fms_output.landed_state.state == LANDED_STATE_LANDED);
+  CHECK(fms_output.prearm_result.state == PREARM_READY);
+  if (fms_output.prearm_result.state != PREARM_READY)
+    return;
+
+  /* Pre-arm guidance may have produced a hold candidate. The first-reference
+   * clock starts at ARM, so discard pre-arm output before the ARM owner turn. */
+  memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
+  sil_refresh_live_fms_inputs();
+  arm_request = submit_command_with_target(PRODUCT_CMD_ARM,
+      fms_output.prearm_result.check_epoch, 0.0f, NULL);
+  CHECK(arm_request != 0u);
+  test_clock.monotonic_us += 10000u;
+  sil_refresh_live_fms_inputs();
+  task_mission_step();
+  memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
+  CHECK(sil_command_has_ack(arm_request, COMMAND_ACK_COMPLETED));
+  CHECK(fms_output.state_snapshot.arm_state == ARM_STATE_ARMED);
+  if (fms_output.state_snapshot.arm_state != ARM_STATE_ARMED)
+    return;
+
+  /* Ten owner turns reach the 100 ms boundary. Discard generated guidance
+   * after each turn so FMS has not received a usable first reference. */
+  for (tick = 0u; tick < 10u; ++tick) {
+    test_clock.monotonic_us += 10000u;
+    sil_refresh_live_fms_inputs();
+    memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
+    task_mission_step();
+    memset(&plan_bundle.guidance, 0, sizeof(plan_bundle.guidance));
+  }
+  CHECK(fms_output.state_snapshot.arm_state == ARM_STATE_ARMED);
+  CHECK((fms_output.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
+
+  /* The timeout uses a strict > comparison; deliver at 110 ms, one 10 ms
+   * owner period after the 100 ms deadline. */
+  test_clock.monotonic_us += 10000u;
+  sil_refresh_live_fms_inputs();
+  sil_publish_late_first_reference();
+  task_mission_step();
+
+  CHECK(fms_output.state_snapshot.arm_state == ARM_STATE_DISARMED);
+  CHECK(fms_output.landed_state.state == LANDED_STATE_LANDED);
+  CHECK(fms_output.actuation_permit.permit_flags == PERMIT_FLAG_REVOKED);
+  CHECK(fms_output.actuation_permit.reason_code ==
+        FMS_PERMIT_REVOKE_REASON_FIRST_REFERENCE_GROUND_DISARM);
+  CHECK(fms_output.decision_event.decision_code == DECISION_FORCE_SAFE_ACTION);
+  CHECK(fms_output.decision_event.reason_code ==
+        FMS_DECISION_REASON_FIRST_REFERENCE_GROUND_DISARM);
+  CHECK(runtime_data.bundle.ground_stop_certificate.header.message_type ==
+        MSG_GROUND_STOP_CERTIFICATE);
+  CHECK(runtime_data.bundle.ground_stop_certificate.lifecycle ==
+        ACTUATOR_GROUND_STOP_LIFECYCLE_LANDED);
+  CHECK(runtime_data.bundle.ground_stop_certificate.authority_epoch ==
+        fms_output.actuation_permit.authority_epoch);
+  CHECK(runtime_data.bundle.ground_stop_certificate.directive_epoch ==
+        fms_output.actuation_permit.directive_epoch);
+
+  for (tick = 0u; tick < 180u &&
+       runtime_data.receipt.result_code != ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED; ++tick) {
+    test_clock.monotonic_us += 1000u;
+    turn(task_actuator_entry);
+  }
+  CHECK(commits >= commits_before + 1u);
+  CHECK(actuator_guard_state() == ACTUATOR_GUARD_DISARMED);
+  CHECK(runtime_data.receipt.result_code == ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED);
+  CHECK(runtime_data.receipt.header.message_type == MSG_ACTUATOR_COMMIT_RECEIPT);
+  CHECK(runtime_data.receipt.committed_demand.motor_thrust_n[0] == 0.0f);
+  CHECK((runtime_data.receipt.limit_flags & ACTUATOR_GROUND_STOP_OVERRUN_FLAG) == 0u);
+  printf("live_fms_first_reference: late reference -> ground-disarm certificate -> actuator zero receipt\n");
+}
+
+static void run_ground_stop_task_smoke(void)
+{
+  FmsOutputView output;
+  ActuationPermit active_permit, permit;
+  GroundStopCertificate certificate, invalid_certificate;
+  ActuatorDemand demand;
+  uint64_t now = test_clock.monotonic_us;
+  uint64_t stop_start = 0u;
+  unsigned commits_before = commits;
+  unsigned tick;
+
+  CHECK(!runtime_bench_inhibit_active());
+
+  /* First prove that an invalid ground-stop candidate cannot starve a valid
+   * M6 demand. The guard must reject the candidate and let this 5 N demand
+   * reach the normal frame boundary. */
+  memset(&active_permit, 0, sizeof(active_permit));
+  active_permit.header = h(SOURCE_M4, now + 5000u);
+  active_permit.header.message_type = MSG_ACTUATION_PERMIT;
+  active_permit.permit_epoch = 1u;
+  active_permit.authority_epoch = 5u;
+  active_permit.directive_epoch = 3u;
+  active_permit.state_epoch = 1u;
+  active_permit.reference_epoch = 1u;
+  active_permit.permit_flags = PERMIT_SCOPE_CONTROL_ACTIVE;
+  active_permit.output_policy_id = 2u;
+  active_permit.permit_expires_at_us = now + 200000u;
+
+  memset(&demand, 0, sizeof(demand));
+  demand.header = h(SOURCE_M6, now + 5000u);
+  demand.header.message_type = MSG_ACTUATOR_DEMAND;
+  demand.header.frame_id = FRAME_BODY_FRD;
+  demand.actuator_layout_id = PRODUCT_ACTUATOR_LAYOUT_ID;
+  demand.valid_channel_mask = 15u;
+  demand.permit_epoch = active_permit.permit_epoch;
+  demand.directive_epoch = active_permit.directive_epoch;
+  demand.authority_epoch = active_permit.authority_epoch;
+  demand.state_epoch = active_permit.state_epoch;
+  demand.reference_epoch = active_permit.reference_epoch;
+  demand.control_sequence = 1u;
+  demand.demand_expires_at_us = now + 5000u;
+  demand.demand.valid_mask = 15u;
+  for (unsigned motor = 0; motor < 4u; ++motor)
+    demand.demand.motor_thrust_n[motor] = 5.0f;
+
+  memset(&invalid_certificate, 0, sizeof(invalid_certificate));
+  invalid_certificate.header = h(SOURCE_M4, now + 5000u);
+  invalid_certificate.header.message_type = MSG_GROUND_STOP_CERTIFICATE;
+  invalid_certificate.stop_code = ACTUATOR_GROUND_STOP_CODE_ZERO;
+  invalid_certificate.lifecycle = LANDED_STATE_IN_AIR;
+  invalid_certificate.ramp_nps = 100.0f;
+  invalid_certificate.authority_epoch = active_permit.authority_epoch;
+  invalid_certificate.directive_epoch = active_permit.directive_epoch;
+  invalid_certificate.certificate_expires_at_us = now + 200000u;
+
+  CHECK(runtime_data_lock(0));
+  runtime_data.bundle.permit = active_permit;
+  runtime_data.bundle.ground_stop_certificate = invalid_certificate;
+  runtime_data.bundle_ready = 1u;
+  runtime_data.demand = demand;
+  runtime_data.have_demand = 1u;
+  runtime_data_unlock();
+
+  turn(task_actuator_entry);
+  CHECK(commits == commits_before + 1u);
+  CHECK(runtime_data.receipt.result_code == ACTUATOR_RECEIPT_COMMITTED);
+  CHECK(fabsf(runtime_data.receipt.committed_demand.motor_thrust_n[0] - 5.0f) < 1e-3f);
+  CHECK(actuator_guard_state() == ACTUATOR_GUARD_ACTIVE);
+
+  /* Now revoke the active permit and publish a valid landed/disarmed
+   * certificate through the same helper used by task_mission_step(). */
+  memset(&output, 0, sizeof(output));
+  memset(&permit, 0, sizeof(permit));
+  permit.header = h(SOURCE_M4, now + 5000u);
+  permit.header.message_type = MSG_ACTUATION_PERMIT;
+  permit.permit_epoch = 2u;
+  permit.authority_epoch = 5u;
+  permit.directive_epoch = 3u;
+  permit.state_epoch = 1u;
+  permit.reference_epoch = 1u;
+  permit.permit_flags = PERMIT_FLAG_REVOKED;
+  permit.reason_code = FMS_PERMIT_REVOKE_REASON_COMMAND_DISARM;
+  permit.output_policy_id = 2u;
+  permit.permit_expires_at_us = now + 200000u;
+
+  output.actuation_permit = permit;
+  output.decision_event.header = h(SOURCE_M4, now + 5000u);
+  output.decision_event.header.message_type = MSG_DECISION_EVENT;
+  output.decision_event.decision_code = DECISION_ACCEPT;
+  output.decision_event.reason_code = 0u;
+  output.landed_state.header = h(SOURCE_M4, now + 5000u);
+  output.landed_state.header.message_type = MSG_LANDED_STATE_SNAPSHOT;
+  output.landed_state.state = LANDED_STATE_LANDED;
+  output.state_snapshot.header = h(SOURCE_M4, now + 5000u);
+  output.state_snapshot.header.message_type = MSG_FMS_STATE_SNAPSHOT;
+  output.state_snapshot.arm_state = ARM_STATE_DISARMED;
+
+  CHECK(task_mission_update_ground_stop_certificate(&output, now, 1) == STATUS_OK);
+  certificate = plan_bundle.ground_stop_certificate;
+  {
+    FmsOutputView invalid_output = output;
+    const uint64_t certificate_expiry = certificate.certificate_expires_at_us;
+    CHECK(task_mission_update_ground_stop_certificate(NULL, now + 1000u, 0) ==
+              STATUS_NOT_READY);
+    CHECK(plan_bundle.ground_stop_certificate.header.sequence == certificate.header.sequence &&
+          plan_bundle.ground_stop_certificate.certificate_expires_at_us == certificate_expiry);
+    invalid_output.landed_state.state = LANDED_STATE_IN_AIR;
+    CHECK(task_mission_update_ground_stop_certificate(&invalid_output, now + 2000u, 1) ==
+              STATUS_NOT_PERMITTED);
+    CHECK(plan_bundle.ground_stop_certificate.header.message_type == 0u &&
+          plan_bundle.ground_stop_certificate.certificate_expires_at_us == 0u);
+    CHECK(task_mission_update_ground_stop_certificate(&output, now, 1) == STATUS_OK);
+    certificate = plan_bundle.ground_stop_certificate;
+    CHECK(task_mission_update_ground_stop_certificate(NULL, certificate_expiry + 1u, 0) ==
+              STATUS_NOT_READY);
+    CHECK(plan_bundle.ground_stop_certificate.header.message_type == 0u &&
+          plan_bundle.ground_stop_certificate.certificate_expires_at_us == 0u);
+    CHECK(task_mission_update_ground_stop_certificate(&output, now, 1) == STATUS_OK);
+    certificate = plan_bundle.ground_stop_certificate;
+  }
+  CHECK(actuator_update_permit(&permit, now) == STATUS_OK);
+  CHECK(certificate.header.message_type == MSG_GROUND_STOP_CERTIFICATE);
+
+  CHECK(runtime_data_lock(0));
+  runtime_data.bundle.permit = permit;
+  runtime_data.bundle.ground_stop_certificate = certificate;
+  runtime_data.have_demand = 0u;
+  runtime_data_unlock();
+
+  /* Exercise the real task owner from a non-zero 5 N frame through the
+   * bounded 100 N/s ramp to the confirmed zero-target receipt. */
+  turn(task_actuator_entry);
+  stop_start = actuator_guard_ground_stop_start_us();
+  for (tick = 0u; tick < 180u &&
+       runtime_data.receipt.result_code != ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED; ++tick) {
+    test_clock.monotonic_us += 1000u;
+    turn(task_actuator_entry);
+  }
+
+  CHECK(commits >= commits_before + 3u);
+  CHECK(stop_start != 0u);
+  CHECK(actuator_guard_state() == ACTUATOR_GUARD_DISARMED);
+  CHECK(runtime_data.receipt.result_code == ACTUATOR_RECEIPT_ZERO_TARGET_APPLIED);
+  CHECK(runtime_data.receipt.header.message_type == MSG_ACTUATOR_COMMIT_RECEIPT);
+  CHECK(runtime_data.receipt.committed_demand.motor_thrust_n[0] == 0.0f);
+  CHECK(runtime_data.receipt.estimated_apply_time_us >=
+        runtime_data.receipt.commit_time_us);
+  CHECK(runtime_data.receipt.estimated_apply_time_us - stop_start <=
+        ACTUATOR_GROUND_STOP_MAX_APPLY_US);
+  CHECK((runtime_data.receipt.limit_flags & ACTUATOR_GROUND_STOP_OVERRUN_FLAG) == 0u);
+}
+
+/* RT-SIL-04: the one-slot handoff must reject another producer until the
+ * FMS call has finished with its borrowed mission candidate. */
+static void run_mission_staging_smoke(void)
+{
+  MissionUploadCandidate first = {0}, second;
+  const MissionUploadCandidate *borrowed;
+  first.header = h(SOURCE_GCS, test_clock.monotonic_us + 200000u);
+  first.header.message_type = MSG_MISSION_UPLOAD_CANDIDATE;
+  first.transaction_id = 11u;
+  second = first;
+  second.transaction_id = 12u;
+
+  CHECK(runtime_submit_mission(&first) == STATUS_OK);
+  CHECK(runtime_data_lock(RT_WAITING_FOREVER));
+  borrowed = runtime_data_claim_mission();
+  runtime_data_unlock();
+  CHECK(borrowed == &runtime_data.mission);
+  CHECK(borrowed != NULL && borrowed->transaction_id == first.transaction_id);
+  CHECK(runtime_submit_mission(&second) == STATUS_BUFFER_FULL);
+  CHECK(borrowed != NULL && borrowed->transaction_id == first.transaction_id);
+  CHECK(runtime_data_lock(RT_WAITING_FOREVER));
+  CHECK(runtime_data_claim_mission() == NULL);
+  runtime_data_unlock();
+
+  runtime_data_release_mission();
+  CHECK(runtime_submit_mission(&second) == STATUS_OK);
+  CHECK(runtime_data_lock(RT_WAITING_FOREVER));
+  borrowed = runtime_data_claim_mission();
+  runtime_data_unlock();
+  CHECK(borrowed != NULL && borrowed->transaction_id == second.transaction_id);
+  runtime_data_release_mission();
+  CHECK(runtime_data_lock(RT_WAITING_FOREVER));
+  CHECK(runtime_data_claim_mission() == NULL);
+  runtime_data_unlock();
+
+  CHECK(runtime_submit_mission(&first) == STATUS_OK);
+  task_mission_step();
+  CHECK(runtime_submit_mission(&second) == STATUS_OK);
+}
+
 int main(int argc, char **argv)
 {
   unsigned takeoff_commits = 0, takeoff_completed_ms = 0;
@@ -782,6 +1284,8 @@ int main(int argc, char **argv)
   uint16_t terminal_command = PRODUCT_CMD_LAND;
   int mission_scenario = 0;
   int return_accepted_in_hold = 0;
+  int land_position_reference_seen = 0;
+  int return_mode_seen = 0;
   float peak_height = 0;
   float hold_error = 0;
   float near_ground_max_down = 0;
@@ -791,7 +1295,14 @@ int main(int argc, char **argv)
   int motion_request_failed = 0;
   RuntimeStats stats;
 
-  if (argc != 1) {
+  const int mission_staging_smoke = argc == 2 && !strcmp(argv[1], "--mission-staging-smoke");
+  const int ground_stop_smoke = argc == 2 && !strcmp(argv[1], "--ground-stop-smoke");
+  const int live_fms_ground_stop_smoke =
+      argc == 2 && !strcmp(argv[1], "--live-fms-ground-stop-smoke");
+  const int live_fms_first_reference_ground_stop_smoke =
+      argc == 2 && !strcmp(argv[1], "--live-fms-first-reference-ground-stop-smoke");
+  if (argc != 1 && !mission_staging_smoke && !ground_stop_smoke && !live_fms_ground_stop_smoke &&
+      !live_fms_first_reference_ground_stop_smoke) {
 #ifdef FLIGHT_GROUND_STATION
     if (argc == 6 && !strcmp(argv[3], "Ground")) {
       ground_online = 1;
@@ -845,10 +1356,40 @@ int main(int argc, char **argv)
     fmt_sim_host_close();
     return 1;
   }
+  if (mission_staging_smoke) {
+    run_mission_staging_smoke();
+    runtime_shutdown();
+    printf("sil_mission_staging: %u checks, %u failures\n", checks, failures);
+    return failures ? 1 : 0;
+  }
+  if (live_fms_first_reference_ground_stop_smoke) {
+    run_live_fms_first_reference_task_smoke();
+    runtime_shutdown();
+    printf("sil_live_fms_first_reference: %u checks, %u failures, commits=%u\\n",
+           checks, failures, commits);
+    return failures ? 1 : 0;
+  }
+  if (live_fms_ground_stop_smoke) {
+    run_live_fms_ground_stop_task_smoke();
+    runtime_shutdown();
+    printf("sil_live_fms_ground_stop: %u checks, %u failures, commits=%u\\n",
+           checks, failures, commits);
+    return failures ? 1 : 0;
+  }
+  if (ground_stop_smoke) {
+    run_ground_stop_task_smoke();
+    runtime_shutdown();
+    printf("sil_ground_stop_smoke: %u checks, %u failures, commits=%u inhibits=%u\\n",
+           checks, failures, commits, inhibits);
+    return failures ? 1 : 0;
+  }
   if (fmt_online)
     sensor_imu_use_external_source(true);
 
-  unsigned duration_ms = mission_scenario ? 36000u : fmt_online ? 24000u : 8000u;
+  /* Leave enough simulated time for the bounded contact probe and the
+   * unchanged 2 s LandDetector dwell. This changes only the scenario horizon,
+   * not any velocity, contact, ACK, or disarm acceptance threshold. */
+  unsigned duration_ms = mission_scenario ? 44000u : fmt_online ? 32000u : 8000u;
 #ifdef FLIGHT_GROUND_STATION
   if (ground_online)
     duration_ms = 24u * 60u * 60u * 1000u;
@@ -928,6 +1469,11 @@ int main(int argc, char **argv)
     if (tick % 40u != 0u)
       continue;
     turn(task_mission_entry);
+    if (runtime_data.fms.flight_mode == FLIGHT_MODE_AUTO_LAND &&
+        fms_output.directive.guidance_mode_code == PRODUCT_GUIDANCE_MODE_POS_HOLD)
+      land_position_reference_seen = 1;
+    if (runtime_data.fms.flight_mode == FLIGHT_MODE_AUTO_RETURN)
+      return_mode_seen = 1;
     turn(task_mpc_entry);
     if (ms % 100u == 0u)
       task_supervisor_step();
@@ -1025,17 +1571,35 @@ int main(int argc, char **argv)
         const NavStateCore *nav = &runtime_data.nav.core;
         const ControlCapability *control = &runtime_data.control_cap;
         const ActuationPermit *permit = &fms_output.actuation_permit;
-        printf("[settle] t=%u mode=%u contact=%u landed=%u height=%.4f "
+        const ProductHomeTargetSnapshot *home = &fms_output.directive.payload.home;
+        printf("[settle] t=%u mode=%u op=%u guide_mode=%u home_valid=%u home=%.3f,%.3f,%.3f "
+               "contact=%u landed=%u height=%.4f p=%.4f,%.4f,%.4f "
                "v=%.4f,%.4f,%.4f a=%.4f,%.4f,%.4f truth_v=%.4f,%.4f,%.4f "
-               "scope=%u control_sample=%llu permit_sample=%llu\n", ms,
-               runtime_data.fms.flight_mode, flight_sil_ground_contact(), fms_output.landed_state.state,
-               (double)fmt_height(), (double)nav->velocity_ned_mps[0],
+               "scope=%u control_sample=%llu control_publish=%llu permit_sample=%llu permit_publish=%llu "
+               "ref_kind=%u ref_epoch=%u guidance=%u/%u feas_reason=%u constraint=%u\n", ms,
+               (unsigned)runtime_data.fms.flight_mode,
+               (unsigned)fms_output.directive.operation_code,
+               (unsigned)fms_output.directive.guidance_mode_code, (unsigned)home->validity,
+               (double)home->position_ned_m[0], (double)home->position_ned_m[1],
+               (double)home->position_ned_m[2], flight_sil_ground_contact(),
+               (unsigned)fms_output.landed_state.state, (double)fmt_height(),
+               (double)nav->position_ned_m[0], (double)nav->position_ned_m[1],
+               (double)nav->position_ned_m[2], (double)nav->velocity_ned_mps[0],
                (double)nav->velocity_ned_mps[1], (double)nav->velocity_ned_mps[2],
                (double)nav->acceleration_ned_mps2[0], (double)nav->acceleration_ned_mps2[1],
                (double)nav->acceleration_ned_mps2[2], (double)fmt_state.velocity_ned_mps[0],
                (double)fmt_state.velocity_ned_mps[1], (double)fmt_state.velocity_ned_mps[2],
-               permit->permit_flags, (unsigned long long)control->header.timestamp_sample_us,
-               (unsigned long long)permit->header.timestamp_sample_us);
+               (unsigned)permit->permit_flags,
+               (unsigned long long)control->header.timestamp_sample_us,
+               (unsigned long long)control->header.timestamp_publish_us,
+               (unsigned long long)permit->header.timestamp_sample_us,
+               (unsigned long long)permit->header.timestamp_publish_us,
+               (unsigned)plan_bundle.guidance.guidance_status.reference_kind,
+               (unsigned)plan_bundle.guidance.guidance_status.reference_epoch,
+               (unsigned)plan_bundle.guidance.guidance_status.guidance_state,
+               (unsigned)plan_bundle.guidance.guidance_status.reason_code,
+               (unsigned)plan_bundle.guidance.feasibility.reason_code,
+               (unsigned)plan_bundle.guidance.feasibility.violated_constraint_id);
       }
       /* Keep the vehicle parked through alignment and the first control handshake. */
       fmt_send_committed(takeoff_ack == COMMAND_ACK_ACCEPTED ||
@@ -1129,6 +1693,8 @@ int main(int argc, char **argv)
            (double)near_ground_max_down);
     printf("[fmt] wall timeout %.0f ms, longest successful state gap %.1f ms\n",
            (double)fmt_wall_timeout_us / 1000.0, (double)fmt_longest_gap_us / 1000.0);
+    printf("[fmt] land_position_reference_seen=%d return_mode_seen=%d\n",
+           land_position_reference_seen, return_mode_seen);
     CHECK(fmt_active_frames > 0u);
     CHECK(!fmt_timeout);
     CHECK(peak_height >= 1.8f);
@@ -1137,6 +1703,10 @@ int main(int argc, char **argv)
     CHECK(near_ground_max_down > 0.0f && near_ground_max_down <= 0.40f);
     CHECK(terminal_ack == COMMAND_ACK_COMPLETED);
     CHECK(disarm_ack == COMMAND_ACK_COMPLETED);
+    if (terminal_command == PRODUCT_CMD_LAND)
+      CHECK(land_position_reference_seen);
+    if (terminal_command == PRODUCT_CMD_RETURN)
+      CHECK(return_mode_seen);
     CHECK(runtime_data.fms.arm_state == ARM_STATE_DISARMED);
     CHECK(flight_sil_ground_contact() == GROUND_CONTACT_CONTACT);
     if (terminal_command == PRODUCT_CMD_RETURN) {

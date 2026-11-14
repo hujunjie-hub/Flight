@@ -34,6 +34,23 @@ jobs:
         run: |
           python -m py_compile tools/check_layout.py tests/algorithms/run_tests.py tests/algorithms/test_source_lock.py middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/source_lock.py tests/runtime/run_tests.py tests/runtime/verify_firmware.py tests/drivers/check_drivers.py tools/guidance/generate_kinodynamic_primitives.py tests/guidance/verify_norm_bounds.py tests/guidance/verify_dynamic_prediction.py tests/guidance/verify_curve_eval_gap.py
 
+      - name: Parse local PowerShell regression runners
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($path in @('tests/simulation/run_sil.ps1', 'tests/simulation/run_fmt_sim_regression.ps1')) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path).Path, [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) {
+              foreach ($errorRecord in $errors) {
+                Write-Error "${path}:$($errorRecord.Extent.StartLineNumber): $($errorRecord.Message)"
+              }
+              exit 1
+            }
+            Write-Host "PowerShell parse PASS: $path"
+          }
+
       - name: Check source layout
         run: python tools/check_layout.py
 
@@ -83,6 +100,8 @@ jobs:
       - name: Compile M4/M5 production sources for Cortex-M7
         run: bash tests/guidance/arm_build_check.sh
 
+      - name: Check FP model audit mutation guards
+        run: python tests/guidance/check_consumer_fp_contraction.py --self-test
       - name: Check consumer floating-point contraction
         run: python tests/guidance/check_consumer_fp_contraction.py
 
@@ -209,5 +228,8 @@ jobs:
         if: always()
         with:
           name: abi-evidence
-          path: tests/abi/evidence/
+          path: |
+            tests/abi/evidence/
+            middleware/contracts/product_contract/abi_lock.h
+            spec/validation/abi_layout.json
 

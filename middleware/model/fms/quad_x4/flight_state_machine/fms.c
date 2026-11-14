@@ -387,14 +387,14 @@ static uint8_t fms_dedup_lookup(FmsEngine *e, const OperationRequest *req, uint6
   *out = NULL;
   for (i = 0u; i < FMS_DEDUP_CAPACITY; ++i) {
     FmsDedupEntry *d = &e->dedup[i];
-    if (d->used == 0u) {
+    if (d->request_id == 0u) {
       if (free_slot == NULL) {
         free_slot = d;
       }
       continue;
     }
     if (now > d->seen_us && (now - d->seen_us) > FMS_DEDUP_TTL_US) {
-      d->used = 0u;
+      d->request_id = 0u;
       if (free_slot == NULL) {
         free_slot = d;
       }
@@ -512,7 +512,6 @@ static void fms_handle_request(FmsEngine *e, const FmsInputs *in,
   }
 
   if (slot != NULL) {
-    slot->used = 1u;
     slot->request_id = req->request_id;
     slot->session = req->source_session_id;
     slot->source = req->header.source_id;
@@ -607,7 +606,7 @@ static void fms_handle_request(FmsEngine *e, const FmsInputs *in,
       break;
     }
     e->flight.arm_state = ARM_STATE_DISARMING;
-    fms_permit_revoke(e, 20u /* CANCELLED */);
+    fms_permit_revoke(e, FMS_PERMIT_REVOKE_REASON_COMMAND_DISARM);
     e->authority.owner = AUTHORITY_NONE;
     e->authority.latched = 0u;
     e->authority.source_id = 0u;
@@ -765,7 +764,7 @@ static void fms_handle_request(FmsEngine *e, const FmsInputs *in,
     } else if (e->mission.state == MISSION_STATE_COMPLETED &&
                e->mission.result_code == MISSION_RESULT_SUCCESS &&
                e->flight.flight_mode == FLIGHT_MODE_POS_HOLD) {
-      t->preparing_return = FMS_RETURN_STABILIZE_HOLD;
+      t->preparing_return = FMS_RETURN_WAIT_CONTROL_BINDING;
     }
     if (t->preparing_return == 0u) {
       (void)fms_mode_transition(e, FLIGHT_MODE_AUTO_RETURN, in, 1u);
@@ -902,7 +901,7 @@ static void fms_tracker_ack(FmsEngine *e, FmsOutputView *out, const FmsTracker *
 {
   for (unsigned i = 0; i < FMS_DEDUP_CAPACITY; ++i) {
     FmsDedupEntry *entry = &e->dedup[i];
-    if (entry->used != 0u && entry->request_id == t->request_id &&
+    if (entry->request_id != 0u && entry->request_id == t->request_id &&
         entry->session == t->session && entry->source == t->source) {
       entry->ack_state = state;
       entry->reason = reason;
@@ -925,18 +924,11 @@ static uint8_t fms_return_control_is_bound(const FmsEngine *e, const FmsInputs *
       e->permit.authority_epoch != e->authority.epoch ||
       e->permit.expires_at_us <= in->now_us ||
       in->control->header.source_id != SOURCE_M6 ||
-      in->control->header.timestamp_sample_us < e->permit.binding_since_us)
+      /* binding_since_us is an M4 processing-time event. M6 may publish a
+       * valid capability from a navigation sample captured slightly earlier. */
+      in->control->header.timestamp_publish_us < e->permit.binding_since_us)
     return 0u;
   return 1u;
-}
-
-static uint8_t fms_return_hold_is_stable(const FmsEngine *e, const FmsInputs *in)
-{
-  if (!fms_return_control_is_bound(e, in)) return 0u;
-  const float *v = in->nav->core.velocity_ned_mps;
-  const float *a = fms_motion_acceleration(e, in);
-  return a != NULL && hypotf(hypotf(v[0], v[1]), v[2]) < 0.15f &&
-         hypotf(hypotf(a[0], a[1]), a[2]) < 0.4f;
 }
 
 static void fms_tracker_tick(FmsEngine *e, const FmsInputs *in, FmsOutputView *out)
@@ -1013,14 +1005,14 @@ static void fms_tracker_tick(FmsEngine *e, const FmsInputs *in, FmsOutputView *o
         }
         if (completed ||
             (fms_return_control_is_bound(e, in) &&
-             in->control->header.timestamp_sample_us - e->permit.binding_since_us >= 80000u &&
+             in->control->header.timestamp_publish_us - e->permit.binding_since_us >= FMS_RETURN_CONTROL_BIND_US &&
              fms_mode_transition(e, FLIGHT_MODE_POS_HOLD, in, 1u))) {
           fms_mission_suspend(e, 20u);
-          t->preparing_return = FMS_RETURN_STABILIZE_HOLD;
+          t->preparing_return = FMS_RETURN_WAIT_CONTROL_BINDING;
           t->directive_epoch = e->flight.directive_epoch;
         }
       }
-      if (t->preparing_return == FMS_RETURN_STABILIZE_HOLD) {
+      if (t->preparing_return == FMS_RETURN_WAIT_CONTROL_BINDING) {
         if (e->flight.failsafe_level >= FAILSAFE_ACTION_REQUIRED || e->authority.latched ||
             e->flight.flight_mode != FLIGHT_MODE_POS_HOLD ||
             t->directive_epoch != e->flight.directive_epoch ||
@@ -1034,12 +1026,10 @@ static void fms_tracker_tick(FmsEngine *e, const FmsInputs *in, FmsOutputView *o
           fms_tracker_ack(e, out, t, COMMAND_ACK_FAILED, 6u);
           continue;
         }
-        if (!fms_return_hold_is_stable(e, in)) {
-          t->stable_since_us = 0u;
-        } else if (t->stable_since_us == 0u) {
-          t->stable_since_us = in->now_us;
-        } else if (in->now_us - t->stable_since_us >= FMS_RETURN_STABLE_US &&
-                   fms_mode_transition(e, FLIGHT_MODE_AUTO_RETURN, in, 1u)) {
+        if (fms_return_control_is_bound(e, in) &&
+            in->control->header.timestamp_publish_us - e->permit.binding_since_us >=
+                FMS_RETURN_CONTROL_BIND_US &&
+            fms_mode_transition(e, FLIGHT_MODE_AUTO_RETURN, in, 1u)) {
           t->preparing_return = 0u;
           fms_permit_revoke(e, 12u);
         }
@@ -1190,6 +1180,15 @@ static uint16_t fms_guidance_mode(uint8_t mode)
   case FLIGHT_MODE_MANUAL_RATE: return PRODUCT_GUIDANCE_MODE_RATE;
   case FLIGHT_MODE_MANUAL_ATTITUDE: return PRODUCT_GUIDANCE_MODE_ATTITUDE;
   case FLIGHT_MODE_ALT_HOLD: return PRODUCT_GUIDANCE_MODE_ALT_HOLD;
+  case FLIGHT_MODE_AUTO_LAND:
+    /* With valid horizontal navigation and Home, LAND uses a 3-D trajectory
+     * so M6 brakes and holds the touchdown point while descending. fms_publish
+     * falls back to ALT_HOLD when those inputs are unavailable. */
+    return PRODUCT_GUIDANCE_MODE_POS_HOLD;
+  case FLIGHT_MODE_EMERGENCY_LAND:
+    /* Emergency landing retains the vertical-only fallback; no XY target is
+     * invented when the normal position solution is unavailable. */
+    return PRODUCT_GUIDANCE_MODE_ALT_HOLD;
   case FLIGHT_MODE_POS_HOLD: return PRODUCT_GUIDANCE_MODE_POS_HOLD;
   default: return PRODUCT_GUIDANCE_MODE_TRAJECTORY;
   }
@@ -1220,6 +1219,9 @@ static void fms_publish(FmsEngine *e, const FmsInputs *in, FmsOutputView *out)
   dir->reason_code = 0u;
   dir->directive_expires_at_us = fms_add_us(now, e->policy->directive_ttl_us);
   dir->required_nav_capabilities = fms_mode_required_nav(e->flight.flight_mode);
+  if (e->flight.flight_mode == FLIGHT_MODE_AUTO_LAND &&
+      dir->guidance_mode_code == PRODUCT_GUIDANCE_MODE_POS_HOLD)
+    dir->required_nav_capabilities = fms_mode_required_nav(FLIGHT_MODE_POS_HOLD);
   dir->safety_envelope_id = 1u;
   dir->payload.flight_phase = (uint8_t)(e->flight.failsafe_level == FAILSAFE_TERMINAL
                                             ? FLIGHT_PHASE_EMERGENCY

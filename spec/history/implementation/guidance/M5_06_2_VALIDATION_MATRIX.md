@@ -278,3 +278,12 @@ S06-081 新增恒加速度解析候选点 oracle 已随该 commit 实际执行�
 CI：[Host validation #542](https://github.com/hujunjie-hub/Flight/actions/runs/42746417706)。
 
 自动化状态对该 commit 更新为 PASS；独立数学审查 MR-001..MR-008 仍未全部 APPROVED，M5-06 整体仍 BLOCKED。
+
+
+## S06-115：R30 rounded Horner intermediate overflow（2026-11-13）
+
+| ID | 场景 | 期望 | 实际 |
+|---|---|---|---|
+| S06-115 | 固定 binary32 degree-5 反例；理想 H_k 均小于 FLT_MAX、magnitude term < FLT_MAX/16；真实 Horner k=3 精确加法落在 RN overflow midpoint | consumer error bound 返回 +Inf；POSITION_HORNER counter=1；拒绝不被舍入误差掩盖 | Host focused 430/0；M5 Host 322,299/0；M5 ASan/UBSan 322,299/0；focused ASan/UBSan 430/0；Host validation #43417453111 PASS |
+
+该用例为固定输入，无随机 seed。degree 5/4/3 Horner helper 分支分别命中；完整 validator 的系数构造和导数缩放分支验证 NUMERIC_FAILURE。三个 Horner 分支的完整 validator 可达性仍待独立审查，不作 PASS 声明。

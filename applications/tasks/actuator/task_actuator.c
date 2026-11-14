@@ -4,6 +4,8 @@
 #include <rtthread.h>
 #include "task_config.h"
 #include "runtime_internal.h"
+#include "messages/message_ids.h"
+#include "output_guard/actuator_guard.h"
 
 static void task_actuator_step(void)
 {
@@ -12,11 +14,21 @@ static void task_actuator_step(void)
     ActuatorCapability capability;
     ActuatorCommitReceipt receipt = {0};
     ActuationPermit permit;
+    GroundStopCertificate ground_stop;
     int have_demand = 0;
+    int have_ground_stop = 0;
+    const uint64_t now_us = runtime_now_us();
 
     runtime_data_mark_heartbeat(RUNTIME_OWNER_ACTUATOR, runtime_now_us());
     if (runtime_data_lock(0))
     {
+        if (runtime_data.bundle_ready)
+        {
+            ground_stop = runtime_data.bundle.ground_stop_certificate;
+            have_ground_stop =
+                ground_stop.header.message_type == MSG_GROUND_STOP_CERTIFICATE &&
+                ground_stop.certificate_expires_at_us > now_us;
+        }
         if (runtime_data.have_demand)
         {
             demand = runtime_data.demand;
@@ -26,12 +38,31 @@ static void task_actuator_step(void)
         }
         runtime_data_unlock();
     }
+    /* The M4 certificate is a separate, post-revocation transaction. It
+     * owns the actuator output while active; do not let a queued M6 demand race
+     * the bounded ramp. Repeated copies are idempotent in the M7 guard. */
+    if (have_ground_stop)
+    {
+        /* Only an accepted certificate owns output. A malformed, stale or
+         * unauthorized candidate must not starve a valid M6 demand. Once the
+         * guard accepts the certificate, its active/latched state rejects any
+         * racing demand until the zero-target receipt is latched. */
+        const Status stop_status =
+            actuator_guard_ground_stop(&ground_stop, runtime_now_us());
+        if (stop_status == STATUS_OK)
+            have_demand = 0;
+    }
     if (have_demand)
     {
         (void)actuator_apply(&demand, &permit, &status);
     }
 
-    /* This wake polls status. A receipt requires a physical frame boundary. */
+    /* The 1 ms owner wake drives the M7 frame gate; the guard enforces the
+     * minimum 2.5 ms inter-frame interval. BENCH_INHIBIT never reaches a driver. */
+    if (!runtime_bench_inhibit_active())
+        (void)actuator_guard_frame_boundary(runtime_now_us());
+
+    /* Poll completes an asynchronous DMA frame before publishing receipt evidence. */
     (void)actuator_poll(runtime_now_us(), &status);
     (void)actuator_get_capability(&capability);
     (void)actuator_get_commit_receipt(&receipt);

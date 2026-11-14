@@ -11,7 +11,7 @@
   "archive_command": "pwsh -NoProfile -File .\\tools\\archive_validation_run.ps1",
   "default_branch_for_current_milestone": "opt/stage-02-m5-06-safety-validator",
   "pr_number": 2,
-  "pr_state": "OPEN_DRAFT",
+  "pr_state": "CLOSED_UNMERGED",
   "profiles": {
     "product_h723": {
       "vehicle": "QUAD_X4",
@@ -22,7 +22,7 @@
     },
     "host_sil": {
       "vehicle": "QUAD_X4",
-      "scope": "M5-02..M5-06 host-only algorithm and synthetic map validation",
+      "scope": "M4/M5/M6/M7 Host/SIL validation: M5-02..M5-06 algorithms and synthetic-map fixtures, M6 MPC/control, M7 actuator guard, and M4-to-M7 ground-stop runtime handoff; no target-hardware claim.",
       "obstacle_data": "synthetic/host fixtures",
       "target_hardware_claim": false
     }
@@ -170,6 +170,60 @@
       "required": true,
       "pass": "exit_code=0; expected production build/link invariants pass",
       "evidence": "target build report"
+    },
+    {
+      "id": "FLIGHT-M6-HOST-001",
+      "name": "M6 MPC and control Host tests",
+      "context": "WSL Ubuntu-26.04",
+      "command": "bash tests/control/run_host_tests.sh",
+      "required": true,
+      "pass": "MPC checks > 0 and failures=0; M6 guard/input lifecycle checks > 0 and failures=0",
+      "evidence": "build/validation/ and M6/M7 host validation workflow artifact"
+    },
+    {
+      "id": "FLIGHT-M7-HOST-001",
+      "name": "M7 actuator guard Host tests",
+      "context": "WSL Ubuntu-26.04",
+      "command": "bash tests/actuation/run_host_tests.sh",
+      "required": true,
+      "pass": "checks > 0; failures=0",
+      "evidence": "build/validation/ and M6/M7 host validation workflow artifact"
+    },
+    {
+      "id": "FLIGHT-M6M7-ASAN-001",
+      "name": "M6/M7 AddressSanitizer and UndefinedBehaviorSanitizer",
+      "context": "WSL Ubuntu-26.04",
+      "command": "EXTRA_CFLAGS='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' bash tests/control/run_host_tests.sh && EXTRA_CFLAGS='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer' bash tests/actuation/run_host_tests.sh",
+      "required": true,
+      "pass": "M6 MPC, M6 guard and M7 guard suites all execute with zero sanitizer failures",
+      "evidence": "M6/M7 host validation workflow artifact"
+    },
+    {
+      "id": "FLIGHT-M4M7-SIL-001",
+      "name": "Live FMS-to-M7 ground-stop SIL integration",
+      "context": "Host/SIL",
+      "command": "bash tests/simulation/run_sil.sh",
+      "required": true,
+      "pass": "explicit DISARM and first-reference timeout scenarios pass; ground-stop ramp checks > 0; failures=0",
+      "evidence": "build/validation/sim/sil/ and M6/M7 host validation workflow artifact"
+    },
+    {
+      "id": "FLIGHT-M6M7-ARM-001",
+      "name": "Cortex-M7 M4/M5/M6/M7 production-module compile",
+      "context": "GNU Arm Embedded / Cortex-M7",
+      "command": "python tests/algorithms/run_tests.py --target arm && bash tests/flight_management/arm_build_check.sh && bash tests/guidance/arm_build_check.sh && bash tests/actuation/arm_build_check.sh",
+      "required": true,
+      "pass": "M4/M5/M6/M7 module compile succeeds; this is not a full product firmware link or target run",
+      "evidence": "build/validation/controller_navigation/arm/; build/m4_arm/; build/m5_arm/; build/m7_arm/"
+    },
+    {
+      "id": "FLIGHT-ABI-CURRENT-001",
+      "name": "Current production ABI and spec layout revalidation",
+      "context": "CI / GNU Arm Embedded",
+      "command": "python tests/abi/abi_report.py && python spec/tools/audit_spec.py --round 3 --label ci",
+      "required": true,
+      "pass": "production ABI 0 mismatches; Spec Audit exits 0 and report generated",
+      "evidence": "Host validation workflow artifact"
     }
   ],
   "m5_06_safety_requirements": [
@@ -396,29 +450,29 @@
     {
       "id": "S06-100",
       "name": "Differential static collision (consumer hits, exact clears)",
-      "seed": "deterministic",
-      "cases": 4,
-      "status_at_code_baseline": "NOT_RUN",
-      "oracle": "REVOKED R7 design (non-product envelope, midpoint-only); feasibility NOT ESTABLISHED",
-      "local_run": "M5-06-R11-20261110"
+      "seed": "NOT_APPLICABLE",
+      "cases": 2,
+      "status_at_code_baseline": "PASS",
+      "oracle": "Whole-reference Hermite maximum clears the inflated voxel corner; real M6 midpoint penetrates; validator STATIC_COLLISION; clear control passes",
+      "local_run": "M5-06-DIFF-20261114"
     },
     {
       "id": "S06-101",
       "name": "Differential dynamic collision",
-      "seed": "deterministic",
-      "cases": 4,
-      "status_at_code_baseline": "NOT_RUN",
-      "oracle": "REVOKED R7 design (non-product envelope, midpoint-only); feasibility NOT ESTABLISHED",
-      "local_run": "M5-06-R11-20261110"
+      "seed": "NOT_APPLICABLE",
+      "cases": 2,
+      "status_at_code_baseline": "PASS",
+      "oracle": "Whole-reference Hermite maximum clears the track including the declared acceleration uncertainty; real M6 midpoint penetrates; validator DYNAMIC_COLLISION; clear control passes",
+      "local_run": "M5-06-DIFF-20261114"
     },
     {
       "id": "S06-102",
       "name": "Differential geofence violation",
-      "seed": "deterministic",
-      "cases": 4,
-      "status_at_code_baseline": "NOT_RUN",
-      "oracle": "REVOKED R7 design (non-product envelope, midpoint-only); feasibility NOT ESTABLISHED",
-      "local_run": "M5-06-R11-20261110"
+      "seed": "NOT_APPLICABLE",
+      "cases": 2,
+      "status_at_code_baseline": "PASS",
+      "oracle": "Whole-reference Hermite maximum clears the vertically inflated KEEP_IN floor; real M6 midpoint penetrates; validator GEOFENCE_VIOLATION; clear control passes",
+      "local_run": "M5-06-DIFF-20261114"
     },
     {
       "id": "S06-103",
@@ -570,18 +624,38 @@
       "actual_error_checks": 18,
       "mode2_error_over_gamma2_min": 3.618080472981205,
       "mode2_error_over_gamma2_max": 4.059050992445377
+    },
+    {
+      "id": "S06-114",
+      "name": "MR-009 first consumer numerical rejection stage",
+      "seed": "NOT_APPLICABLE",
+      "cases": 7,
+      "checks": 25,
+      "oracle": "Three full-validator numerical rejections, three Horner helper rejections and one full-validator legal companion",
+      "source": "tests/guidance/test_m5_main.c",
+      "full_validator_horner_reachability": "NOT_ESTABLISHED_FOR_HELPER_ONLY_BRANCHES"
+    },
+    {
+      "id": "S06-116",
+      "name": "MR-009 same-axis geometry rounding composition",
+      "seed": "NOT_APPLICABLE",
+      "checks": 9,
+      "status_at_code_baseline": "PASS",
+      "oracle": "Production geometry radius encloses the analytic midpoint conversion error plus the binary32 consumer envelope",
+      "source": "tests/guidance/test_m5_main.c"
     }
   ],
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
-      "R29 archive metadata protocol and 33 unit tests pass; B01/B02/B03 still require OWNER approval; B05 branch trace remains incomplete; B06 4,248 B > 4,096 B; B07 NOT_RUN."
+      "B07 target and HIL verification is NOT_RUN."
     ],
-    "next_milestone": "M5-07 only after M5-06 acceptance and explicit independent mathematical approval."
+    "next_milestone": "M5-07 only after M5-06 acceptance and project authorization."
   },
   "m5_06_consumer_curve_bound": {
     "mr_id": "MR-009",
-    "status": "FIX_IMPLEMENTED_WAITING_INDEPENDENT_REVIEW",
+    "status": "TECHNICAL_REVIEW_COMPLETED_WITH_CORRECTION",
+    "review_policy": "OWNER_WAIVED_INDEPENDENT_REVIEW_FOR_MR009_ON_2026_11_14",
     "position_roundings": 10,
     "velocity_roundings": 12,
     "acceleration_roundings": 10,
@@ -604,7 +678,7 @@
     "subnormal_term": "n * 2^-149 * max(1, s_eval_max)^n",
     "preview_step_contract_checked": true,
     "host_mxcsr_checked": true,
-    "differential_collision_status": "NOT_IMPLEMENTED (feasibility NOT ESTABLISHED)",
+    "differential_collision_status": "PASS_S06_100_THROUGH_102_HOST",
     "fp_report_model_check": "MATCH (tokens verified against the compiled source)",
     "time_evidence": "S06-103 phase A/B with physical time reference",
     "fp_model_self_test": "PASS (mutated gamma_2 detected)",
@@ -712,44 +786,56 @@
     "archive_script_commit": "bbf3e9205f2a764caaeb9e833c308c8069c6f7fb"
   },
   "latest_local_validation": {
-    "run_id": "M5-06-TAKEOVER-20261113",
+    "run_id": "M5-06-STACK-20261114",
     "branch": "opt/stage-02-m5-06-safety-validator",
-    "validated_code_commit": "36d7b7ce9ed92a319b7112e9952acde6b1ebe5d1",
+    "validated_code_commit": "bbda2028a4d905b54cfc7d6c3879a186d26c210b",
     "scope": "LOCAL_EXECUTION_ONLY",
     "status": "PASS",
     "passed_commands": 30,
     "gate_failures": 0,
     "blocked_gates": 0,
     "m5_06_acceptance": "BLOCKED",
-    "independent_math_review": "OPEN",
+    "independent_math_review": "OWNER_WAIVED_FOR_MR009",
     "not_run": [
-      "S06-100",
-      "S06-101",
-      "S06-102",
       "B07"
     ]
   },
   "product_config_source": "QUAD_X4_PRODUCT_CONFIG (fms_quad_x4_policy + fms_product_build_safety_envelope; fms_product_validate_config shared with FMS init)",
   "jerk_enforcement": "IMPLEMENTED_CONTINUOUS_INTERVAL_BOUND (S06-110/110b/110c/110d + S06-112 three separate bounds)",
   "stack_budget": {
-    "validator_worst_chain_bytes": 4248,
+    "validator_worst_chain_bytes": 3576,
     "planner_worker_limit_bytes": 4096,
-    "status": "EXCEEDED_BLOCKED",
+    "status": "PASS_STATIC_RELEASE_IMAGE",
     "roll_map_to_position_bytes": 128,
     "roll_map_reference_stack_only_bytes": 32840,
-    "chain": "validate 1112 + build_curve 2824 + interval_scale 112 (SP) + interval_mul 88 (SP) + interval_bounds 64 + interval_invalid 48",
-    "record": "build/validation/R28_B06_STACK_ANALYSIS.md",
-    "callgraph_status": "UNKNOWN",
-    "unknown_call_edges": "RECORDED_IN_r28_stack_analysis.json",
-    "analysis": "build/validation/regenerated/r28_stack_analysis.json",
-    "static_headroom_bytes": 232
+    "chain": "m5_trajectory_safety_validate -> build_curve -> consumer_eval_error_bound -> binary32_rounded_upper_nonnegative -> nextafter",
+    "callgraph_status": "COMPLETE",
+    "reachable_unknown_call_edges": 0,
+    "analysis": "build/validation/software-closure/stack-o2-reconciled.json",
+    "nonoptimized": {
+      "status": "PASS",
+      "known_lower_bound_bytes": 3968,
+      "callgraph_status": "COMPLETE",
+      "analysis": "build/validation/software-closure/stack-o0-reconciled.json"
+    },
+    "historical_nonoptimized": {
+      "status": "BLOCKED",
+      "known_lower_bound_bytes": 4248,
+      "callgraph_status": "UNKNOWN",
+      "analysis": "build/validation/priority-20261113/b06-o0.json"
+    },
+    "hardware_stack_watermark": "NOT_RUN",
+    "static_headroom_bytes": 264,
+    "icd_m4_static_total_bytes": 48888,
+    "icd_m4_limit_bytes": 49152,
+    "static_headroom_note": "42,696 B reserved plus 6,192 B aligned M4 BSS. Release map confirms removal of the extra 1,152 B staging copy, bringing the image in line with the one staging slot already in this accounting."
   },
   "blocker_board": "spec/quality/BLOCKER_BOARD.md",
   "issue_register": "spec/quality/ISSUE_REGISTER.md",
   "mr009_review_material": "spec/history/implementation/guidance/MR009_R17_REVIEW_MATERIAL.md",
   "resource_risks": {
     "FLIGHT-LOCAL-26": "roll_map_to_position 40 B + roll_axis_inplace 64 B + map_cell_at 24 B = 128 B; legacy reference 32,840 B is Host-test only",
-    "FLIGHT-LOCAL-27": "ICD+M4 static 48,920 / 49,152 B; 232 B headroom, WARN; budget change needs approval",
+    "FLIGHT-LOCAL-27": "Stage-02 object and Release-map checks measured 8 B headroom before compacting the private FMS dedup entries and 264 B after. Removed the unbudgeted 1,152 B duplicate staging slot. The remaining 264 B budget headroom is below the 1 KiB warning (GitHub issue #13).",
     "FLIGHT-LOCAL-29": "R18 reported 104 B; R19 objdump confirms map_cell_at 24 B, true 128 B",
     "FLIGHT-LOCAL-30": "R19 external sidecar/report; no PENDING in formal manifest"
   },
@@ -789,12 +875,136 @@
     "mcu": "STM32H723ZGT6",
     "obstacle_source_mode": "NONE",
     "bench_mode": "BENCH_INHIBIT",
-    "default_max_speed_mps": 8.0,
-    "default_max_accel_mps2": 4.0,
-    "jerk_x_mps3": 16.0,
-    "jerk_y_mps3": 16.0,
-    "jerk_z_mps3": 8.0,
+    "default_max_speed_mps": 8,
+    "default_max_accel_mps2": 4,
+    "jerk_x_mps3": 16,
+    "jerk_y_mps3": 16,
+    "jerk_z_mps3": 8,
     "valid_mask": "0x7F",
     "online_obstacle_avoidance_authorized": false
+  },
+  "latest_branch_ci": {
+    "date": "2026-11-13",
+    "branch": "opt/stage-02-m5-06-safety-validator",
+    "implementation_commit": "b6b2c8d1fbe2483ac76164993e7798a18af1e697",
+    "post_spec_sync_ci_required": false,
+    "workflows": [
+      {
+        "name": "Host validation",
+        "run_id": 43410120128,
+        "url": "https://github.com/hujunjie-hub/Flight/actions/runs/43410120128",
+        "jobs": "6/6",
+        "conclusion": "SUCCESS"
+      },
+      {
+        "name": "M6/M7 host validation",
+        "run_id": 43410120115,
+        "url": "https://github.com/hujunjie-hub/Flight/actions/runs/43410120115",
+        "jobs": "5/5",
+        "conclusion": "SUCCESS"
+      },
+      {
+        "name": "M7 host validation",
+        "run_id": 43410120239,
+        "url": "https://github.com/hujunjie-hub/Flight/actions/runs/43410120239",
+        "jobs": "2/2",
+        "conclusion": "SUCCESS"
+      }
+    ],
+    "results": {
+      "m4_host": {
+        "checks": 1002,
+        "failures": 0
+      },
+      "m5_host": {
+        "checks": 322179,
+        "failures": 0
+      },
+      "m4_m5_integration": {
+        "checks": 1075,
+        "failures": 0
+      },
+      "m5_asan_ubsan": {
+        "checks": 322179,
+        "failures": 0
+      },
+      "m4_m5_integration_asan_ubsan": {
+        "checks": 1075,
+        "failures": 0
+      },
+      "m6_mpc": {
+        "checks": 15,
+        "failures": 0
+      },
+      "m6_guard_input_lifecycle": {
+        "checks": 26,
+        "failures": 0
+      },
+      "m7_actuator_guard": {
+        "checks": 274,
+        "failures": 0
+      },
+      "m6_m7_sanitizers": {
+        "m6_mpc": {
+          "checks": 15,
+          "failures": 0
+        },
+        "m6_guard": {
+          "checks": 26,
+          "failures": 0
+        },
+        "m7_guard": {
+          "checks": 274,
+          "failures": 0
+        }
+      },
+      "sil_explicit_disarm": {
+        "checks": 455,
+        "failures": 0
+      },
+      "sil_first_reference_timeout": {
+        "checks": 467,
+        "failures": 0
+      },
+      "sil_ground_stop_ramp": {
+        "checks": 27,
+        "failures": 0,
+        "frame_commits": 18,
+        "inhibits": 58
+      },
+      "production_abi": {
+        "types": 144,
+        "spec_mismatches": 0,
+        "unexpected_host_arm": 0,
+        "lock": "PASS"
+      },
+      "spec_audit": {
+        "types": 145,
+        "checks": 8,
+        "status": "PASS"
+      },
+      "cortex_m7_module_compile": {
+        "modules": [
+          "M4",
+          "M5",
+          "M6",
+          "M7"
+        ],
+        "status": "PASS"
+      },
+      "mpc_ram_bytes": 29400,
+      "mpc_worker_stack_bytes": 8192,
+      "largest_static_frame_bytes": 2024
+    },
+    "scope_limits": [
+      "Results apply to validated post-sync commit b6b2c8d1fbe2483ac76164993e7798a18af1e697; future commits require fresh CI.",
+      "No H723 target runtime, full product firmware release-link, WCET/RTA, target RAM/stack watermark, physical DShot apply-time, ESC thrust response, physical HIL, calibration or flight evidence.",
+      "M5-06 remains BLOCKED pending independent mathematical review and S06-100..102; M5-07 must not start.",
+      "FLIGHT-LOCAL-27 static headroom is estimated at 8 B after counting two GroundStopCertificate snapshots; memory-budget and final-map checks remain required."
+    ],
+    "spec_sync_commits": [
+      "a5effdefb35a688e638833524c586eaad56beb55",
+      "b6b2c8d1fbe2483ac76164993e7798a18af1e697"
+    ]
   }
 }

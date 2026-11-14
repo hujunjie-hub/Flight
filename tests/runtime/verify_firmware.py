@@ -38,7 +38,8 @@ def scons_python():
 def capture_source_hashes():
     inputs={ROOT/name for name in ('.config','rtconfig.h','rtconfig.py','README.md','PROJECT_STRUCTURE.md',
             'Kconfig','SConstruct','SConscript','tools/check_layout.py','spec/contracts/FCU.xml',
-            'packages/deps.lock','packages/SConscript','tools/flight_mavsdk.py')}
+            'tools/rt_packages.lock.json','tools/check_rt_packages_lock.py',
+            'packages/SConscript','packages/pkgs.json','tools/flight_mavsdk.py')}
     suffixes={'.c','.h','.cpp','.hpp','.s','.S','.inc','.lds','.py','.md','.json','.yaml','.ioc','.conf'}
     for folder in ('applications','middleware','sensor_device','board','libraries/HAL_Drivers',
                    'tests/runtime','tests/target','tests/algorithms','config'):
@@ -49,7 +50,10 @@ def capture_source_hashes():
         'rt-thread/components/legacy/usb/usbdevice/class/cdc_vcom.c',
         'rt-thread/components/legacy/usb/usbdevice/core/usbdevice.c',
         'tests/drivers/check_drivers.py'))
-    return {p.relative_to(ROOT).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(inputs)}
+    inputs.update(p for p in RTT.rglob('*') if p.is_file()
+                  and (p.suffix in suffixes or p.name in {'Kconfig','SConscript'}))
+    return {(p.relative_to(ROOT).as_posix() if p.is_relative_to(ROOT) else p.as_posix()):
+            hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(inputs)}
 
 def capture_artifacts():
     artifacts={}
@@ -58,7 +62,6 @@ def capture_artifacts():
         artifacts[name]={'bytes':len(content),'sha256':hashlib.sha256(content).hexdigest()}
     return artifacts
 
-source_hashes=capture_source_hashes()
 generation=json.loads((ROOT/'middleware/protocol/mavlink/wire_generation.json').read_text())
 assert generation['input_sha256']==hashlib.sha256((ROOT/'spec/contracts/FCU.xml').read_bytes()).hexdigest()
 assert generation['output_sha256']==hashlib.sha256((ROOT/'middleware/protocol/mavlink/fcu_mavlink_layout.h').read_bytes()).hexdigest()
@@ -85,6 +88,11 @@ def run(cmd,name,env=None):
     if p.returncode:
         print((p.stdout+p.stderr)[-4000:]);raise SystemExit(p.returncode)
     return p.stdout
+
+# The package tree is installed locally; its authoritative pins are tracked.
+package_lock = json.loads(run([sys.executable, 'tools/check_rt_packages_lock.py',
+                               '--installed'], 'package_lock'))
+source_hashes = capture_source_hashes()
 includes=['.', 'board', 'board/CubeMX_Config/Inc', 'libraries/HAL_Drivers',
  'libraries/HAL_Drivers/drivers', 'libraries/HAL_Drivers/drivers/config',
  'packages/stm32h7_hal_driver-latest/Inc', 'packages/stm32h7_cmsis_driver-latest/Include',
@@ -173,6 +181,9 @@ axi_end=int(re.search(r'^([0-9a-f]+) B _end$',symbols,re.M).group(1),16)
 axi_headroom=0x24050000-axi_end
 assert axi_headroom>=64*1024
 artifacts=capture_artifacts()
+# The driver report hashes the final ELF/BIN/MAP. Refresh it after the
+# release link, which may change the image even when the map is unchanged.
+run([sys.executable, 'tests/drivers/check_drivers.py'], 'driver_checks', env=build_env)
 checks={}
 for key,path in [('runtime','host/summary.json'),('sanitizers','host_sanitized/summary.json'),('wire','wire/summary.json')]:
     report=json.loads((OUT/path).read_text(encoding='utf-8'))
@@ -203,7 +214,7 @@ for key,relative in [
         for relative,digest in arm_abi['header_sha256'].items():
             assert (ROOT/relative).is_file() and hashlib.sha256((ROOT/relative).read_bytes()).hexdigest()==digest, 'stale ABI: '+relative
     else:
-        assert report['firmware_sha256']=={name:value['sha256'] for name,value in artifacts.items()}
+        assert report['firmware_sha256']=={name:value['sha256'] for name,value in artifacts.items()}, 'stale driver firmware evidence'
     checks[key]={'status':'PASS','evidence':relative,'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
 layout=ROOT/'build/three_layer_refactor/layout_checks.json'
 assert json.loads(layout.read_text(encoding='utf-8'))['status']=='PASS'
@@ -227,6 +238,7 @@ manifest={'date':datetime.now(timezone(timedelta(hours=8))).date().isoformat(),
  'required_linked_symbols':required,'strict_arm_sources':[str(p.relative_to(ROOT)) for p in sources],
  'resources':{'estimator_cores_dtcm_bytes':core_bytes,'axi_static_headroom_bytes':axi_headroom},
  'artifacts':artifacts,'size_output':size,'checks':checks,
+ 'package_lock':package_lock,
  'remaining_evidence':{'target_boot_stack_wcet_rta':'NOT_RUN','physical_waveforms':'NOT_RUN',
  'hil':'NOT_RUN','flight':'NOT_RUN','independent_review':'NOT_RUN'},
  'source_sha256':source_hashes}

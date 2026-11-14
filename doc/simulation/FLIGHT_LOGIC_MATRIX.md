@@ -1,5 +1,6 @@
 # 飞行与策略仿真验证矩阵
 
+本文件的 PASS 记录均绑定各自历史 RUN_ID；最新 Stage-02 复测曾失败，修复提交 `31a0d3d` 的 Host CI 已通过，但原生 FMT-SIM 尚未复跑，见文末。
 本轮使用 `SIM_CONTROLLED_STOP` Host 构建和隔离的 FMT-SIM Ground 场景。
 H723 的运行配置仍使用 `BENCH_INHIBIT`。设备固件、UART/DMA、板上时序和实机运动
 留在各自的验证门禁。
@@ -114,3 +115,44 @@ Host 运行时共 3519 项检查，覆盖释放数传后 ELRS 继续收帧、HIL
 | 双航点返航 | t=17.280 s 接受返航，t=20.700 s 切换模式。最终距 Home 0.415 m，t=29.320 s 解除解锁 | 0.323 m/s | 78.4 ms | 40931 项，0 失败 |
 
 两轮均使用 350 ms 状态流门槛，最终状态为 LANDED 和 DISARMED。FMS、制导、两者集成、静态 SIL 和运行时回归分别通过 871、7944、944、3151 和 3519 项检查。Cortex-M7 固件完成编译和链接。日志位于 `build/validation/sim/flight_settle`，实机接地及输出验证保留在发布门禁。
+
+## 2026-11-14 Stage-02 复测
+
+隔离 Ground/HIL 实例的三个动态场景本轮均失败。Land 的首个落地制导参考被拒绝；Return 已接地但在场景截止前未获接地确认和上锁回执；Mission 完成两个航点后在返航准备阶段超时。三者的状态间隔都低于 350 ms。测试计数和原始日志见 [ENG-07 的现行验收记录](../../spec/09_需求验证实施与发布管理.md#2026-11-14-eng-07-动态-fmt-sim-复测fail)。
+
+
+## ENG-07 Fix Iteration 1
+
+Stage-02 code fixes are in commits 9ac05a3, 1e7ad7c, 31a0d3d, bf312b8, 1df941b, 52d7ee9, e1333ac, d072106, 03653a2, f6ceaeb and ce00ff9. The three CI workflows on ce00ff9 passed. Host evidence: M4 1,074/0; M5 324,792/0; MR-009 focused 430/0; M4/M5 integration 1,147/0; M5 ASan/UBSan 324,792/0; M4/M5 integration sanitizer 1,147/0.
+
+- Land: active trajectory acceleration is carried into vertical automatic LAND only when the previous reference remains valid and active. The vertical LAND builder reports the actual rejection reason/constraint, reaches the Home plane with zero terminal velocity/acceleration, then executes a bounded 4 s below-plane probe.
+- Land/Return: the 0.12 m/s vertical-speed bound applies in the final 0.20 m braking band; the physical contact oracle remains at 0.06 m. Return guidance now stages through a 0.60 m approach point, a 0.20 m braking point, then Home. Only the explicit 0.20 m brake and final Home stages use a copied guidance config with a 25% lower three-axis jerk limit for M6's 20 ms float-boundary reconstruction; the long-return approach retains its original jerk envelope. Vertical-only LAND uses the same braking point before Home and the bounded below-plane probe. Curves entering the braking band are checked with continuous Bernstein bounds; the boundary bisection requires a provably nondecreasing NED-down segment and fails closed on ambiguous crossings.
+- Mission: FMS compares M6 capability publication time against the M4 permit-binding event. A 20 ms sample-to-publish delay is covered for both in-mission Return and post-mission Return.
+
+The original Windows FMT-SIM Land/Return/Mission scenarios have NOT been rerun after these changes. The prior 350 ms Stage-02 failures remain the authoritative dynamic baseline; Issues #17/#18/#19 stay OPEN. The next native run uses expanded [settle] trace fields for effective operation/guidance mode, Home validity/position, nav p/v/a, truth velocity, M6 sample/publish timestamps, permit sample/publish timestamps, guidance reference/state/reason and violated constraint. No H723 target/HIL/WCET/stack-watermark result is implied.
+
+
+## ENG-07 Braking-Margin Correction
+
+The Return trace showed 0.358 m/s at 0.105 m above Home. A 0.06 m-only speed cap leaves 0.045 m before the contact sensor threshold, which is insufficient to brake to 0.12 m/s under the 1 m/s² vertical-acceleration envelope. The guidance braking band is now 0.20 m while the physical contact oracle remains at 0.06 m. Return is staged through 0.60 m approach, 0.20 m brake and Home; vertical LAND stages through the braking altitude, Home, then the bounded 0.25 m probe. Only the explicit 0.20 m brake and final Home stages use a copied guidance config with a 25% lower three-axis jerk limit for M6's 20 ms float-boundary reconstruction; the long-return approach retains its original jerk envelope. The FMS 0.15 m/s LandDetector threshold, contact evidence and dwell remain unchanged.
+
+Host CI on ce00ff9 PASS: Host validation #43547565040, M6/M7 host validation #43547564966, M7 host validation #43547564942. M4 1,074/0; M5 324,792/0; MR-009 focused 430/0; M4/M5 integration 1,147/0; M5 ASan/UBSan 324,792/0; integration sanitizer 1,147/0.
+
+Native FMT-SIM must still be rerun locally before #17/#18/#19 can close.
+
+
+## ENG-07 原生 FMT-SIM 本机复测责任与证据入口
+
+按项目方要求，后续 Windows 原生 FMT-SIM 动态复测统一由项目 Owner 在本机完成；远程 Agent 负责代码修改、Host/SIL/CI 和失败分析，不代跑原生引擎。正式操作及证据格式见 [FMT-SIM 本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。
+
+当前产品代码修复基线为 `ce00ff9f0a8eb4989d1a171c3322f3640de2965c`；最新已完成自动化验证的代码 HEAD 为 `5a8e2c3079d230bbb5ca90ebbf229552487c2be9`。[Host #43552823302](https://github.com/hujunjie-hub/Flight/actions/runs/43552823302)、[M6/M7 #43552823284](https://github.com/hujunjie-hub/Flight/actions/runs/43552823284)、[M7 #43552823258](https://github.com/hujunjie-hub/Flight/actions/runs/43552823258) 分别 6/6、5/5、2/2 SUCCESS；M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integration 1,147/0、M5 ASan/UBSan 324,792/0；PowerShell Parser 对两个本地 runner 均 PASS。以上均未启动原生 FMT-SIM；修复后的原生 FMT-SIM 尚未复测。#17 Land、#18 Return、#19 Mission 保持 OPEN，待 Owner 在本机以同一隔离安装、UDP 14653、350 ms、hover 0.62，Owner 显式确认 loopback 127.0.0.1 后顺序运行，并回传 manifest、完整日志和 SHA256。Host/CI 通过不关闭动态仿真 Issue；FMT-SIM 通过也不代表 H723 实机、物理 HIL 或飞行通过。
+
+
+## ENG-07 Native FMT-SIM: local execution tool
+
+The project owner runs all native Windows FMT-SIM scenarios locally. The formal batch runner `tests/simulation/run_fmt_sim_regression.ps1` builds SIL once, starts a fresh simulator process for Land, Return and Mission, and emits a unique manifest, raw logs, SHA256SUMS and a handoff ZIP. Each simulator process is closed by its owned PID before the next scenario starts. The strict gate requires hover 0.62, an explicit owner loopback confirmation, a clean checkout and local HEAD matching the upstream tracking HEAD for issue-closure eligibility. Issues #17/#18/#19 remain OPEN until the returned local evidence is reviewed. See [FMT_SIM_LOCAL_HANDOFF.md](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md).
+
+
+## ENG-07 R30 archive intake — stale code baseline
+
+The owner returned R30 archive SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae9909063`; ZIP and all 31 internal hashes validate. The five diagnostic runs all failed (201,306 checks / 29 failures). However, the tested commit is `3299a4f`, 181 commits behind current branch HEAD `9063f310`; its worktree was dirty and the package lacks the formal batch-runner manifest and loopback-confirmation evidence. This does not retest the ENG-07 fixes now on the branch. No production code change is justified from this stale run. Keep #17/#18/#19 OPEN and rerun from a clean current-HEAD clone using `run_fmt_sim_regression.ps1`. See [the full R30 archive review](../../spec/validation/FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md).

@@ -275,17 +275,48 @@ static void test_landing_aligns_and_limits_final_descent(void)
 
   fx.nav.core.position_ned_m[0] = 0.0f;
   unsigned low_points = 0;
-  for (unsigned i = 0; i < 450; ++i) {
+  uint8_t failure_logged = 0u;
+  /* Allow the approach, braking waypoint, Home-plane arrival and 4 s probe. */
+  for (unsigned i = 0; i < 1200; ++i) {
     CHECK(fx_step(&fx) == STATUS_OK);
+    if ((fx.out.feasibility.feasible == 0u ||
+         fx.out.guidance_status.reference_epoch != epoch) && failure_logged == 0u) {
+      printf("LAND_STAGE_FAIL step=%u feasible=%u state=%u reason=%u feas_reason=%u constraint=%u "
+             "epoch=%u expected=%u nav_z=%.5f nav_vz=%.5f anchor_z=%.5f anchor_vz=%.5f "
+             "preview_z=%.5f preview_vz=%.5f\\n",
+             i, (unsigned)fx.out.feasibility.feasible,
+             (unsigned)fx.out.guidance_status.guidance_state,
+             (unsigned)fx.out.guidance_status.reason_code,
+             (unsigned)fx.out.feasibility.reason_code,
+             (unsigned)fx.out.feasibility.violated_constraint_id,
+             fx.out.guidance_status.reference_epoch, epoch,
+             (double)fx.nav.core.position_ned_m[2], (double)fx.nav.core.velocity_ned_mps[2],
+             (double)fx.out.reference.anchor.point.position_ned_m[2],
+             (double)fx.out.reference.anchor.point.velocity_ned_mps[2],
+             (double)fx.out.reference.points[23].point.position_ned_m[2],
+             (double)fx.out.reference.points[23].point.velocity_ned_mps[2]);
+      failure_logged = 1u;
+    }
     CHECK(fx.out.feasibility.feasible && fx.out.guidance_status.reference_epoch == epoch);
     const ProductMotionPoint *point = &fx.out.reference.points[23].point;
-    if (point->position_ned_m[2] >= -0.5f) {
+    if (point->position_ned_m[2] >= -GUIDANCE_LANDING_BRAKE_HEIGHT_M) {
       ++low_points;
-      CHECK(point->velocity_ned_mps[2] <= 0.35001f);
+      CHECK(fabsf(point->velocity_ned_mps[2]) <=
+            GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-5f);
     }
+    /* Follow the current reference anchor so the staged approach/brake/final
+     * state machine can advance; this is an idealized tracking fixture, not SIL. */
+    const ProductMotionPoint *anchor = &fx.out.reference.anchor.point;
+    memcpy(fx.nav.core.position_ned_m, anchor->position_ned_m,
+           sizeof(fx.nav.core.position_ned_m));
+    memcpy(fx.nav.core.velocity_ned_mps, anchor->velocity_ned_mps,
+           sizeof(fx.nav.core.velocity_ned_mps));
+    memcpy(fx.nav.core.acceleration_ned_mps2, anchor->acceleration_ned_mps2,
+           sizeof(fx.nav.core.acceleration_ned_mps2));
   }
   CHECK(low_points > 0);
-  CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[2]) < 0.001f);
+  CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[2] -
+              GUIDANCE_LANDING_PROBE_M) < 0.001f);
   CHECK(guidance_stop() == STATUS_OK);
 }
 
@@ -341,6 +372,47 @@ static void test_hold_reference_shape(void)
          PRODUCT_POINT_VALID_YAW_RATE));
   CHECK(fx.out.feasibility.feasible == 1u);
   CHECK(fx.out.guidance_status.reference_expires_at_us > fx.now);
+  CHECK(guidance_stop() == STATUS_OK);
+}
+
+static void test_vertical_land_reports_actual_constraint(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx.dir.operation_code = PRODUCT_OP_LAND;
+  fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_ALT_HOLD;
+  fx.nav.core.position_ned_m[2] = -2.0f;
+  fx.nav.core.acceleration_ned_mps2[2] = 5.5f;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_REJECTED);
+  CHECK(fx.out.guidance_status.reason_code == GUIDANCE_PLAN_REASON_ENVELOPE_INVALID);
+  CHECK(fx.out.feasibility.reason_code == GUIDANCE_PLAN_REASON_ENVELOPE_INVALID);
+  CHECK(fx.out.feasibility.violated_constraint_id == GUIDANCE_PLAN_CONSTRAINT_SPEED);
+  CHECK(guidance_stop() == STATUS_OK);
+}
+
+static void test_vertical_land_handoff_uses_active_reference_acceleration(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx.nav.core.position_ned_m[2] = -2.0f;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  const uint32_t previous_epoch = fx.out.guidance_status.reference_epoch;
+  fx_make_permit(&fx, previous_epoch);
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_ACTIVE);
+
+  fx.has_permit = 0u;
+  ++fx.dir.directive_epoch;
+  fx.dir.operation_code = PRODUCT_OP_LAND;
+  fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_ALT_HOLD;
+  /* A valid but frame-rippled acceleration must not replace the last
+   * validated trajectory acceleration during the automatic LAND handoff. */
+  fx.nav.core.acceleration_ned_mps2[2] = 5.5f;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.guidance_status.reference_epoch != previous_epoch);
+  CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_READY);
+  CHECK(fx.out.feasibility.feasible);
   CHECK(guidance_stop() == STATUS_OK);
 }
 
@@ -2301,7 +2373,7 @@ static void test_m5_safety_bernstein_bounds_randomized(void)
 
     CHECK(m5_trajectory_safety_test_curve_bounds(
         p0, v0, a0, p1, v1, a1, duration, u0, u1,
-        position_low, position_high, &speed_bound, &acceleration_bound));
+        position_low, position_high, &speed_bound, &acceleration_bound, NULL, NULL));
 
     for (sample = 0u; sample <= 64u; ++sample) {
       double fraction = (double)sample / 64.0;
@@ -2346,7 +2418,7 @@ static void test_m5_safety_bernstein_zero_curve_enclosure(void)
 
   CHECK(m5_trajectory_safety_test_curve_bounds(
       zero, zero, zero, zero, zero, zero, 0.02f, 0.0f, 1.0f,
-      low, high, &speed, &acceleration));
+      low, high, &speed, &acceleration, NULL, NULL));
   for (axis = 0u; axis < 3u; ++axis) {
     CHECK(low[axis] <= 0.0f);
     CHECK(high[axis] >= 0.0f);
@@ -2363,16 +2435,16 @@ static void test_m5_safety_bernstein_bounds_invalid_inputs(void)
   float low[3], high[3], speed, acceleration;
   CHECK(!m5_trajectory_safety_test_curve_bounds(
       p0, v0, a0, p0, v0, a0, 1.0f, 0.5f, 0.5f,
-      low, high, &speed, &acceleration));
+      low, high, &speed, &acceleration, NULL, NULL));
   CHECK(!m5_trajectory_safety_test_curve_bounds(
       p0, v0, a0, p0, v0, a0, 0.0f, 0.0f, 1.0f,
-      low, high, &speed, &acceleration));
+      low, high, &speed, &acceleration, NULL, NULL));
   CHECK(!m5_trajectory_safety_test_curve_bounds(
       p0, v0, a0, p0, v0, a0, 1.0f, -0.1f, 0.5f,
-      low, high, &speed, &acceleration));
+      low, high, &speed, &acceleration, NULL, NULL));
   CHECK(!m5_trajectory_safety_test_curve_bounds(
       p0, v0, a0, p0, v0, a0, 1.0f, 0.0f, 1.1f,
-      low, high, &speed, &acceleration));
+      low, high, &speed, &acceleration, NULL, NULL));
   {
     float position[3], velocity[3], acceleration_values[3];
     CHECK(!m5_trajectory_safety_test_curve_eval(
@@ -5154,6 +5226,20 @@ static void test_m5_safety_subnormal_jerk_numeric_failure(void)
 
 /* MR-009 R28: exercise the production per-level Horner bound directly and
    through the production validator with finite extreme coefficients. */
+static void check_mr009_rejection_counts(
+    M5SafetyTestConsumerRejectStage expected)
+{
+  uint32_t counts[M5_TEST_CONSUMER_REJECT_STAGE_COUNT] = {0};
+  unsigned i;
+  m5_trajectory_safety_test_consumer_rejection_counts(counts);
+  for (i = 0u; i < M5_TEST_CONSUMER_REJECT_STAGE_COUNT; ++i) {
+    uint32_t wanted = (expected != M5_TEST_CONSUMER_REJECT_NONE &&
+        i == (unsigned)expected) ? 1u : 0u;
+    CHECK(counts[i] == wanted);
+  }
+}
+
+/* MR-009 R30: the rounded Horner chain, not only ideal H_k, must be finite. */
 static void test_m5_safety_mr009_horner_bound_extremes(void)
 {
   double low[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -5162,17 +5248,25 @@ static void test_m5_safety_mr009_horner_bound_extremes(void)
   double bound;
 
   c[0] = 1.0f;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 5u, 10u, 0.02, low, high);
   CHECK(isfinite(bound) && bound >= 0.0);
+  CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+        M5_TEST_CONSUMER_REJECT_NONE);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_NONE);
 
-  /* FLT_MAX near c0/c1: the H_k accumulation must overflow to +Inf. */
+  /* FLT_MAX near c0/c1: the rounded position Horner chain rejects. */
   c[0] = FLT_MAX;
   c[1] = FLT_MAX;
   c[2] = FLT_MAX;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 5u, 10u, 1.0, low, high);
   CHECK(isinf(bound));
+  CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+        M5_TEST_CONSUMER_REJECT_POSITION_HORNER);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_POSITION_HORNER);
 
   /* Positive/negative cancellation cannot hide the magnitude term. */
   c[0] = FLT_MAX;
@@ -5181,55 +5275,186 @@ static void test_m5_safety_mr009_horner_bound_extremes(void)
   c[3] = -FLT_MAX;
   c[4] = FLT_MAX;
   c[5] = -FLT_MAX;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 5u, 10u, 1.0, low, high);
   CHECK(isinf(bound));
 
-  /* Velocity coefficient scaling (5c5..2c2) with FLT_MAX. */
+  /* Velocity Horner degree and acceleration Horner degree remain guarded. */
   c[0] = 0.0f;
   c[1] = FLT_MAX;
   c[2] = FLT_MAX;
   c[3] = FLT_MAX;
   c[4] = FLT_MAX;
   c[5] = 0.0f;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 4u, 12u, 1.0, low, high);
   CHECK(isinf(bound));
+  CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+        M5_TEST_CONSUMER_REJECT_VELOCITY_HORNER);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_VELOCITY_HORNER);
 
-  /* Acceleration coefficient scaling (20c5..2c2) with FLT_MAX. */
   c[0] = 0.0f;
   c[1] = 0.0f;
   c[2] = FLT_MAX;
   c[3] = FLT_MAX;
   c[4] = FLT_MAX;
   c[5] = 0.0f;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 3u, 10u, 1.0, low, high);
   CHECK(isinf(bound));
+  CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+        M5_TEST_CONSUMER_REJECT_ACCELERATION_HORNER);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_ACCELERATION_HORNER);
 
-  /* Subnormal-range magnitude is rejected by the cancellation guard. */
+  /* Subnormal-range magnitude is rejected conservatively, before Horner. */
   c[0] = nextafterf(0.0f, 1.0f);
   c[1] = 0.0f;
   c[2] = 0.0f;
   c[3] = 0.0f;
   c[4] = 0.0f;
   c[5] = 0.0f;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 5u, 10u, 1.0, low, high);
   CHECK(isinf(bound));
+  CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+        M5_TEST_CONSUMER_REJECT_NONE);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_NONE);
 
   /* A non-finite coefficient is never accepted. */
   c[0] = NAN;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 5u, 10u, 1.0, low, high);
   CHECK(isinf(bound));
+  CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+        M5_TEST_CONSUMER_REJECT_NONE);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_NONE);
 
   /* Extremely short interval: finite and non-negative, no silent NaN. */
   c[0] = 1.0f;
   c[1] = 0.0f;
+  m5_trajectory_safety_test_reset_consumer_rejection();
   bound = m5_trajectory_safety_test_consumer_error_bound(
       c, 5u, 10u, nextafter(0.0, 1.0), low, high);
   CHECK(isfinite(bound) && bound >= 0.0);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_NONE);
+
+  /*
+   * S06-115 counterexample: every ideal H_k is below FLT_MAX and the
+   * magnitude term is below FLT_MAX/16, yet binary32 Horner rounds the k=4
+   * intermediate upward so the k=3 add lands exactly on the RN overflow
+   * midpoint and becomes +Inf. The former exact-H-only guard accepted it.
+   */
+  {
+    const float time_s = 0x1.8f5c28p-2f;
+    const float rounded_case[6] = {
+      0.0f, 0.0f, 0.0f,
+      0x1.64befeP+127f,
+      0x1.b6eda2P+126f,
+      0x1.ca01dcP+127f
+    };
+    double ideal_h = fabs((double)rounded_case[5]);
+    double magnitude = 0.0;
+    double power = 1.0;
+    volatile float actual = rounded_case[5];
+    unsigned k;
+    unsigned actual_overflow_stage = 99u;
+
+    for (k = 0u; k <= 5u; ++k) {
+      magnitude += fabs((double)rounded_case[k]) * power;
+      power *= (double)time_s;
+    }
+    for (k = 5u; k-- > 0u;) {
+      ideal_h = fabs((double)rounded_case[k]) + (double)time_s * ideal_h;
+      CHECK(ideal_h < (double)FLT_MAX);
+    }
+    CHECK(magnitude < (double)FLT_MAX * 0.0625);
+
+    for (k = 5u; k-- > 0u;) {
+      volatile float product = actual * time_s;
+      volatile float sum = product + rounded_case[k];
+      if (!isfinite(product) || !isfinite(sum)) {
+        actual_overflow_stage = k;
+        break;
+      }
+      actual = sum;
+    }
+    CHECK(actual_overflow_stage == 3u);
+
+    m5_trajectory_safety_test_reset_consumer_rejection();
+    bound = m5_trajectory_safety_test_consumer_error_bound(
+        rounded_case, 5u, 10u, (double)time_s, low, high);
+    CHECK(isinf(bound));
+    CHECK(m5_trajectory_safety_test_consumer_rejection() ==
+          M5_TEST_CONSUMER_REJECT_POSITION_HORNER);
+    check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_POSITION_HORNER);
+  }
+}
+
+static void test_m5_safety_mr009_consumer_rejection_stages(void)
+{
+  const double h = (double)((float)PRODUCT_PREVIEW_STEP_US * 1e-6f);
+  const double position_for_max_c5 = (double)FLT_MAX * h * h * h * h * h / 6.0;
+  const struct {
+    float end_position;
+    M5SafetyTestConsumerRejectStage stage;
+  } cases[] = {
+    {FLT_MAX, M5_TEST_CONSUMER_REJECT_COEFFICIENTS},
+    {(float)(0.25 * position_for_max_c5), M5_TEST_CONSUMER_REJECT_VELOCITY_SCALING},
+    {(float)(0.10 * position_for_max_c5), M5_TEST_CONSUMER_REJECT_ACCELERATION_SCALING},
+  };
+  const double exact[6] = {0};
+  const M5SafetyTestConsumerRejectStage horner_stages[] = {
+    M5_TEST_CONSUMER_REJECT_ACCELERATION_HORNER,
+    M5_TEST_CONSUMER_REJECT_VELOCITY_HORNER,
+    M5_TEST_CONSUMER_REJECT_POSITION_HORNER,
+  };
+  const unsigned roundings[] = {10u, 12u, 10u};
+  SafetyFx fx;
+  unsigned i;
+
+  /* Full validator: coefficient construction and both derivative scaling
+     stages must each produce NUMERIC_FAILURE for the intended branch only. */
+  for (i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+    safety_fx_init(&fx, 59400000u);
+    safety_zero_uncertainty(&fx);
+    fx.reference.points[0].point.position_ned_m[0] = cases[i].end_position;
+    m5_trajectory_safety_test_reset_consumer_rejection();
+    CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+        &fx.result) == M5_SAFETY_NUMERIC_FAILURE);
+    CHECK(fx.result.reason_code == M5_SAFETY_REASON_NUMERIC);
+    CHECK(fx.result.passed == 0u);
+    CHECK(m5_trajectory_safety_test_consumer_rejection() == cases[i].stage);
+    check_mr009_rejection_counts(cases[i].stage);
+  }
+
+  /* The same production helper is exercised at each derivative degree.
+     Full-validator reachability is deliberately not inferred from this hook. */
+  for (i = 0u; i < sizeof(horner_stages) / sizeof(horner_stages[0]); ++i) {
+    unsigned degree = i + 3u;
+    float c[6] = {0};
+    c[degree] = FLT_MAX;
+    c[degree - 1u] = FLT_MAX;
+    m5_trajectory_safety_test_reset_consumer_rejection();
+    CHECK(isinf(m5_trajectory_safety_test_consumer_error_bound(
+        c, degree, roundings[i], 0.02, exact, exact)));
+    CHECK(m5_trajectory_safety_test_consumer_rejection() == horner_stages[i]);
+    check_mr009_rejection_counts(horner_stages[i]);
+  }
+
+  /* A legal full-validator companion passes and has no rejection trace. */
+  safety_fx_init(&fx, 59400000u);
+  safety_zero_uncertainty(&fx);
+  m5_trajectory_safety_test_reset_consumer_rejection();
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace,
+      &fx.result) == M5_SAFETY_PASS);
+  CHECK(fx.result.passed == 1u);
+  CHECK(m5_trajectory_safety_test_consumer_rejection() == M5_TEST_CONSUMER_REJECT_NONE);
+  check_mr009_rejection_counts(M5_TEST_CONSUMER_REJECT_NONE);
 }
 
 static void test_m5_safety_mr009_extreme_reference_rejected(void)
@@ -5794,6 +6019,188 @@ static void test_m5_safety_envelope_geofence_participation(void)
 
 
 
+static void safety_product_differential_reference(SafetyFx *fx, float x, float y,
+                                                 unsigned axis, float speed)
+{
+  ProductFmsConfig fms;
+  ProductGuidanceConfig guidance;
+  uint16_t i;
+
+  safety_fx_init(fx, 96000000u);
+  fms_model_default_config(&fms);
+  CHECK(fms_product_build_safety_envelope(&fms_quad_x4_policy, &fms,
+        1u, &fx->base.env) == STATUS_OK);
+  fill_header(&fx->base.env.header, MSG_SAFETY_ENVELOPE, SOURCE_M4, fx->base.now);
+  safety_set_constant_position(fx, x, y, -5.0f);
+  fx->base.nav.core.velocity_ned_mps[axis] = speed;
+  fx->reference.anchor.point.velocity_ned_mps[axis] = speed;
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i)
+    fx->reference.points[i].point.velocity_ned_mps[axis] = i % 2u ? speed : -speed;
+
+  safety_map_reset(fx);
+  guidance_default_config(&guidance);
+  fx->map.vehicle_radius_m = guidance.payload.vehicle_radius_m;
+  fx->map.clearance_margin_m = guidance.payload.clearance_margin_m;
+  fx->map.uncertainty_inflation_factor = guidance.payload.uncertainty_inflation_factor;
+  safety_zero_uncertainty(fx);
+  CHECK(m5_trajectory_safety_validate(&fx->input, &fx->workspace, &fx->result)
+        == M5_SAFETY_PASS);
+}
+
+/* Equal positions, opposite tangents and zero accelerations give
+   p(u) = x ± h*v*(u - 2*u^3 + u^4) in every interval. The term in
+   parentheses ranges from 0 to 5/16 on [0,1], attaining 5/16 at 1/2.
+   This bounds the exact moving coordinate over the entire 24-segment reference. */
+static double safety_differential_exact_max(const SafetyFx *fx, unsigned axis)
+{
+  const float h = (float)PRODUCT_PREVIEW_STEP_US * 1e-6f;
+  return (double)fx->reference.anchor.point.position_ned_m[axis] +
+      (5.0 / 16.0) * (double)h *
+      (double)fx->reference.anchor.point.velocity_ned_mps[axis];
+}
+
+static ProductMotionPoint safety_differential_consumer_midpoint(const SafetyFx *fx)
+{
+  ProductMotionPoint sampled = {0};
+  const uint64_t time = fx->base.now + PRODUCT_PREVIEW_STEP_US / 2u;
+  CHECK(control_sample_reference(&fx->reference, time, &sampled) == STATUS_OK);
+  return sampled;
+}
+
+static double safety_differential_inflation(const SafetyFx *fx)
+{
+  return (double)fx->map.vehicle_radius_m + fx->map.clearance_margin_m;
+}
+
+static void test_m5_safety_s06_100_static_differential(void)
+{
+  SafetyFx fx;
+  ProductMotionPoint sampled;
+  const float probe[3] = {0.25f, 0.25f, -4.75f};
+  float center[3];
+  double limit, exact_x, consumed_x, dy;
+  uint16_t voxel = 0u;
+
+  safety_product_differential_reference(&fx, -0x1.f5a83ap-2f, -0x1.000002p-2f, 0u, 0x1.0cp-12f);
+  sampled = safety_differential_consumer_midpoint(&fx);
+  CHECK(m5_local_map_world_to_voxel(&fx.map, probe, &voxel));
+  m5_local_map_voxel_center(&fx.map, voxel, center);
+  CHECK(center[0] == probe[0] && center[1] == probe[1] && center[2] == probe[2]);
+  /* Closest AABB point is (0,0,-5) for the whole reference. */
+  exact_x = safety_differential_exact_max(&fx, 0u);
+  consumed_x = sampled.position_ned_m[0];
+  dy = sampled.position_ned_m[1];
+  limit = safety_differential_inflation(&fx);
+  CHECK(exact_x < 0.0 && consumed_x < 0.0 && dy == fx.reference.anchor.point.position_ned_m[1]);
+  CHECK(sampled.position_ned_m[2] == -5.0f);
+  CHECK(exact_x * exact_x + dy * dy > limit * limit);
+  CHECK(consumed_x * consumed_x + dy * dy < limit * limit);
+  safety_mark_occupied(&fx, probe[0], probe[1], probe[2]);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_STATIC_COLLISION);
+  CHECK(fx.result.passed == 0u && fx.result.reason_code == M5_SAFETY_REASON_STATIC_COLLISION);
+  fx.map.cells[voxel].state = M5_MAP_CELL_FREE_CONFIRMED;
+  fx.map.cells[voxel].log_odds = -4;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_PASS);
+}
+
+static void test_m5_safety_s06_101_dynamic_differential(void)
+{
+  SafetyFx fx;
+  ProductMotionPoint sampled;
+  M5DynamicTrack *track;
+  const double preview_s = (double)PRODUCT_PREVIEW_STEP_US * PRODUCT_PREVIEW_COUNT / 1000000.0;
+  double limit, motion, exact_x, consumed_x, dy;
+
+  safety_product_differential_reference(&fx, -0x1.3999cep-1f, 0x1.0cp-12f, 0u, 0x1.0cp-12f);
+  sampled = safety_differential_consumer_midpoint(&fx);
+  track = &fx.map.tracks[0];
+  safety_set_far_dynamic_track(track, 901u, fx.base.now,
+      0.0f, 0.0f, -5.0f, 0.0f, 0.0f, 0.0f);
+  track->radius_m = 0.0625f;
+  track->position_std_m = 0.0f;
+  track->velocity_std_mps = 0.0f;
+  fx.input.max_dynamic_obstacle_accel_mps2 = 0x1p-26f;
+  /* Enclose all motion allowed by the track acceleration bound for the
+     exact curve, including after the first segment. */
+  motion = 0.5 * fx.map.uncertainty_inflation_factor *
+      fx.input.max_dynamic_obstacle_accel_mps2 * preview_s * preview_s;
+  limit = safety_differential_inflation(&fx) + track->radius_m;
+  exact_x = safety_differential_exact_max(&fx, 0u);
+  consumed_x = sampled.position_ned_m[0];
+  dy = sampled.position_ned_m[1];
+  CHECK(exact_x < 0.0 && consumed_x < 0.0 && dy == fx.reference.anchor.point.position_ned_m[1]);
+  CHECK(sampled.position_ned_m[2] == track->position_ned_m[2]);
+  CHECK(exact_x * exact_x + dy * dy > (limit + motion) * (limit + motion));
+  CHECK(consumed_x * consumed_x + dy * dy < limit * limit);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_DYNAMIC_COLLISION);
+  CHECK(fx.result.passed == 0u && fx.result.reason_code == M5_SAFETY_REASON_DYNAMIC_COLLISION);
+  memset(track, 0, sizeof(*track));
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_PASS);
+}
+
+static void test_m5_safety_s06_102_geofence_differential(void)
+{
+  SafetyFx fx;
+  ProductMotionPoint sampled;
+  double upper_edge;
+
+  safety_product_differential_reference(&fx, 0.0f, 0.0f, 2u, 0x1p-14f);
+  sampled = safety_differential_consumer_midpoint(&fx);
+  safety_set_keep_in_fence(&fx, 0x1.1cc984p+2f, 50.0f, 0x1.a36e2ep-13f);
+  upper_edge = (double)fx.base.dir.payload.home.position_ned_m[2] -
+      fx.fence.min_height_above_home_m - fx.fence.vertical_margin_m -
+      safety_differential_inflation(&fx);
+  /* The trajectory is vertically above the inflated floor for its full
+     duration. Both horizontal coordinates stay at the center of the box. */
+  CHECK(sampled.position_ned_m[0] == 0.0f && sampled.position_ned_m[1] == 0.0f);
+  CHECK(safety_differential_exact_max(&fx, 2u) < upper_edge);
+  CHECK(sampled.position_ned_m[2] > upper_edge);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_GEOFENCE_VIOLATION);
+  CHECK(fx.result.passed == 0u && fx.result.reason_code == M5_SAFETY_REASON_GEOFENCE_VIOLATION);
+  fx.fence.min_height_above_home_m = 4.0f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_PASS);
+}
+
+/* The analytic midpoint lies between binary32 values. Compare the actual
+   production geometry radius to the axis-aligned sum of the two error terms. */
+static void test_m5_safety_s06_116_midpoint_radius(void)
+{
+  SafetyFx fx;
+  const ProductMotionPoint *a, *b;
+  const float h = (float)PRODUCT_PREVIEW_STEP_US * 1e-6f;
+  double exact, midpoint_rounding;
+  float position_low[3], position_high[3], speed, acceleration;
+  float geometry_position, geometry_velocity;
+  float eval_position, eval_velocity, eval_acceleration;
+
+  safety_product_differential_reference(&fx, -0x1.f5a83ap-2f, 0.0f, 0u, 0x1.0cp-12f);
+  /* Isolate north so the standalone consumer radius equals its north error. */
+  fx.reference.anchor.point.position_ned_m[2] = 0.0f;
+  fx.reference.points[0].point.position_ned_m[2] = 0.0f;
+  a = &fx.reference.anchor.point;
+  b = &fx.reference.points[0].point;
+  exact = safety_differential_exact_max(&fx, 0u);
+  midpoint_rounding = fabs((double)(float)exact - exact);
+  CHECK(midpoint_rounding > 0.0);
+  CHECK(m5_trajectory_safety_test_curve_envelope(
+      a->position_ned_m, a->velocity_ned_mps, a->acceleration_ned_mps2,
+      b->position_ned_m, b->velocity_ned_mps, b->acceleration_ned_mps2,
+      h, 0.0f, 1.0f, &eval_position, &eval_velocity, &eval_acceleration));
+  CHECK(m5_trajectory_safety_test_curve_bounds(
+      a->position_ned_m, a->velocity_ned_mps, a->acceleration_ned_mps2,
+      b->position_ned_m, b->velocity_ned_mps, b->acceleration_ned_mps2,
+      h, 0.0f, 1.0f, position_low, position_high, &speed, &acceleration,
+      &geometry_position, &geometry_velocity));
+  CHECK((double)geometry_position >= midpoint_rounding + eval_position);
+  CHECK(geometry_velocity >= eval_velocity);
+}
+
 /* S06-110: production jerk enforcement (spec/02 JERK bit). */
 static void test_m5_safety_jerk_envelope(void)
 {
@@ -6123,6 +6530,47 @@ static void test_m5_safety_jerk_bound_covers_analytic(void)
   }
 }
 
+static void test_landing_reference_probes_below_home_plane(void)
+{
+  Fx fx;
+  float lowest = 0.0f;
+  float max_probe_speed = 0.0f;
+  float max_brake_speed = 0.0f;
+  unsigned probe_samples = 0u;
+  unsigned brake_samples = 0u;
+
+  CHECK(fx_init(&fx));
+  fx.dir.operation_code = PRODUCT_OP_LAND;
+  fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_ALT_HOLD;
+  fx.nav.core.position_ned_m[2] = -2.0f;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  for (unsigned i = 0; i < 1800; ++i) {
+    CHECK(fx_step(&fx) == STATUS_OK);
+    const float above = fx.out.pilot_control_reference.vehicle_extension.altitude_above_origin_m;
+    const float vertical_up = fx.out.pilot_control_reference.vehicle_extension.vertical_velocity_up_mps;
+    if (above < lowest) lowest = above;
+    if (above <= GUIDANCE_LANDING_BRAKE_HEIGHT_M &&
+        above >= -GUIDANCE_LANDING_PROBE_M - 1e-4f) {
+      max_brake_speed = fmaxf(max_brake_speed, fabsf(vertical_up));
+      brake_samples++;
+    }
+    if (above <= 0.0f && above >= -GUIDANCE_LANDING_PROBE_M - 1e-4f) {
+      max_probe_speed = fmaxf(max_probe_speed, fabsf(vertical_up));
+      probe_samples++;
+    }
+  }
+  /* FMAT-0008: a landing that stops exactly at Home hovers above the landing
+   * surface whenever the vertical estimate drifted, so the detector can never
+   * confirm LANDED. The reference must therefore descend through the Home plane
+   * (home=0 here) and let the ground contact model stop the airframe. */
+  CHECK(lowest < -0.2f);
+  CHECK(probe_samples > 0u);
+  CHECK(brake_samples > 0u);
+  CHECK(max_brake_speed <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-4f);
+  CHECK(max_probe_speed <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-4f);
+  CHECK(guidance_stop() == STATUS_OK);
+}
+
 int main(void)
 {
   struct {
@@ -6132,6 +6580,8 @@ int main(void)
     {"hold_reference_shape", test_hold_reference_shape},
     {"landing_alignment_and_speed", test_landing_aligns_and_limits_final_descent},
     {"trajectory_handoff_acceleration", test_trajectory_handoff_uses_active_reference_acceleration},
+    {"vertical_land_reports_constraint", test_vertical_land_reports_actual_constraint},
+    {"vertical_land_handoff_acceleration", test_vertical_land_handoff_uses_active_reference_acceleration},
     {"mission_reference_token", test_mission_reference_and_token},
     {"mission_final_time_bin", test_mission_uses_final_time_bin_before_rejecting},
     {"mission_leg_time_window_reject", test_mission_leg_beyond_time_window_rejected},
@@ -6240,6 +6690,7 @@ int main(void)
     {"m5_safety_numeric_finite_extreme", test_m5_safety_finite_numeric_extreme_rejected},
     {"m5_safety_subnormal_jerk_numeric", test_m5_safety_subnormal_jerk_numeric_failure},
     {"m5_safety_mr009_horner_bound_extremes", test_m5_safety_mr009_horner_bound_extremes},
+    {"m5_safety_mr009_consumer_rejection_stages", test_m5_safety_mr009_consumer_rejection_stages},
     {"m5_safety_mr009_extreme_reference", test_m5_safety_mr009_extreme_reference_rejected},
     {"m5_safety_property_fuzz", test_m5_safety_deterministic_property_fuzz},
     {"m5_safety_geometry_clearance_reference", test_m5_safety_geometry_clearance_reference},
@@ -6273,6 +6724,10 @@ int main(void)
     {"m5_safety_envelope_static_participation", test_m5_safety_envelope_static_participation},
     {"m5_safety_envelope_dynamic_participation", test_m5_safety_envelope_dynamic_participation},
     {"m5_safety_envelope_geofence_participation", test_m5_safety_envelope_geofence_participation},
+    {"m5_safety_s06_100_static_differential", test_m5_safety_s06_100_static_differential},
+    {"m5_safety_s06_101_dynamic_differential", test_m5_safety_s06_101_dynamic_differential},
+    {"m5_safety_s06_102_geofence_differential", test_m5_safety_s06_102_geofence_differential},
+    {"m5_safety_s06_116_midpoint_radius", test_m5_safety_s06_116_midpoint_radius},
     {"m5_safety_jerk_envelope", test_m5_safety_jerk_envelope},
     {"m5_safety_jerk_interval_bound", test_m5_safety_jerk_interval_bound},
     {"m5_safety_jerk_bound_covers_analytic", test_m5_safety_jerk_bound_covers_analytic},
@@ -6280,6 +6735,7 @@ int main(void)
     {"m5_safety_product_envelope_source", test_m5_safety_product_envelope_source},
     {"m5_safety_product_config_validation", test_m5_safety_product_config_validation},
     {"m5_safety_consumer_time_error_c", test_m5_safety_consumer_time_error_c_path},
+    {"landing_reference_probes_below_home", test_landing_reference_probes_below_home_plane},
   };
   size_t i;
   for (i = 0u; i < sizeof(tests) / sizeof(tests[0]); ++i) {

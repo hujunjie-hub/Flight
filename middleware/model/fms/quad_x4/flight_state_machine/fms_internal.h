@@ -29,7 +29,7 @@
 #define FMS_MISSION_ID_MAX 0xFFFFFFFEu
 #define FMS_RETURN_ARRIVE_M 0.5f
 #define FMS_RETURN_PREPARE_TIMEOUT_US 6000000ull
-#define FMS_RETURN_STABLE_US 1000000ull
+#define FMS_RETURN_CONTROL_BIND_US 80000ull
 #define FMS_TAKEOFF_ALT_TOL_M 0.2f
 #define FMS_TAKEOFF_VZ_TOL_MPS 0.2f
 #define FMS_TAKEOFF_STABLE_US 1000000ull
@@ -161,19 +161,18 @@ typedef struct {
 } FmsGeofence;
 
 typedef struct {
-  uint32_t request_id;
+  uint64_t seen_us;
+  uint32_t request_id;  /* Zero denotes an unused entry. */
   uint32_t session;
   uint16_t source;
   uint16_t ack_state;
   uint16_t reason;
   uint16_t command_code;
   ProductOperationPayload payload;
-  uint64_t seen_us;
-  uint8_t used;
 } FmsDedupEntry;
 
 enum { FMS_TRACKER_NONE = 0, FMS_TRACKER_TAKEOFF = 1, FMS_TRACKER_LAND = 2, FMS_TRACKER_RETURN = 3 };
-enum { FMS_RETURN_STABILIZE_HOLD = 1, FMS_RETURN_WAIT_MISSION_HANDOFF = 2 };
+enum { FMS_RETURN_WAIT_CONTROL_BINDING = 1, FMS_RETURN_WAIT_MISSION_HANDOFF = 2 };
 
 typedef struct {
   uint8_t kind;

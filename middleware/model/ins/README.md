@@ -92,8 +92,10 @@ pwsh tests/estimator_backend/run_host_tests.ps1 `
 | `test_contract_coexistence` | 与公共契约共存 | PASS |
 | `test_upstream_compare` | 21 维核心 vs 上游原版（400 历元/20 次 GNSS） | 426 checks / 0 fail |
 
-日志固定在 `build/validation/kf_gins_upstream/`。上游参考需要单独检出锁定 commit（Eigen/ThirdParty
-不入库）；缺失时该测试标记 SKIPPED 而不是伪造通过。
+日志默认位于 `build/validation/kf_gins_upstream/`。上游参考使用单独检出的锁定 commit
+和其中的 Eigen。验收时显式传入 `-Upstream`。入口校验检出的 commit 和工作区清洁状态，
+参考不完整、版本错误或有本地改动时返回失败。省略 `-Upstream` 且默认位置缺少参考时，
+对照行标记 SKIPPED，其余本机用例照常运行。
 
 ### 2026-11-04 历史状态
 

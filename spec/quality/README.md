@@ -60,4 +60,4 @@ GitHub 自动生成的 Issue number 是唯一编号。项目内引用统一写�
 
 ## 当前约束
 
-M5-06 当前仍是 Host/SIL 独立验证阶段。S06 测试 CI 通过不等于 MR-001..MR-008 全部数学审查通过；M5-06 独立审查未 APPROVED 前，不得开始 M5-07。H723/NONE 不具备在线避障放行。
+MR-009 已按项目方指示完成本地技术复核。S06-100～102 已通过 Host 和 ASan/UBSan。B07 目标验证仍未执行，M5-07 未启动。当前 stage-02 已通过 Host/SIL 的显式 DISARM、首参考超时和地面停机回归。H723 配置为 `OBSTACLE_SOURCE_MODE=NONE / BENCH_INHIBIT`。
