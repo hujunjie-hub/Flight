@@ -305,6 +305,21 @@ static float fmt_height(void)
   return fmt_origin.position_ned_m[2] - fmt_state.position_ned_m[2];
 }
 
+/* FLIGHT-29: the navigation estimate can keep every validity bit set while it
+ * separates from the plant. Once that happens every downstream terminal
+ * assertion describes the estimate rather than the airframe, so the scenario
+ * must fail with one explicit divergence assertion instead of a pile of
+ * unrelated terminal failures. */
+static float truth_north_m(void)
+{
+  return fmt_state.position_ned_m[0] - fmt_origin.position_ned_m[0];
+}
+
+static float truth_east_m(void)
+{
+  return fmt_state.position_ned_m[1] - fmt_origin.position_ned_m[1];
+}
+
 uint8_t flight_sil_ground_contact(void)
 {
   if (!fmt_online)
@@ -1298,6 +1313,10 @@ int main(int argc, char **argv)
   int logged_control_rejection = 0;
   int fmt_timeout = 0;
   int motion_request_failed = 0;
+  float nav_truth_hmax = 0.0f;
+  float nav_truth_dmax = 0.0f;
+  unsigned nav_truth_bad_ms = 0u;
+  int nav_diverged = 0;
   RuntimeStats stats;
 
   const int mission_staging_smoke = argc == 2 && !strcmp(argv[1], "--mission-staging-smoke");
@@ -1421,6 +1440,30 @@ int main(int argc, char **argv)
       last_fmt_us = test_clock.monotonic_us + 500u;
       fmt_frames += frames;
       peak_height = fmaxf(peak_height, fmt_height());
+      {
+        const float *home = fms_output.directive.payload.home.position_ned_m;
+        const float dh = hypotf(runtime_data.nav.core.position_ned_m[0] - home[0] - truth_north_m(),
+                                runtime_data.nav.core.position_ned_m[1] - home[1] - truth_east_m());
+        const float dz = fabsf(runtime_data.nav.core.position_ned_m[2] - home[2] + fmt_height());
+        if (dh > nav_truth_hmax) nav_truth_hmax = dh;
+        if (dz > nav_truth_dmax) nav_truth_dmax = dz;
+        if (runtime_data.fms.arm_state == ARM_STATE_ARMED && (dh > 1.0f || dz > 0.8f))
+          nav_truth_bad_ms += 10u;
+        else
+          nav_truth_bad_ms = 0u;
+        if (nav_truth_bad_ms >= 500u && nav_diverged == 0) {
+          nav_diverged = 1;
+          printf("[nav] ESTIMATOR_DIVERGENCE t=%u ms dh=%.2f m dz=%.2f m nav=(%.2f,%.2f,%.2f) truth=(%.2f,%.2f,%.2f) "
+                 "nav_mask=0x%x pos_std=%.2f\n",
+                 ms, (double)dh, (double)dz,
+                 (double)runtime_data.nav.core.position_ned_m[0],
+                 (double)runtime_data.nav.core.position_ned_m[1],
+                 (double)runtime_data.nav.core.position_ned_m[2],
+                 (double)truth_north_m(), (double)truth_east_m(), (double)-fmt_height(),
+                 (unsigned)runtime_data.nav.core.valid_mask,
+                 (double)runtime_data.nav_cap.horizontal_position_std_m);
+        }
+      }
       if (terminal_request != 0u && fmt_height() >= 0.0f && fmt_height() <= 0.5f) {
         const float down_speed = fmt_state.velocity_ned_mps[2];
         if (down_speed > near_ground_max_down) {
@@ -1734,6 +1777,9 @@ int main(int argc, char **argv)
            land_position_reference_seen, return_mode_seen);
     CHECK(fmt_active_frames > 0u);
     CHECK(!fmt_timeout);
+    printf("[nav] max nav/truth separation horizontal %.3f m, vertical %.3f m\n",
+           (double)nav_truth_hmax, (double)nav_truth_dmax);
+    CHECK(nav_diverged == 0);
     CHECK(peak_height >= 1.8f);
     CHECK(takeoff_ack == COMMAND_ACK_COMPLETED);
     CHECK(hold_error <= .30f);
