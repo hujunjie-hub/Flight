@@ -1,6 +1,6 @@
 # FMAT-0013 M7 Host validation record
 
-> Historical evidence for the standalone M7 commit on `test/fmat-0013-m7-actuation`. The statement below that FMS-to-M7 publication was not implemented describes that standalone commit only. The later M6 integration branch adds the FMS ground-stop certificate adapter, runtime handoff, asynchronous actuator apply polling and SIL coverage. This file does not claim that the integrated staging branch has passed its current CI; use the new integrated-branch run records for that determination.
+> Historical evidence for the standalone M7 commit on `test/fmat-0013-m7-actuation`. The statement below that FMS-to-M7 publication was not implemented describes that standalone commit only. The later M6 integration work, including the FMS ground-stop certificate adapter, runtime handoff, asynchronous actuator apply polling and SIL coverage, is merged into `main`. The current integrated main CI result is recorded in the final section below.
 
 
 ## Scope
@@ -42,4 +42,4 @@ Both independently triggered workflows compiled and ran the same real actuator g
 
 ## Current integrated main branch — 2026-11-14
 
-The standalone `test/fmat-0013-m7-actuation` record above is historical. Its M7 actuator guard work is included in the integrated `main` branch through PR #20 (merge commit `eacb966b502b7f9cb547617e866641504346a5fd`). Integration source HEAD `bcbe4db5e665e5f678069afc1b206a00ae1cd36d` reported 13/13 CI checks SUCCESS, including M7 Host and M7 ASan/UBSan. The M7 workflow push filter is now main-only; use fresh post-update main CI as the current validation baseline. Physical DShot waveform/apply-time, ESC response, H723 runtime, HIL and flight remain NOT_RUN.
+The standalone `test/fmat-0013-m7-actuation` record above is historical. Its M7 actuator guard work is included in the integrated `main` branch through PR #20 (merge commit `eacb966b502b7f9cb547617e866641504346a5fd`). Integration source HEAD `bcbe4db5e665e5f678069afc1b206a00ae1cd36d` reported 13/13 CI checks SUCCESS, including M7 Host and M7 ASan/UBSan. The final main commit `5a98ef939eea195297d654ee735e3f5d64798d2c` passed all three main-push workflows: [Host validation #43567326797](https://github.com/hujunjie-hub/Flight/actions/runs/43567326797) 6/6, [M6/M7 host validation #43567326806](https://github.com/hujunjie-hub/Flight/actions/runs/43567326806) 5/5, and [M7 host validation #43567326816](https://github.com/hujunjie-hub/Flight/actions/runs/43567326816) 2/2. The Host workflow's PowerShell runner parse step also passed. Physical DShot waveform/apply-time, ESC response, H723 runtime, HIL and flight remain NOT_RUN.

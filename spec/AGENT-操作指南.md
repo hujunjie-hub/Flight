@@ -46,7 +46,7 @@ M5-06 还必须读取：
 git clone https://github.com/hujunjie-hub/Flight.git
 cd Flight
 git fetch origin --prune
-git switch --track origin/main
+git switch main
 git status --short --branch
 git rev-parse HEAD
 ```

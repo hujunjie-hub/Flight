@@ -261,6 +261,6 @@ H723 实机、WCET/RTA、物理 ESC 响应、HIL、目标 RAM/stack watermark �
 
 自 PR #20 合并后，`main` 是唯一开发、测试和交付分支。禁止新建或继续使用 feature/opt/test 分支；本地正式 FMT-SIM runner 只接受 `main` 且要求 `origin/main` 与 HEAD 完全一致。历史验证分支名称仅用于解释历史归档，不再是当前目标。
 
-PR #20 merge commit 为 `eacb966b502b7f9cb547617e866641504346a5fd`。整合源 `bcbe4db5e665e5f678069afc1b206a00ae1cd36d` 的 13 项 CI checks 全部 SUCCESS；main merge commit Host validation #43566259362 6/6 SUCCESS。后续工作流 push filter 已统一为 main，当前 SPEC/runner 更新后的 main commit 必须重新跑全套 CI。
+PR #20 merge commit 为 `eacb966b502b7f9cb547617e866641504346a5fd`。整合源 `bcbe4db5e665e5f678069afc1b206a00ae1cd36d` 的 13 项 CI checks 全部 SUCCESS；main merge commit Host validation #43566259362 6/6 SUCCESS。后续工作流 push filter 已统一为 main，当前 SPEC/runner 更新后的 main commit 必须重新跑全套 CI。 Main HEAD `5a98ef939eea195297d654ee735e3f5d64798d2c` 的三组工作流全部 SUCCESS：Host [#43567326797](https://github.com/hujunjie-hub/Flight/actions/runs/43567326797) 6/6、M6/M7 [#43567326806](https://github.com/hujunjie-hub/Flight/actions/runs/43567326806) 5/5、M7 [#43567326816](https://github.com/hujunjie-hub/Flight/actions/runs/43567326816) 2/2；Host PowerShell runner parse step PASS。
 
 R31 本机 FMT-SIM RUN_ID `FMT-SIM-LOCAL-20261114T045144621Z-304fbd12` 在旧 HEAD `304fbd12078679d46b80cb626aba9eb0727b6914` 上 Land 4、Return 3、Mission 6 failures；共 116,893 checks / 13 failures。该 HEAD 比整合源 HEAD 落后 7 commits，不能用于判断当前 main。#17/#18/#19 继续 OPEN，等待 Owner 在 main 上执行严格 350 ms 本机复测。详见 `spec/validation/FMT_SIM_LOCAL_20261114_304FBD12_REVIEW.md`。
