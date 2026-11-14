@@ -123,7 +123,7 @@ Host 运行时共 3519 项检查，覆盖释放数传后 ELRS 继续收帧、HIL
 
 ## ENG-07 Fix Iteration 1
 
-Stage-02 code fixes are in commits 9ac05a3, 1e7ad7c, 31a0d3d, bf312b8, 1df941b, 52d7ee9, e1333ac, d072106, 03653a2 and f6ceaeb. The three CI workflows on f6ceaeb passed. Host evidence: M4 1,074/0; M5 324,792/0; MR-009 focused 430/0; M4/M5 integration 1,147/0; M5 ASan/UBSan 324,792/0; M4/M5 integration sanitizer 1,147/0.
+Stage-02 code fixes are in commits 9ac05a3, 1e7ad7c, 31a0d3d, bf312b8, 1df941b, 52d7ee9, e1333ac, d072106, 03653a2, f6ceaeb and ce00ff9. The three CI workflows on ce00ff9 passed. Host evidence: M4 1,074/0; M5 324,792/0; MR-009 focused 430/0; M4/M5 integration 1,147/0; M5 ASan/UBSan 324,792/0; M4/M5 integration sanitizer 1,147/0.
 
 - Land: active trajectory acceleration is carried into vertical automatic LAND only when the previous reference remains valid and active. The vertical LAND builder reports the actual rejection reason/constraint, reaches the Home plane with zero terminal velocity/acceleration, then executes a bounded 4 s below-plane probe.
 - Land/Return: the 0.12 m/s vertical-speed bound applies in the final 0.20 m braking band; the physical contact oracle remains at 0.06 m. Return guidance now stages through a 0.60 m approach point, a 0.20 m braking point, then Home. Only the explicit 0.20 m brake and final Home stages use a copied guidance config with a 25% lower three-axis jerk limit for M6's 20 ms float-boundary reconstruction; the long-return approach retains its original jerk envelope. Vertical-only LAND uses the same braking point before Home and the bounded below-plane probe. Curves entering the braking band are checked with continuous Bernstein bounds; the boundary bisection requires a provably nondecreasing NED-down segment and fails closed on ambiguous crossings.
@@ -136,6 +136,6 @@ The original Windows FMT-SIM Land/Return/Mission scenarios have NOT been rerun a
 
 The Return trace showed 0.358 m/s at 0.105 m above Home. A 0.06 m-only speed cap leaves 0.045 m before the contact sensor threshold, which is insufficient to brake to 0.12 m/s under the 1 m/s² vertical-acceleration envelope. The guidance braking band is now 0.20 m while the physical contact oracle remains at 0.06 m. Return is staged through 0.60 m approach, 0.20 m brake and Home; vertical LAND stages through the braking altitude, Home, then the bounded 0.25 m probe. Only the explicit 0.20 m brake and final Home stages use a copied guidance config with a 25% lower three-axis jerk limit for M6's 20 ms float-boundary reconstruction; the long-return approach retains its original jerk envelope. The FMS 0.15 m/s LandDetector threshold, contact evidence and dwell remain unchanged.
 
-Host CI on f6ceaeb PASS: Host validation #43546782809, M6/M7 host validation #43546782826, M7 host validation #43546782824. M4 1,074/0; M5 324,792/0; MR-009 focused 430/0; M4/M5 integration 1,147/0; M5 ASan/UBSan 324,792/0; integration sanitizer 1,147/0.
+Host CI on ce00ff9 PASS: Host validation #43547565040, M6/M7 host validation #43547564966, M7 host validation #43547564942. M4 1,074/0; M5 324,792/0; MR-009 focused 430/0; M4/M5 integration 1,147/0; M5 ASan/UBSan 324,792/0; integration sanitizer 1,147/0.
 
 Native FMT-SIM must still be rerun before #17/#18 can close.
