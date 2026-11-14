@@ -138,9 +138,10 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
 }
 
 static uint8_t plan(GuidanceState *s, const GuidanceInput *in, const float goal[3], float yaw,
+                    const ProductGuidanceConfig *planning_config,
                     const float *handoff_acceleration, uint16_t *reason, uint16_t *constraint)
 {
-    const ProductGuidanceConfigPayload *cfg = &s->config.payload;
+    const ProductGuidanceConfigPayload *cfg = &planning_config->payload;
     const ProductSafetyEnvelopePayload *e = &in->safety_envelope->vehicle_extension;
     ProductMotionPoint start;
     GuidanceQuintic q[4];
@@ -183,7 +184,7 @@ static uint8_t plan(GuidanceState *s, const GuidanceInput *in, const float goal[
         for (interval = 0; interval < 16; ++interval) {
             const float t0 = duration * interval / 16;
             const float t1 = duration * (interval + 1u) / 16;
-            if (!guidance_curve_dynamics(q, t0, t1, in->safety_envelope, &s->config, constraint)) {
+            if (!guidance_curve_dynamics(q, t0, t1, in->safety_envelope, planning_config, constraint)) {
                 feasible = 0; break;
             }
             if (!guidance_landing_speed_ok(in, &q[2], t0, t1)) {
@@ -192,7 +193,7 @@ static uint8_t plan(GuidanceState *s, const GuidanceInput *in, const float goal[
             }
         }
         if (feasible) {
-            if (!guidance_plan_fences(in, &s->config, q, duration)) {
+            if (!guidance_plan_fences(in, planning_config, q, duration)) {
                 *reason = GUIDANCE_PLAN_REASON_GEOFENCE_VIOLATION; *constraint = GUIDANCE_PLAN_CONSTRAINT_GEOFENCE; return 0;
             }
             memcpy(s->plan, q, sizeof(q)); s->plan_start_us = in->control_time_us;
@@ -222,6 +223,7 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
     unsigned i;
     GuidanceInput limited;
     SafetyEnvelope envelope;
+    ProductGuidanceConfig planning_config = s->config;
     *reason = GUIDANCE_PLAN_REASON_NONE; *constraint = GUIDANCE_PLAN_CONSTRAINT_NONE; s->violation_offset_us = 0;
     if (in->directive->operation_code == PRODUCT_OP_MISSION &&
         (in->authorized_mission->mission.flags & PRODUCT_MISSION_REQUIRES_OBSTACLE_AVOIDANCE)) {
@@ -237,12 +239,10 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
         limited.safety_envelope = &envelope; in = &limited;
     } else if (guidance_has_landing_plane(in)) {
         /* M6 reconstructs each 20 ms interval from float boundary states. Keep
-         * landing-curve jerk 25% below the product envelope to preserve margin
-         * against consumer-side reconstruction and quantization. */
-        envelope = *in->safety_envelope; limited = *in;
+         * landing-curve jerk 25% below the product guidance limit to preserve
+         * margin against consumer-side reconstruction and quantization. */
         for (i = 0; i < 3; ++i)
-            envelope.vehicle_extension.max_jerk_ned_mps3[i] *= GUIDANCE_LANDING_JERK_MARGIN;
-        limited.safety_envelope = &envelope; in = &limited;
+            planning_config.payload.max_jerk_ned_mps3[i] *= GUIDANCE_LANDING_JERK_MARGIN;
     }
     if ((in->geofence_count && !guidance_home_ok(in)) || !target(in, s, goal, &yaw)) {
         *reason = GUIDANCE_PLAN_REASON_GEOFENCE_INVALID; *constraint = GUIDANCE_PLAN_CONSTRAINT_GEOFENCE; return STATUS_INVALID_ARGUMENT;
@@ -250,7 +250,8 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
     if (guidance_has_landing_plane(in))
         landing_stage_target(in, s, goal);
     if (!s->plan_valid || memcmp(goal, s->ctx.target_ned, sizeof(goal)) || yaw != s->ctx.target_yaw_rad)
-        if (!plan(s, in, goal, yaw, handoff_acceleration, reason, constraint)) return STATUS_OUT_OF_RANGE;
+        if (!plan(s, in, goal, yaw, &planning_config, handoff_acceleration, reason, constraint))
+            return STATUS_OUT_OF_RANGE;
     /* Keep the wider spacing through hold/land at a distant waypoint. At 8 m
      * the float position quantum doubles, and 20 ms Hermite intervals can
      * turn that rounding into excessive jerk even on a smooth stop. */
@@ -269,7 +270,7 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
         p->offset_us = i * step_us; p->valid_mask = 0x1Fu;
         sample(s, in->control_time_us+p->offset_us, &p->point);
     }
-    if (!guidance_validate_reference(in, &s->config, r, reason, constraint, &s->violation_offset_us))
+    if (!guidance_validate_reference(in, &planning_config, r, reason, constraint, &s->violation_offset_us))
         return STATUS_OUT_OF_RANGE;
     guidance_publish_header(in, s, &r->header, MSG_MOTION_REFERENCE, GUIDANCE_REFERENCE_TRAJECTORY);
     return STATUS_OK;

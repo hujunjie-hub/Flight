@@ -277,7 +277,7 @@ static void test_landing_aligns_and_limits_final_descent(void)
   unsigned low_points = 0;
   uint8_t failure_logged = 0u;
   /* Allow the approach, braking waypoint and final 0.20 m descent segments. */
-  for (unsigned i = 0; i < 900; ++i) {
+  for (unsigned i = 0; i < 1200; ++i) {
     CHECK(fx_step(&fx) == STATUS_OK);
     if ((fx.out.feasibility.feasible == 0u ||
          fx.out.guidance_status.reference_epoch != epoch) && failure_logged == 0u) {
