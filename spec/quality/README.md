@@ -61,3 +61,5 @@ GitHub 自动生成的 Issue number 是唯一编号。项目内引用统一写�
 ## 当前约束
 
 MR-009 已按项目方指示完成本地技术复核。S06-100～102 已通过 Host 和 ASan/UBSan。B07 目标验证仍未执行，M5-07 未启动。当前 stage-02 已通过 Host/SIL 的显式 DISARM、首参考超时和地面停机回归。H723 配置为 `OBSTACLE_SOURCE_MODE=NONE / BENCH_INHIBIT`。
+
+2026-11-15：ENG-07 的 CONTACT_HOLD 参考拒绝已在本机原生 FMT-SIM 中修复（见 [FLIGHT-23](https://github.com/hujunjie-hub/Flight/issues/23)、[FLIGHT-25](https://github.com/hujunjie-hub/Flight/issues/25) 与 spec/09 R38/R39 节）；三个场景的剩余失败统一由 [FLIGHT-26](https://github.com/hujunjie-hub/Flight/issues/26)（M6 近地水平极限环）解释，LANDED、terminal ACK 与 DISARM 仍未完成。
