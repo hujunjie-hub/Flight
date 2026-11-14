@@ -1044,6 +1044,10 @@ static void test_post_mission_return_missing_control_times_out_in_hold(void)
   CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
   CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_FAILED);
   const CommandAck *ack = fx_find_ack(&fx, request_id);
+  printf("return missing-control result: ack_state=%u reason=%u mode=%u failsafe=%u permit=0x%08x\\n",
+         ack ? ack->ack_state : 0u, ack ? ack->reason_code : 0u,
+         fx.out.state_snapshot.flight_mode, fx.out.state_snapshot.failsafe_level,
+         fx.out.actuation_permit.permit_flags);
   CHECK(ack != NULL && ack->reason_code == 6u);
   CHECK(fms_policy_stop() == STATUS_OK);
 }
