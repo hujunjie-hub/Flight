@@ -976,47 +976,46 @@ static void test_return_pauses_running_mission(void)
   CHECK(fx.out.mission_status.mission_state == MISSION_STATE_PAUSED);
   CHECK(fx.out.mission_status.mission_epoch != epoch);
   CHECK(fx.out.authorized_mission.execution_token == 0u);
+
+  /* A new M6 binding for the POS_HOLD directive is sufficient to hand off.
+   * The return trajectory owns deceleration; M4 does not wait for a stationary
+   * hover or a low instantaneous acceleration estimate. */
   fx_control_active(&fx, 82u);
   fx_run(&fx, 1200000u);
-  CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
-  fx.nav.core.velocity_ned_mps[0] = 0.0f;
-  fx_run(&fx, 2200000u);
   CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_AUTO_RETURN);
+
+  memset(fx.nav.core.position_ned_m, 0, sizeof(fx.nav.core.position_ned_m));
+  memset(fx.nav.core.velocity_ned_mps, 0, sizeof(fx.nav.core.velocity_ned_mps));
+  memset(fx.nav.core.acceleration_ned_mps2, 0, sizeof(fx.nav.core.acceleration_ned_mps2));
+  fx.ext.ground_contact_state = GROUND_CONTACT_CONTACT;
+  fx_run(&fx, 2200000u);
+  CHECK(fx.out.landed_state.state == LANDED_STATE_LANDED);
   CHECK(fms_policy_stop() == STATUS_OK);
 }
 
-static void test_post_mission_return_waits_for_stable_hold(void)
+static void test_post_mission_return_starts_after_control_binding(void)
 {
   Fx fx;
   FmsInputView input;
   const uint32_t request_id = 3200u;
   fx_complete_single_waypoint_mission(&fx);
   fx.control_sample_lag_us = 20000u; /* Bind on M6 processing time, not sensor capture time. */
-  fx.nav.core.velocity_ned_mps[0] = 0.3f;
-  CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_ACCEPTED);
-  CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
-  const uint64_t deadline = fx.req.execution_deadline_us;
-
   fx_control_active(&fx, 81u);
-  fx_run(&fx, 1200000u);
-  CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
-  fx.nav.core.velocity_ned_mps[0] = 0.0f;
-  for (unsigned i = 0; i < 1100000u / STEP_US; ++i) {
-    fx.nav.core.acceleration_ned_mps2[2] = (i % 2u) ? 2.0f : -2.0f;
-    CHECK(fx_step(&fx) == STATUS_OK);
-  }
-  CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
-  for (unsigned elapsed = 0; elapsed < 350000u &&
-       fx.out.state_snapshot.flight_mode != FLIGHT_MODE_AUTO_RETURN; elapsed += STEP_US) {
-    fx.nav.core.acceleration_ned_mps2[2] = (elapsed / STEP_US % 2u) ? 2.0f : -2.0f;
-    CHECK(fx_step(&fx) == STATUS_OK);
-  }
+  fx_run(&fx, 100000u); /* The same directive has a continuous 80 ms M6 binding. */
+
+  /* Deliberately non-stationary: the bounded M5 return trajectory must own
+   * deceleration instead of waiting for a separate hover-stability gate. */
+  fx.nav.core.velocity_ned_mps[0] = 0.3f;
+  fx.nav.core.acceleration_ned_mps2[2] = 2.0f;
+  CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_ACCEPTED);
   CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_AUTO_RETURN);
   CHECK(fx.out.actuation_permit.permit_flags & PERMIT_FLAG_REVOKED);
+  const uint64_t deadline = fx.req.execution_deadline_us;
 
   fx_control_active(&fx, 82u);
   memset(fx.nav.core.position_ned_m, 0, sizeof(fx.nav.core.position_ned_m));
-  fx.nav.core.acceleration_ned_mps2[2] = 0.0f;
+  memset(fx.nav.core.velocity_ned_mps, 0, sizeof(fx.nav.core.velocity_ned_mps));
+  memset(fx.nav.core.acceleration_ned_mps2, 0, sizeof(fx.nav.core.acceleration_ned_mps2));
   fx.ext.ground_contact_state = GROUND_CONTACT_CONTACT;
   fx_run(&fx, 2200000u);
   CHECK(fx.out.landed_state.state == LANDED_STATE_LANDED);
@@ -1030,21 +1029,19 @@ static void test_post_mission_return_waits_for_stable_hold(void)
   CHECK(fms_policy_stop() == STATUS_OK);
 }
 
-static void test_post_mission_return_timeout_preserves_hold(void)
+static void test_post_mission_return_missing_control_times_out_in_hold(void)
 {
   Fx fx;
   const uint32_t request_id = 3201u;
   fx_complete_single_waypoint_mission(&fx);
-  fx.nav.core.velocity_ned_mps[0] = 0.3f;
-  CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_ACCEPTED);
   fx_control_active(&fx, 81u);
-  fx_run(&fx, 1000000u);
-  for (unsigned i = 0; i < 20u; ++i) {
-    fx.nav.core.velocity_ned_mps[0] = (i % 2u) ? 0.14f : -0.14f;
-    fx_run(&fx, 260000u);
-  }
+  fx_run(&fx, 100000u);
+  fx.omit_control = 1u; /* No current M6 capability may authorize AUTO_RETURN. */
+  CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_ACCEPTED);
   CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
-  CHECK(fx.out.actuation_permit.permit_flags == PERMIT_SCOPE_CONTROL_ACTIVE);
+  fx_run(&fx, FMS_RETURN_PREPARE_TIMEOUT_US + 100000u);
+  CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);
+  CHECK((fx.out.actuation_permit.permit_flags & PERMIT_SCOPE_CONTROL_ACTIVE) == 0u);
   CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_FAILED);
   const CommandAck *ack = fx_find_ack(&fx, request_id);
   CHECK(ack != NULL && ack->reason_code == 6u);
@@ -1657,8 +1654,8 @@ int main(void)
     {"operator_home_survives_arm", test_operator_home_survives_arm},
     {"clear_empty_mission_requires_disarm", test_clear_empty_mission_requires_disarm},
     {"return_pauses_running_mission", test_return_pauses_running_mission},
-    {"post_mission_return_waits_for_hold", test_post_mission_return_waits_for_stable_hold},
-    {"post_mission_return_timeout_preserves_hold", test_post_mission_return_timeout_preserves_hold},
+    {"post_mission_return_starts_after_control_binding", test_post_mission_return_starts_after_control_binding},
+    {"post_mission_return_missing_control_times_out_in_hold", test_post_mission_return_missing_control_times_out_in_hold},
     {"duplicate_request_replay", test_duplicate_request_replays_ack},
     {"dedup_full_and_expiry", test_dedup_full_and_expiry},
     {"geofence_required", test_geofence_required_rejects_outside_waypoint},
