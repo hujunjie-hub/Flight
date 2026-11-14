@@ -272,11 +272,14 @@ static void test_landing_aligns_and_limits_final_descent(void)
    * a 2.4 m horizontal leg while returning from 2.4 m above Home. */
   fx.nav.core.position_ned_m[0] = 2.4f;
   fx.nav.core.position_ned_m[2] = -2.4f;
+  const float approach_altitude = fx.nav.core.position_ned_m[2];
   CHECK(fx_step(&fx) == STATUS_OK);
   CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_READY);
   const uint32_t epoch = fx.out.guidance_status.reference_epoch;
   unsigned low_points = 0;
   unsigned capture_points = 0;
+  uint8_t approach_hold_seen = 0u;
+  uint8_t descent_started = 0u;
   uint8_t failure_logged = 0u;
   /* Follow the full long-leg approach, brake, Home-plane arrival and 4 s probe. */
   for (unsigned i = 0; i < 1800; ++i) {
@@ -303,6 +306,19 @@ static void test_landing_aligns_and_limits_final_descent(void)
     }
     CHECK(fx.out.feasibility.feasible && fx.out.guidance_status.reference_epoch == epoch);
     const ProductMotionPoint *point = &fx.out.reference.points[23].point;
+    const float horizontal_error = hypotf(fx.nav.core.position_ned_m[0],
+                                          fx.nav.core.position_ned_m[1]);
+    const float horizontal_speed = hypotf(fx.nav.core.velocity_ned_mps[0],
+                                          fx.nav.core.velocity_ned_mps[1]);
+    if (horizontal_error > 0.30f) {
+      approach_hold_seen = 1u;
+      CHECK(fabsf(point->position_ned_m[2] - approach_altitude) <= 0.05f);
+    }
+    if (fabsf(point->position_ned_m[2] - approach_altitude) > 0.05f) {
+      descent_started = 1u;
+      CHECK(horizontal_error <= 0.30f + 1e-4f);
+      CHECK(horizontal_speed <= 0.25f + 1e-4f);
+    }
     if (point->position_ned_m[2] >= -GUIDANCE_LANDING_CAPTURE_HEIGHT_M) {
       ++capture_points;
       CHECK(fabsf(point->velocity_ned_mps[2]) <=
@@ -323,6 +339,8 @@ static void test_landing_aligns_and_limits_final_descent(void)
   }
   CHECK(capture_points > 0);
   CHECK(low_points > 0);
+  CHECK(approach_hold_seen);
+  CHECK(descent_started);
   CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[0]) < 0.001f);
   CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[1]) < 0.001f);
   CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[2] -
@@ -348,6 +366,11 @@ static void test_landing_contact_latches_horizontal_hold(void)
   fx.has_landed = 1u;
   fx.landed.state = LANDED_STATE_UNKNOWN;
   fx.landed.evidence_mask = LANDED_EVIDENCE_GROUND_CONTACT;
+  /* The contact sample can contain a vertical-velocity overshoot and a raw
+   * acceleration impulse. The new hold plan must start from M5's last valid
+   * reference, not from those unbounded navigation transients. */
+  fx.nav.core.velocity_ned_mps[2] = 0.128f;
+  fx.nav.core.acceleration_ned_mps2[2] = 2.95f;
   CHECK(fx_step(&fx) == STATUS_OK);
   CHECK(fx.out.feasibility.feasible);
   CHECK(fx.out.guidance_status.reference_epoch == epoch);
