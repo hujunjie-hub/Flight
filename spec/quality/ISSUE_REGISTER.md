@@ -266,6 +266,7 @@ Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析
 | [#32](https://github.com/hujunjie-hub/Flight/issues/32) | — | 非安全设置持久化（TEST-V191-PARAM，由 #28 拆分） |
 | [#33](https://github.com/hujunjie-hub/Flight/issues/33) | — | 长航段任务/返航分段（TEST-M5-TIME-LATTICE，由 #28 拆分） |
 | [#34](https://github.com/hujunjie-hub/Flight/issues/34) | — | 组合软件故障注入（spec/09 4.3，由 #28 拆分） |
+| [#35](https://github.com/hujunjie-hub/Flight/issues/35) | — | 估计器套件未进 CI（R42 新增；已修 `125227df`，Job 16 s 通过） |
 
 > 注意事项：映射表首列必须是 Issue 链接，不得以 `| FLIGHT-LOCAL-` 开头；`tools/check_validation_evidence.py` 用该前缀识别正式登记表并检查编号唯一性。
 
