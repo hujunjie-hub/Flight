@@ -63,7 +63,7 @@ git rev-parse HEAD
 
 如果本地存在未提交改动，先报告文件清单和 diff 摘要；不得自动 reset、clean、stash、覆盖用户文件。若远端分支已变更，先比较提交，不得使用强制覆盖。
 
-自 2026-11-14 起，`main` 是唯一远程开发、测试和交付分支。历史 `opt/*` 与 `test/*` 分支已完成整合，不得继续切换、推送或创建新功能分支。每次开始前执行 `git fetch origin --prune`，确认当前分支为 `main`、工作区干净，并将本地 `main` fast-forward 到 `origin/main`；不得使用旧分支上的旧 HEAD 作为当前基线。
+自 2026-11-14 起，`main` 是唯一远程开发、测试和交付分支。历史 `opt/*` 分支已完成整合并删除，远程分支清单已核实只剩 `main`；不得继续切换、推送或创建新功能分支。每次开始前执行 `git fetch origin --prune`，确认当前分支为 `main`、工作区干净，并将本地 `main` fast-forward 到 `origin/main`；不得使用旧分支上的旧 HEAD 作为当前基线。
 
 ### 3.3 Windows 换行修复（每次新检出必须确认）
 
