@@ -120,11 +120,11 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；Git
 
 | Issue | 场景 | 当前状态 | 执行责任 / 解除证据 |
 |---|---|---|---|
-| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / R30 OLD-HEAD DIAGNOSTIC FAIL; POST-FIX NOT RETESTED | R30 tested 3299a4f, 5 failures; rerun current HEAD with formal 350 ms gate |
-| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R30 OLD-HEAD DIAGNOSTIC FAIL; POST-FIX NOT RETESTED | R30 tested 3299a4f, 6 failures; rerun current HEAD with formal 350 ms gate |
-| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R30 OLD-HEAD DIAGNOSTIC FAIL; POST-FIX NOT RETESTED | R30 tested 3299a4f, 9 failures; rerun current HEAD with formal 350 ms gate |
+| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / R32 SCENARIO PASS; FULL BATCH NOT CLOSURE-ELIGIBLE | R32 Land 48,043/0; rerun all scenarios after fix `3d8d29b` |
+| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R32 SCENARIO PASS; FULL BATCH NOT CLOSURE-ELIGIBLE | R32 Return 44,667/0; rerun all scenarios after fix `3d8d29b` |
+| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R32 3 FAILURES; FIX COMMITTED / RETEST REQUIRED | R32 62,793/3; near-ground descent 0.665 m/s, disarm reason 11, arm not DISARMED |
 
-最新已完成自动化验证的代码 HEAD `5a8e2c3079d230bbb5ca90ebbf229552487c2be9` 的 Host validation #43552823302（6/6）、M6/M7 #43552823284（5/5）、M7 #43552823258（2/2）均 SUCCESS；M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integration 1,147/0、M5 ASan/UBSan 324,792/0；PowerShell Parser 对两个本地 runner 均 PASS。以上 CI 不启动原生 FMT-SIM。后续原生 FMT-SIM 均由项目 Owner 在 Windows 本机执行，远程 Agent 不代跑。Agent 负责代码修复、Host/SIL/CI、日志分析和分支交付。命令、环境指纹、归档和回传规则见 [FMT-SIM 本机复测交接方案](../validation/FMT_SIM_LOCAL_HANDOFF.md)；批量入口为 `tests/simulation/run_fmt_sim_regression.ps1`。严格关闭资格另要求 hover 0.62、显式 `-ConfirmLoopbackAddress`、UDP 14653 和 350 ms。三项 Issue 在本机证据回传并复核前保持 OPEN；不得用 Host/CI PASS 或 650 ms 诊断运行关闭。
+Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` 的 Host validation #43574875444（6/6）、M6/M7 #43574875363（5/5）、M7 #43574875394（2/2）全部 SUCCESS；M5 Host 326,004/0、M5 ASan/UBSan 326,004/0、M4 Host 945/0、M4/M5 integration 1,018/0、integration sanitizer 1,018/0、MR-009 focused 430/0。新增 `landing_alignment_and_speed` 与 `landing_contact_latches_xy` 均 PASS。以上 CI 不启动原生 FMT-SIM。后续原生 FMT-SIM 均由项目 Owner 在 Windows 本机执行，远程 Agent 不代跑。Agent 负责代码修复、Host/SIL/CI、日志分析和分支交付。命令、环境指纹、归档和回传规则见 [FMT-SIM 本机复测交接方案](../validation/FMT_SIM_LOCAL_HANDOFF.md)；批量入口为 `tests/simulation/run_fmt_sim_regression.ps1`。严格关闭资格另要求 hover 0.62、显式 `-ConfirmLoopbackAddress`、UDP 14653 和 350 ms。三项 Issue 在本机证据回传并复核前保持 OPEN；不得用 Host/CI PASS 或 650 ms 诊断运行关闭。
 
 
 R30 archive SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae9909063` is verified, but its tested HEAD `3299a4f` is 181 commits behind the reviewed current branch HEAD `9063f310`; worktree DIRTY and formal manifest/loopback gate evidence absent. Five diagnostic scenarios failed (29 assertions total). Do not close or repeat code fixes from this old result; wait for a clean current-HEAD formal rerun. [Full archive review](../validation/FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md).
@@ -134,3 +134,12 @@ R30 archive SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae990
 - PR #20 已合并至唯一分支 `main`，merge commit `eacb966b502b7f9cb547617e866641504346a5fd`；整合源 HEAD `bcbe4db5e665e5f678069afc1b206a00ae1cd36d` 的 13 项 CI checks 全部 SUCCESS；main merge commit Host validation #43566259362 为 6/6 SUCCESS。 Main HEAD `d7666c5aa093dbef36fef11b82909e91fdc61491` 的三组工作流全部 SUCCESS：Host [#43567633122](https://github.com/hujunjie-hub/Flight/actions/runs/43567633122) 6/6、M6/M7 [#43567633103](https://github.com/hujunjie-hub/Flight/actions/runs/43567633103) 5/5、M7 [#43567633072](https://github.com/hujunjie-hub/Flight/actions/runs/43567633072) 2/2；Host PowerShell runner parse step PASS。
 - Owner 的 R31 本机 FMT-SIM 归档测试 HEAD 为 `304fbd12078679d46b80cb626aba9eb0727b6914`，比整合源 HEAD 落后 7 commits。Land 4、Return 3、Mission 6 failures；总计 116,893 checks / 13 failures。该结果仅绑定旧 HEAD，不能判定当前 main 的原生仿真结果。
 - #17/#18/#19 继续 OPEN，必须在干净的 `main` 与 `origin/main` 完全同步后重新运行正式 FMT-SIM 批量入口。B07 H723 实机、WCET/RTA、栈水位、物理 HIL 与飞行仍 NOT_RUN；M5-07 不启动。
+
+
+## 2026-11-14 ENG-07 R32 归档与修复
+
+- R32 RUN_ID `FMT-SIM-LOCAL-20261114T072713056Z-e470f00c` 在 main HEAD `e470f00cd539f438b1923b0faa844456ba2d3b59` 运行；正式门禁、worktree、upstream 和归档哈希均有效。
+- Land 48,043/0 PASS；Return 44,667/0 PASS；Mission 62,793/3 FAIL；总计 155,503/3。Mission 失败为近地下降速度 0.665 m/s、DISARMED ACK reason 11、arm state 未 DISARMED。
+- Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` 已增加 final 0.50 m / 0.40 m/s 限制并锁存 touchdown XY；FMS 安全阈值未放宽。Host/M6-M7/M7 全部通过（6/6、5/5、2/2），新增 M5 测试 PASS。
+- R32 的 #17/#18 单场景 PASS 不构成全批次 closure eligibility；#17/#18/#19 继续 OPEN，等待 fix commit 上完整原生三场景复测。B07 H723、WCET/RTA、栈水位、物理 HIL、飞行仍 NOT_RUN。
+- 完整报告：[R32 FMT-SIM archive review](../validation/FMT_SIM_LOCAL_20261114_E470F00C_REVIEW.md)。

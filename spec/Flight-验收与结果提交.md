@@ -264,3 +264,14 @@ H723 实机、WCET/RTA、物理 ESC 响应、HIL、目标 RAM/stack watermark �
 PR #20 merge commit 为 `eacb966b502b7f9cb547617e866641504346a5fd`。整合源 `bcbe4db5e665e5f678069afc1b206a00ae1cd36d` 的 13 项 CI checks 全部 SUCCESS；main merge commit Host validation #43566259362 6/6 SUCCESS。后续工作流 push filter 已统一为 main，当前 SPEC/runner 更新后的 main commit 必须重新跑全套 CI。 Main HEAD `d7666c5aa093dbef36fef11b82909e91fdc61491` 的三组工作流全部 SUCCESS：Host [#43567633122](https://github.com/hujunjie-hub/Flight/actions/runs/43567633122) 6/6、M6/M7 [#43567633103](https://github.com/hujunjie-hub/Flight/actions/runs/43567633103) 5/5、M7 [#43567633072](https://github.com/hujunjie-hub/Flight/actions/runs/43567633072) 2/2；Host PowerShell runner parse step PASS。
 
 R31 本机 FMT-SIM RUN_ID `FMT-SIM-LOCAL-20261114T045144621Z-304fbd12` 在旧 HEAD `304fbd12078679d46b80cb626aba9eb0727b6914` 上 Land 4、Return 3、Mission 6 failures；共 116,893 checks / 13 failures。该 HEAD 比整合源 HEAD 落后 7 commits，不能用于判断当前 main。#17/#18/#19 继续 OPEN，等待 Owner 在 main 上执行严格 350 ms 本机复测。详见 `spec/validation/FMT_SIM_LOCAL_20261114_304FBD12_REVIEW.md`。
+
+
+## 11. 2026-11-14 R32 原生复测与 main 修复
+
+R32 RUN_ID `FMT-SIM-LOCAL-20261114T072713056Z-e470f00c` 在 main HEAD `e470f00cd539f438b1923b0faa844456ba2d3b59` 上执行，正式门禁有效，归档 ZIP/sidecar、manifest 与内部 102 项哈希全部通过。构建 PASS。Land 48,043/0 PASS；Return 44,667/0 PASS；Mission 62,793/3 FAIL；总计 155,503 checks / 3 failures，最大状态间隔 145.3 ms。
+
+Mission 失败包括近地最后 0.50 m 最大下降速度 0.665 m/s（上限 0.40）、DISARMED ACK reason 11、arm state 未 DISARMED。最终 ground contact=1、landed=UNKNOWN、nav horizontal speed 0.204 m/s、touchdown distance 0.352 m。完整复核见 `spec/validation/FMT_SIM_LOCAL_20261114_E470F00C_REVIEW.md`。
+
+修复已提交 main：`3d8d29b5dfda21237f8ed02db3c31223c656bfbe`。M5 增加最后 0.50 m / 0.40 m/s 速度约束，保留最后 0.20 m / 0.12 m/s；首次 LANDED 后锁存实际 touchdown XY，并在 LANDED 快照短暂丢失时保持。FMS 接地判据、dwell 和 DISARM 安全条件未放宽。SIL 增加 landed stable/evidence/confidence 与 near-ground peak 日志。
+
+自动化验证：Host #43574875444 6/6、M6/M7 #43574875363 5/5、M7 #43574875394 2/2 SUCCESS；M5 Host/ASan 各 326,004/0，M4 Host 945/0，M4/M5 integration/sanitizer 各 1,018/0，MR-009 focused 430/0。新 M5 测试 `landing_alignment_and_speed`、`landing_contact_latches_xy` 均 PASS。修复后的原生 FMT-SIM 仍待 Owner 本机重跑，#17/#18/#19 暂保持 OPEN。

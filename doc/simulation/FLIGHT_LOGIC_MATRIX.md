@@ -168,3 +168,18 @@ Owner archive RUN_ID `FMT-SIM-LOCAL-20261114T045144621Z-304fbd12`, tested HEAD `
 | Mission | 43,692 | 6 | 48.5 ms | near-ground descent bound, terminal ACK, DISARMED ACK, arm state, ground contact, return touchdown error |
 
 Total: 116,893 checks / 13 failures. The test HEAD is seven commits behind the integration source HEAD `bcbe4db5e665e5f678069afc1b206a00ae1cd36d`; those later commits include FMS Return binding and M5 landing-stage/probe corrections. Therefore this run is a valid failure record for `304fbd12`, not a post-fix result for the later code or current main. Keep #17/#18/#19 OPEN and rerun the formal batch runner on clean `main` / `origin/main`. The subsequent integrated main HEAD `d7666c5aa093dbef36fef11b82909e91fdc61491` passed Host [#43567633122](https://github.com/hujunjie-hub/Flight/actions/runs/43567633122) 6/6, M6/M7 [#43567633103](https://github.com/hujunjie-hub/Flight/actions/runs/43567633103) 5/5 and M7 [#43567633072](https://github.com/hujunjie-hub/Flight/actions/runs/43567633072) 2/2 CI workflows; this still does not substitute for the required native FMT-SIM rerun. Detailed hashes and failure lines: [R31 archive review](../../spec/validation/FMT_SIM_LOCAL_20261114_304FBD12_REVIEW.md).
+
+
+## ENG-07 R32 FMT-SIM local run — Land/Return PASS, Mission 3 failures
+
+Owner archive RUN_ID `FMT-SIM-LOCAL-20261114T072713056Z-e470f00c`, tested main HEAD `e470f00cd539f438b1923b0faa844456ba2d3b59`. Branch/upstream match, clean stable worktree, fetch success, explicit loopback, UDP 14653, hover 0.62 and 350 ms gate all verified. Build PASS; ZIP/sidecar SHA256 match; manifest SHA256 match; all 102 internal hashes pass.
+
+| Scenario | Checks | Failures | Longest state gap |
+|---|---:|---:|---:|
+| Land | 48,043 | 0 | 145.3 ms |
+| Return | 44,667 | 0 | 64.4 ms |
+| Mission | 62,793 | 3 | 65.5 ms |
+
+Mission's failures: final 0.50 m maximum descent 0.665 m/s (limit 0.40); DISARMED ACK rejected with reason 11; arm state not DISARMED. At 41,140 ms Return request 2163 completed; DISARM request 3064 was rejected at 41,160 ms. Final contact=1 but landed=UNKNOWN, nav horizontal speed 0.204 m/s and touchdown distance 0.352 m. This is consistent with the M5 reference continuing to chase Home XY after LANDED confirmation and exceeding the FMS 0.20 m/s stable-ground gate. The old M5 trajectory validator only limited the final 0.20 m to 0.12 m/s, while the native acceptance measured the full final 0.50 m.
+
+Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` adds a 0.50 m / 0.40 m/s bound, retains the final 0.20 m / 0.12 m/s bound, and latches touchdown XY after LANDED. FMS safety thresholds are unchanged. Host #43574875444 6/6, M6/M7 #43574875363 5/5 and M7 #43574875394 2/2 all PASS; new M5 landing speed/contact-hold tests PASS. The patch still needs a new native FMT-SIM batch on latest main. Keep #17/#18/#19 OPEN because the R32 manifest is not closure-eligible. [Full R32 archive review](../../spec/validation/FMT_SIM_LOCAL_20261114_E470F00C_REVIEW.md).

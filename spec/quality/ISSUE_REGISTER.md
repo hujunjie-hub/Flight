@@ -138,3 +138,14 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 - ZIP SHA256 `af97c2ac451c2937fab186ccd5e1a9f553b4ee6d699470ab9963e0b105505d26` 与 sidecar 一致，内部 102 项哈希全部匹配。该结果有效绑定旧 HEAD，但不验证后续 7 个提交或当前 main。
 - GitHub Issues #17 Land、#18 Return、#19 Mission 均保持 OPEN。等待 Owner 在干净的 `main` / `origin/main` 同步 checkout 上完成正式 350 ms 批量复测；不得用旧 HEAD 失败直接判定当前 main 失败，也不得用 Host/CI PASS 关闭原生 FMT-SIM Issue。
 - 具体失败断言、工具链、FMT-SIM/settings 哈希及逐场景日志哈希见 [R31 归档复核报告](../validation/FMT_SIM_LOCAL_20261114_304FBD12_REVIEW.md)。
+
+
+## 2026-11-14 ENG-07 R32 本机复测与修复状态
+
+- 归档 RUN_ID `FMT-SIM-LOCAL-20261114T072713056Z-e470f00c`，测试 HEAD `e470f00cd539f438b1923b0faa844456ba2d3b59`；main/origin/main 精确匹配，worktree clean/stable，fetch 成功，正式 350 ms / UDP 14653 / hover 0.62 / loopback gate 全部满足。
+- 归档完整性 PASS：ZIP SHA256 `93f9ad1289a0b30f0a92afa3dee039b37b1e8c03435db54354a2986cdf3eb76d` 与 sidecar 匹配；manifest SHA256 `50cd771b3b810bdf8d5dd08c761b201b4e5a19770ee4b9405d93799d0e039234` 匹配；内部 102 项哈希全部通过。
+- R32：Land 48,043/0 PASS；Return 44,667/0 PASS；Mission 62,793/3 FAIL；合计 155,503 checks / 3 failures。最大状态间隔 145.3 ms。Mission 剩余：近地 0.50 m 最大下降速度 0.665 m/s、DISARMED ACK reason 11、arm state 未 DISARMED。
+- 代码根因：M5 旧约束仅覆盖最后 0.20 m 的 0.12 m/s，缺少最后 0.50 m 的 0.40 m/s 包络；LANDED 后继续追 Home XY 导致 touchdown handoff 水平速度短暂越过 FMS 0.20 m/s 稳定门槛。FMS 安全门槛不应放宽。
+- 修复 main commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`：增加 0.50 m / 0.40 m/s 速度约束；LANDED 后锁存 touchdown XY 并在快照短暂丢失时保持；SIL 增加 landed stable/evidence/confidence 和 near-ground peak 日志。
+- Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` passed Host validation [#43574875444](https://github.com/hujunjie-hub/Flight/actions/runs/43574875444) 6/6, M6/M7 [#43574875363](https://github.com/hujunjie-hub/Flight/actions/runs/43574875363) 5/5 and M7 [#43574875394](https://github.com/hujunjie-hub/Flight/actions/runs/43574875394) 2/2. M5 Host and ASan/UBSan each passed 326,004/0; M4 Host 945/0; M4/M5 integration and its sanitizer each 1,018/0; MR-009 focused 430/0. New tests `landing_alignment_and_speed` and `landing_contact_latches_xy` passed.
+- #17 Land、#18 Return 在 R32 各自场景 PASS，但整份 manifest `issue_closure_eligible=false`，因为 #19 Mission 仍 FAIL；三个 Issue 继续 OPEN，等待修复后完整三场景复测。R32 完整证据见 [R32 report](../validation/FMT_SIM_LOCAL_20261114_E470F00C_REVIEW.md)。

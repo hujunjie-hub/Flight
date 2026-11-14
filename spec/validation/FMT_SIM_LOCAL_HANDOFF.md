@@ -28,8 +28,9 @@
 
 - M5 垂直自动 LAND 允许沿用仍有效且已验证的活动轨迹加速度；拒绝时保留实际 reason / constraint。
 - LAND 先经 0.20 m 制动高度，再到 Home 平面，以零终端垂向速度/加速度结束参考，随后执行有界探针。
-- LAND / RETURN 在 Home 上方 0.20 m 制动带内限制垂向速度；物理接地判据仍为 0.06 m，LandDetector 原有接地、速度、加速度和 dwell 条件未放宽。
+- LAND / RETURN 在 Home 上方最后 0.50 m 内限制垂向速度不超过 0.40 m/s；最后 0.20 m 继续限制为 0.12 m/s。物理接地判据仍为 0.06 m，LandDetector 原有接地、速度、加速度和 dwell 条件未放宽。
 - RETURN 分为 0.60 m 进近、0.20 m 制动和最终 Home 段；25% 三轴 jerk 余量只作用于制动和最终段，不压缩长距离进近段。
+- FMS 首次确认 LANDED 后，M5 锁存实际接地点的水平坐标并保持至解除武装交接结束；LANDED 快照短暂丢失时不再恢复追逐 Home XY。
 - M4 Mission→Return 许可绑定比较使用 M6 capability 的 publish 时间，覆盖 20 ms sample-to-publish 延迟。
 
 代码修复基线为 `ce00ff9f0a8eb4989d1a171c3322f3640de2965c`。最新已完成自动化验证的代码 HEAD 为 `5a8e2c3079d230bbb5ca90ebbf229552487c2be9`，三组 CI 全部通过：
@@ -178,3 +179,14 @@ build/validation/fmt-sim-local/<RUN_ID>.zip
 - R31 结果：Land 36,600/4 FAIL；Return 36,601/3 FAIL；Mission 43,692/6 FAIL；合计 116,893 checks / 13 failures。最长状态间隔分别 78.7/48.0/48.5 ms，均小于 350 ms。构建 PASS，严格 issue-closure eligibility 为 false。ZIP SHA256 `af97c2ac451c2937fab186ccd5e1a9f553b4ee6d699470ab9963e0b105505d26` 与 sidecar 匹配；内部 102 项哈希全部通过。
 - 逐场景失败断言、环境指纹和哈希见 [R31 本机归档复核报告](FMT_SIM_LOCAL_20261114_304FBD12_REVIEW.md)。#17/#18/#19 继续 OPEN。
 - **下一轮本机复测只使用 main：** `git fetch origin --prune; git switch main; git pull --ff-only origin main`，确认 clean、HEAD 与 `origin/main` 一致后执行本方案正式批量入口。runner 已改为只接受 `main` / `origin/main`；旧 stage-02 checkout 会被拒绝。
+
+
+## 2026-11-14 R32 本机归档复核与下一轮修复
+
+- RUN_ID：`FMT-SIM-LOCAL-20261114T072713056Z-e470f00c`；正式门禁有效：`main` / HEAD `e470f00cd539f438b1923b0faa844456ba2d3b59`，`origin/main` 完全匹配，worktree clean 且运行期间稳定，fetch 成功，loopback 显式确认，UDP 14653、hover 0.62、350 ms。
+- ZIP SHA256 `93f9ad1289a0b30f0a92afa3dee039b37b1e8c03435db54354a2986cdf3eb76d` 与 sidecar 匹配；104 个 ZIP entries CRC 通过；manifest SHA256 `50cd771b3b810bdf8d5dd08c761b201b4e5a19770ee4b9405d93799d0e039234` 匹配；内部 102 项 SHA256 全部通过。构建 PASS。
+- 结果：Land 48,043/0 PASS；Return 44,667/0 PASS；Mission 62,793/3 FAIL；总计 155,503 checks / 3 failures。最大状态间隔 145.3 ms，小于 350 ms。Mission 失败为近地 0.50 m 最大下降速度 0.665 m/s（上限 0.40）、DISARMED ACK 和最终 arm state。
+- Mission Return ACK 在 41,140 ms 完成，DISARM 在 41,160 ms 被 FMS 以 reason 11 拒绝；最终 ground contact=1 但 landed state UNKNOWN，nav horizontal speed 0.204 m/s，略高于 LandDetector 0.20 m/s 稳定门槛，touchdown distance 0.352 m。R32 完整断言、日志和哈希见 [R32 归档复核报告](FMT_SIM_LOCAL_20261114_E470F00C_REVIEW.md)。
+- 根因修复提交：`3d8d29b5dfda21237f8ed02db3c31223c656bfbe`。M5 增加最后 0.50 m / 0.40 m/s 速度包络（最后 0.20 m / 0.12 m/s 保持不变）；首次 LANDED 后锁存 touchdown XY，避免解除武装期间继续追 Home。FMS 接地、速度、加速度、dwell 和 DISARM 判据均未放宽。SIL 新增 LandDetector 稳定时间/证据位/置信度与 near-ground peak 时高诊断。
+- Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` passed Host validation [#43574875444](https://github.com/hujunjie-hub/Flight/actions/runs/43574875444) 6/6, M6/M7 [#43574875363](https://github.com/hujunjie-hub/Flight/actions/runs/43574875363) 5/5 and M7 [#43574875394](https://github.com/hujunjie-hub/Flight/actions/runs/43574875394) 2/2. M5 Host and ASan/UBSan each passed 326,004/0; M4 Host 945/0; M4/M5 integration and its sanitizer each 1,018/0; MR-009 focused 430/0. New tests `landing_alignment_and_speed` and `landing_contact_latches_xy` passed.
+- **下一轮必须在最新 main 上重跑完整 Land → Return → Mission。** R32 的 Land、Return 场景虽然通过，但 manifest 的 `issue_closure_eligible=false`；#17/#18/#19 暂均保持 OPEN，不能以单场景 PASS 或 Host/CI PASS 代替完整原生验收。
