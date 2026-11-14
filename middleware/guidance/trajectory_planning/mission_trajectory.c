@@ -2,8 +2,8 @@
 #include <string.h>
 #include "guidance_update/guidance_internal.h"
 
-enum { LANDING_APPROACH = 1, LANDING_BRAKE = 2, LANDING_FINAL = 3, LANDING_PROBE = 4,
-       LANDING_CONTACT_HOLD = 5 };
+enum { LANDING_APPROACH = 1, LANDING_DESCENT = 2, LANDING_BRAKE = 3,
+       LANDING_FINAL = 4, LANDING_PROBE = 5, LANDING_CONTACT_HOLD = 6 };
 
 static uint8_t finite3(const float v[3])
 { return (uint8_t)(isfinite(v[0]) && isfinite(v[1]) && isfinite(v[2])); }
@@ -139,9 +139,10 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
     if (s->landing_stage == 0u) {
         const float horizontal_error = hypotf(position[0] - goal[0], position[1] - goal[1]);
         const float horizontal_speed = hypotf(velocity[0], velocity[1]);
-        if (position[2] < approach_down || horizontal_error > 0.30f ||
-            horizontal_speed > 0.25f)
+        if (horizontal_error > 0.30f || horizontal_speed > 0.25f)
             s->landing_stage = LANDING_APPROACH;
+        else if (position[2] < approach_down)
+            s->landing_stage = LANDING_DESCENT;
         else if (position[2] < brake_down)
             s->landing_stage = LANDING_BRAKE;
         else if (position[2] < home_down)
@@ -155,13 +156,35 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
             hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
             hypotf(velocity[0], velocity[1]) <= 0.25f &&
             fabsf(position[2] - s->ctx.target_ned[2]) <= 0.20f &&
-            fabsf(velocity[2]) <= 0.20f)
-            s->landing_stage = LANDING_BRAKE;
+            fabsf(velocity[2]) <= 0.20f) {
+            if (position[2] < approach_down)
+                s->landing_stage = LANDING_DESCENT;
+            else if (position[2] < brake_down)
+                s->landing_stage = LANDING_BRAKE;
+            else if (position[2] < home_down)
+                s->landing_stage = LANDING_FINAL;
+            else
+                s->landing_stage = LANDING_PROBE;
+        }
         if (s->landing_stage == LANDING_APPROACH) {
             /* First align and brake horizontally at the current altitude.
-             * Do not combine a long XY return with the final descent: the
-             * vehicle must settle over Home before entering the landing band. */
+             * Do not combine a long XY return with the vertical descent. */
             goal[2] = s->ctx.target_ned[2];
+            return;
+        }
+    }
+
+    if (s->landing_stage == LANDING_DESCENT) {
+        if (plan_complete &&
+            hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
+            hypotf(velocity[0], velocity[1]) <= 0.15f &&
+            fabsf(position[2] - approach_down) <= 0.20f &&
+            fabsf(velocity[2]) <= 0.20f)
+            s->landing_stage = LANDING_BRAKE;
+        if (s->landing_stage == LANDING_DESCENT) {
+            /* Descend vertically to the 0.60 m approach shelf only after the
+             * horizontal return has settled over Home. */
+            goal[2] = approach_down;
             return;
         }
     }
