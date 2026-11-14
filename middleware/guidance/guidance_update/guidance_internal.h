@@ -31,6 +31,12 @@ CONTRACT_STATIC_ASSERT(GUIDANCE_MAX_DURATION_US == 6200000u,
  * detector could never confirm LANDED. Both landing builders descend through
  * the plane by this bounded probe; the ground contact model stops the airframe. */
 #define GUIDANCE_LANDING_PROBE_M 0.25f
+/* FMS LandDetector requires |vertical speed| <= 0.15 m/s; keep the planned
+ * near-home envelope at 0.12 m/s to leave tracking margin. */
+#define GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS 0.12f
+/* After reaching the Home plane at zero vertical speed, probe below it slowly.
+ * The 4 s rest-to-rest probe remains inside M5's 6.2 s bounded horizon. */
+#define GUIDANCE_LANDING_PROBE_DURATION_S 4.0f
 /* Landing descends in small steps from the measured position instead of aiming at
  * an unreachable plane: a large constant position error saturates the vertical
  * loop, bounces the airframe off the contact spring and flickers LANDED. */
@@ -174,7 +180,9 @@ uint8_t guidance_handoff_acceleration(const GuidanceState *state, const Guidance
 Status guidance_build_trajectory(GuidanceState *state, const GuidanceInput *in, GuidanceOutput *out,
                              const float *handoff_acceleration, uint16_t *reason, uint16_t *constraint);
 Status guidance_build_pilot(GuidanceState *state, const GuidanceInput *in, GuidanceOutput *out);
-Status guidance_build_vertical_land(GuidanceState *state, const GuidanceInput *in, GuidanceOutput *out);
+Status guidance_build_vertical_land(GuidanceState *state, const GuidanceInput *in, GuidanceOutput *out,
+                                    const float *handoff_acceleration, uint16_t *reason,
+                                    uint16_t *constraint);
 void guidance_publish_header(const GuidanceInput *in, GuidanceState *state, ContractHeader *header,
                           uint16_t type, uint16_t kind);
 void guidance_quintic_hermite_eval(float p0, float v0, float a0, float p1, float v1, float a1,

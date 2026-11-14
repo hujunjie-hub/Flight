@@ -78,7 +78,9 @@ uint8_t guidance_handoff_acceleration(const GuidanceState *s, const GuidanceInpu
 {
     const GuidanceRefContext *previous = &s->ctx;
     if (in->directive->policy_id != 2u || !previous->valid || !s->active || !s->plan_valid ||
-        previous->kind != GUIDANCE_REFERENCE_TRAJECTORY || next->kind != GUIDANCE_REFERENCE_TRAJECTORY ||
+        previous->kind != GUIDANCE_REFERENCE_TRAJECTORY ||
+        (next->kind != GUIDANCE_REFERENCE_TRAJECTORY &&
+         next->kind != GUIDANCE_REFERENCE_ALTITUDE_AUTOMATIC) ||
         previous->boot_id != next->boot_id || previous->time_epoch != next->time_epoch ||
         previous->state_epoch != next->state_epoch || previous->origin_id != next->origin_id ||
         in->control_time_us <= s->last_state_time_us || in->control_time_us - s->last_state_time_us > 40000u ||

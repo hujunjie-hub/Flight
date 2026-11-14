@@ -65,7 +65,9 @@ uint8_t guidance_landing_speed_ok(const GuidanceInput *in, const GuidanceQuintic
         return 0u;
     if (hi < in->directive->payload.home.position_ned_m[2] - 0.5f)
         return 1u;
-    return guidance_quintic_bounds(down, t0, t1, 1, &lo, &hi) && hi <= 0.35f + 1e-5f;
+    return guidance_quintic_bounds(down, t0, t1, 1, &lo, &hi) &&
+           lo >= -GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS - 1e-5f &&
+           hi <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-5f;
 }
 
 static float absmin(float lo, float hi)

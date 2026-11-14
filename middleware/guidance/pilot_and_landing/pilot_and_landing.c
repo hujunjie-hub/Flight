@@ -59,53 +59,97 @@ Status guidance_build_pilot(GuidanceState *s, const GuidanceInput *in, GuidanceO
 /* Typed altitude-only landing: never feeds invented horizontal coordinates
  * into XYZ tracking. Each bounded descent segment ends at zero v/a. */
 
-Status guidance_build_vertical_land(GuidanceState *s, const GuidanceInput *in, GuidanceOutput *out)
+Status guidance_build_vertical_land(GuidanceState *s, const GuidanceInput *in,
+                                    GuidanceOutput *out, const float *handoff_acceleration,
+                                    uint16_t *reason, uint16_t *constraint)
 {
     PilotControlReference *r = &out->pilot_control_reference;
     ProductPilotControlReferencePayload *p = &r->vehicle_extension;
     float elapsed = s->plan_valid ? (in->control_time_us-s->plan_start_us)*1e-6f : 0;
-    float d, v, a, goal, duration;
+    float d, v, a, goal, duration, plane = 0.0f;
+    uint8_t home_valid = guidance_home_ok(in);
     unsigned i, attempt;
-    uint16_t constraint = 0;
+
+    *reason = GUIDANCE_PLAN_REASON_NONE;
+    *constraint = GUIDANCE_PLAN_CONSTRAINT_NONE;
     /* With no horizontal capability, a geofence swept-volume claim is impossible. */
-    if (in->geofence_count) return STATUS_NOT_READY;
+    if (in->geofence_count) {
+        *reason = GUIDANCE_PLAN_REASON_CLEARANCE_UNPROVEN;
+        *constraint = GUIDANCE_PLAN_CONSTRAINT_GEOFENCE;
+        return STATUS_NOT_READY;
+    }
     if (!s->plan_valid || elapsed >= s->plan_duration_s) {
         if (s->plan_valid) {
-            d = guidance_quintic_eval(&s->plan[2], s->plan_duration_s, 0); v = a = 0;
+            d = guidance_quintic_eval(&s->plan[2], s->plan_duration_s, 0);
+            v = a = 0;
         } else {
             d = in->navigation->core.position_ned_m[2];
             v = in->navigation->core.velocity_ned_mps[2];
-            a = (in->navigation->core.valid_mask & NAV_VALID_ACCELERATION) ?
-                in->navigation->core.acceleration_ned_mps2[2] : 0;
+            a = handoff_acceleration != NULL ? handoff_acceleration[2] :
+                ((in->navigation->core.valid_mask & NAV_VALID_ACCELERATION) ?
+                    in->navigation->core.acceleration_ned_mps2[2] : 0.0f);
         }
-        if (!isfinite(a)) return STATUS_NUMERIC_ERROR;
-        goal = d+1.0f;
-        if (guidance_home_ok(in)) {
-            const float plane = in->directive->payload.home.position_ned_m[2];
+        if (!isfinite(a)) {
+            *reason = GUIDANCE_PLAN_REASON_NUMERIC;
+            *constraint = GUIDANCE_PLAN_CONSTRAINT_DYNAMICS;
+            return STATUS_NUMERIC_ERROR;
+        }
+
+        goal = d + 1.0f;
+        if (home_valid) {
+            plane = in->directive->payload.home.position_ned_m[2];
             const float floor_m = in->directive->operation_code == PRODUCT_OP_LAND
                                       ? plane + GUIDANCE_LANDING_PROBE_M
                                       : plane;
-            goal = fmaxf(d, fminf(goal, floor_m));
+            /* Reach Home with zero v/a first. Only if contact evidence is still
+             * absent on the next segment do we make the bounded below-plane probe. */
+            if (in->directive->operation_code == PRODUCT_OP_LAND &&
+                d < plane && goal > plane) {
+                goal = plane;
+            } else {
+                goal = fmaxf(d, fminf(goal, floor_m));
+            }
         }
         if (in->landed_state && guidance_header_ok(&in->landed_state->header, &in->navigation->header,
             MSG_LANDED_STATE_SNAPSHOT, in->evaluation_time_us) &&
-            in->landed_state->state == LANDED_STATE_LANDED) goal = d;
+            in->landed_state->state == LANDED_STATE_LANDED) {
+            goal = d;
+        }
+
         duration = 0.2f;
-        for (attempt = 0; attempt < GUIDANCE_MAX_DURATION_ATTEMPTS && duration <= GUIDANCE_MAX_DURATION_S+1e-5f; ++attempt) {
+        if (home_valid && in->directive->operation_code == PRODUCT_OP_LAND &&
+            d >= plane - 1e-5f && goal > d + 1e-5f) {
+            duration = GUIDANCE_LANDING_PROBE_DURATION_S;
+        }
+        for (attempt = 0; attempt < GUIDANCE_MAX_DURATION_ATTEMPTS &&
+             duration <= GUIDANCE_MAX_DURATION_S + 1e-5f; ++attempt) {
             uint8_t valid = 1;
+            *constraint = GUIDANCE_PLAN_CONSTRAINT_NONE;
             memset(s->plan, 0, sizeof(s->plan));
             guidance_quintic_solve(d, v, a, goal, duration, &s->plan[2]);
-            for (i = 0; i < 16; ++i)
+            for (i = 0; i < 16; ++i) {
                 if (!guidance_curve_dynamics(s->plan, duration*i/16, duration*(i+1)/16,
-                                      in->safety_envelope, &s->config, &constraint)) { valid = 0; break; }
+                                             in->safety_envelope, &s->config, constraint)) {
+                    valid = 0;
+                    break;
+                }
+            }
             if (valid) break;
             duration = ceilf(duration*1.25f/0.2f)*0.2f;
         }
-        if (attempt == GUIDANCE_MAX_DURATION_ATTEMPTS || duration > GUIDANCE_MAX_DURATION_S+1e-5f) {
-            s->plan_valid = 0; return STATUS_OUT_OF_RANGE;
+        if (attempt == GUIDANCE_MAX_DURATION_ATTEMPTS ||
+            duration > GUIDANCE_MAX_DURATION_S + 1e-5f) {
+            s->plan_valid = 0;
+            *reason = GUIDANCE_PLAN_REASON_ENVELOPE_INVALID;
+            if (*constraint == GUIDANCE_PLAN_CONSTRAINT_NONE) {
+                *constraint = GUIDANCE_PLAN_CONSTRAINT_DYNAMICS;
+            }
+            return STATUS_OUT_OF_RANGE;
         }
-        s->plan_duration_s = duration; s->plan_start_us = in->control_time_us;
-        s->plan_valid = 1; elapsed = 0;
+        s->plan_duration_s = duration;
+        s->plan_start_us = in->control_time_us;
+        s->plan_valid = 1;
+        elapsed = 0;
         s->pilot_yaw_rad = guidance_yaw_from_quat(in->navigation->core.q_nb_wxyz);
     }
     p->valid_mask = PRODUCT_PILOT_REF_VALID_ATTITUDE | PRODUCT_PILOT_REF_VALID_ALTITUDE_UP |
@@ -113,10 +157,14 @@ Status guidance_build_vertical_land(GuidanceState *s, const GuidanceInput *in, G
     guidance_quat_from_rpy(0, 0, s->pilot_yaw_rad, p->q_nb_desired_wxyz);
     p->altitude_above_origin_m = -guidance_quintic_eval(&s->plan[2], elapsed, 0);
     p->vertical_velocity_up_mps = -guidance_quintic_eval(&s->plan[2], elapsed, 1);
-    r->reference_id = s->ref_id; r->reference_epoch = s->ref_epoch;
-    r->state_epoch = s->ctx.state_epoch; r->origin_id = s->ctx.origin_id;
-    r->authority_epoch = s->ctx.authority_epoch; r->directive_epoch = s->ctx.directive_epoch;
+    r->reference_id = s->ref_id;
+    r->reference_epoch = s->ref_epoch;
+    r->state_epoch = s->ctx.state_epoch;
+    r->origin_id = s->ctx.origin_id;
+    r->authority_epoch = s->ctx.authority_epoch;
+    r->directive_epoch = s->ctx.directive_epoch;
     r->reference_kind = PILOT_REFERENCE_ALTITUDE_ATTITUDE;
-    guidance_publish_header(in, s, &r->header, MSG_PILOT_CONTROL_REFERENCE, GUIDANCE_REFERENCE_ALTITUDE_AUTOMATIC);
+    guidance_publish_header(in, s, &r->header, MSG_PILOT_CONTROL_REFERENCE,
+                            GUIDANCE_REFERENCE_ALTITUDE_AUTOMATIC);
     return STATUS_OK;
 }

@@ -57,6 +57,7 @@ typedef struct {
   uint64_t guidance_ttl_us;
   uint8_t guidance_valid;
   uint8_t omit_control;
+  uint32_t control_sample_lag_us;
   uint8_t has_candidate;
   OperationRequest req;
   uint8_t has_req;
@@ -160,6 +161,9 @@ static void fx_fill_headers(Fx *fx)
   fill_header(&fx->rc.header, MSG_COMMUNICATION_LINK_STATUS, 1u, now, 200000u, now);
   fill_header(&fx->gcs.header, MSG_COMMUNICATION_LINK_STATUS, 2u, now, 200000u, now);
   fill_header(&fx->control.header, MSG_CONTROL_CAPABILITY, 23u, now, 100000u, now);
+  if (fx->control_sample_lag_us != 0u && now >= fx->control_sample_lag_us) {
+    fx->control.header.timestamp_sample_us = now - fx->control_sample_lag_us;
+  }
   fill_header(&fx->act_cap.header, MSG_ACTUATOR_CAPABILITY, 24u, now, 100000u, now);
   fill_header(&fx->act_status.header, MSG_ACTUATOR_STATUS, 24u, now, 50000u, now);
   fill_header(&fx->faults.header, MSG_FAULT_SUMMARY, 25u, now, 200000u, now);
@@ -960,6 +964,7 @@ static void test_return_pauses_running_mission(void)
   fx_control_active(&fx, 80u);
   fx_airborne(&fx);
   fx_start_mission(&fx);
+  fx.control_sample_lag_us = 20000u; /* M6 publish follows a slightly older nav sample. */
   CHECK(fx.out.authorized_mission.execution_token != 0u);
   const uint32_t epoch = fx.out.mission_status.mission_epoch;
   fx.nav.core.velocity_ned_mps[0] = 0.3f;
@@ -986,6 +991,7 @@ static void test_post_mission_return_waits_for_stable_hold(void)
   FmsInputView input;
   const uint32_t request_id = 3200u;
   fx_complete_single_waypoint_mission(&fx);
+  fx.control_sample_lag_us = 20000u; /* Bind on M6 processing time, not sensor capture time. */
   fx.nav.core.velocity_ned_mps[0] = 0.3f;
   CHECK(fx_send(&fx, PRODUCT_CMD_RETURN, request_id, 0, 0, 0, 0, 0, 0.0f) == COMMAND_ACK_ACCEPTED);
   CHECK(fx.out.state_snapshot.flight_mode == FLIGHT_MODE_POS_HOLD);

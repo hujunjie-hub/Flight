@@ -281,7 +281,8 @@ static void test_landing_aligns_and_limits_final_descent(void)
     const ProductMotionPoint *point = &fx.out.reference.points[23].point;
     if (point->position_ned_m[2] >= -0.5f) {
       ++low_points;
-      CHECK(point->velocity_ned_mps[2] <= 0.35001f);
+      CHECK(fabsf(point->velocity_ned_mps[2]) <=
+            GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-5f);
     }
   }
   CHECK(low_points > 0);
@@ -341,6 +342,47 @@ static void test_hold_reference_shape(void)
          PRODUCT_POINT_VALID_YAW_RATE));
   CHECK(fx.out.feasibility.feasible == 1u);
   CHECK(fx.out.guidance_status.reference_expires_at_us > fx.now);
+  CHECK(guidance_stop() == STATUS_OK);
+}
+
+static void test_vertical_land_reports_actual_dynamics_constraint(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx.dir.operation_code = PRODUCT_OP_LAND;
+  fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_ALT_HOLD;
+  fx.nav.core.position_ned_m[2] = -2.0f;
+  fx.nav.core.acceleration_ned_mps2[2] = 5.5f;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_REJECTED);
+  CHECK(fx.out.guidance_status.reason_code == GUIDANCE_PLAN_REASON_ENVELOPE_INVALID);
+  CHECK(fx.out.feasibility.reason_code == GUIDANCE_PLAN_REASON_ENVELOPE_INVALID);
+  CHECK(fx.out.feasibility.violated_constraint_id == GUIDANCE_PLAN_CONSTRAINT_ACCELERATION);
+  CHECK(guidance_stop() == STATUS_OK);
+}
+
+static void test_vertical_land_handoff_uses_active_reference_acceleration(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx.nav.core.position_ned_m[2] = -2.0f;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  const uint32_t previous_epoch = fx.out.guidance_status.reference_epoch;
+  fx_make_permit(&fx, previous_epoch);
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_ACTIVE);
+
+  fx.has_permit = 0u;
+  ++fx.dir.directive_epoch;
+  fx.dir.operation_code = PRODUCT_OP_LAND;
+  fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_ALT_HOLD;
+  /* A valid but frame-rippled acceleration must not replace the last
+   * validated trajectory acceleration during the automatic LAND handoff. */
+  fx.nav.core.acceleration_ned_mps2[2] = 5.5f;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.guidance_status.reference_epoch != previous_epoch);
+  CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_READY);
+  CHECK(fx.out.feasibility.feasible);
   CHECK(guidance_stop() == STATUS_OK);
 }
 
@@ -6462,6 +6504,8 @@ static void test_landing_reference_probes_below_home_plane(void)
 {
   Fx fx;
   float lowest = 0.0f;
+  float max_probe_speed = 0.0f;
+  unsigned probe_samples = 0u;
 
   CHECK(fx_init(&fx));
   fx.dir.operation_code = PRODUCT_OP_LAND;
@@ -6471,13 +6515,20 @@ static void test_landing_reference_probes_below_home_plane(void)
   for (unsigned i = 0; i < 1500; ++i) {
     CHECK(fx_step(&fx) == STATUS_OK);
     const float above = fx.out.pilot_control_reference.vehicle_extension.altitude_above_origin_m;
+    const float vertical_up = fx.out.pilot_control_reference.vehicle_extension.vertical_velocity_up_mps;
     if (above < lowest) lowest = above;
+    if (above <= 0.0f && above >= -GUIDANCE_LANDING_PROBE_M - 1e-4f) {
+      max_probe_speed = fmaxf(max_probe_speed, fabsf(vertical_up));
+      probe_samples++;
+    }
   }
   /* FMAT-0008: a landing that stops exactly at Home hovers above the landing
    * surface whenever the vertical estimate drifted, so the detector can never
    * confirm LANDED. The reference must therefore descend through the Home plane
    * (home=0 here) and let the ground contact model stop the airframe. */
   CHECK(lowest < -0.2f);
+  CHECK(probe_samples > 0u);
+  CHECK(max_probe_speed <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-4f);
   CHECK(guidance_stop() == STATUS_OK);
 }
 
@@ -6490,6 +6541,8 @@ int main(void)
     {"hold_reference_shape", test_hold_reference_shape},
     {"landing_alignment_and_speed", test_landing_aligns_and_limits_final_descent},
     {"trajectory_handoff_acceleration", test_trajectory_handoff_uses_active_reference_acceleration},
+    {"vertical_land_reports_constraint", test_vertical_land_reports_actual_dynamics_constraint},
+    {"vertical_land_handoff_acceleration", test_vertical_land_handoff_uses_active_reference_acceleration},
     {"mission_reference_token", test_mission_reference_and_token},
     {"mission_final_time_bin", test_mission_uses_final_time_bin_before_rejecting},
     {"mission_leg_time_window_reject", test_mission_leg_beyond_time_window_rejected},

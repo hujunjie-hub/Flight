@@ -924,7 +924,9 @@ static uint8_t fms_return_control_is_bound(const FmsEngine *e, const FmsInputs *
       e->permit.authority_epoch != e->authority.epoch ||
       e->permit.expires_at_us <= in->now_us ||
       in->control->header.source_id != SOURCE_M6 ||
-      in->control->header.timestamp_sample_us < e->permit.binding_since_us)
+      /* binding_since_us is an M4 processing-time event. M6 may publish a
+       * valid capability from a navigation sample captured slightly earlier. */
+      in->control->header.timestamp_publish_us < e->permit.binding_since_us)
     return 0u;
   return 1u;
 }
@@ -1012,7 +1014,7 @@ static void fms_tracker_tick(FmsEngine *e, const FmsInputs *in, FmsOutputView *o
         }
         if (completed ||
             (fms_return_control_is_bound(e, in) &&
-             in->control->header.timestamp_sample_us - e->permit.binding_since_us >= 80000u &&
+             in->control->header.timestamp_publish_us - e->permit.binding_since_us >= 80000u &&
              fms_mode_transition(e, FLIGHT_MODE_POS_HOLD, in, 1u))) {
           fms_mission_suspend(e, 20u);
           t->preparing_return = FMS_RETURN_STABILIZE_HOLD;
