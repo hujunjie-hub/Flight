@@ -2,6 +2,8 @@
 #include <string.h>
 #include "guidance_update/guidance_internal.h"
 
+enum { LANDING_APPROACH = 1, LANDING_BRAKE = 2, LANDING_FINAL = 3 };
+
 static uint8_t finite3(const float v[3])
 { return (uint8_t)(isfinite(v[0]) && isfinite(v[1]) && isfinite(v[2])); }
 
@@ -99,7 +101,6 @@ uint8_t guidance_handoff_acceleration(const GuidanceState *s, const GuidanceInpu
 
 static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, float goal[3])
 {
-    enum { LANDING_APPROACH = 1, LANDING_BRAKE = 2, LANDING_FINAL = 3 };
     const float approach_down = goal[2] - 0.6f;
     const float brake_down = goal[2] - GUIDANCE_LANDING_BRAKE_HEIGHT_M;
     const float *position = in->navigation->core.position_ned_m;
@@ -237,18 +238,20 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
         for (i = 0; i < 3; ++i) envelope.vehicle_extension.max_velocity_ned_mps[i] =
             fminf(envelope.vehicle_extension.max_velocity_ned_mps[i], limit);
         limited.safety_envelope = &envelope; in = &limited;
-    } else if (guidance_has_landing_plane(in)) {
-        /* M6 reconstructs each 20 ms interval from float boundary states. Keep
-         * landing-curve jerk 25% below the product guidance limit to preserve
-         * margin against consumer-side reconstruction and quantization. */
-        for (i = 0; i < 3; ++i)
-            planning_config.payload.max_jerk_ned_mps3[i] *= GUIDANCE_LANDING_JERK_MARGIN;
     }
     if ((in->geofence_count && !guidance_home_ok(in)) || !target(in, s, goal, &yaw)) {
         *reason = GUIDANCE_PLAN_REASON_GEOFENCE_INVALID; *constraint = GUIDANCE_PLAN_CONSTRAINT_GEOFENCE; return STATUS_INVALID_ARGUMENT;
     }
     if (guidance_has_landing_plane(in))
         landing_stage_target(in, s, goal);
+    /* Keep the normal long-return approach on its original jerk envelope.
+     * Apply the 25% M6 reconstruction margin only after the explicit brake
+     * waypoint has been reached and during the final Home segment. */
+    if (guidance_has_landing_plane(in) &&
+        (s->landing_stage == LANDING_BRAKE || s->landing_stage == LANDING_FINAL)) {
+        for (i = 0; i < 3; ++i)
+            planning_config.payload.max_jerk_ned_mps3[i] *= GUIDANCE_LANDING_JERK_MARGIN;
+    }
     if (!s->plan_valid || memcmp(goal, s->ctx.target_ned, sizeof(goal)) || yaw != s->ctx.target_yaw_rad)
         if (!plan(s, in, goal, yaw, &planning_config, handoff_acceleration, reason, constraint))
             return STATUS_OUT_OF_RANGE;
