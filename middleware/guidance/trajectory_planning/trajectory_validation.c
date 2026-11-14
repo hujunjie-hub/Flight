@@ -77,7 +77,7 @@ uint8_t guidance_landing_speed_ok(const GuidanceInput *in, const GuidanceQuintic
     /* Allow a faster approach above the braking band. Within the final 20 cm,
      * constrain speed early enough to enter the 6 cm contact-sensor band safely. */
     check_t = t0;
-    if (start_down < contact_down) {
+    if (start_down < brake_down) {
         float left = t0, right = t1, velocity_lo, velocity_hi;
         /* A single bisection is valid only when the segment is nondecreasing in
          * NED-down. If the Bernstein position bound enters the contact band but

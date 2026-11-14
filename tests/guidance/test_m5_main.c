@@ -285,6 +285,15 @@ static void test_landing_aligns_and_limits_final_descent(void)
       CHECK(fabsf(point->velocity_ned_mps[2]) <=
             GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-5f);
     }
+    /* Follow the current reference anchor so the staged approach/brake/final
+     * state machine can advance; this is an idealized tracking fixture, not SIL. */
+    const ProductMotionPoint *anchor = &fx.out.reference.anchor.point;
+    memcpy(fx.nav.core.position_ned_m, anchor->position_ned_m,
+           sizeof(fx.nav.core.position_ned_m));
+    memcpy(fx.nav.core.velocity_ned_mps, anchor->velocity_ned_mps,
+           sizeof(fx.nav.core.velocity_ned_mps));
+    memcpy(fx.nav.core.acceleration_ned_mps2, anchor->acceleration_ned_mps2,
+           sizeof(fx.nav.core.acceleration_ned_mps2));
   }
   CHECK(low_points > 0);
   CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[2]) < 0.001f);
