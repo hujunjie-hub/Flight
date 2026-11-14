@@ -134,6 +134,7 @@ def main():
         ("T29", "stack_image_selftest", [py, "tools/analyze_stack_image.py",
                                          "--self-test"], {}),
         ("T30", "runner_selftest", [py, "tests/guidance/test_run_validation.py"], {}),
+        ("T31", "estimator_host", wsl + ["bash", "tests/estimator_backend/run_host_tests.sh"], {}),
     ]
     if args.only is not None:
         selected = {part.strip() for part in args.only.split(",")}
