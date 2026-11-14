@@ -275,9 +275,28 @@ static void test_landing_aligns_and_limits_final_descent(void)
 
   fx.nav.core.position_ned_m[0] = 0.0f;
   unsigned low_points = 0;
+  uint8_t failure_logged = 0u;
   /* Allow the approach, braking waypoint and final 0.20 m descent segments. */
   for (unsigned i = 0; i < 900; ++i) {
     CHECK(fx_step(&fx) == STATUS_OK);
+    if ((fx.out.feasibility.feasible == 0u ||
+         fx.out.guidance_status.reference_epoch != epoch) && failure_logged == 0u) {
+      printf("LAND_STAGE_FAIL step=%u feasible=%u state=%u reason=%u feas_reason=%u constraint=%u "
+             "epoch=%u expected=%u nav_z=%.5f nav_vz=%.5f anchor_z=%.5f anchor_vz=%.5f "
+             "preview_z=%.5f preview_vz=%.5f\\n",
+             i, (unsigned)fx.out.feasibility.feasible,
+             (unsigned)fx.out.guidance_status.guidance_state,
+             (unsigned)fx.out.guidance_status.reason_code,
+             (unsigned)fx.out.feasibility.reason_code,
+             (unsigned)fx.out.feasibility.violated_constraint_id,
+             fx.out.guidance_status.reference_epoch, epoch,
+             (double)fx.nav.core.position_ned_m[2], (double)fx.nav.core.velocity_ned_mps[2],
+             (double)fx.out.reference.anchor.point.position_ned_m[2],
+             (double)fx.out.reference.anchor.point.velocity_ned_mps[2],
+             (double)fx.out.reference.points[23].point.position_ned_m[2],
+             (double)fx.out.reference.points[23].point.velocity_ned_mps[2]);
+      failure_logged = 1u;
+    }
     CHECK(fx.out.feasibility.feasible && fx.out.guidance_status.reference_epoch == epoch);
     const ProductMotionPoint *point = &fx.out.reference.points[23].point;
     if (point->position_ned_m[2] >= -GUIDANCE_LANDING_BRAKE_HEIGHT_M) {
