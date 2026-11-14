@@ -1284,6 +1284,8 @@ int main(int argc, char **argv)
   uint16_t terminal_command = PRODUCT_CMD_LAND;
   int mission_scenario = 0;
   int return_accepted_in_hold = 0;
+  int land_position_reference_seen = 0;
+  int return_mode_seen = 0;
   float peak_height = 0;
   float hold_error = 0;
   float near_ground_max_down = 0;
@@ -1384,7 +1386,10 @@ int main(int argc, char **argv)
   if (fmt_online)
     sensor_imu_use_external_source(true);
 
-  unsigned duration_ms = mission_scenario ? 36000u : fmt_online ? 24000u : 8000u;
+  /* Leave enough simulated time for the bounded contact probe and the
+   * unchanged 2 s LandDetector dwell. This changes only the scenario horizon,
+   * not any velocity, contact, ACK, or disarm acceptance threshold. */
+  unsigned duration_ms = mission_scenario ? 44000u : fmt_online ? 32000u : 8000u;
 #ifdef FLIGHT_GROUND_STATION
   if (ground_online)
     duration_ms = 24u * 60u * 60u * 1000u;
@@ -1464,6 +1469,11 @@ int main(int argc, char **argv)
     if (tick % 40u != 0u)
       continue;
     turn(task_mission_entry);
+    if (runtime_data.fms.flight_mode == FLIGHT_MODE_AUTO_LAND &&
+        fms_output.directive.guidance_mode_code == PRODUCT_GUIDANCE_MODE_POS_HOLD)
+      land_position_reference_seen = 1;
+    if (runtime_data.fms.flight_mode == FLIGHT_MODE_AUTO_RETURN)
+      return_mode_seen = 1;
     turn(task_mpc_entry);
     if (ms % 100u == 0u)
       task_supervisor_step();
@@ -1683,6 +1693,8 @@ int main(int argc, char **argv)
            (double)near_ground_max_down);
     printf("[fmt] wall timeout %.0f ms, longest successful state gap %.1f ms\n",
            (double)fmt_wall_timeout_us / 1000.0, (double)fmt_longest_gap_us / 1000.0);
+    printf("[fmt] land_position_reference_seen=%d return_mode_seen=%d\n",
+           land_position_reference_seen, return_mode_seen);
     CHECK(fmt_active_frames > 0u);
     CHECK(!fmt_timeout);
     CHECK(peak_height >= 1.8f);
@@ -1691,6 +1703,10 @@ int main(int argc, char **argv)
     CHECK(near_ground_max_down > 0.0f && near_ground_max_down <= 0.40f);
     CHECK(terminal_ack == COMMAND_ACK_COMPLETED);
     CHECK(disarm_ack == COMMAND_ACK_COMPLETED);
+    if (terminal_command == PRODUCT_CMD_LAND)
+      CHECK(land_position_reference_seen);
+    if (terminal_command == PRODUCT_CMD_RETURN)
+      CHECK(return_mode_seen);
     CHECK(runtime_data.fms.arm_state == ARM_STATE_DISARMED);
     CHECK(flight_sil_ground_contact() == GROUND_CONTACT_CONTACT);
     if (terminal_command == PRODUCT_CMD_RETURN) {

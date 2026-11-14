@@ -222,6 +222,11 @@ uint8_t guidance_plan_fences(const GuidanceInput *in, const ProductGuidanceConfi
             float clearance = fence_clearance(f, p[0], p[1])-horizontal_guard;
             float min_h = f->min_height_above_home_m+f->vertical_margin_m+vertical_guard;
             float max_h = f->max_height_above_home_m-f->vertical_margin_m-vertical_guard;
+            /* A zero-or-lower fence floor may admit the bounded LAND/RETURN
+             * contact probe. Positive minimum-height fences remain fail-closed. */
+            if (guidance_has_landing_plane(in) &&
+                f->min_height_above_home_m + f->vertical_margin_m <= 0.0f)
+                min_h = fminf(min_h, -GUIDANCE_LANDING_PROBE_M - vertical_guard);
             if (clearance < 0 || home_d-p[2] < min_h || home_d-p[2] > max_h) return 0;
             if (clearance <= sqrtf(dx*dx+dy*dy) || home_d-hi[2] < min_h-1e-5f ||
                 home_d-lo[2] > max_h+1e-5f) proved = 0;

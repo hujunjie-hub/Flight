@@ -44,18 +44,6 @@ static uint8_t target(const GuidanceInput *in, GuidanceState *s, float p[3], flo
                in->directive->operation_code == PRODUCT_OP_SAFE_ACTION) {
         if (!guidance_home_ok(in)) return 0; /* origin zero is not ground */
         p[2] = d->home.position_ned_m[2];
-        if (in->directive->operation_code == PRODUCT_OP_LAND &&
-            !(in->landed_state && guidance_header_ok(&in->landed_state->header,
-                                                      &in->navigation->header,
-                                                      MSG_LANDED_STATE_SNAPSHOT,
-                                                      in->evaluation_time_us) &&
-              in->landed_state->state == LANDED_STATE_LANDED)) {
-            /* FMAT-0008: keep descending through the Home plane until the land
-             * detector reports LANDED. Step from the measured position so the
-             * tracking error stays small; the contact model stops the airframe. */
-            const float step_z = in->navigation->core.position_ned_m[2] + GUIDANCE_LANDING_STEP_M;
-            p[2] = fminf(step_z, d->home.position_ned_m[2] + GUIDANCE_LANDING_PROBE_M);
-        }
     }
     return (uint8_t)(finite3(p) && isfinite(*yaw));
 }
@@ -99,12 +87,35 @@ uint8_t guidance_handoff_acceleration(const GuidanceState *s, const GuidanceInpu
     return 1u;
 }
 
+static uint8_t landing_confirmed(const GuidanceInput *in)
+{
+    return (uint8_t)(in->landed_state != NULL &&
+        guidance_header_ok(&in->landed_state->header, &in->navigation->header,
+                          MSG_LANDED_STATE_SNAPSHOT, in->evaluation_time_us) &&
+        in->landed_state->state == LANDED_STATE_LANDED);
+}
+
 static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, float goal[3])
 {
-    const float approach_down = goal[2] - 0.6f;
-    const float brake_down = goal[2] - GUIDANCE_LANDING_BRAKE_HEIGHT_M;
+    const float home_down = in->directive->payload.home.position_ned_m[2];
+    const float approach_down = home_down - 0.6f;
+    const float brake_down = home_down - GUIDANCE_LANDING_BRAKE_HEIGHT_M;
+    const float final_down = home_down + GUIDANCE_LANDING_PROBE_M;
     const float *position = in->navigation->core.position_ned_m;
     const float *velocity = in->navigation->core.velocity_ned_mps;
+    uint8_t plan_complete = (uint8_t)(s->plan_valid &&
+        in->control_time_us >= s->plan_start_us &&
+        (in->control_time_us - s->plan_start_us) * 1e-6f >= s->plan_duration_s);
+
+    if (landing_confirmed(in)) {
+        s->landing_stage = LANDING_FINAL;
+        s->plan_valid = 0u;
+        goal[0] = position[0];
+        goal[1] = position[1];
+        goal[2] = position[2];
+        return;
+    }
+
     if (s->landing_stage == 0u) {
         if (position[2] < approach_down)
             s->landing_stage = LANDING_APPROACH;
@@ -113,27 +124,53 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
         else
             s->landing_stage = LANDING_FINAL;
     }
+
     if (s->landing_stage == LANDING_APPROACH) {
-        if (s->plan_valid && in->control_time_us >= s->plan_start_us &&
-            (in->control_time_us - s->plan_start_us) * 1e-6f >= s->plan_duration_s &&
-            hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
-            hypotf(velocity[0], velocity[1]) <= 0.25f &&
-            fabsf(position[2] - approach_down) <= 0.20f && fabsf(velocity[2]) <= 0.20f) {
-            s->landing_stage = LANDING_BRAKE;
-        } else {
+        if (plan_complete) {
+            if (hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
+                hypotf(velocity[0], velocity[1]) <= 0.25f &&
+                fabsf(position[2] - approach_down) <= 0.20f &&
+                fabsf(velocity[2]) <= 0.20f)
+                s->landing_stage = LANDING_BRAKE;
+            /* Replan from measured p/v/a if the previous segment ended but
+             * the approach state has not actually settled. */
+            s->plan_valid = 0u;
+        }
+        if (s->landing_stage == LANDING_APPROACH) {
             goal[2] = approach_down;
+            return;
         }
     }
+
     if (s->landing_stage == LANDING_BRAKE) {
-        if (s->plan_valid && in->control_time_us >= s->plan_start_us &&
-            (in->control_time_us - s->plan_start_us) * 1e-6f >= s->plan_duration_s &&
-            hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
-            hypotf(velocity[0], velocity[1]) <= 0.15f &&
-            fabsf(position[2] - brake_down) <= 0.10f &&
-            fabsf(velocity[2]) <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS) {
-            s->landing_stage = LANDING_FINAL;
-        } else {
+        if (plan_complete) {
+            if (hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
+                hypotf(velocity[0], velocity[1]) <= 0.15f &&
+                fabsf(position[2] - brake_down) <= 0.10f &&
+                fabsf(velocity[2]) <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS)
+                s->landing_stage = LANDING_FINAL;
+            /* A completed segment is never treated as a settled state unless
+             * measured position and velocity satisfy the explicit gate. */
+            s->plan_valid = 0u;
+        }
+        if (s->landing_stage == LANDING_BRAKE) {
             goal[2] = brake_down;
+            return;
+        }
+    }
+
+    if (s->landing_stage == LANDING_FINAL) {
+        if (plan_complete)
+            s->plan_valid = 0u;
+        if (s->plan_valid) {
+            /* Keep the current 3 cm step fixed until its trajectory completes. */
+            goal[2] = s->ctx.target_ned[2];
+        } else if (position[2] >= final_down) {
+            goal[2] = position[2];
+        } else {
+            /* The Home plane is shared by LAND and RETURN. Continue below it
+             * in bounded steps until the contact/dwell evidence is confirmed. */
+            goal[2] = fminf(position[2] + GUIDANCE_LANDING_STEP_M, final_down);
         }
     }
 }
