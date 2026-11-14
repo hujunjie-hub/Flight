@@ -108,10 +108,10 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
         (in->control_time_us - s->plan_start_us) * 1e-6f >= s->plan_duration_s);
 
     if (landing_confirmed(in)) {
-        /* Keep the established probe reference while FMS completes its
-         * disarm handoff; do not introduce a new ground-level position step. */
+        /* Keep the established reference while FMS completes its disarm
+         * handoff; if no plan exists, hold the measured contact position. */
         s->landing_stage = LANDING_PROBE;
-        goal[2] = s->plan_valid ? s->ctx.target_ned[2] : final_down;
+        goal[2] = s->plan_valid ? s->ctx.target_ned[2] : position[2];
         return;
     }
 
