@@ -310,14 +310,15 @@ static void test_landing_aligns_and_limits_final_descent(void)
                                           fx.nav.core.position_ned_m[1]);
     const float horizontal_speed = hypotf(fx.nav.core.velocity_ned_mps[0],
                                           fx.nav.core.velocity_ned_mps[1]);
-    if (horizontal_error > 0.30f) {
+    if (horizontal_error > GUIDANCE_LANDING_APPROACH_MAX_HORIZONTAL_ERROR_M ||
+        horizontal_speed > GUIDANCE_LANDING_APPROACH_MAX_HORIZONTAL_SPEED_MPS) {
       approach_hold_seen = 1u;
       CHECK(fabsf(point->position_ned_m[2] - approach_altitude) <= 0.05f);
     }
     if (fabsf(point->position_ned_m[2] - approach_altitude) > 0.05f) {
       descent_started = 1u;
-      CHECK(horizontal_error <= 0.30f + 1e-4f);
-      CHECK(horizontal_speed <= 0.25f + 1e-4f);
+      CHECK(horizontal_error <= GUIDANCE_LANDING_APPROACH_MAX_HORIZONTAL_ERROR_M + 1e-4f);
+      CHECK(horizontal_speed <= GUIDANCE_LANDING_APPROACH_MAX_HORIZONTAL_SPEED_MPS + 1e-4f);
     }
     if (point->position_ned_m[2] >= -GUIDANCE_LANDING_CAPTURE_HEIGHT_M) {
       ++capture_points;
@@ -345,6 +346,24 @@ static void test_landing_aligns_and_limits_final_descent(void)
   CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[1]) < 0.001f);
   CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[2] -
               GUIDANCE_LANDING_PROBE_M) < 0.001f);
+  CHECK(guidance_stop() == STATUS_OK);
+}
+
+static void test_landing_speed_only_requires_horizontal_brake(void)
+{
+  Fx fx;
+  CHECK(fx_init(&fx));
+  fx.dir.operation_code = PRODUCT_OP_RETURN;
+  fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
+  fx.nav.core.position_ned_m[0] = 0.10f; /* Already inside the XY error band. */
+  fx.nav.core.position_ned_m[2] = -2.4f;
+  fx.nav.core.velocity_ned_mps[0] = 0.20f; /* Above the M5 pre-descent target. */
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_READY);
+  for (unsigned i = 0; i < GUIDANCE_PREVIEW_POINTS; ++i) {
+    CHECK(fabsf(fx.out.reference.points[i].point.position_ned_m[2] + 2.4f) <= 0.05f);
+    CHECK(fabsf(fx.out.reference.points[i].point.velocity_ned_mps[2]) <= 1e-4f);
+  }
   CHECK(guidance_stop() == STATUS_OK);
 }
 
@@ -6714,6 +6733,7 @@ int main(void)
   } tests[] = {
     {"hold_reference_shape", test_hold_reference_shape},
     {"landing_alignment_and_speed", test_landing_aligns_and_limits_final_descent},
+    {"landing_speed_only_requires_horizontal_brake", test_landing_speed_only_requires_horizontal_brake},
     {"landing_contact_latches_xy", test_landing_contact_latches_horizontal_hold},
     {"landing_contact_waits_for_low_speed", test_landing_contact_waits_for_low_speed},
     {"trajectory_handoff_acceleration", test_trajectory_handoff_uses_active_reference_acceleration},
