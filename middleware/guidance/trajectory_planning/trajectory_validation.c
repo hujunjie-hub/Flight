@@ -59,13 +59,38 @@ uint8_t guidance_landing_speed_ok(const GuidanceInput *in, const GuidanceQuintic
                                   float t0, float t1)
 {
     float lo, hi;
+    const float contact_down = in->directive->payload.home.position_ned_m[2] -
+                               GUIDANCE_LANDING_CONTACT_HEIGHT_M;
+    float start_down, end_down, check_t;
+    unsigned iteration;
     if (!guidance_has_landing_plane(in))
         return 1u;
     if (!guidance_quintic_bounds(down, t0, t1, 0, &lo, &hi))
         return 0u;
-    if (hi < in->directive->payload.home.position_ned_m[2] - 0.5f)
+    if (hi < contact_down)
         return 1u;
-    return guidance_quintic_bounds(down, t0, t1, 1, &lo, &hi) &&
+
+    start_down = guidance_quintic_eval(down, t0, 0);
+    end_down = guidance_quintic_eval(down, t1, 0);
+    if (!isfinite(start_down) || !isfinite(end_down))
+        return 0u;
+    /* Allow a faster approach while still above the contact-sensor band.
+     * Bound only the final 6 cm where the SIL contact oracle can assert contact. */
+    if (end_down < contact_down)
+        return 1u;
+    check_t = t0;
+    if (start_down < contact_down) {
+        float left = t0, right = t1;
+        for (iteration = 0; iteration < 16u; ++iteration) {
+            const float mid = 0.5f * (left + right);
+            if (guidance_quintic_eval(down, mid, 0) >= contact_down)
+                right = mid;
+            else
+                left = mid;
+        }
+        check_t = right;
+    }
+    return guidance_quintic_bounds(down, check_t, t1, 1, &lo, &hi) &&
            lo >= -GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS - 1e-5f &&
            hi <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-5f;
 }

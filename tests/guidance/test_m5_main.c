@@ -279,7 +279,7 @@ static void test_landing_aligns_and_limits_final_descent(void)
     CHECK(fx_step(&fx) == STATUS_OK);
     CHECK(fx.out.feasibility.feasible && fx.out.guidance_status.reference_epoch == epoch);
     const ProductMotionPoint *point = &fx.out.reference.points[23].point;
-    if (point->position_ned_m[2] >= -0.5f) {
+    if (point->position_ned_m[2] >= -GUIDANCE_LANDING_CONTACT_HEIGHT_M) {
       ++low_points;
       CHECK(fabsf(point->velocity_ned_mps[2]) <=
             GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-5f);
@@ -345,7 +345,7 @@ static void test_hold_reference_shape(void)
   CHECK(guidance_stop() == STATUS_OK);
 }
 
-static void test_vertical_land_reports_actual_dynamics_constraint(void)
+static void test_vertical_land_reports_actual_constraint(void)
 {
   Fx fx;
   CHECK(fx_init(&fx));
@@ -357,7 +357,7 @@ static void test_vertical_land_reports_actual_dynamics_constraint(void)
   CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_REJECTED);
   CHECK(fx.out.guidance_status.reason_code == GUIDANCE_PLAN_REASON_ENVELOPE_INVALID);
   CHECK(fx.out.feasibility.reason_code == GUIDANCE_PLAN_REASON_ENVELOPE_INVALID);
-  CHECK(fx.out.feasibility.violated_constraint_id == GUIDANCE_PLAN_CONSTRAINT_ACCELERATION);
+  CHECK(fx.out.feasibility.violated_constraint_id == GUIDANCE_PLAN_CONSTRAINT_SPEED);
   CHECK(guidance_stop() == STATUS_OK);
 }
 
@@ -6541,7 +6541,7 @@ int main(void)
     {"hold_reference_shape", test_hold_reference_shape},
     {"landing_alignment_and_speed", test_landing_aligns_and_limits_final_descent},
     {"trajectory_handoff_acceleration", test_trajectory_handoff_uses_active_reference_acceleration},
-    {"vertical_land_reports_constraint", test_vertical_land_reports_actual_dynamics_constraint},
+    {"vertical_land_reports_constraint", test_vertical_land_reports_actual_constraint},
     {"vertical_land_handoff_acceleration", test_vertical_land_handoff_uses_active_reference_acceleration},
     {"mission_reference_token", test_mission_reference_and_token},
     {"mission_final_time_bin", test_mission_uses_final_time_bin_before_rejecting},
