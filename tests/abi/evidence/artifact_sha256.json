@@ -1,7 +1,7 @@
 {
   "baseline": "V1.9.1-GLOBAL-AUDIT-R3",
   "algorithm": "sha256",
-  "generated_at_utc": "2026-11-14T18:04:35Z",
+  "generated_at_utc": "2026-11-14T19:42:45Z",
   "file_count": 21,
   "files": {
     "middleware/contracts/base_types/common_base.h": "b28c37f625060e249254f4140a17668279baa86b9899a87511ee459a17b89102",
@@ -15,15 +15,15 @@
     "middleware/contracts/product_contract/abi_lock.h": "d2a7feff095110562e2b36d02c4008b510a2615fbcc0a55a83f6e343edfbc1fb",
     "middleware/contracts/product_contract/product_contract.h": "3b9957b6f8229be9db50b26fd44076bf333142eb2e9e439be030962c07d4d444",
     "middleware/contracts/PUBLIC_INTERFACES.md": "c286094f842b760da35e176736033abd7928bbef75a1d34d2f5084f1b9e6ab0a",
-    "tests/abi/abi_report.py": "561562e6365ae7374682997eccc97efdd38f98659f70d9f5dacbb8781b7e9982",
-    "tests/abi/evidence/abi_arm.json": "ae5e23d7e58ba67b6d04bcf5ef9e8088d361b0a31818ea7a885736dc7b867b0b",
+    "tests/abi/abi_report.py": "a429776be467d36f540a926a3d96a3fdd7d3698586838a1c1991929fdcd668b3",
+    "tests/abi/evidence/abi_arm.json": "8707a4115970b6d9a9e0561428b951d93ea3ba2fbb1e4fb57d416e9a2b4662bf",
     "tests/abi/evidence/abi_canonical_arm.txt": "da2707e9a59b8ed745570a26fc9c80f9361c5ad03799737e230ba6df8926e4ac",
     "tests/abi/evidence/abi_canonical_host.txt": "402764a0f9caa5b59e99408752ad6a625a600dbb8d1f9c085d03b5fea29fb83a",
     "tests/abi/evidence/abi_compare.json": "e5b73f4ca8b14fb4a922d5bb9bb08387940d5a690db7c766f06fa278e4a8063d",
-    "tests/abi/evidence/abi_host.json": "93bf4b09f891d45a9d547f5546351eee7b00f8d8b377ce4d0b871e2acdfa8ebd",
+    "tests/abi/evidence/abi_host.json": "04fbc5b0f24c60629aa4afa2cfb1f310a285d316585d6df0539431a5747c0bff",
     "tests/abi/evidence/abi_probe.c": "1672f043d2f3e9dd182e715a1ecaabce99e420d4616a146d78baf868d30f2d99",
     "tests/abi/evidence/abi_report.md": "6bb32cc14f6157cdebc1ecbede3a241db255c7500502f98a323feef6dce3090b",
-    "tests/abi/evidence/commands.json": "f8f66e2db9fcb6bbc3027f70f8914a00df6a7c1736492867bef8abe687d7304e",
+    "tests/abi/evidence/commands.json": "84620b3036af91ae279027b1e1d54a55fd54bb86ddfd16d789cd478b90eabb32",
     "tests/abi/negative_control.py": "b73eb4e974ebc1ba273848878a94672d18e55cb756bc4661f70419c4a251a650"
   }
 }

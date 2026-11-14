@@ -93,15 +93,36 @@ def sha256_file(path: Path) -> str:
     return sha256_bytes(path.read_bytes())
 
 
+TOOL_DIRS = []
+
+
+def portable(text) -> str:
+    """Strip machine-specific paths from recorded evidence.
+
+    The committed evidence must not embed the checkout location or the temp
+    directory of whoever regenerated it (FLIGHT-27). Compilers and the probe run
+    on absolute paths, so rewrite them to stable placeholders and use forward
+    slashes. Hash inputs (probe source, canonical listings) are unaffected.
+    """
+    out = str(text).replace(str(ROOT), "<REPO>")
+    for tool_dir in TOOL_DIRS:
+        out = out.replace(str(tool_dir), "<TOOLCHAIN>")
+    try:
+        out = out.replace(str(Path(tempfile.gettempdir())), "<TMP>")
+    except OSError:
+        pass
+    return out.replace("\\", "/")
+
+
 def run(cmd, cwd=None, label=""):
     started = time.time()
     result = subprocess.run([str(x) for x in cmd], cwd=cwd, capture_output=True, text=True)
     record = {
         "label": label,
-        "command": [str(x) for x in cmd],
+        "command": [portable(x) for x in cmd],
         "returncode": result.returncode,
-        "stdout": result.stdout.strip(),
-        "stderr": result.stderr.strip(),
+        "stdout": portable(result.stdout.strip()),
+        "stderr": portable(result.stderr.strip()),
         "duration_ms": int((time.time() - started) * 1000),
     }
     commands.append(record)
@@ -291,7 +312,8 @@ def dump_values(obj: Path, objcopy: Path, expected: int, preferred: str):
                 continue
             commands.append({
                 "label": "objcopy %s" % section,
-                "command": [str(objcopy), "--dump-section", "%s=%s" % (section, binary), str(obj)],
+                "command": [portable(objcopy), "--dump-section", portable("%s=%s" % (section, binary)),
+                            portable(obj)],
                 "returncode": 0,
                 "stdout": result.stdout.strip(),
                 "stderr": result.stderr.strip(),
@@ -646,6 +668,7 @@ def main():
     arm_bin = args.arm_bin or (DEFAULT_ARM_BIN if DEFAULT_ARM_BIN.is_dir() else None)
     host_bin = args.host_bin or (DEFAULT_HOST_BIN if DEFAULT_HOST_BIN.is_dir() else None)
     host_prefix = "" if os.name == "nt" else "x86_64-w64-mingw32-"
+    TOOL_DIRS[:] = [d for d in (arm_bin, host_bin) if d]
     arm_cc, arm_cxx, arm_objcopy = probe_tools(arm_bin, "arm-none-eabi-", "--arm-bin")
     host_cc, host_cxx, host_objcopy = probe_tools(host_bin, host_prefix, "--host-bin")
 
@@ -684,7 +707,7 @@ def main():
                 targets.setdefault(target, {})[language] = {
                     "compiler": str(compiler),
                     "compiler_version": tool_version(compiler),
-                    "flags": flags + include_flags,
+                    "flags": [portable(item) for item in flags + include_flags],
                     "object_section": section,
                     "values_sha256": sha256_bytes(struct.pack("<%dI" % len(values), *values)),
                     "types": len(order),

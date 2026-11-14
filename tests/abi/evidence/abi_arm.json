@@ -41,7 +41,7 @@
     "-Wextra",
     "-Werror",
     "-fno-short-enums",
-    "-ID:\\STM32Project\\Flight\\middleware\\contracts"
+    "-I<REPO>/middleware/contracts"
   ],
   "abi_hash": "da2707e9a59b8ed745570a26fc9c80f9361c5ad03799737e230ba6df8926e4ac",
   "types": 144,

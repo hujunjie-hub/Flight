@@ -36,7 +36,7 @@
     "-Wall",
     "-Wextra",
     "-Werror",
-    "-ID:\\STM32Project\\Flight\\middleware\\contracts"
+    "-I<REPO>/middleware/contracts"
   ],
   "abi_hash": "402764a0f9caa5b59e99408752ad6a625a600dbb8d1f9c085d03b5fea29fb83a",
   "types": 144,
