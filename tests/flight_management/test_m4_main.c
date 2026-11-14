@@ -1374,7 +1374,7 @@ static void test_contact_candidate_does_not_authorize_disarm(void)
 static void test_contact_candidate_requires_valid_navigation(void)
 {
   Fx fx;
-  fx_defaults(&fx);
+  CHECK(fx_init(&fx));
   fx.omit_nav = 1u; /* Null navigation pointer with the presence bit cleared. */
   CHECK(fx_step(&fx) == STATUS_OK);
   CHECK(fx.out.landed_state.state == LANDED_STATE_UNKNOWN);
