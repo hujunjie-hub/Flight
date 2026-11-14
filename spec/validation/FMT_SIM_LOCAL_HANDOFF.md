@@ -233,3 +233,9 @@ R34 后 main 修复：
 - Return：**新回归 #25**。RETURN 后约 80 ms、真值高度约 1.99 m（`contact=2 landed=2`）报 `guidance=4/1550`（JERK→SPEED），估计垂向加速度约 8.62 m/s²；permit 撤销、`t=11.200 s` `FAILSAFE_TERMINAL`（cause 18），RETURN ACK 取消，场景 12.2 s 结束。
 - Mission：近地 0.340 m/s、两航点、无 failsafe 通过；返航落点 **0.504 m** 超 0.50 m 限值（`FAIL 1732`），LANDED 未锁存（末端 `nav_vh=0.236`）。
 - 下一轮方向：优先修复 #25 的 RETURN handoff 瞬态敏感（用已验参考而不是瞬时样本重建/校验），并为 ~8 m/s² 垂向瞬态加 Host 回归；随后处理 #23 的 LANDED（Land accel 0.029 余量、Mission 水平 0.236）与 Mission 4 mm 落点。修复后仍在干净 latest `main` 上完整复测。详见 [R37 归档复核报告](FMT_SIM_LOCAL_20261114_2D219EAD_REVIEW.md)。
+
+### R37 后续定位与复测
+
+- `return_handoff_r37` 回放 R37 的四帧导航数据和活动参考交接。旧实现的前三帧可行，第四帧在预览偏移 920 ms 被拒绝（1550 / JERK）。该帧仍使用原有刹停曲线。跨越刹停终点并接入静止段的 Hermite 区间触发了 jerk 拒绝。
+- 修复在仿真位置模式的水平刹停规划中为 jerk 留出裕量，并按原包线逐周期校验消费预览。回归覆盖参考绑定和水平刹停结束。完成原生 ENG-07 验收仍需按 §4 的命令在同步后的干净 `main` 上执行 Land → Return → Mission。
+- R37 `[settle]` 中的 `nav_ad` 是原始导航快照值。`SIM_CONTROLLED_STOP` 的 LandDetector 用速度估计加速度，同时用原始加速度检查输入有效性。仅凭最后一帧 `nav_ad=0.529` 无法定位连续 2 s dwell 的失败。Mission 的 `return_error` 取场景结束时的水平位置，仍须满足 0.50 m 判据。

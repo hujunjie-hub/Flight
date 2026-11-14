@@ -509,6 +509,70 @@ static void test_trajectory_handoff_uses_active_reference_acceleration(void)
   }
 }
 
+static void test_return_handoff_r37(void)
+{
+  Fx fx;
+  ProductFmsConfig config;
+  CHECK(fx_init(&fx));
+  fms_model_default_config(&config);
+  config.payload.output_policy_id = 2u;
+  CHECK(fms_product_build_safety_envelope(&fms_quad_x4_policy, &config,
+                                          1u, &fx.env) == STATUS_OK);
+  fx.nav.core.position_ned_m[0] = -0.19f;
+  fx.nav.core.position_ned_m[1] = -0.0995f;
+  fx.nav.core.position_ned_m[2] = -1.9946f;
+  fx.dir.payload.home.position_ned_m[2] = -0.016f;
+  CHECK(fx_step(&fx) == STATUS_OK);
+  fx_make_permit(&fx, fx.out.guidance_status.reference_epoch);
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_ACTIVE);
+  const uint32_t previous_epoch = fx.out.guidance_status.reference_epoch;
+  uint32_t return_epoch = 0u;
+
+  /* Replay the RETURN handoff and the next three M5 samples from R37. */
+  const float samples[][9] = {
+    {-0.1900f, -0.0995f, -1.9946f, 0.0983f, -0.0470f, 0.0363f, 0.1237f, 1.4141f, -1.4260f},
+    {-0.1880f, -0.1002f, -1.9939f, 0.1000f, -0.0235f, 0.0448f, 0.0603f, 1.1460f, 0.6753f},
+    {-0.1860f, -0.1005f, -1.9923f, 0.1006f, -0.0092f, 0.1266f, 0.0136f, 0.4075f, 6.5266f},
+    {-0.1840f, -0.1007f, -1.9882f, 0.1008f, -0.0041f, 0.2816f, 0.0020f, 0.1434f, 8.6231f},
+  };
+  fx.has_permit = 0u;
+  ++fx.dir.directive_epoch;
+  fx.dir.operation_code = PRODUCT_OP_RETURN;
+  fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
+  /* Keep replaying the final navigation sample long enough to validate the
+   * rolling preview through the end of the horizontal brake. */
+  for (unsigned i = 0; i < 75u; ++i) {
+    if (i < sizeof(samples) / sizeof(samples[0])) {
+      memcpy(fx.nav.core.position_ned_m, &samples[i][0], sizeof(fx.nav.core.position_ned_m));
+      memcpy(fx.nav.core.velocity_ned_mps, &samples[i][3], sizeof(fx.nav.core.velocity_ned_mps));
+      memcpy(fx.nav.core.acceleration_ned_mps2, &samples[i][6], sizeof(fx.nav.core.acceleration_ned_mps2));
+    }
+    CHECK(fx_step(&fx) == STATUS_OK);
+    if (!fx.out.feasibility.feasible)
+      printf("R37 RETURN sample=%u reason=%u constraint=%u offset=%u\n", i,
+             fx.out.feasibility.reason_code, fx.out.feasibility.violated_constraint_id,
+             fx.out.feasibility.earliest_violation_offset_us);
+    CHECK(fx.out.feasibility.feasible);
+    if (i == 0u) {
+      return_epoch = fx.out.guidance_status.reference_epoch;
+      CHECK(return_epoch != previous_epoch);
+      CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_READY);
+      fx_make_permit(&fx, return_epoch);
+      fx.permit.directive_epoch = fx.dir.directive_epoch;
+    } else {
+      CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_ACTIVE);
+      CHECK(fx.out.guidance_status.reference_epoch == return_epoch);
+    }
+    fx.permit.permit_expires_at_us = fx.now + 25000u;
+    fx.now += 10000u;
+    if (!fx.out.feasibility.feasible) break;
+  }
+  CHECK(hypotf(fx.out.reference.anchor.point.position_ned_m[0],
+               fx.out.reference.anchor.point.position_ned_m[1]) < 1e-4f);
+  CHECK(guidance_stop() == STATUS_OK);
+}
+
 static void test_hold_reference_shape(void)
 {
   Fx fx;
@@ -6734,6 +6798,7 @@ int main(void)
     {"hold_reference_shape", test_hold_reference_shape},
     {"landing_alignment_and_speed", test_landing_aligns_and_limits_final_descent},
     {"landing_speed_only_requires_horizontal_brake", test_landing_speed_only_requires_horizontal_brake},
+    {"return_handoff_r37", test_return_handoff_r37},
     {"landing_contact_latches_xy", test_landing_contact_latches_horizontal_hold},
     {"landing_contact_waits_for_low_speed", test_landing_contact_waits_for_low_speed},
     {"trajectory_handoff_acceleration", test_trajectory_handoff_uses_active_reference_acceleration},

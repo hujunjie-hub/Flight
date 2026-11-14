@@ -364,6 +364,8 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
     GuidanceInput limited;
     SafetyEnvelope envelope;
     ProductGuidanceConfig planning_config = s->config;
+    const uint8_t has_landing_plane = guidance_has_landing_plane(in);
+    uint8_t landing_approach;
     *reason = GUIDANCE_PLAN_REASON_NONE; *constraint = GUIDANCE_PLAN_CONSTRAINT_NONE; s->violation_offset_us = 0;
     if (in->directive->operation_code == PRODUCT_OP_MISSION &&
         (in->authorized_mission->mission.flags & PRODUCT_MISSION_REQUIRES_OBSTACLE_AVOIDANCE)) {
@@ -381,16 +383,24 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
     if ((in->geofence_count && !guidance_home_ok(in)) || !target(in, s, goal, &yaw)) {
         *reason = GUIDANCE_PLAN_REASON_GEOFENCE_INVALID; *constraint = GUIDANCE_PLAN_CONSTRAINT_GEOFENCE; return STATUS_INVALID_ARGUMENT;
     }
-    if (guidance_has_landing_plane(in))
+    if (has_landing_plane)
         landing_stage_target(in, s, goal);
-    /* Keep the normal long-return approach on its original jerk envelope.
-     * Apply the 25% M6 reconstruction margin only after the explicit brake
-     * waypoint has been reached and during the final Home segment. */
-    if (guidance_has_landing_plane(in) &&
+    landing_approach = has_landing_plane && s->landing_stage == LANDING_APPROACH;
+    /* Preserve the tighter envelope for the near-ground segments. */
+    if (has_landing_plane &&
         (s->landing_stage == LANDING_BRAKE || s->landing_stage == LANDING_FINAL ||
          s->landing_stage == LANDING_PROBE || s->landing_stage == LANDING_CONTACT_HOLD)) {
         for (i = 0; i < 3; ++i)
             planning_config.payload.max_jerk_ned_mps3[i] *= GUIDANCE_LANDING_JERK_MARGIN;
+    }
+    if (landing_approach) {
+        /* A rolling preview interval can straddle the end of the horizontal
+         * brake. Reserve jerk headroom in the source curve so that the
+         * consumer's reconstruction across the transition to rest fits. */
+        for (i = 0; i < 3; ++i)
+            planning_config.payload.max_jerk_ned_mps3[i] = GUIDANCE_LANDING_JERK_MARGIN *
+                fminf(planning_config.payload.max_jerk_ned_mps3[i],
+                      in->safety_envelope->vehicle_extension.max_jerk_ned_mps3[i]);
     }
     if (!s->plan_valid || memcmp(goal, s->ctx.target_ned, sizeof(goal)) || yaw != s->ctx.target_yaw_rad)
         if (!plan(s, in, goal, yaw, &planning_config, handoff_acceleration, reason, constraint))
@@ -413,7 +423,8 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
         p->offset_us = i * step_us; p->valid_mask = 0x1Fu;
         sample(s, in->control_time_us+p->offset_us, &p->point);
     }
-    if (!guidance_validate_reference(in, &planning_config, r, reason, constraint, &s->violation_offset_us))
+    if (!guidance_validate_reference(in, landing_approach ? &s->config : &planning_config,
+                                     r, reason, constraint, &s->violation_offset_us))
         return STATUS_OUT_OF_RANGE;
     guidance_publish_header(in, s, &r->header, MSG_MOTION_REFERENCE, GUIDANCE_REFERENCE_TRAJECTORY);
     return STATUS_OK;
