@@ -103,16 +103,15 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
     const float final_down = home_down + GUIDANCE_LANDING_PROBE_M;
     const float *position = in->navigation->core.position_ned_m;
     const float *velocity = in->navigation->core.velocity_ned_mps;
-    uint8_t plan_complete = (uint8_t)(s->plan_valid &&
+    const uint8_t plan_complete = (uint8_t)(s->plan_valid &&
         in->control_time_us >= s->plan_start_us &&
         (in->control_time_us - s->plan_start_us) * 1e-6f >= s->plan_duration_s);
 
     if (landing_confirmed(in)) {
+        /* Keep the established probe reference while FMS completes its
+         * disarm handoff; do not introduce a new ground-level position step. */
         s->landing_stage = LANDING_PROBE;
-        s->plan_valid = 0u;
-        goal[0] = position[0];
-        goal[1] = position[1];
-        goal[2] = position[2];
+        goal[2] = s->plan_valid ? s->ctx.target_ned[2] : final_down;
         return;
     }
 
@@ -128,32 +127,27 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
     }
 
     if (s->landing_stage == LANDING_APPROACH) {
-        if (plan_complete) {
-            if (hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
-                hypotf(velocity[0], velocity[1]) <= 0.25f &&
-                fabsf(position[2] - approach_down) <= 0.20f &&
-                fabsf(velocity[2]) <= 0.20f)
-                s->landing_stage = LANDING_BRAKE;
-            /* Replan from measured p/v/a if the previous segment ended but
-             * the approach state has not actually settled. */
-            s->plan_valid = 0u;
-        }
+        if (plan_complete &&
+            hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
+            hypotf(velocity[0], velocity[1]) <= 0.25f &&
+            fabsf(position[2] - approach_down) <= 0.20f &&
+            fabsf(velocity[2]) <= 0.20f)
+            s->landing_stage = LANDING_BRAKE;
         if (s->landing_stage == LANDING_APPROACH) {
+            /* Keep the completed approach endpoint as a stationary reference
+             * until measured state satisfies the transition gate. */
             goal[2] = approach_down;
             return;
         }
     }
 
     if (s->landing_stage == LANDING_BRAKE) {
-        if (plan_complete) {
-            if (hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
-                hypotf(velocity[0], velocity[1]) <= 0.15f &&
-                fabsf(position[2] - brake_down) <= 0.10f &&
-                fabsf(velocity[2]) <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS)
-                s->landing_stage = LANDING_FINAL;
-            /* Replan from measured p/v/a until the explicit brake gate passes. */
-            s->plan_valid = 0u;
-        }
+        if (plan_complete &&
+            hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
+            hypotf(velocity[0], velocity[1]) <= 0.15f &&
+            fabsf(position[2] - brake_down) <= 0.10f &&
+            fabsf(velocity[2]) <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS)
+            s->landing_stage = LANDING_FINAL;
         if (s->landing_stage == LANDING_BRAKE) {
             goal[2] = brake_down;
             return;
@@ -161,15 +155,12 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
     }
 
     if (s->landing_stage == LANDING_FINAL) {
-        if (plan_complete) {
-            if (hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.15f &&
-                hypotf(velocity[0], velocity[1]) <= 0.15f &&
-                fabsf(position[2] - home_down) <= GUIDANCE_LANDING_CONTACT_HEIGHT_M &&
-                fabsf(velocity[2]) <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS)
-                s->landing_stage = LANDING_PROBE;
-            /* Do not replan a completed segment from a stale preview point. */
-            s->plan_valid = 0u;
-        }
+        if (plan_complete &&
+            hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.15f &&
+            hypotf(velocity[0], velocity[1]) <= 0.15f &&
+            fabsf(position[2] - home_down) <= GUIDANCE_LANDING_CONTACT_HEIGHT_M &&
+            fabsf(velocity[2]) <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS)
+            s->landing_stage = LANDING_PROBE;
         if (s->landing_stage == LANDING_FINAL) {
             goal[2] = home_down;
             return;
@@ -177,12 +168,14 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
     }
 
     if (s->landing_stage == LANDING_PROBE) {
-        if (s->plan_valid) {
+        if (s->plan_valid && !(plan_complete && s->ctx.target_ned[2] < final_down)) {
             /* Keep the 4 s rest-to-rest contact probe fixed until completion. */
             goal[2] = s->ctx.target_ned[2];
         } else if (position[2] >= final_down) {
             goal[2] = position[2];
         } else {
+            /* The completed Home-plane reference is the probe's zero-velocity
+             * start state; plan() preserves that boundary when changing target. */
             goal[2] = final_down;
         }
     }
