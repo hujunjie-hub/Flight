@@ -1586,7 +1586,7 @@ int main(int argc, char **argv)
         printf("[settle] t=%u mode=%u op=%u guide_mode=%u home_valid=%u home=%.3f,%.3f,%.3f "
                "contact=%u landed=%u landed_stable_ms=%u landed_evidence=0x%x landed_confidence=%.2f height=%.4f p=%.4f,%.4f,%.4f "
                "v=%.4f,%.4f,%.4f a=%.4f,%.4f,%.4f truth_v=%.4f,%.4f,%.4f "
-               "ref=%.4f,%.4f,%.4f refv=%.4f,%.4f,%.4f ref23=%.4f,%.4f,%.4f yaw=%.1f gz=%.3f gx=%.3f gy=%.3f "
+               "ref=%.4f,%.4f,%.4f refv=%.4f,%.4f,%.4f ref23=%.4f,%.4f,%.4f yaw=%.1f gz=%.3f gx=%.3f gy=%.3f navmask=0x%x posstd=%.3f ctl=%d "
                "scope=%u control_sample=%llu control_publish=%llu permit_sample=%llu permit_publish=%llu "
                "ref_kind=%u ref_epoch=%u guidance=%u/%u feas_reason=%u constraint=%u\n", ms,
                (unsigned)runtime_data.fms.flight_mode,
@@ -1621,6 +1621,9 @@ int main(int argc, char **argv)
                (double)nav->body_rate_frd_radps[2],
                (double)nav->body_rate_frd_radps[0],
                (double)nav->body_rate_frd_radps[1],
+               (unsigned)nav->valid_mask,
+               (double)runtime_data.nav_cap.horizontal_position_std_m,
+               (int)runtime_stats.control_status,
                (unsigned)permit->permit_flags,
                (unsigned long long)control->header.timestamp_sample_us,
                (unsigned long long)control->header.timestamp_publish_us,
