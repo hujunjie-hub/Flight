@@ -135,6 +135,7 @@
 | [#24](https://github.com/hujunjie-hub/Flight/issues/24) | Landing descends before horizontal settled | OPEN / 部分有效 | 接地水平速度改善；LANDED 受 #26 阻塞 |
 | [#25](https://github.com/hujunjie-hub/Flight/issues/25) | RETURN handoff re-plan regression | OPEN / 修复已验证 | R39 无 handoff 拒绝；等待整批与独立复核 |
 | [#26](https://github.com/hujunjie-hub/Flight/issues/26) | M6 近地水平极限环 | NEW / S1 | ~0.2 m/s、~1.4 s 周期，导航与真值一致；阻断 LANDED 且需 M6/MPC 复核 |
+| [#29](https://github.com/hujunjie-hub/Flight/issues/29) | 导航估计与真值发散 | NEW / S1 | Mission 延长视界下分离 10.441 m、`return_error` 16.927 m、`pos_std` 0.062→0.81、导航加速度 -80.7/-137.6 m/s²；SIL 已有 `ESTIMATOR_DIVERGENCE` 断言与 M6 fail-closed 门控，估计器侧修复仍未做 |
 
 CI on exact HEAD `547f37883186c888d786c4293f2a4341d348b994`: Host validation, M6/M7 host validation and M7 host validation all SUCCESS. M5 Host and ASan/UBSan 330,302/0 each; M4 969/0; M4/M5 integration 1,042/0; Cortex-M7 module compile PASS. These workflows do not launch native FMT-SIM. #17/#18/#19/#21/#23/#24/#25 remain OPEN pending #26 and independent review; #22 remains OPEN pending independent safety review.
 

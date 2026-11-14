@@ -257,4 +257,21 @@ Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析
 | — | [#23](https://github.com/hujunjie-hub/Flight/issues/23) | contact-hold 拒绝/锁存 |
 | — | [#24](https://github.com/hujunjie-hub/Flight/issues/24) | 下降先于水平收敛 |
 | — | [#25](https://github.com/hujunjie-hub/Flight/issues/25) | RETURN handoff 回归 |
-| — | [#26](https://github.com/hujunjie-hub/Flight/issues/26) | M6 近地极限环（本轮新增） |
+| — | [#26](https://github.com/hujunjie-hub/Flight/issues/26) | M6 近地极限环（R40 新增） |
+| — | [#27](https://github.com/hujunjie-hub/Flight/issues/27) | 固化证据不可复现（R40 新增；对象新鲜度项已修 `dd1ef142`） |
+| — | [#28](https://github.com/hujunjie-hub/Flight/issues/28) | 仅记录在 spec/09 的验收工作流（R40 新增） |
+| — | [#29](https://github.com/hujunjie-hub/Flight/issues/29) | 导航估计与真值发散（R41 新增；已加 SIL 检测器与 M6 fail-closed 门控） |
+| — | [#30](https://github.com/hujunjie-hub/Flight/issues/30) | Bootloader 验收（TEST-V191-BOOT，由 #28 拆分） |
+| — | [#31](https://github.com/hujunjie-hub/Flight/issues/31) | MAVLink 安全验收（TEST-V191-MAVSEC，由 #28 拆分） |
+| — | [#32](https://github.com/hujunjie-hub/Flight/issues/32) | 非安全设置持久化（TEST-V191-PARAM，由 #28 拆分） |
+| — | [#33](https://github.com/hujunjie-hub/Flight/issues/33) | 长航段任务/返航分段（TEST-M5-TIME-LATTICE，由 #28 拆分） |
+| — | [#34](https://github.com/hujunjie-hub/Flight/issues/34) | 组合软件故障注入（spec/09 4.3，由 #28 拆分） |
+
+## 2026-11-15 ENG-07 R41：导航发散与消费端门控
+
+- R41 定位：Mission 在延长视界下导航与 FMT 真值分离最多 10.441 m（`return_error` 16.927 m），而 `nav.valid_mask=0xff`、`horizontal_position_std` 由 0.062 升到 0.81、导航加速度出现 -80.7/-137.6 m/s²。这不是调参产物：**控制器未改动**同样复现。登记为 [#29](https://github.com/hujunjie-hub/Flight/issues/29)。
+- 因此撤回 R40 中"内环调参导致 Mission 发散"的初步归因；调参只是改变了触发时机。Mission 的终端断言在估计器可信前不具判定意义。
+- SIL 增加 `ESTIMATOR_DIVERGENCE` 断言与 `[nav] max` 统计（`7fd57508`）：armed 状态下导航与真值持续 500 ms 超过 1.0 m 水平 / 0.8 m 垂直即明确失败。实测在 `t=30610 ms`、`dh=1.37 m`、`pos_std=0.11` 时触发。
+- M6 增加消费端 fail-closed 门控（`7b55218e`）：有效标志下的导航加速度超过 20 m/s²/轴即 `STATUS_MODEL_OUT_OF_DOMAIN`，不再把发散估计转成姿态指令。M6 guard 26→28 checks。
+- memory-budget 拒绝过期对象（`dd1ef142`）：旧对象会报 24 B 而非 264 B 余量；修复后双向验证。
+- 仍缺：估计器侧创新门控与 `position_std` 健康标志（#29 未关闭）；M6 近地极限环（#26）待 #29 可信后重新评估。
