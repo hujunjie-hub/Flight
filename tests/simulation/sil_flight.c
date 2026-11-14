@@ -1586,7 +1586,7 @@ int main(int argc, char **argv)
         printf("[settle] t=%u mode=%u op=%u guide_mode=%u home_valid=%u home=%.3f,%.3f,%.3f "
                "contact=%u landed=%u landed_stable_ms=%u landed_evidence=0x%x landed_confidence=%.2f height=%.4f p=%.4f,%.4f,%.4f "
                "v=%.4f,%.4f,%.4f a=%.4f,%.4f,%.4f truth_v=%.4f,%.4f,%.4f "
-               "ref=%.4f,%.4f,%.4f refv=%.4f,%.4f,%.4f ref23=%.4f,%.4f,%.4f "
+               "ref=%.4f,%.4f,%.4f refv=%.4f,%.4f,%.4f ref23=%.4f,%.4f,%.4f yaw=%.1f gz=%.3f gx=%.3f gy=%.3f "
                "scope=%u control_sample=%llu control_publish=%llu permit_sample=%llu permit_publish=%llu "
                "ref_kind=%u ref_epoch=%u guidance=%u/%u feas_reason=%u constraint=%u\n", ms,
                (unsigned)runtime_data.fms.flight_mode,
@@ -1613,6 +1613,14 @@ int main(int argc, char **argv)
                (double)plan_bundle.guidance.reference.points[23].point.position_ned_m[0],
                (double)plan_bundle.guidance.reference.points[23].point.position_ned_m[1],
                (double)plan_bundle.guidance.reference.points[23].point.position_ned_m[2],
+               (double)(114.591559026165f * atan2f(
+                   2.0f * (nav->q_nb_wxyz[0] * nav->q_nb_wxyz[3] +
+                           nav->q_nb_wxyz[1] * nav->q_nb_wxyz[2]),
+                   1.0f - 2.0f * (nav->q_nb_wxyz[2] * nav->q_nb_wxyz[2] +
+                                  nav->q_nb_wxyz[3] * nav->q_nb_wxyz[3]))),
+               (double)nav->body_rate_frd_radps[2],
+               (double)nav->body_rate_frd_radps[0],
+               (double)nav->body_rate_frd_radps[1],
                (unsigned)permit->permit_flags,
                (unsigned long long)control->header.timestamp_sample_us,
                (unsigned long long)control->header.timestamp_publish_us,
