@@ -101,11 +101,17 @@ Status guidance_build_vertical_land(GuidanceState *s, const GuidanceInput *in,
             const float floor_m = in->directive->operation_code == PRODUCT_OP_LAND
                                       ? plane + GUIDANCE_LANDING_PROBE_M
                                       : plane;
-            /* Reach Home with zero v/a first. Only if contact evidence is still
-             * absent on the next segment do we make the bounded below-plane probe. */
-            if (in->directive->operation_code == PRODUCT_OP_LAND &&
-                d < plane && goal > plane) {
-                goal = plane;
+            /* LAND stages: approach to 20 cm above Home, brake to the Home plane,
+             * then make the bounded below-plane probe only if contact is absent. */
+            if (in->directive->operation_code == PRODUCT_OP_LAND) {
+                const float brake_start = plane - GUIDANCE_LANDING_BRAKE_HEIGHT_M;
+                if (d < brake_start) {
+                    goal = fminf(goal, brake_start);
+                } else if (d < plane) {
+                    goal = plane;
+                } else {
+                    goal = fmaxf(d, fminf(goal, floor_m));
+                }
             } else {
                 goal = fmaxf(d, fminf(goal, floor_m));
             }
@@ -118,7 +124,8 @@ Status guidance_build_vertical_land(GuidanceState *s, const GuidanceInput *in,
 
         duration = 0.2f;
         if (home_valid && in->directive->operation_code == PRODUCT_OP_LAND &&
-            d >= plane - 1e-5f && goal > d + 1e-5f) {
+            d >= plane - GUIDANCE_LANDING_BRAKE_HEIGHT_M - 1e-5f &&
+            goal > d + 1e-5f) {
             duration = GUIDANCE_LANDING_PROBE_DURATION_S;
         }
         for (attempt = 0; attempt < GUIDANCE_MAX_DURATION_ATTEMPTS &&
@@ -128,8 +135,15 @@ Status guidance_build_vertical_land(GuidanceState *s, const GuidanceInput *in,
             memset(s->plan, 0, sizeof(s->plan));
             guidance_quintic_solve(d, v, a, goal, duration, &s->plan[2]);
             for (i = 0; i < 16; ++i) {
-                if (!guidance_curve_dynamics(s->plan, duration*i/16, duration*(i+1)/16,
+                const float segment_start = duration*i/16;
+                const float segment_end = duration*(i+1)/16;
+                if (!guidance_curve_dynamics(s->plan, segment_start, segment_end,
                                              in->safety_envelope, &s->config, constraint)) {
+                    valid = 0;
+                    break;
+                }
+                if (!guidance_landing_speed_ok(in, &s->plan[2], segment_start, segment_end)) {
+                    *constraint = GUIDANCE_PLAN_CONSTRAINT_SPEED;
                     valid = 0;
                     break;
                 }

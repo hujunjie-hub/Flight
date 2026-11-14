@@ -34,8 +34,10 @@ CONTRACT_STATIC_ASSERT(GUIDANCE_MAX_DURATION_US == 6200000u,
 /* FMS LandDetector requires |vertical speed| <= 0.15 m/s; keep the planned
  * near-home envelope at 0.12 m/s to leave tracking margin. */
 #define GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS 0.12f
-/* The Host/SIL contact oracle asserts contact within this Home-plane tolerance. */
+/* The Host/SIL contact oracle asserts physical contact within 6 cm. */
 #define GUIDANCE_LANDING_CONTACT_HEIGHT_M 0.06f
+/* Start limiting descent early enough to decelerate before entering contact range. */
+#define GUIDANCE_LANDING_BRAKE_HEIGHT_M 0.20f
 /* After reaching the Home plane at zero vertical speed, probe below it slowly.
  * The 4 s rest-to-rest probe remains inside M5's 6.2 s bounded horizon. */
 #define GUIDANCE_LANDING_PROBE_DURATION_S 4.0f

@@ -280,7 +280,7 @@ static void test_landing_aligns_and_limits_final_descent(void)
     CHECK(fx_step(&fx) == STATUS_OK);
     CHECK(fx.out.feasibility.feasible && fx.out.guidance_status.reference_epoch == epoch);
     const ProductMotionPoint *point = &fx.out.reference.points[23].point;
-    if (point->position_ned_m[2] >= -GUIDANCE_LANDING_CONTACT_HEIGHT_M) {
+    if (point->position_ned_m[2] >= -GUIDANCE_LANDING_BRAKE_HEIGHT_M) {
       ++low_points;
       CHECK(fabsf(point->velocity_ned_mps[2]) <=
             GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-5f);
@@ -6506,18 +6506,25 @@ static void test_landing_reference_probes_below_home_plane(void)
   Fx fx;
   float lowest = 0.0f;
   float max_probe_speed = 0.0f;
+  float max_brake_speed = 0.0f;
   unsigned probe_samples = 0u;
+  unsigned brake_samples = 0u;
 
   CHECK(fx_init(&fx));
   fx.dir.operation_code = PRODUCT_OP_LAND;
   fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_ALT_HOLD;
   fx.nav.core.position_ned_m[2] = -2.0f;
   CHECK(fx_step(&fx) == STATUS_OK);
-  for (unsigned i = 0; i < 1500; ++i) {
+  for (unsigned i = 0; i < 1800; ++i) {
     CHECK(fx_step(&fx) == STATUS_OK);
     const float above = fx.out.pilot_control_reference.vehicle_extension.altitude_above_origin_m;
     const float vertical_up = fx.out.pilot_control_reference.vehicle_extension.vertical_velocity_up_mps;
     if (above < lowest) lowest = above;
+    if (above <= GUIDANCE_LANDING_BRAKE_HEIGHT_M &&
+        above >= -GUIDANCE_LANDING_PROBE_M - 1e-4f) {
+      max_brake_speed = fmaxf(max_brake_speed, fabsf(vertical_up));
+      brake_samples++;
+    }
     if (above <= 0.0f && above >= -GUIDANCE_LANDING_PROBE_M - 1e-4f) {
       max_probe_speed = fmaxf(max_probe_speed, fabsf(vertical_up));
       probe_samples++;
@@ -6529,6 +6536,8 @@ static void test_landing_reference_probes_below_home_plane(void)
    * (home=0 here) and let the ground contact model stop the airframe. */
   CHECK(lowest < -0.2f);
   CHECK(probe_samples > 0u);
+  CHECK(brake_samples > 0u);
+  CHECK(max_brake_speed <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-4f);
   CHECK(max_probe_speed <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-4f);
   CHECK(guidance_stop() == STATUS_OK);
 }
