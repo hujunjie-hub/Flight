@@ -1,6 +1,6 @@
 # Flight 问题登记清单入口
 
-本文件是当前本地正式问题登记入口。`GITHUB_PUBLICATION = PARTIAL`：GitHub Issues #8–#19 已用于当前部分问题在线跟踪；历史 FLIGHT-LOCAL 编号不保证与线上 Issue 一一映射，只有明确登记的映射有效。不得虚构 GitHub Issue 编号，也不得出现本地 CLOSED、GitHub OPEN 的状态冲突。
+本文件是当前本地正式问题登记入口。`GITHUB_PUBLICATION = PARTIAL`：GitHub Issues #8–#19、#21–#22 已用于当前部分问题在线跟踪；历史 FLIGHT-LOCAL 编号不保证与线上 Issue 一一映射，只有明确登记的映射有效。不得虚构 GitHub Issue 编号，也不得出现本地 CLOSED、GitHub OPEN 的状态冲突。
 
 - [全部开放问题](https://github.com/hujunjie-hub/Flight/issues?q=is%3Aissue+is%3Aopen)
 - [开放的安全问题](https://github.com/hujunjie-hub/Flight/issues?q=is%3Aissue+is%3Aopen+label%3Akind%3Asafety)
@@ -22,7 +22,7 @@
 
 状态必须按 [Issue 工作流](ISSUE_WORKFLOW.md) 更新；关闭前必须完成 [Issue 关闭清单](ISSUE_CLOSURE_CHECKLIST.md)。
 
-GitHub Issues #8–#19 已在线跟踪；未映射的历史本地问题仍按本地状态管理。未完成适用的复验/审查不得 VERIFIED/CLOSED。MR-009/#8 的独立审查要求已由项目方于 2026-11-14 明确豁免，仅限该项，不得扩展到其他安全/数学问题。下方带日期的 R16–R31/CI 条目保留当时快照；其中 GITHUB_PUBLICATION=PENDING、MR-009 WAITING_INDEPENDENT_REVIEW 和旧资源数字均非当前状态，当前状态以本段、末尾 ENG-07 当前记录和 BLOCKER_BOARD 顶部摘要为准。BLOCKER_BOARD.md 只是本文件的派生视图，不得维护独立状态。
+GitHub Issues #8–#19、#21–#22 已在线跟踪；未映射的历史本地问题仍按本地状态管理。未完成适用的复验/审查不得 VERIFIED/CLOSED。MR-009/#8 的独立审查要求已由项目方于 2026-11-14 明确豁免，仅限该项，不得扩展到其他安全/数学问题。下方带日期的 R16–R31/CI 条目保留当时快照；其中 GITHUB_PUBLICATION=PENDING、MR-009 WAITING_INDEPENDENT_REVIEW 和旧资源数字均非当前状态，当前状态以本段、末尾 ENG-07 当前记录和 BLOCKER_BOARD 顶部摘要为准。BLOCKER_BOARD.md 只是本文件的派生视图，不得维护独立状态。
 
 ## 历史本地正式登记（部分映射 GitHub Issues）
 
@@ -115,13 +115,17 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 
 ## ENG-07 原生 FMT-SIM 本机复测登记
 
-- 最新已完成自动化验证的代码 HEAD：`5a8e2c3079d230bbb5ca90ebbf229552487c2be9`；产品代码修复基线：`ce00ff9f0a8eb4989d1a171c3322f3640de2965c`。
-- 在线跟踪：GitHub Issues [#17 Land](https://github.com/hujunjie-hub/Flight/issues/17)、[#18 Return](https://github.com/hujunjie-hub/Flight/issues/18)、[#19 Mission](https://github.com/hujunjie-hub/Flight/issues/19)。
-- 当前证据：[Host #43552823302](https://github.com/hujunjie-hub/Flight/actions/runs/43552823302) 6/6、[M6/M7 #43552823284](https://github.com/hujunjie-hub/Flight/actions/runs/43552823284) 5/5、[M7 #43552823258](https://github.com/hujunjie-hub/Flight/actions/runs/43552823258) 2/2 SUCCESS；M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integration 1,147/0、M5 ASan/UBSan 324,792/0；PowerShell Parser 对两个本地 runner 均 PASS；修复后的原生 FMT-SIM Land/Return/Mission 均 NOT_RUN。
+- 当前产品代码修复提交：`3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；最新 main HEAD（其后仅有 R32 状态文档同步）：`55552e980345b06657b3bc8483f00ececb3cae07`。
+- R32 原生复测 RUN_ID：`FMT-SIM-LOCAL-20261114T072713056Z-e470f00c`，测试 HEAD：`e470f00cd539f438b1923b0faa844456ba2d3b59`。Land 48,043/0 PASS、Return 44,667/0 PASS、Mission 62,793/3 FAIL；总计 155,503 checks / 3 failures，最长状态间隔 145.3 ms。R32 在修复提交之前执行，不是修复后验证。
+- 在线跟踪：GitHub Issues [#17 Land](https://github.com/hujunjie-hub/Flight/issues/17)、[#18 Return](https://github.com/hujunjie-hub/Flight/issues/18)、[#19 Mission](https://github.com/hujunjie-hub/Flight/issues/19)，Mission 子问题 [#21 近地下降速度](https://github.com/hujunjie-hub/Flight/issues/21)、[#22 LANDED/接地点保持](https://github.com/hujunjie-hub/Flight/issues/22)。
+- 修复提交 3d8d29b5dfda21237f8ed02db3c31223c656bfbe 的自动化证据：
+- Host validation [#43574875444](https://github.com/hujunjie-hub/Flight/actions/runs/43574875444)：6/6 jobs SUCCESS；M4 945/0、M5 326,004/0、MR-009 focused 430/0、M4/M5 integration 1,018/0、M5 ASan/UBSan 326,004/0。
+- M6/M7 host validation [#43574875363](https://github.com/hujunjie-hub/Flight/actions/runs/43574875363)：5/5 jobs SUCCESS。
+- M7 host validation [#43574875394](https://github.com/hujunjie-hub/Flight/actions/runs/43574875394)：2/2 jobs SUCCESS。
+  M5 Host / ASan/UBSan 各 326,004/0；M4 Host 945/0；M4/M5 integration 与 sanitizer 各 1,018/0；新增 landing speed / touchdown XY latch 回归通过。
 - 执行责任：项目 Owner 在 Windows 本机执行；远程 Agent 不代跑原生 FMT-SIM。Agent 负责代码、Host/SIL/CI、分析和下一轮修复。
-- 统一方案：spec/validation/FMT_SIM_LOCAL_HANDOFF.md；批量入口 `tests/simulation/run_fmt_sim_regression.ps1` 一次构建并启动三个独立引擎进程。严格关闭资格固定为目标分支、UDP 14653、350 ms、hover 0.62、Owner 显式确认 loopback 127.0.0.1、干净工作区且 HEAD 与脚本刚 fetch 的 origin tracking HEAD 一致；需回传 manifest、summary、完整日志、逐场景退出码、SHA256SUMS 和 ZIP sidecar。
-- 状态规则：#17/#18/#19 继续 OPEN；收到修复后本机证据并逐项复核前，不标 VERIFIED/CLOSED。Host/CI PASS 不替代原生 FMT-SIM；FMT-SIM PASS 不替代 B07 H723 实机/HIL/WCET/栈水位/飞行证据。
-
+- 统一方案：spec/validation/FMT_SIM_LOCAL_HANDOFF.md；批量入口 `tests/simulation/run_fmt_sim_regression.ps1` 一次构建并启动三个独立引擎进程。严格关闭资格固定为 main、UDP 14653、350 ms、hover 0.62、Owner 显式确认 loopback 127.0.0.1、干净工作区且 HEAD 与脚本刚 fetch 的 origin tracking HEAD 一致；需回传 manifest、summary、完整日志、逐场景退出码、SHA256SUMS 和 ZIP sidecar。
+- 状态规则：#17/#18/#19/#21/#22 均继续 OPEN；修复后的完整三场景批量复测尚未运行。收到新归档并逐项复核前，不标 VERIFIED/CLOSED。Host/CI PASS 不替代原生 FMT-SIM；FMT-SIM PASS 不替代 B07 H723 实机/HIL/WCET/栈水位/飞行证据。
 
 ## 2026-11-14 R30 归档复核登记
 

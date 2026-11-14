@@ -4,7 +4,7 @@
 >
 > 适用分支：**main**
 >
-> 当前代码修复基线：**ce00ff9f0a8eb4989d1a171c3322f3640de2965c**
+> 当前代码修复基线：**3d8d29b5dfda21237f8ed02db3c31223c656bfbe**（最新 main HEAD：55552e980345b06657b3bc8483f00ececb3cae07）
 >
 > 本方案只覆盖 Windows 原生 FMT-SIM + Flight Host SIL 软件动态复测；不代表 H723 真机、台架 HIL、WCET/RTA、目标栈水位或飞行验收。
 
@@ -33,15 +33,16 @@
 - FMS 首次确认 LANDED 后，M5 锁存实际接地点的水平坐标并保持至解除武装交接结束；LANDED 快照短暂丢失时不再恢复追逐 Home XY。
 - M4 Mission→Return 许可绑定比较使用 M6 capability 的 publish 时间，覆盖 20 ms sample-to-publish 延迟。
 
-代码修复基线为 `ce00ff9f0a8eb4989d1a171c3322f3640de2965c`。最新已完成自动化验证的代码 HEAD 为 `5a8e2c3079d230bbb5ca90ebbf229552487c2be9`，三组 CI 全部通过：
+生产代码修复提交为 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；最新 main HEAD 为 `55552e980345b06657b3bc8483f00ececb3cae07`（其后仅有 R32 状态文档同步）。R32 原生复测在修复前 HEAD `e470f00cd539f438b1923b0faa844456ba2d3b59` 执行：Land 48,043/0 PASS、Return 44,667/0 PASS、Mission 62,793/3 FAIL；总计 155,503/3，最长状态间隔 145.3 ms。R32 不能作为修复提交的原生验证证据。
 
-- [Host validation #43552823302](https://github.com/hujunjie-hub/Flight/actions/runs/43552823302)：6/6 jobs SUCCESS。
-- [M6/M7 host validation #43552823284](https://github.com/hujunjie-hub/Flight/actions/runs/43552823284)：5/5 jobs SUCCESS。
-- [M7 host validation #43552823258](https://github.com/hujunjie-hub/Flight/actions/runs/43552823258)：2/2 jobs SUCCESS。
+修复提交 3d8d29b5dfda21237f8ed02db3c31223c656bfbe 的三组 CI 全部通过：
+- [Host validation #43574875444](https://github.com/hujunjie-hub/Flight/actions/runs/43574875444)：6/6 jobs SUCCESS。
+- [M6/M7 host validation #43574875363](https://github.com/hujunjie-hub/Flight/actions/runs/43574875363)：5/5 jobs SUCCESS。
+- [M7 host validation #43574875394](https://github.com/hujunjie-hub/Flight/actions/runs/43574875394)：2/2 jobs SUCCESS。
 
-Host 证据包括 M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integration 1,147/0、M5 ASan/UBSan 324,792/0；Production ABI 144 types / 0 mismatch、Spec Audit 145 types / 8 checks PASS，两个本地 PowerShell runner 的 Parser 检查均 PASS。
+Host 证据包括 M4 945/0、M5 326,004/0、MR-009 focused 430/0、M4/M5 integration 1,018/0、M5 ASan/UBSan 326,004/0、integration sanitizer 1,018/0；Production ABI、Spec Audit、Cortex-M7 production-module compile、MPC RAM checks 和 PowerShell runner parse 均 PASS。
 
-**以上均不是本轮修复后的原生 FMT-SIM 证据。** 最新代码修复后的 Land、Return、Mission 原生复测仍为 NOT_RUN；历史 RUN_ID M5-06-SOFTWARE-20261114 的三项失败继续保留为修复前动态基线。GitHub Issues #17/#18/#19 保持 OPEN。
+**以上均不是修复后的原生 FMT-SIM 证据。** 修复提交后的完整 Land / Return / Mission 批量复测仍 NOT_RUN；GitHub Issues #17/#18/#19 及子问题 #21/#22 均保持 OPEN。
 
 ## 3. 本机运行前置条件
 

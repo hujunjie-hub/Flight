@@ -1,6 +1,6 @@
 # 飞行与策略仿真验证矩阵
 
-本文件的 PASS 记录均绑定各自历史 RUN_ID；最新 Stage-02 复测曾失败，修复提交 `31a0d3d` 的 Host CI 已通过，但原生 FMT-SIM 尚未复跑，见文末。
+本文件的 PASS 记录均绑定各自历史 RUN_ID。R32 在修复前 main HEAD `e470f00cd539f438b1923b0faa844456ba2d3b59` 上 Land / Return 通过、Mission 3 项失败；修复提交 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` 的 Host / M6-M7 / M7 CI 已通过，但修复后完整原生 FMT-SIM 尚未复跑。详见文末 R32 记录和本机交接方案。
 本轮使用 `SIM_CONTROLLED_STOP` Host 构建和隔离的 FMT-SIM Ground 场景。
 H723 的运行配置仍使用 `BENCH_INHIBIT`。设备固件、UART/DMA、板上时序和实机运动
 留在各自的验证门禁。

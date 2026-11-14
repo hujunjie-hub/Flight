@@ -8,11 +8,11 @@
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
 RUN_ID `M5-06-R31-20261113`；validated code `8dcb60b3ac18e6a763c939d3e810984092cdd321`；
-code-validation HEAD `d7666c5aa093dbef36fef11b82909e91fdc61491`；
+code-validation HEAD `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；latest main HEAD `55552e980345b06657b3bc8483f00ececb3cae07`（文档同步提交）；
 唯一开发/验证分支 `main`；历史 R31 证明基线仍为 `8dcb60b3ac18e6a763c939d3e810984092cdd321`。
 
 本文件结论来自历史本地验证记录与本轮 GitHub Actions 远程 Host/SIL/Cortex-M7 编译证据；均不是 H723 实机、HIL、
-WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；GitHub Issues #8–#19 已在线跟踪，历史本地编号仅按明确映射关联。
+WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；GitHub Issues #8–#19、#21–#22 已在线跟踪，历史本地编号仅按明确映射关联。
 
 ## B01 Spec Audit FAIL
 
@@ -123,6 +123,8 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；Git
 | [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / R32 SCENARIO PASS; FULL BATCH NOT CLOSURE-ELIGIBLE | R32 Land 48,043/0; rerun all scenarios after fix `3d8d29b` |
 | [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R32 SCENARIO PASS; FULL BATCH NOT CLOSURE-ELIGIBLE | R32 Return 44,667/0; rerun all scenarios after fix `3d8d29b` |
 | [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R32 3 FAILURES; FIX COMMITTED / RETEST REQUIRED | R32 62,793/3; near-ground descent 0.665 m/s, disarm reason 11, arm not DISARMED |
+| [#21](https://github.com/hujunjie-hub/Flight/issues/21) | Mission near-ground speed | OPEN / FIX COMMITTED / NATIVE RETEST REQUIRED | 3d8d29 adds 0.50 m / 0.40 m/s plus 0.20 m / 0.12 m/s continuous bounds |
+| [#22](https://github.com/hujunjie-hub/Flight/issues/22) | Mission touchdown hold | OPEN / FIX COMMITTED / NATIVE RETEST REQUIRED | 3d8d29 latches touchdown XY after LANDED; FMS thresholds unchanged |
 
 Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` 的 Host validation #43574875444（6/6）、M6/M7 #43574875363（5/5）、M7 #43574875394（2/2）全部 SUCCESS；M5 Host 326,004/0、M5 ASan/UBSan 326,004/0、M4 Host 945/0、M4/M5 integration 1,018/0、integration sanitizer 1,018/0、MR-009 focused 430/0。新增 `landing_alignment_and_speed` 与 `landing_contact_latches_xy` 均 PASS。以上 CI 不启动原生 FMT-SIM。后续原生 FMT-SIM 均由项目 Owner 在 Windows 本机执行，远程 Agent 不代跑。Agent 负责代码修复、Host/SIL/CI、日志分析和分支交付。命令、环境指纹、归档和回传规则见 [FMT-SIM 本机复测交接方案](../validation/FMT_SIM_LOCAL_HANDOFF.md)；批量入口为 `tests/simulation/run_fmt_sim_regression.ps1`。严格关闭资格另要求 hover 0.62、显式 `-ConfirmLoopbackAddress`、UDP 14653 和 350 ms。三项 Issue 在本机证据回传并复核前保持 OPEN；不得用 Host/CI PASS 或 650 ms 诊断运行关闭。
 
