@@ -40,12 +40,10 @@ CONTRACT_STATIC_ASSERT(GUIDANCE_MAX_DURATION_US == 6200000u,
 #define GUIDANCE_LANDING_BRAKE_HEIGHT_M 0.20f
 /* Margin for M6's 20 ms float-boundary reconstruction of the landing curve. */
 #define GUIDANCE_LANDING_JERK_MARGIN 0.75f
-/* After reaching the Home plane at zero vertical speed, probe below it slowly.
- * The 4 s rest-to-rest probe remains inside M5's 6.2 s bounded horizon. */
+/* After reaching the Home plane at zero vertical speed, M5 executes one bounded
+ * 4 s rest-to-rest probe below it. This remains inside the 6.2 s planning horizon. */
 #define GUIDANCE_LANDING_PROBE_DURATION_S 4.0f
-/* Landing descends in small steps from the measured position instead of aiming at
- * an unreachable plane: a large constant position error saturates the vertical
- * loop, bounces the airframe off the contact spring and flickers LANDED. */
+/* Retained as a conservative per-update descent increment for future consumers. */
 #define GUIDANCE_LANDING_STEP_M 0.03f
 #define GUIDANCE_MAX_DURATION_ATTEMPTS 16u
 #define GUIDANCE_VALIDATION_WORK_UNITS 256u

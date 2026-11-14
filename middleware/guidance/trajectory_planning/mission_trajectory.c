@@ -2,7 +2,7 @@
 #include <string.h>
 #include "guidance_update/guidance_internal.h"
 
-enum { LANDING_APPROACH = 1, LANDING_BRAKE = 2, LANDING_FINAL = 3 };
+enum { LANDING_APPROACH = 1, LANDING_BRAKE = 2, LANDING_FINAL = 3, LANDING_PROBE = 4 };
 
 static uint8_t finite3(const float v[3])
 { return (uint8_t)(isfinite(v[0]) && isfinite(v[1]) && isfinite(v[2])); }
@@ -108,7 +108,7 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
         (in->control_time_us - s->plan_start_us) * 1e-6f >= s->plan_duration_s);
 
     if (landing_confirmed(in)) {
-        s->landing_stage = LANDING_FINAL;
+        s->landing_stage = LANDING_PROBE;
         s->plan_valid = 0u;
         goal[0] = position[0];
         goal[1] = position[1];
@@ -121,8 +121,10 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
             s->landing_stage = LANDING_APPROACH;
         else if (position[2] < brake_down)
             s->landing_stage = LANDING_BRAKE;
-        else
+        else if (position[2] < home_down)
             s->landing_stage = LANDING_FINAL;
+        else
+            s->landing_stage = LANDING_PROBE;
     }
 
     if (s->landing_stage == LANDING_APPROACH) {
@@ -149,8 +151,7 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
                 fabsf(position[2] - brake_down) <= 0.10f &&
                 fabsf(velocity[2]) <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS)
                 s->landing_stage = LANDING_FINAL;
-            /* A completed segment is never treated as a settled state unless
-             * measured position and velocity satisfy the explicit gate. */
+            /* Replan from measured p/v/a until the explicit brake gate passes. */
             s->plan_valid = 0u;
         }
         if (s->landing_stage == LANDING_BRAKE) {
@@ -160,17 +161,29 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
     }
 
     if (s->landing_stage == LANDING_FINAL) {
-        if (plan_complete)
+        if (plan_complete) {
+            if (hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.15f &&
+                hypotf(velocity[0], velocity[1]) <= 0.15f &&
+                fabsf(position[2] - home_down) <= GUIDANCE_LANDING_CONTACT_HEIGHT_M &&
+                fabsf(velocity[2]) <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS)
+                s->landing_stage = LANDING_PROBE;
+            /* Do not replan a completed segment from a stale preview point. */
             s->plan_valid = 0u;
+        }
+        if (s->landing_stage == LANDING_FINAL) {
+            goal[2] = home_down;
+            return;
+        }
+    }
+
+    if (s->landing_stage == LANDING_PROBE) {
         if (s->plan_valid) {
-            /* Keep the current 3 cm step fixed until its trajectory completes. */
+            /* Keep the 4 s rest-to-rest contact probe fixed until completion. */
             goal[2] = s->ctx.target_ned[2];
         } else if (position[2] >= final_down) {
             goal[2] = position[2];
         } else {
-            /* The Home plane is shared by LAND and RETURN. Continue below it
-             * in bounded steps until the contact/dwell evidence is confirmed. */
-            goal[2] = fminf(position[2] + GUIDANCE_LANDING_STEP_M, final_down);
+            goal[2] = final_down;
         }
     }
 }
@@ -209,6 +222,9 @@ static uint8_t plan(GuidanceState *s, const GuidanceInput *in, const float goal[
         duration = fmaxf(duration, cbrtf(d/fminf(cfg->max_jerk_ned_mps3[axis], e->max_jerk_ned_mps3[axis])));
     }
     duration = fmaxf(duration, fabsf(guidance_wrap_pi(yaw-start.yaw_rad))/in->safety_envelope->max_yaw_rate_radps);
+    if (guidance_has_landing_plane(in) && s->landing_stage == LANDING_PROBE &&
+        goal[2] > start.position_ned_m[2] + 1e-3f)
+        duration = fmaxf(duration, GUIDANCE_LANDING_PROBE_DURATION_S);
     duration = quantize_duration_up(duration);
     for (attempt = 0; attempt < GUIDANCE_MAX_DURATION_ATTEMPTS && duration <= max_duration + 1e-5f; ++attempt) {
         uint8_t feasible = 1;
@@ -285,7 +301,8 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
      * Apply the 25% M6 reconstruction margin only after the explicit brake
      * waypoint has been reached and during the final Home segment. */
     if (guidance_has_landing_plane(in) &&
-        (s->landing_stage == LANDING_BRAKE || s->landing_stage == LANDING_FINAL)) {
+        (s->landing_stage == LANDING_BRAKE || s->landing_stage == LANDING_FINAL ||
+         s->landing_stage == LANDING_PROBE)) {
         for (i = 0; i < 3; ++i)
             planning_config.payload.max_jerk_ned_mps3[i] *= GUIDANCE_LANDING_JERK_MARGIN;
     }

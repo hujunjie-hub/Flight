@@ -276,7 +276,7 @@ static void test_landing_aligns_and_limits_final_descent(void)
   fx.nav.core.position_ned_m[0] = 0.0f;
   unsigned low_points = 0;
   uint8_t failure_logged = 0u;
-  /* Allow the approach, braking waypoint and final 0.20 m descent segments. */
+  /* Allow the approach, braking waypoint, Home-plane arrival and 4 s probe. */
   for (unsigned i = 0; i < 1200; ++i) {
     CHECK(fx_step(&fx) == STATUS_OK);
     if ((fx.out.feasibility.feasible == 0u ||
@@ -315,7 +315,8 @@ static void test_landing_aligns_and_limits_final_descent(void)
            sizeof(fx.nav.core.acceleration_ned_mps2));
   }
   CHECK(low_points > 0);
-  CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[2]) < 0.001f);
+  CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[2] -
+              GUIDANCE_LANDING_PROBE_M) < 0.001f);
   CHECK(guidance_stop() == STATUS_OK);
 }
 
