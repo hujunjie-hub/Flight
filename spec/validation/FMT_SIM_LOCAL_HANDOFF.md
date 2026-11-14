@@ -2,7 +2,7 @@
 
 > 状态：**OWNER_LOCAL_RUN_REQUIRED / NOT_RUN_AFTER_FIX**
 >
-> 适用分支：**opt/stage-02-m5-06-safety-validator**
+> 适用分支：**main**
 >
 > 当前代码修复基线：**ce00ff9f0a8eb4989d1a171c3322f3640de2965c**
 >
@@ -17,7 +17,7 @@
 | 代码分析、缺陷定位、修改与回归用例 | ChatGPT Agent | 在指定分支完成代码修改；不删减失败断言、不放宽安全阈值 |
 | Host 单元/集成/Sanitizer、静态检查、Host SIL、CI | ChatGPT Agent | 在可用远程环境执行并绑定 commit SHA、日志和 CI URL |
 | Windows 原生 FMT-SIM Land / Return / Mission | 项目 Owner 本地 | 拉取分支，按本方案运行，保存完整日志和环境指纹 |
-| FMT-SIM 结果分析与下一轮修复 | ChatGPT Agent | 用户回传归档后分析首个失败点、确定根因、修改代码和测试、更新 SPEC/Issue、推送分支 |
+| FMT-SIM 结果分析与下一轮修复 | ChatGPT Agent | 用户回传归档后分析首个失败点、确定根因、修改代码和测试、更新 SPEC/Issue、推送 main |
 | H723 真机 / 物理台架 HIL / 飞行 | 对应硬件责任人 | 按 B07 独立计划执行；不得用 FMT-SIM 或 Host SIL 替代 |
 
 “本地 FMT-SIM”指 Windows 上的原生仿真引擎与隔离 Ground/HIL 实例。它与不启动 FMT-SIM 的 Host SIL、GitHub Actions、H723 板载 HIL 是不同验证层级。
@@ -45,7 +45,7 @@ Host 证据包括 M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integ
 ## 3. 本机运行前置条件
 
 1. Windows 工作站；从 Flight 仓库根目录运行 PowerShell 7（pwsh）。批量入口会用 PowerShell Parser 检查 run_sil.ps1 语法。
-2. 当前分支为 opt/stage-02-m5-06-safety-validator，工作区干净；运行前执行 git fetch origin，确认本地 HEAD 与 upstream tracking HEAD 一致，不要只记录分支名。
+2. 当前分支为 main，工作区干净；运行前执行 git fetch origin，确认本地 HEAD 与 upstream tracking HEAD 一致，不要只记录分支名。
 3. 本机已配置 MinGW，默认路径为 D:\STM32CubeCLT\mingw64\bin；若安装位置不同，调整命令中的 GccDir。
 4. 使用隔离的 FMT-SIM 安装，不要指向生产/飞行实例。正式批量入口只记录 EXE 文件名与 SHA256，不复制 FMT-SIM 二进制。默认路径示例：
 
@@ -62,7 +62,7 @@ Host 证据包括 M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integ
 
 ```powershell
 git fetch origin
-git switch opt/stage-02-m5-06-safety-validator
+git switch main
 git pull --ff-only
 git status --short
 git rev-parse HEAD
@@ -76,7 +76,7 @@ $sim = (Resolve-Path 'build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FM
 pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -FmtHilPort 14653 -FmtStateTimeoutMs 350 -FmtGraphicsAdapter 1 -FmtHover 0.62 -ConfirmLoopbackAddress
 ```
 
-若 FMT-SIM 安装路径不同，只修改 `$sim`；MinGW 路径不同时使用 `-GccDir`。批量入口自身先执行 `git fetch --prune origin`，再拒绝错误分支、dirty worktree、非 `origin/opt/stage-02-m5-06-safety-validator` upstream 或本地 HEAD 与刚拉取的 upstream HEAD 不一致。正式关闭资格还要求命令显式带 `-ConfirmLoopbackAddress`（表示 Owner 已人工确认 settings 中的地址为 127.0.0.1）、hover 保持 0.62、端口 14653 和 350 ms；否则只生成诊断证据。它也会检查 settings.jason 中指定端口恰好匹配一架 HIL/UDP 载具且 Autobound=true；回环地址 127.0.0.1 仍需按本方案人工核对。
+若 FMT-SIM 安装路径不同，只修改 `$sim`；MinGW 路径不同时使用 `-GccDir`。批量入口自身先执行 `git fetch --prune origin`，再拒绝错误分支、dirty worktree、非 `origin/main` upstream 或本地 HEAD 与刚拉取的 upstream HEAD 不一致。正式关闭资格还要求命令显式带 `-ConfirmLoopbackAddress`（表示 Owner 已人工确认 settings 中的地址为 127.0.0.1）、hover 保持 0.62、端口 14653 和 350 ms；否则只生成诊断证据。它也会检查 settings.jason 中指定端口恰好匹配一架 HIL/UDP 载具且 Autobound=true；回环地址 127.0.0.1 仍需按本方案人工核对。
 
 批量入口调用 `run_sil.ps1 -BuildOnly` 构建一次，再通过 `run_sil.ps1 -ReuseBuild` 执行各场景；每个场景有独立 OutDir 和 FMT-SIM 引擎进程。即使一个场景失败，也会继续收集其余场景，逐项记录退出码，不覆盖之前 RUN_ID。
 
@@ -159,7 +159,7 @@ build/validation/fmt-sim-local/<RUN_ID>.zip
 3. 按 #17/#18/#19 分别定位首个失败时刻、状态、reason、constraint、参考和许可时间戳；不以最终状态单点猜根因。
 4. 对已证实根因逐项修改生产代码并增加 Host 回归测试；必要时增加 Host SIL 场景回归。
 5. 运行受影响 Host、集成、Sanitizer、静态检查和 CI；更新 SPEC、Issue、阻塞表和下一轮本地 FMT-SIM 命令。
-6. 推送修复分支，交付新的精确 HEAD 和本地复测步骤。用户再次在本机运行 FMT-SIM；未取得新日志前，#17/#18/#19 保持 OPEN。
+6. 推送 main 分支，交付新的精确 HEAD 和本地复测步骤。用户再次在本机运行 FMT-SIM；未取得新日志前，#17/#18/#19 保持 OPEN。
 
 **禁止状态跃迁：** Host/SIL/CI PASS 不会自动关闭 #17/#18/#19；本机 FMT-SIM 未运行时必须记为 NOT_RUN；FMT-SIM 软件仿真 PASS 也不能关闭 B07 的 H723 实机/HIL/WCET/栈水位/飞行门禁。
 
@@ -169,3 +169,12 @@ build/validation/fmt-sim-local/<RUN_ID>.zip
 2026-11-14 已收到 `FMT-SIM-R30-20261114.zip`。ZIP/sidecar 与内部 31 项 SHA256 均匹配，但归档测试 HEAD 为 `3299a4f0702083ca4374ccc978edccb5d0c900da`，而复核时 GitHub 当前目标分支 HEAD 为 `9063f31053ac301b71c806858a67e84f69402414`（前进 181 commits）。旧包工作区 DIRTY、upstream 记录过期，且使用直接 `run_sil.ps1` 场景命令，没有正式批量入口 manifest 和显式 loopback 确认。因此它是旧代码诊断，不是修复后验收；五个有效场景均 FAIL，#17/#18/#19 仍 OPEN。详细逐场景数据和未证实假设见 [R30 归档复核报告](FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md)。
 
 **不要在原有 DIRTY 工作区执行 reset/clean。** 请保留旧归档，在新的干净克隆检出最新目标分支后运行本节第 4 节的正式批量入口；脚本会自行 fetch 并拒绝 HEAD/upstream 不一致、dirty worktree 或缺少 `-ConfirmLoopbackAddress` 的关闭资格。
+
+## 2026-11-14 main 唯一分支整合与 R31 复测登记
+
+- 唯一工作分支：`main`。PR [#20](https://github.com/hujunjie-hub/Flight/pull/20) 已合并，合并提交 `eacb966b502b7f9cb547617e866641504346a5fd`；完整 177 提交历史已进入 main。后续本机 FMT-SIM 必须在 main 上运行。
+- 合并源代码 HEAD：`bcbe4db5e665e5f678069afc1b206a00ae1cd36d`。该提交 13 项 CI checks 全部 SUCCESS；main 合并提交的 Host validation #43566259362（6/6）SUCCESS。M6/M7 与 M7 独立 workflow 已调整为 main push 触发，需以本次 SPEC/runner 更新后的 main commit 再核对全部 CI。
+- Owner 回传 RUN_ID `FMT-SIM-LOCAL-20261114T045144621Z-304fbd12`，测试 HEAD `304fbd12078679d46b80cb626aba9eb0727b6914`，测试时 branch/upstream 均为旧 stage-02 分支且一致、worktree clean。该 HEAD 比合并源 HEAD 落后 7 commits，不能代表当前 main。
+- R31 结果：Land 36,600/4 FAIL；Return 36,601/3 FAIL；Mission 43,692/6 FAIL；合计 116,893 checks / 13 failures。最长状态间隔分别 78.7/48.0/48.5 ms，均小于 350 ms。构建 PASS，严格 issue-closure eligibility 为 false。ZIP SHA256 `af97c2ac451c2937fab186ccd5e1a9f553b4ee6d699470ab9963e0b105505d26` 与 sidecar 匹配；内部 102 项哈希全部通过。
+- 逐场景失败断言、环境指纹和哈希见 [R31 本机归档复核报告](FMT_SIM_LOCAL_20261114_304FBD12_REVIEW.md)。#17/#18/#19 继续 OPEN。
+- **下一轮本机复测只使用 main：** `git fetch origin --prune; git switch main; git pull --ff-only origin main`，确认 clean、HEAD 与 `origin/main` 一致后执行本方案正式批量入口。runner 已改为只接受 `main` / `origin/main`；旧 stage-02 checkout 会被拒绝。

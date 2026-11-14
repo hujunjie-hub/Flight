@@ -156,3 +156,15 @@ The project owner runs all native Windows FMT-SIM scenarios locally. The formal 
 ## ENG-07 R30 archive intake — stale code baseline
 
 The owner returned R30 archive SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae9909063`; ZIP and all 31 internal hashes validate. The five diagnostic runs all failed (201,306 checks / 29 failures). However, the tested commit is `3299a4f`, 181 commits behind current branch HEAD `9063f310`; its worktree was dirty and the package lacks the formal batch-runner manifest and loopback-confirmation evidence. This does not retest the ENG-07 fixes now on the branch. No production code change is justified from this stale run. Keep #17/#18/#19 OPEN and rerun from a clean current-HEAD clone using `run_fmt_sim_regression.ps1`. See [the full R30 archive review](../../spec/validation/FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md).
+
+## ENG-07 R31 FMT-SIM local run — old HEAD, all three scenarios FAIL
+
+Owner archive RUN_ID `FMT-SIM-LOCAL-20261114T045144621Z-304fbd12`, tested HEAD `304fbd12078679d46b80cb626aba9eb0727b6914`. The archive has a clean worktree, successful fetch, exact upstream HEAD match, build PASS, 350 ms timeout, hover 0.62, UDP 14653 and explicit loopback confirmation. ZIP/sidecar SHA256 match; all 102 internal file hashes pass.
+
+| Scenario | Checks | Failures | Longest state gap | Failing assertions |
+|---|---:|---:|---:|---|
+| Land | 36,600 | 4 | 78.7 ms | near-ground descent bound, terminal ACK, DISARMED ACK, arm state |
+| Return | 36,601 | 3 | 48.0 ms | terminal ACK, DISARMED ACK, arm state |
+| Mission | 43,692 | 6 | 48.5 ms | near-ground descent bound, terminal ACK, DISARMED ACK, arm state, ground contact, return touchdown error |
+
+Total: 116,893 checks / 13 failures. The test HEAD is seven commits behind the integration source HEAD `bcbe4db5e665e5f678069afc1b206a00ae1cd36d`; those later commits include FMS Return binding and M5 landing-stage/probe corrections. Therefore this run is a valid failure record for `304fbd12`, not a post-fix result for the later code or current main. Keep #17/#18/#19 OPEN and rerun the formal batch runner on clean `main` / `origin/main`. Detailed hashes and failure lines: [R31 archive review](../../spec/validation/FMT_SIM_LOCAL_20261114_304FBD12_REVIEW.md).

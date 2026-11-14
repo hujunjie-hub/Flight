@@ -15,8 +15,8 @@
 ## 强制规则
 
 - 以 `spec/00` 至 `spec/09` 为设计和安全约束；以 `spec/09` 为唯一正式验收状态台账；以 GitHub Issues 为问题状态唯一权威记录。
-- 默认在当前任务指定的功能分支工作。本轮 M5-06 分支为 `opt/stage-02-m5-06-safety-validator`，PR #2 目标分支为 `opt/stage-01-host-validation`。
-- 不得切换或提交到 `main`；不得合并 PR；不得将 Draft PR 改为 Ready；不得 force push。除非用户明确要求，Agent 只做本地修改和本地 commit，不 push。
+- 仓库唯一远程开发、测试和交付分支为 `main`。所有后续代码、测试和 SPEC 修改均直接基于 `main`；不得新建、切换或继续使用功能分支。历史分支仅作为提交历史，不再作为工作目标。
+- 只有用户明确授权时才 push `main`；不得 force push。不得擅自创建替代分支或把工作重新分流到 PR 分支。
 - 不得擅自修改公共 ICD、ABI、Product Profile、硬件绑定、FMS 授权边界或安全策略。需要修改时先提交变更影响和 CR 建议，等待用户批准。
 - M5-05 输出始终是 candidate。M5-06 未通过验证和独立数学审查前，不得接入 M6，不得开始 M5-07，不得授予 Permit。
 - H723 当前产品配置为 `QUAD_X4 / STM32H723ZGT6 / OBSTACLE_SOURCE_MODE=NONE / BENCH_INHIBIT`。M5-06 地图/动态障碍物验证属于 Host/SIL；不得宣称 H723 已具备在线避障能力。
@@ -28,4 +28,4 @@
 
 ## Agent 开始工作时的第一条输出
 
-先报告：仓库路径、当前分支、HEAD SHA、工作区是否干净、目标任务 ID、已读取的规范文件、准备运行的测试命令。若当前分支不正确或存在用户未提交改动，先停止并报告，不得自行 reset、clean、stash 或覆盖。
+先报告：仓库路径、当前分支（必须为 `main`）、HEAD SHA、工作区是否干净、目标任务 ID、已读取的规范文件、准备运行的测试命令。若当前分支不是 `main` 或存在用户未提交改动，先停止并报告，不得自行 reset、clean、stash 或覆盖。

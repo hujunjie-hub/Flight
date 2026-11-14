@@ -3,8 +3,7 @@ name: M7 host validation
 on:
   push:
     branches:
-      - test/fmat-0013-m7-actuation
-      - "opt/**"
+      - main
   pull_request:
     branches:
       - main

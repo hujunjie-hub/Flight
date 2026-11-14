@@ -39,3 +39,7 @@ The suite includes permit generation/watermark, demand freshness, frame-boundary
 - M7 ASan/UBSan: 255 checks / 0 failures.
 
 Both independently triggered workflows compiled and ran the same real actuator guard source. This closes the M7 Host/Sanitizer gate for this commit only. It does not close the FMS→M7 integration, target build, DShot physical-application timing, HIL or flight gates listed above.
+
+## Current integrated main branch — 2026-11-14
+
+The standalone `test/fmat-0013-m7-actuation` record above is historical. Its M7 actuator guard work is included in the integrated `main` branch through PR #20 (merge commit `eacb966b502b7f9cb547617e866641504346a5fd`). Integration source HEAD `bcbe4db5e665e5f678069afc1b206a00ae1cd36d` reported 13/13 CI checks SUCCESS, including M7 Host and M7 ASan/UBSan. The M7 workflow push filter is now main-only; use fresh post-update main CI as the current validation baseline. Physical DShot waveform/apply-time, ESC response, H723 runtime, HIL and flight remain NOT_RUN.

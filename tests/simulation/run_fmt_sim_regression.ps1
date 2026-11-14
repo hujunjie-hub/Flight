@@ -75,7 +75,7 @@ if ($LASTEXITCODE -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
 }
 $branch = (& git -C $repoRoot branch --show-current).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Unable to resolve the current Git branch' }
-$expectedBranch = 'opt/stage-02-m5-06-safety-validator'
+$expectedBranch = 'main'
 if ($branch -ne $expectedBranch) {
     throw "Expected branch '$expectedBranch', found '$branch'."
 }

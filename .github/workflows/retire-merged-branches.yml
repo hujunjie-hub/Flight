@@ -1,0 +1,32 @@
+name: Retire merged development branches
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  retire-obsolete-branches:
+    if: contains(github.event.head_commit.message, '[retire-branches]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete only the two merged legacy branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for branch in opt/spec-sync-review opt/stage-02-m5-06-safety-validator; do
+            ref="repos/${GITHUB_REPOSITORY}/git/ref/heads/${branch}"
+            if gh api --silent "$ref" >/dev/null 2>&1; then
+              gh api --silent --method DELETE "$ref"
+              echo "Deleted ${branch}"
+            else
+              echo "Already absent: ${branch}"
+            fi
+          done
+          gh api --silent "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" >/dev/null
+          echo "Verified main still exists"

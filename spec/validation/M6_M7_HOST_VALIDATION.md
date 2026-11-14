@@ -314,3 +314,9 @@ M5 and M4/M5 integration ASan/UBSan each completed with 0 failures (322,179 and 
 M6/M7 ASan/UBSan and M4/M5 regression/sanitizer jobs all completed with zero failures. Production ABI 144 types / 0 mismatches / 0 unexpected Host/ARM; Spec Audit 145 types / 8 checks PASS; Cortex-M7 M4/M5/M6/M7 module compile PASS. MPC RAM 29,400 B; worker stack 8,192 B; largest static frame 2,024 B.
 
 H723 product runtime, physical DShot apply-time, ESC thrust response, WCET/RTA, target RAM/stack watermark, physical HIL and flight remain NOT_RUN. M5-06 independent mathematical review remains BLOCKED; M5-07 is not authorized. FLIGHT-LOCAL-27 remains OPEN / RISK with estimated 8 B static headroom pending memory-budget and final-map recheck. These runs validate the commit above; subsequent commits require fresh CI.
+
+## Current integrated main branch — 2026-11-14
+
+PR #20 merged the complete stage-02 history into `main` at `eacb966b502b7f9cb547617e866641504346a5fd`. The integration source `bcbe4db5e665e5f678069afc1b206a00ae1cd36d` had 13/13 completed CI checks SUCCESS, including M6/M7 Host, ASan/UBSan, Cortex-M7 M4/M5/M6/M7 module compile and runtime ground-stop SIL. Main merge commit Host validation #43566259362 completed 6/6 jobs SUCCESS. The M6/M7 and M7 workflows are now configured to run on main pushes; the post-documentation main commit must be checked for fresh runs. Historical standalone feature-branch records above remain historical only.
+
+H723 runtime, physical DShot apply-time, ESC response, WCET/RTA, target RAM/stack watermark, physical HIL and flight remain NOT_RUN. This integration does not authorize physical actuator output, M5-07 or flight.

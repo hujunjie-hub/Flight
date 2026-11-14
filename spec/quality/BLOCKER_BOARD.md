@@ -8,8 +8,8 @@
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
 RUN_ID `M5-06-R31-20261113`；validated code `8dcb60b3ac18e6a763c939d3e810984092cdd321`；
-code-validation HEAD `8dcb60b3ac18e6a763c939d3e810984092cdd321`；
-ahead 动态计算；branch `opt/stage-02-m5-06-safety-validator`。
+code-validation HEAD `eacb966b502b7f9cb547617e866641504346a5fd`；
+唯一开发/验证分支 `main`；历史 R31 证明基线仍为 `8dcb60b3ac18e6a763c939d3e810984092cdd321`。
 
 本文件结论来自历史本地验证记录与本轮 GitHub Actions 远程 Host/SIL/Cortex-M7 编译证据；均不是 H723 实机、HIL、
 WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；GitHub Issues #8–#19 已在线跟踪，历史本地编号仅按明确映射关联。
@@ -128,3 +128,9 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；Git
 
 
 R30 archive SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae9909063` is verified, but its tested HEAD `3299a4f` is 181 commits behind the reviewed current branch HEAD `9063f310`; worktree DIRTY and formal manifest/loopback gate evidence absent. Five diagnostic scenarios failed (29 assertions total). Do not close or repeat code fixes from this old result; wait for a clean current-HEAD formal rerun. [Full archive review](../validation/FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md).
+
+## 2026-11-14 main 整合与 ENG-07 R31 最新状态
+
+- PR #20 已合并至唯一分支 `main`，merge commit `eacb966b502b7f9cb547617e866641504346a5fd`；整合源 HEAD `bcbe4db5e665e5f678069afc1b206a00ae1cd36d` 的 13 项 CI checks 全部 SUCCESS；main merge commit Host validation #43566259362 为 6/6 SUCCESS。
+- Owner 的 R31 本机 FMT-SIM 归档测试 HEAD 为 `304fbd12078679d46b80cb626aba9eb0727b6914`，比整合源 HEAD 落后 7 commits。Land 4、Return 3、Mission 6 failures；总计 116,893 checks / 13 failures。该结果仅绑定旧 HEAD，不能判定当前 main 的原生仿真结果。
+- #17/#18/#19 继续 OPEN，必须在干净的 `main` 与 `origin/main` 完全同步后重新运行正式 FMT-SIM 批量入口。B07 H723 实机、WCET/RTA、栈水位、物理 HIL 与飞行仍 NOT_RUN；M5-07 不启动。

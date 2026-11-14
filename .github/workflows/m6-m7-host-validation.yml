@@ -3,8 +3,7 @@ name: M6/M7 host validation
 on:
   push:
     branches:
-      - test/fmat-0012-m6-controller
-      - "opt/**"
+      - main
   pull_request:
     branches:
       - main

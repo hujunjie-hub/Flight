@@ -130,3 +130,11 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 - 结果：Land 5、Return 6、Mission 9、Land single 5、Land Beach 4 failures；共 201,306 checks / 29 failures。最长状态间隔 67.1–208.4 ms，低于 350 ms。
 - 分类：`DIAGNOSTIC_ONLY / STALE_HEAD / DIRTY_WORKTREE / FORMAL_MANIFEST_MISSING`。不构成修复后复测，不关闭 #17/#18/#19；不基于此旧 HEAD 重复修改生产代码。
 - 下一步：新建干净克隆检出当前分支，使用 `tests/simulation/run_fmt_sim_regression.ps1`，显式 `-ConfirmLoopbackAddress`，并回传 manifest、summary、完整日志和 ZIP sidecar。详细记录见 [R30 归档复核报告](../validation/FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md)。
+
+## 2026-11-14 main 唯一分支与 ENG-07 R31 本机复测状态
+
+- 当前唯一远程开发/测试/交付分支为 `main`。PR [#20](https://github.com/hujunjie-hub/Flight/pull/20) 已合并，合并 HEAD 为 `eacb966b502b7f9cb547617e866641504346a5fd`；此前 `opt/spec-sync-review` 的 83 个提交和 stage-02 后续 94 个提交均包含在完整 177 提交历史中。
+- R31 本机 FMT-SIM RUN_ID `FMT-SIM-LOCAL-20261114T045144621Z-304fbd12` 测试的是旧 HEAD `304fbd12078679d46b80cb626aba9eb0727b6914`，比合并源 HEAD `bcbe4db5e665e5f678069afc1b206a00ae1cd36d` 落后 7 commits。Land 36,600/4、Return 36,601/3、Mission 43,692/6，合计 116,893 checks / 13 failures；构建 PASS，三场景 FAIL。
+- ZIP SHA256 `af97c2ac451c2937fab186ccd5e1a9f553b4ee6d699470ab9963e0b105505d26` 与 sidecar 一致，内部 102 项哈希全部匹配。该结果有效绑定旧 HEAD，但不验证后续 7 个提交或当前 main。
+- GitHub Issues #17 Land、#18 Return、#19 Mission 均保持 OPEN。等待 Owner 在干净的 `main` / `origin/main` 同步 checkout 上完成正式 350 ms 批量复测；不得用旧 HEAD 失败直接判定当前 main 失败，也不得用 Host/CI PASS 关闭原生 FMT-SIM Issue。
+- 具体失败断言、工具链、FMT-SIM/settings 哈希及逐场景日志哈希见 [R31 归档复核报告](../validation/FMT_SIM_LOCAL_20261114_304FBD12_REVIEW.md)。

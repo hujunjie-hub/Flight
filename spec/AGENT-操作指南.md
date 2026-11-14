@@ -46,7 +46,7 @@ M5-06 还必须读取：
 git clone https://github.com/hujunjie-hub/Flight.git
 cd Flight
 git fetch origin --prune
-git switch --track origin/opt/stage-02-m5-06-safety-validator
+git switch --track origin/main
 git status --short --branch
 git rev-parse HEAD
 ```
@@ -56,14 +56,14 @@ git rev-parse HEAD
 ```powershell
 git status --short --branch
 git fetch origin --prune
-git switch opt/stage-02-m5-06-safety-validator
-git pull --ff-only origin opt/stage-02-m5-06-safety-validator
+git switch main
+git pull --ff-only origin main
 git rev-parse HEAD
 ```
 
 如果本地存在未提交改动，先报告文件清单和 diff 摘要；不得自动 reset、clean、stash、覆盖用户文件。若远端分支已变更，先比较提交，不得使用强制覆盖。
 
-本轮基线分支为 `opt/stage-02-m5-06-safety-validator`。截至 2026-11-13，PR #2 为 CLOSED / UNMERGED，目标分支为 `opt/stage-01-host-validation`；本轮只更新 stage-02，不重开或合并该 PR。若后续 PR/分支变化，以 GitHub 当前状态为准，不得硬编码旧 SHA。
+自 2026-11-14 起，`main` 是唯一远程开发、测试和交付分支。历史 `opt/*` 与 `test/*` 分支已完成整合，不得继续切换、推送或创建新功能分支。每次开始前执行 `git fetch origin --prune`，确认当前分支为 `main`、工作区干净，并将本地 `main` fast-forward 到 `origin/main`；不得使用旧分支上的旧 HEAD 作为当前基线。
 
 ### 3.3 Windows 换行修复（每次新检出必须确认）
 
@@ -242,11 +242,10 @@ NEXT_ACTION:
 
 ## 9. Git 操作边界
 
-- Agent 默认只在本地当前功能分支修改和 commit。
-- 只有用户明确说“推送”时才 push，且只允许推送到指定功能分支。
-- 永远不推送 `main`，不合并 PR，不关闭问题，不把 PR 从 Draft 改为 Ready。
+- `main` 是唯一远程开发、测试和交付分支；所有修改和本地 commit 均在 `main` 上完成，不创建功能分支或新 PR。
+- 只有用户明确授权时才 push `main`；不得把提交推送到任何历史分支。
 - 不使用 `git push --force`、`git reset --hard`、`git clean -fd`。
-- 如需 cherry-pick/rebase 或处理冲突，先报告影响和方案，等待用户授权。
+- 如需 cherry-pick/rebase 或处理冲突，先报告影响和方案；不得通过切换到其他长期分支绕过冲突。
 
 ## 10. M5-06 特别安全边界
 
