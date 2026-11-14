@@ -57,6 +57,7 @@ typedef struct {
   uint64_t guidance_ttl_us;
   uint8_t guidance_valid;
   uint8_t omit_control;
+  uint8_t omit_nav;
   uint32_t control_sample_lag_us;
   uint8_t has_candidate;
   OperationRequest req;
@@ -199,7 +200,7 @@ static void fx_view(Fx *fx, FmsInputView *iv)
   iv->operator_input = &fx->op;
   iv->link_statuses = &fx->rc;
   iv->link_status_count = 2u;
-  iv->navigation = &fx->nav;
+  iv->navigation = (fx->omit_nav != 0u) ? NULL : &fx->nav;
   iv->navigation_capability = &fx->cap;
   iv->mission_candidate = fx->has_candidate ? &fx->cand : NULL;
   iv->guidance_feasibility = fx->guidance_valid ? &fx->feas : NULL;
@@ -209,7 +210,8 @@ static void fx_view(Fx *fx, FmsInputView *iv)
   iv->actuator_status = &fx->act_status;
   iv->fault_summary = &fx->faults;
   iv->product_extension = fx->ext;
-  iv->presence_mask = FMS_INPUT_HAS_OPERATOR | FMS_INPUT_HAS_LINKS | FMS_INPUT_HAS_NAV |
+  iv->presence_mask = FMS_INPUT_HAS_OPERATOR | FMS_INPUT_HAS_LINKS |
+                      ((fx->omit_nav != 0u) ? 0u : FMS_INPUT_HAS_NAV) |
                       FMS_INPUT_HAS_NAV_CAPABILITY |
                       FMS_INPUT_HAS_ACTUATOR | FMS_INPUT_HAS_FAULT_SUMMARY |
                       FMS_INPUT_HAS_PRODUCT_EXTENSION;
@@ -1369,6 +1371,18 @@ static void test_contact_candidate_does_not_authorize_disarm(void)
   CHECK(fms_policy_stop() == STATUS_OK);
 }
 
+static void test_contact_candidate_requires_valid_navigation(void)
+{
+  Fx fx;
+  fx_defaults(&fx);
+  fx.omit_nav = 1u; /* Null navigation pointer with the presence bit cleared. */
+  CHECK(fx_step(&fx) == STATUS_OK);
+  CHECK(fx.out.landed_state.state == LANDED_STATE_UNKNOWN);
+  CHECK((fx.out.landed_state.evidence_mask & LANDED_EVIDENCE_GROUND_CONTACT) == 0u);
+  CHECK(fx.out.state_snapshot.arm_state == ARM_STATE_DISARMED);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
 static void test_lost_contact_evidence_clears_landed(void)
 {
   Fx fx;
@@ -1693,6 +1707,7 @@ int main(void)
     {"safety_handoff_missing_control_expires", test_safety_handoff_missing_control_expires},
     {"actuator_loss_terminal", test_actuator_loss_terminal_and_latched},
     {"contact_candidate_not_disarm_authority", test_contact_candidate_does_not_authorize_disarm},
+    {"contact_candidate_requires_valid_navigation", test_contact_candidate_requires_valid_navigation},
     {"lost_contact_clears_landed", test_lost_contact_evidence_clears_landed},
     {"mission_arrival_3d", test_mission_arrival_requires_height_and_vertical_speed},
     {"takeoff_explicit_target", test_takeoff_publishes_explicit_home_relative_target},
