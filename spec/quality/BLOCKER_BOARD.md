@@ -8,7 +8,7 @@
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
 
-> **当前 ENG-07 动态验收状态（R34）**：测试 RUN_ID `FMT-SIM-LOCAL-20261114T125449954Z-85f02af5`，测试 HEAD `85f02af5ff2208f805b870d70593a73733db2f5c`；Land 33,837/4、Return 33,346/4、Mission 49,123/5，全部 FAIL。修复代码 HEAD `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b`；文档同步 HEAD `ac2d47ff3d36153960d6103056ae2aff1832a8a1`。R34 之后的原生 FMT-SIM 尚 NOT_RUN，#17/#18/#19/#21/#22 全部 OPEN。
+> **当前 ENG-07 动态验收状态（R34）**：测试 RUN_ID `FMT-SIM-LOCAL-20261114T125449954Z-85f02af5`，测试 HEAD `85f02af5ff2208f805b870d70593a73733db2f5c`；Land 33,837/4、Return 33,346/4、Mission 49,123/5，全部 FAIL。修复代码 HEAD `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b`；首轮文档同步 commit `ac2d47ff3d36153960d6103056ae2aff1832a8a1`；R34 文档复核修订 commit `f9c90c2199362ea0d22f788f6586e0a247d76b7b`。R34 之后的原生 FMT-SIM 尚 NOT_RUN，#17/#18/#19/#21/#22 全部 OPEN。
 >
 历史 R31 证明基线 `8dcb60b3ac18e6a763c939d3e810984092cdd321`、R33 contact-handoff 修复 `419f56962f74fd9d89bc62cfc11ee0923910177c` 和 nav guard `15a33756d4e269800e6778c6180f7086179c9429` 保留为历史记录；R34 后生产修复为 `c9cd17926239e088c105b8506052354fdda0d503` / `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b`，回归测试为 `1f9b4ecdbbe90b3e8be9439ec2170478a8083de2`。唯一开发/验证分支仍为 `main`；Owner 本机必须 fetch 最新 origin/main 后再复测。
 
