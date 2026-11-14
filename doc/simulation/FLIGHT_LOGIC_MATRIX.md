@@ -1,9 +1,11 @@
 # 飞行与策略仿真验证矩阵
 
-本文件的 PASS 记录均绑定各自历史 RUN_ID。R34 在 main HEAD `85f02af5` 上正式复测 Land 33,837/4、Return 33,346/4、Mission 49,123/5，均 FAIL；Mission 最后 0.50 m 下降速度 0.674 m/s。R34 后 main 提交 `c9cd1792` 保留 M5 活动有效参考作为 contact-hold 重规划起点，提交 `d8ea0f05` 分离水平对准与垂直下降；精确 HEAD `d8ea0f05` 的 Host/M6-M7/M7 CI 6/6、5/5、2/2 SUCCESS。修复后的原生 FMT-SIM 尚待 Owner 重跑。nd/Return PASS、Mission 3 项 FAIL；R33 在 `5e3b74f` 上 Land/Return PASS、Mission 3 项终端失败，近地下降速度 0.374 m/s 已通过。R33 后 main 增加 advisory contact handoff `419f56962f74fd9d89bc62cfc11ee0923910177c` 和 nav_ok guard `15a33756d4e269800e6778c6180f7086179c9429`；测试-only 回归 `3270cff5aec26e3ae0717c62d2d78e9f30752020` 通过最新三组 CI。修复后的原生 FMT-SIM 尚待 Owner 重跑。
+本文件的 PASS 记录均绑定各自历史 RUN_ID。最新原生复测 R34 在 main HEAD `85f02af5` 上完成：Land 33,837/4、Return 33,346/4、Mission 49,123/5，三场景均 FAIL；Mission 最后 0.50 m 下降速度为 0.674 m/s。R34 后 main 提交 `c9cd1792` 修复 M5 contact-hold 重新规划，提交 `d8ea0f05` 将水平对准与垂直下降拆分为独立阶段；精确修复代码 HEAD `d8ea0f05` 的 Host/M6-M7/M7 CI 分别 6/6、5/5、2/2 SUCCESS。修复后的原生 FMT-SIM 尚待 Owner 在 Windows 本机重跑，#17/#18/#19/#21/#22 均保持 OPEN。R33 及更早的 PASS 记录均为历史证据，不代表 R34 后代码已通过原生复测。
 本轮使用 `SIM_CONTROLLED_STOP` Host 构建和隔离的 FMT-SIM Ground 场景。
 H723 的运行配置仍使用 `BENCH_INHIBIT`。设备固件、UART/DMA、板上时序和实机运动
 留在各自的验证门禁。
+
+> **历史记录说明：** 以下整链证据表和早期通过项来自更早的 RUN_ID，保留用于追溯；R34 是当前最新原生 FMT-SIM 归档，结果为三场景 FAIL。当前代码修复后的原生复测尚未执行，不得把下方历史 PASS 视为当前放行。
 
 ## 整链证据
 

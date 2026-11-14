@@ -7,12 +7,12 @@
 > **开放风险**：ICD+M4 余量 264 B（FLIGHT-13）；Release 的工具链枚举属性仍有 228 条链接警告（FLIGHT-14）。下方 B01～B06 的表格保留各原始验证时点。
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
-RUN_ID `M5-06-R31-20261113`；validated code `8dcb60b3ac18e6a763c939d3e810984092cdd321`；
-production fix HEAD `15a33756d4e269800e6778c6180f7086179c9429`；contact handoff fix `419f56962f74fd9d89bc62cfc11ee0923910177c`；test-only regression HEAD `3270cff5aec26e3ae0717c62d2d78e9f30752020`；no further production-code changes after `15a33756`; fetch latest origin/main before owner-local retest;
-唯一开发/验证分支 `main`；历史 R31 证明基线仍为 `8dcb60b3ac18e6a763c939d3e810984092cdd321`。
 
-本文件结论来自历史本地验证记录与本轮 GitHub Actions 远程 Host/SIL/Cortex-M7 编译证据；均不是 H723 实机、HIL、
-WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；GitHub Issues #8–#19、#21–#22 已在线跟踪，历史本地编号仅按明确映射关联。
+> **当前 ENG-07 动态验收状态（R34）**：测试 RUN_ID `FMT-SIM-LOCAL-20261114T125449954Z-85f02af5`，测试 HEAD `85f02af5ff2208f805b870d70593a73733db2f5c`；Land 33,837/4、Return 33,346/4、Mission 49,123/5，全部 FAIL。修复代码 HEAD `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b`；文档同步 HEAD `ac2d47ff3d36153960d6103056ae2aff1832a8a1`。R34 之后的原生 FMT-SIM 尚 NOT_RUN，#17/#18/#19/#21/#22 全部 OPEN。
+>
+历史 R31 证明基线 `8dcb60b3ac18e6a763c939d3e810984092cdd321`、R33 contact-handoff 修复 `419f56962f74fd9d89bc62cfc11ee0923910177c` 和 nav guard `15a33756d4e269800e6778c6180f7086179c9429` 保留为历史记录；R34 后生产修复为 `c9cd17926239e088c105b8506052354fdda0d503` / `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b`，回归测试为 `1f9b4ecdbbe90b3e8be9439ec2170478a8083de2`。唯一开发/验证分支仍为 `main`；Owner 本机必须 fetch 最新 origin/main 后再复测。
+
+R34 的原生 FMT-SIM 结果与当前修复后 CI 证据已在本视图末尾更新。所有 Host/SIL/Cortex-M7 编译结果均不是 H723 实机、物理 HIL、WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；GitHub Issues #8–#19、#21–#22 已在线跟踪，历史本地编号仅按明确映射关联。
 
 ## B01 Spec Audit FAIL
 
