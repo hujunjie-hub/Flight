@@ -138,6 +138,10 @@ Invoke-Test -Name 'test_port' -Includes @($trimInclude, $pkgDir, $testDir) `
     -Sources (@((Join-Path $testDir 'test_port.cpp')) + $pluginSources + $trimSources) `
     -ExtraFlags @('-fno-exceptions', '-fno-rtti')
 
+Invoke-Test -Name 'test_nis_recovery' -Includes @($trimInclude, $pkgDir, $testDir) `
+    -Sources (@((Join-Path $testDir 'test_nis_recovery.cpp')) + $pluginSources + $trimSources) `
+    -ExtraFlags @('-fno-exceptions', '-fno-rtti')
+
 Invoke-Test -Name 'test_contract_coexistence' `
     -Includes @((Join-Path $repoRoot 'middleware/contracts'), $pkgDir, $trimInclude) `
     -Sources (@((Join-Path $testDir 'test_contract_coexistence.cpp')) + $pluginSources + $trimSources) `
