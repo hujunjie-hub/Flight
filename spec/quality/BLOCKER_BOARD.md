@@ -1,4 +1,4 @@
-# Flight M5-06 阻塞项视图（R35）
+# Flight M5-06 阻塞项视图（R36）
 
 > **2026-11-13 MR-009 R31 内部预审 CI 快照（代码/证明基线 8dcb60b3ac18e6a763c939d3e810984092cdd321）**：Host validation #43446380866（6/6）、M6/M7 #43446380836（5/5）、M7 #43446380724（2/2）全部 SUCCESS。M5 Host regression、M5 ASan/UBSan、MR-009 focused、S06-099/S06-107、Spec Audit、生产 ABI、18 mutation FP audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer 均 PASS。
 
@@ -8,15 +8,19 @@
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
 
-> **当前 ENG-07 动态验收状态（R35）**：RUN_ID `FMT-SIM-LOCAL-20261114T134046188Z-ac2d47ff`，测试 HEAD `ac2d47ff3d36153960d6103056ae2aff1832a8a1`；Land 48,801/4、Return 39,389/4、Mission 67,112/3，全部 FAIL，总计 155,302/11。ZIP SHA256 `00c926b92fd95d28494bff2b5daa3b7cc9488402ab18643ece6f7e0e090b4e7d`、manifest SHA256 `4d1155034f09dc993c18aa5433706caea462a881d3ef21039189b1c78b28c93c`，内部 102 项哈希通过；正式门禁全部有效。三场景最后 0.50 m 下降速度 0.340/0.316/0.330 m/s 均 PASS。Return 接地重规划仍 reason 1550 / JERK constraint=4；Land/Mission 过早锁定接地点后未完成 LANDED/终端 DISARM。新修复 HEAD `69626899249e1fd926a0a903447f2ad763f24ba1` 已提交，R35 后原生复测 NOT_RUN。
+> **当前 ENG-07 动态验收状态（R36）**：RUN_ID `FMT-SIM-LOCAL-20261114T150346337Z-3fb4dc23`，测试 HEAD `3fb4dc237e36b55899d3bcf0ca450470e72250ae`；main/origin/main 精确匹配、worktree clean/stable、fetch exit 0、loopback 显式确认、UDP 14653、hover 0.62、350 ms 均有效。ZIP SHA256 `d81bae7ea6684bb4a42b7b523a355dc1f5ff855746542257162c00d9de557ea3`，manifest SHA256 `a48dc4c70b8bc75fcb628add77386c932a0ef37972f7f4a589f89d72fb6ddc99`，104 entries CRC PASS，内部 102 项 SHA256 全通过；构建 PASS。
 >
-> 新修复 CI：Host [#43603447251](https://github.com/hujunjie-hub/Flight/actions/runs/43603447251) 6/6、M6/M7 [#43603447288](https://github.com/hujunjie-hub/Flight/actions/runs/43603447288) 5/5、M7 [#43603447340](https://github.com/hujunjie-hub/Flight/actions/runs/43603447340) 2/2 SUCCESS；M4 969/0、M5 329,670/0、M5 ASan/UBSan 329,670/0、M4/M5 integration 与 sanitizer 各 1,042/0、MR-009 focused 430/0、Spec Audit round 3 PASS、Cortex-M7 production compile PASS。
+> R36 Land 48,801/3、Return 48,802/4、Mission 67,112/3，全部 FAIL，总计 164,715/10。最长状态间隔 92.3/147.2/112.5 ms，均低于 350 ms。末段 0.50 m 下降速度 0.336/0.338/0.351 m/s 全部满足 0.40 m/s。Return touchdown 0.220 m；Mission touchdown 0.387 m、航点最近距离 0.250/0.367 m。
 >
-> #17/#18/#19/#21/#23 等待 R36 完整原生复测；#22 的 M4 advisory handoff 已由 R34/R35 确认 evidence=0x1 到达 M5，仍待独立安全复核。唯一分支仍为 `main`。
+> 根因：R36 首次接地时水平速度 0.220/0.234/0.246 m/s，超过 M4 0.20 m/s ground-stability 门槛。旧 M5 LANDING_APPROACH 初始选择/退出条件允许水平速度至 0.25 m/s，导致水平运动未收敛就开始垂直下降。Land/Mission 最终 landed=UNKNOWN；Return 接地信号丢失、最终 landed=IN_AIR。三个场景 terminal ACK / DISARM ACK / DISARMED 均失败。R36 未复现 R35 reason 1550/JERK、M6 -11 或 FAILSAFE_TERMINAL；M4→M5 advisory evidence=0x1 仍到达。
 >
-历史 R31 证明基线 `8dcb60b3ac18e6a763c939d3e810984092cdd321`、R33 contact-handoff 修复 `419f56962f74fd9d89bc62cfc11ee0923910177c` 和 nav guard `15a33756d4e269800e6778c6180f7086179c9429` 保留为历史记录；R34 后 M5 生产修复为 `c9cd17926239e088c105b8506052354fdda0d503` / `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b`，R35 后低速接地候选门控修复为 `69626899249e1fd926a0a903447f2ad763f24ba1`。唯一开发/验证分支仍为 `main`；Owner 本机必须 fetch 最新 origin/main 后再复测。
-
-R35 的原生 FMT-SIM 结果与 `69626899` 修复后的 CI 证据已在本视图末尾更新。所有 Host/SIL/Cortex-M7 编译结果均不是 H723 实机、物理 HIL、WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；GitHub Issues #8–#19、#21–#23 已在线跟踪，历史本地编号仅按明确映射关联。
+> R36 后修复已提交：`866f2d79dff583280b9b1e6f657eb29959b46df5` 将 M5 水平误差/速度门槛收紧至 0.15 m / 0.15 m/s，并新增 `landing_speed_only_requires_horizontal_brake`；`507133064b5f9c4176ff793ede8fa6e8a42fcad1` 将 brake-to-final 转换纳入相同门槛。M4 的 0.20 m/s、0.15 m/s、0.5 m/s²、2 s dwell、M5 0.40/0.12 m/s 下降限值和 DISARM 策略均未放宽。
+>
+> 最终 HEAD `507133064b5f9c4176ff793ede8fa6e8a42fcad1` CI 全部 SUCCESS：Host [#43612480283](https://github.com/hujunjie-hub/Flight/actions/runs/43612480283) 6/6；M6/M7 [#43612480319](https://github.com/hujunjie-hub/Flight/actions/runs/43612480319) 5/5；M7 [#43612480345](https://github.com/hujunjie-hub/Flight/actions/runs/43612480345) 2/2。
+>
+> #17/#18/#19/#24 继续 OPEN 并等待 R37；#21 下降速度指标 PASS 但整批关闭条件未满足；#22 独立安全复核待完成；#23 的原 M5 plan-rejection 在 R36 未复现但仍待完整批次/复核。唯一开发分支仍为 `main`。详见 [R36 review](../validation/FMT_SIM_LOCAL_20261114_3FB4DC23_REVIEW.md)。
+>
+> 历史 R31/R33/R34/R35 基线保留在下方历史记录。当前代码基线为 `507133064b5f9c4176ff793ede8fa6e8a42fcad1`；Owner 必须 fetch 最新 origin/main 后复测。Host/SIL/CI 不是 H723 实机、物理 HIL、WCET/RTA、栈水位或飞行放行证据。
 
 ## B01 Spec Audit FAIL
 

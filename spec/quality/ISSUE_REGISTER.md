@@ -1,6 +1,6 @@
 # Flight 问题登记清单入口
 
-本文件是当前本地正式问题登记入口。`GITHUB_PUBLICATION = PARTIAL`：GitHub Issues #8–#19、#21–#23 已用于当前部分问题在线跟踪；历史 FLIGHT-LOCAL 编号不保证与线上 Issue 一一映射，只有明确登记的映射有效。不得虚构 GitHub Issue 编号，也不得出现本地 CLOSED、GitHub OPEN 的状态冲突。
+本文件是当前本地正式问题登记入口。`GITHUB_PUBLICATION = PARTIAL`：GitHub Issues #8–#19、#21–#24 已用于当前部分问题在线跟踪；历史 FLIGHT-LOCAL 编号不保证与线上 Issue 一一映射，只有明确登记的映射有效。不得虚构 GitHub Issue 编号，也不得出现本地 CLOSED、GitHub OPEN 的状态冲突。
 
 - [全部开放问题](https://github.com/hujunjie-hub/Flight/issues?q=is%3Aissue+is%3Aopen)
 - [开放的安全问题](https://github.com/hujunjie-hub/Flight/issues?q=is%3Aissue+is%3Aopen+label%3Akind%3Asafety)
@@ -22,7 +22,7 @@
 
 状态必须按 [Issue 工作流](ISSUE_WORKFLOW.md) 更新；关闭前必须完成 [Issue 关闭清单](ISSUE_CLOSURE_CHECKLIST.md)。
 
-GitHub Issues #8–#19、#21–#23 已在线跟踪；#8 已因项目方明确豁免独立审查且技术复核完成而关闭（不代表第三方独立 APPROVED）。未映射的历史 FLIGHT-LOCAL 编号仍按本地状态管理；未完成适用的复验/审查不得 VERIFIED/CLOSED。MR-009/#8 的豁免仅限该项，不得扩展到其他安全/数学问题。下方带日期的 R16–R31/CI 条目保留当时快照；其中 GITHUB_PUBLICATION=PENDING、MR-009 WAITING_INDEPENDENT_REVIEW 和旧资源数字均非当前状态，当前状态以本段、末尾 ENG-07 当前记录和 BLOCKER_BOARD 顶部摘要为准。BLOCKER_BOARD.md 只是本文件的派生视图，不得维护独立状态。
+GitHub Issues #8–#19、#21–#24 已在线跟踪；#8 已因项目方明确豁免独立审查且技术复核完成而关闭（不代表第三方独立 APPROVED）。未映射的历史 FLIGHT-LOCAL 编号仍按本地状态管理；未完成适用的复验/审查不得 VERIFIED/CLOSED。MR-009/#8 的豁免仅限该项，不得扩展到其他安全/数学问题。下方带日期的 R16–R31/CI 条目保留当时快照；其中 GITHUB_PUBLICATION=PENDING、MR-009 WAITING_INDEPENDENT_REVIEW 和旧资源数字均非当前状态，当前状态以本段、末尾 ENG-07 当前记录和 BLOCKER_BOARD 顶部摘要为准。BLOCKER_BOARD.md 只是本文件的派生视图，不得维护独立状态。
 
 ## 历史本地正式登记（部分映射 GitHub Issues）
 
@@ -114,6 +114,21 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 
 
 ## ENG-07 原生 FMT-SIM 本机复测登记
+
+### R36 最新归档（FAIL；当前 main 已提交修复，等待 R37 原生复测）
+
+- RUN_ID：`FMT-SIM-LOCAL-20261114T150346337Z-3fb4dc23`；测试 branch `main`；测试 HEAD `3fb4dc237e36b55899d3bcf0ca450470e72250ae`；HEAD 与 origin/main 精确匹配，worktree 运行前后 clean/stable，fetch exit 0。
+- ZIP SHA256 `d81bae7ea6684bb4a42b7b523a355dc1f5ff855746542257162c00d9de557ea3`；manifest SHA256 `a48dc4c70b8bc75fcb628add77386c932a0ef37972f7f4a589f89d72fb6ddc99`；104 entries CRC PASS，内部 102 项 SHA256 全部通过。Manifest `overall=FAIL`、`issue_closure_eligible=false`。
+- FMT-SIM EXE SHA256 `4f9a0f12c78e3964b3e472ee579c547d13ea629456dc6a4c7fe72ea18ae2a6d6`；settings SHA256 `f556717bcd96a32206065d5dbb97a8f9e57e2267c055bd75e3d6bc501102948b`；构建 PASS，build/sil_flight.exe SHA256 `74491e6624b0b78f5cfd7be7c4df5effb8aa7215729329ce70eb766a15b0dae1`。
+- 正式门禁全部有效：main/upstream/clean-worktree、loopback 显式确认、UDP 14653、hover 0.62、350 ms；三个场景独立进程。PowerShell 7.6.10、MinGW GCC/G++ 16.2.0、Python 3.14.8、Git 2.55.0。
+- R36：Land 48,801/3、Return 48,802/4、Mission 67,112/3；总计 164,715 checks / 10 failures。最长状态间隔 92.3 / 147.2 / 112.5 ms，均低于 350 ms。
+- 最后 0.50 m 最大下降速度：Land 0.336、Return 0.338、Mission 0.351 m/s，均满足 0.40 m/s 上限。Return touchdown 0.220 m；Mission touchdown 0.387 m、两个航点最近距离 0.250 / 0.367 m。
+- 首次物理接地时水平速度：Land 0.220 m/s（t=21.940 s）、Return 0.234 m/s（t=26.200 s）、Mission 0.246 m/s（t=36.840 s），均超过 M4 0.20 m/s 地面稳定门槛。Land/Mission 最终 landed=UNKNOWN；Return 最终 contact=NO_CONTACT、landed=IN_AIR。三个场景 terminal ACK、DISARM ACK、DISARMED 失败。
+- 根因：旧 M5 LANDING_APPROACH 初始选择及退出条件允许水平速度达到 0.25 m/s，未与 M4 0.20 m/s 地面稳定门槛和 M5 0.15 m/s 最终低速门槛对齐，导致水平运动尚未收敛即开始垂直下降。R36 未复现 R35 reason 1550/JERK/M6 -11/FAILSAFE_TERMINAL；M4→M5 advisory evidence=0x1 仍到达。
+- R36 后修复：`866f2d79dff583280b9b1e6f657eb29959b46df5` 统一水平对准误差 0.15 m、速度 0.15 m/s 门槛并新增 `landing_speed_only_requires_horizontal_brake`；`507133064b5f9c4176ff793ede8fa6e8a42fcad1` 将 brake-to-final 也纳入相同门槛。M4 阈值、2 s dwell、0.40/0.12 m/s 下降限制和 DISARM 策略均未放宽。
+- 精确最终 HEAD `507133064b5f9c4176ff793ede8fa6e8a42fcad1` CI 全部 SUCCESS：Host [#43612480283](https://github.com/hujunjie-hub/Flight/actions/runs/43612480283) 6/6；M6/M7 [#43612480319](https://github.com/hujunjie-hub/Flight/actions/runs/43612480319) 5/5；M7 [#43612480345](https://github.com/hujunjie-hub/Flight/actions/runs/43612480345) 2/2。
+- #17/#18/#19 继续 OPEN；#21 下降速度指标通过但按完整批次规则保持 OPEN；#22 独立安全复核待完成；#23 原 M5 plan rejection 在 R36 未复现但完整批次/独立复核仍未闭环；新问题 #24 跟踪水平减速与下降阶段不一致。
+- 完整证据与逐场景 SHA256 见 [R36 归档复核报告](../validation/FMT_SIM_LOCAL_20261114_3FB4DC23_REVIEW.md)。R36 修复后原生复测 NOT_RUN；Owner 下一轮必须在最新 main 完整运行 Land → Return → Mission。
 
 ### R35 最新归档（FAIL；R36 修复后复测待 Owner 执行）
 

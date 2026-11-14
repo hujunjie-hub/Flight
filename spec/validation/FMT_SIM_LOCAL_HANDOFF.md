@@ -1,10 +1,10 @@
 # ENG-07 原生 FMT-SIM 本机复测交接方案
 
-> 状态：**OWNER_LOCAL_RUN_REQUIRED / R35_FAIL_ON_PRE-LOW-SPEED-CONTACT-FIX_HEAD / RETEST_LATEST_MAIN_REQUIRED**
+> 状态：**OWNER_LOCAL_RUN_REQUIRED / R36_FAIL_ON_3FB4DC23_BASELINE / R37_RETEST_LATEST_MAIN_REQUIRED**
 >
 > 适用分支：**main**
 >
-> 当前生产代码修复基线：**69626899249e1fd926a0a903447f2ad763f24ba1**；接地候选交接修复：**419f56962f74fd9d89bc62cfc11ee0923910177c**；M5 contact-hold / staged landing 修复：**c9cd17926239e088c105b8506052354fdda0d503** / **d8ea0f05915d0dc52bd73d606c1f3963fff7d25b**；低速接地候选门控修复与回归：**69626899249e1fd926a0a903447f2ad763f24ba1**（运行前 fetch 最新 origin/main）
+> 当前最新代码基线：**507133064b5f9c4176ff793ede8fa6e8a42fcad1**；R36 后 M5 水平对准/制动门槛修复：**866f2d79dff583280b9b1e6f657eb29959b46df5** / **507133064b5f9c4176ff793ede8fa6e8a42fcad1**；此前接地候选交接、contact-hold 与低速门控修复保留在历史记录中。运行前必须 fetch 最新 origin/main。
 >
 > 本方案只覆盖 Windows 原生 FMT-SIM + Flight Host SIL 软件动态复测；不代表 H723 真机、台架 HIL、WCET/RTA、目标栈水位或飞行验收。
 
@@ -35,8 +35,9 @@
 - contact-hold 触发时保留当前有效 M5 轨迹；新保持参考从 M5 已验证轨迹采样状态重新规划到实测接触位置，不再从可能含接地瞬态的 raw nav p/v/a 起算。
 - LAND / RETURN 先在当前高度完成 Home 水平对准和速度收敛，再独立下降到 0.60 m 进近架、0.20 m 制动高度、Home 平面和探针，避免长水平返航与垂直下降耦合。
 - M4 Mission→Return 许可绑定比较使用 M6 capability 的 publish 时间，覆盖 20 ms sample-to-publish 延迟。
+- R36 后 M5 水平对准与制动统一要求水平误差 ≤0.15 m、水平速度 ≤0.15 m/s 后才进入垂直下降/最终段；contact-hold 使用同一低速门槛。M4 原有 0.20 m/s / 0.15 m/s / 0.5 m/s² / 2 s dwell 与 DISARM 门槛未修改。
 
-生产代码修复提交 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` 负责 0.50 m 速度包络与 LANDED touchdown XY latch；R33 后的接地候选交接修复提交 `419f56962f74fd9d89bc62cfc11ee0923910177c`，导航有效性 guard 提交 `15a33756d4e269800e6778c6180f7086179c9429`。R34 后 M5 修复提交 `c9cd17926239e088c105b8506052354fdda0d503` 与 `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b`，回归测试提交 `1f9b4ecdbbe90b3e8be9439ec2170478a8083de2`。Owner 复测前必须 fetch 最新 origin/main；当前固定代码基线为 `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b`。
+生产代码修复提交 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` 负责 0.50 m 速度包络与 LANDED touchdown XY latch；R33 后的接地候选交接修复提交 `419f56962f74fd9d89bc62cfc11ee0923910177c`，导航有效性 guard 提交 `15a33756d4e269800e6778c6180f7086179c9429`。R34 后 M5 修复提交 `c9cd17926239e088c105b8506052354fdda0d503` 与 `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b`，回归测试提交 `1f9b4ecdbbe90b3e8be9439ec2170478a8083de2`。Owner 复测前必须 fetch 最新 origin/main；当前最新代码基线为 `507133064b5f9c4176ff793ede8fa6e8a42fcad1`。
 
 修复提交 3d8d29b5dfda21237f8ed02db3c31223c656bfbe 的三组 CI 全部通过：
 - [Host validation #43574875444](https://github.com/hujunjie-hub/Flight/actions/runs/43574875444)：6/6 jobs SUCCESS。
@@ -49,18 +50,7 @@ Test-only follow-up `2f8118f1b149183e5df2d6e9c9941a52bd52562e` expands `landing_
 
 接地候选修复 `419f56962f74fd9d89bc62cfc11ee0923910177c` / nav guard `15a33756d4e269800e6778c6180f7086179c9429` 后，最新测试提交 `3270cff5aec26e3ae0717c62d2d78e9f30752020` 的 CI：Host #43593701736（6/6）、M6/M7 #43593701892（5/5）、M7 #43593701803（2/2）全部 SUCCESS；M4 1,042/0、M5 327,030/0、M4/M5 integration 969/0、MR-009 focused 430/0、M7 274/0。
 
-**R35 归档并非最新 M5 低速接地候选修复后的复测。** R35 测试 HEAD `ac2d47ff` 早于 `69626899`；当前固定代码基线 `69626899` 的原生 FMT-SIM 仍 NOT_RUN。#17/#18/#19/#21/#23 等待完整 R36 原生三场景复测；#22 的 M4 advisory contact handoff 已在 R34/R35 观察到 evidence=0x1 到达 M5，仍等待独立安全复核。不能以 Host/CI PASS 代替原生三场景结果。
-
-
-## 2026-11-14 R35 归档复核与低速接地候选修复
-
-R35 RUN_ID `FMT-SIM-LOCAL-20261114T134046188Z-ac2d47ff` 测试 main HEAD `ac2d47ff3d36153960d6103056ae2aff1832a8a1`，main/origin/main 匹配、worktree clean、fetch 成功、loopback 显式确认、UDP 14653、hover 0.62、350 ms 门禁有效。ZIP SHA256 `00c926b92fd95d28494bff2b5daa3b7cc9488402ab18643ece6f7e0e090b4e7d`，manifest SHA256 `4d1155034f09dc993c18aa5433706caea462a881d3ef21039189b1c78b28c93c`，内部 102 项哈希全部通过。
-
-Land 48,801/4、Return 39,389/4、Mission 67,112/3，均 FAIL；最大状态间隔 95.0/108.8/92.7 ms。最后 0.50 m 下降速度 0.340/0.316/0.330 m/s，均满足 0.40 m/s。Return 接地候选触发时水平速度约 0.200 m/s，t=25.800 s M5 以 reason 1550 / JERK constraint=4 拒绝，随后 control -11 和 terminal failsafe；Land/Mission 则过早锁定接地点，未完成 LANDED / DISARM。完整分析见 [R35 review](FMT_SIM_LOCAL_20261114_AC2D47FF_REVIEW.md)。
-
-R35 后 main 提交 `69626899249e1fd926a0a903447f2ad763f24ba1`：M5 仅在导航实测速度与活动轨迹参考速度的水平/垂直分量均不超过 0.15 m/s 时消费 UNKNOWN 接地候选；已确认 LANDED 时保留有效轨迹目标。新增 `landing_contact_waits_for_low_speed` 回归。
-
-精确 HEAD `69626899` CI：Host [#43603447251](https://github.com/hujunjie-hub/Flight/actions/runs/43603447251) 6/6、M6/M7 [#43603447288](https://github.com/hujunjie-hub/Flight/actions/runs/43603447288) 5/5、M7 [#43603447340](https://github.com/hujunjie-hub/Flight/actions/runs/43603447340) 2/2 SUCCESS；M4 969/0、M5 329,670/0、M5 ASan/UBSan 329,670/0、M4/M5 integration 与 sanitizer 各 1,042/0、MR-009 focused 430/0。修复后原生 FMT-SIM NOT_RUN；下一轮必须在最新 main 完整复测，不能放宽任何安全阈值。
+**R36 原生复测已完成但三场景 FAIL。** R36 测试 HEAD `3fb4dc237e36`；Land 48,801/3、Return 48,802/4、Mission 67,112/3，总计 164,715 checks / 10 failures。正式门禁和归档哈希通过，三场景末段下降速度均低于 0.40 m/s，但终端 ACK / DISARM 未完成。根因是 M5 允许水平速度达到 0.25 m/s 时开始下降；R36 后已提交 `866f2d79` / `50713306`，将水平误差和速度收敛到 0.15 m / 0.15 m/s 后再下降。最终 HEAD `507133064b5f9c4176ff793ede8fa6e8a42fcad1` 的 Host、M6/M7、M7 CI 6/6、5/5、2/2 全部 SUCCESS；修复后的原生 FMT-SIM 仍 NOT_RUN。#17/#18/#19/#24 继续 OPEN；#21 速度指标 PASS 但整批关闭条件未满足；#22 等待独立安全复核；#23 的原始 plan-rejection 在 R36 未复现，但整体闭环仍待完成。完整 R36 分析见 [R36 review](FMT_SIM_LOCAL_20261114_3FB4DC23_REVIEW.md)。不得以 CI PASS 代替原生 FMT-SIM 复测。
 
 ## 3. 本机运行前置条件
 
