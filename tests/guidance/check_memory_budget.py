@@ -59,12 +59,32 @@ def bss(path):
     return int(output.strip().splitlines()[-1].split()[2])
 
 
+def stale_object(obj, source):
+    """Return a message when the object predates the source it was built from.
+
+    A stale object silently reports the previous source revision: on 2026-11-15
+    an object built before the a205c5b5 dedup still showed 6,426 B M4 BSS and a
+    24 B ICD+M4 headroom instead of the current 6,186 B / 264 B. Charge only
+    fresh objects to the budget.
+    """
+    src = ROOT / source
+    if not src.is_file():
+        return f"missing source {source} for {obj.relative_to(ROOT)}"
+    if obj.stat().st_mtime < src.stat().st_mtime:
+        return (f"stale Cortex-M7 object {obj.relative_to(ROOT)}: older than {source}; "
+                "re-run the matching arm_build_check first")
+    return None
+
+
 def object_size(source):
     obj = ROOT / "build/m5_arm" / Path(source).with_suffix(".o").name
     if not obj.is_file():
         raise SystemExit(
             f"missing Cortex-M7 object {obj.relative_to(ROOT)}; run "
             "tests/guidance/arm_build_check.ps1 or arm_build_check.sh first")
+    problem = stale_object(obj, source)
+    if problem:
+        raise SystemExit(problem)
     return (bss(obj) + 7) // 8 * 8
 
 
@@ -76,6 +96,10 @@ def main():
         raise SystemExit(
             f"missing Cortex-M7 object {m4_obj.relative_to(ROOT)}; run "
             "tests/flight_management/arm_build_check.ps1 first")
+    m4_problem = stale_object(
+        m4_obj, "middleware/model/fms/quad_x4/flight_policy/quad_x4_fms.c")
+    if m4_problem:
+        raise SystemExit(m4_problem)
     m4_raw = bss(m4_obj)
     m4 = (m4_raw+7)//8*8
     production = sum(object_size(source) for source in PRODUCTION_SOURCES)
