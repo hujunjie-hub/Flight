@@ -450,29 +450,29 @@
     {
       "id": "S06-100",
       "name": "Differential static collision (consumer hits, exact clears)",
-      "seed": "deterministic",
-      "cases": 4,
-      "status_at_code_baseline": "NOT_RUN",
-      "oracle": "REVOKED R7 design (non-product envelope, midpoint-only); feasibility NOT ESTABLISHED",
-      "local_run": "M5-06-R11-20261110"
+      "seed": "NOT_APPLICABLE",
+      "cases": 2,
+      "status_at_code_baseline": "PASS",
+      "oracle": "Whole-reference Hermite maximum clears the inflated voxel corner; real M6 midpoint penetrates; validator STATIC_COLLISION; clear control passes",
+      "local_run": "M5-06-DIFF-20261114"
     },
     {
       "id": "S06-101",
       "name": "Differential dynamic collision",
-      "seed": "deterministic",
-      "cases": 4,
-      "status_at_code_baseline": "NOT_RUN",
-      "oracle": "REVOKED R7 design (non-product envelope, midpoint-only); feasibility NOT ESTABLISHED",
-      "local_run": "M5-06-R11-20261110"
+      "seed": "NOT_APPLICABLE",
+      "cases": 2,
+      "status_at_code_baseline": "PASS",
+      "oracle": "Whole-reference Hermite maximum clears the track including the declared acceleration uncertainty; real M6 midpoint penetrates; validator DYNAMIC_COLLISION; clear control passes",
+      "local_run": "M5-06-DIFF-20261114"
     },
     {
       "id": "S06-102",
       "name": "Differential geofence violation",
-      "seed": "deterministic",
-      "cases": 4,
-      "status_at_code_baseline": "NOT_RUN",
-      "oracle": "REVOKED R7 design (non-product envelope, midpoint-only); feasibility NOT ESTABLISHED",
-      "local_run": "M5-06-R11-20261110"
+      "seed": "NOT_APPLICABLE",
+      "cases": 2,
+      "status_at_code_baseline": "PASS",
+      "oracle": "Whole-reference Hermite maximum clears the vertically inflated KEEP_IN floor; real M6 midpoint penetrates; validator GEOFENCE_VIOLATION; clear control passes",
+      "local_run": "M5-06-DIFF-20261114"
     },
     {
       "id": "S06-103",
@@ -640,7 +640,7 @@
     "status": "BLOCKED",
     "reasons": [
       "B05 independent review is pending, including full-validator reachability of the three Horner rejection sites.",
-      "S06-100, S06-101, S06-102 and B07 are NOT_RUN."
+      "B07 target and HIL verification is NOT_RUN."
     ],
     "next_milestone": "M5-07 only after M5-06 acceptance and explicit independent mathematical approval."
   },
@@ -669,7 +669,7 @@
     "subnormal_term": "n * 2^-149 * max(1, s_eval_max)^n",
     "preview_step_contract_checked": true,
     "host_mxcsr_checked": true,
-    "differential_collision_status": "NOT_IMPLEMENTED (feasibility NOT ESTABLISHED)",
+    "differential_collision_status": "PASS_S06_100_THROUGH_102_HOST",
     "fp_report_model_check": "MATCH (tokens verified against the compiled source)",
     "time_evidence": "S06-103 phase A/B with physical time reference",
     "fp_model_self_test": "PASS (mutated gamma_2 detected)",
@@ -788,9 +788,6 @@
     "m5_06_acceptance": "BLOCKED",
     "independent_math_review": "OPEN",
     "not_run": [
-      "S06-100",
-      "S06-101",
-      "S06-102",
       "B07"
     ]
   },

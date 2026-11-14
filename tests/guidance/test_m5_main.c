@@ -5947,6 +5947,154 @@ static void test_m5_safety_envelope_geofence_participation(void)
 
 
 
+static void safety_product_differential_reference(SafetyFx *fx, float x, float y,
+                                                 unsigned axis, float speed)
+{
+  ProductFmsConfig fms;
+  ProductGuidanceConfig guidance;
+  uint16_t i;
+
+  safety_fx_init(fx, 96000000u);
+  fms_model_default_config(&fms);
+  CHECK(fms_product_build_safety_envelope(&fms_quad_x4_policy, &fms,
+        1u, &fx->base.env) == STATUS_OK);
+  fill_header(&fx->base.env.header, MSG_SAFETY_ENVELOPE, SOURCE_M4, fx->base.now);
+  safety_set_constant_position(fx, x, y, -5.0f);
+  fx->base.nav.core.velocity_ned_mps[axis] = speed;
+  fx->reference.anchor.point.velocity_ned_mps[axis] = speed;
+  for (i = 0u; i < PRODUCT_PREVIEW_COUNT; ++i)
+    fx->reference.points[i].point.velocity_ned_mps[axis] = i % 2u ? speed : -speed;
+
+  safety_map_reset(fx);
+  guidance_default_config(&guidance);
+  fx->map.vehicle_radius_m = guidance.payload.vehicle_radius_m;
+  fx->map.clearance_margin_m = guidance.payload.clearance_margin_m;
+  fx->map.uncertainty_inflation_factor = guidance.payload.uncertainty_inflation_factor;
+  safety_zero_uncertainty(fx);
+  CHECK(m5_trajectory_safety_validate(&fx->input, &fx->workspace, &fx->result)
+        == M5_SAFETY_PASS);
+}
+
+/* Equal positions, opposite tangents and zero accelerations give
+   p(u) = x ± h*v*(u - 2*u^3 + u^4) in every interval. The term in
+   parentheses ranges from 0 to 5/16 on [0,1], attaining 5/16 at 1/2.
+   This bounds the exact moving coordinate over the entire 24-segment reference. */
+static double safety_differential_exact_max(const SafetyFx *fx, unsigned axis)
+{
+  const float h = (float)PRODUCT_PREVIEW_STEP_US * 1e-6f;
+  return (double)fx->reference.anchor.point.position_ned_m[axis] +
+      (5.0 / 16.0) * (double)h *
+      (double)fx->reference.anchor.point.velocity_ned_mps[axis];
+}
+
+static ProductMotionPoint safety_differential_consumer_midpoint(const SafetyFx *fx)
+{
+  ProductMotionPoint sampled = {0};
+  const uint64_t time = fx->base.now + PRODUCT_PREVIEW_STEP_US / 2u;
+  CHECK(control_sample_reference(&fx->reference, time, &sampled) == STATUS_OK);
+  return sampled;
+}
+
+static double safety_differential_inflation(const SafetyFx *fx)
+{
+  return (double)fx->map.vehicle_radius_m + fx->map.clearance_margin_m;
+}
+
+static void test_m5_safety_s06_100_static_differential(void)
+{
+  SafetyFx fx;
+  ProductMotionPoint sampled;
+  const float probe[3] = {0.25f, 0.25f, -4.75f};
+  float center[3];
+  double limit, exact_x, consumed_x, dy;
+  uint16_t voxel = 0u;
+
+  safety_product_differential_reference(&fx, -0x1.f5a83ap-2f, -0x1.000002p-2f, 0u, 0x1.0cp-12f);
+  sampled = safety_differential_consumer_midpoint(&fx);
+  CHECK(m5_local_map_world_to_voxel(&fx.map, probe, &voxel));
+  m5_local_map_voxel_center(&fx.map, voxel, center);
+  CHECK(center[0] == probe[0] && center[1] == probe[1] && center[2] == probe[2]);
+  /* Closest AABB point is (0,0,-5) for the whole reference. */
+  exact_x = safety_differential_exact_max(&fx, 0u);
+  consumed_x = sampled.position_ned_m[0];
+  dy = sampled.position_ned_m[1];
+  limit = safety_differential_inflation(&fx);
+  CHECK(exact_x < 0.0 && consumed_x < 0.0 && dy == fx.reference.anchor.point.position_ned_m[1]);
+  CHECK(sampled.position_ned_m[2] == -5.0f);
+  CHECK(exact_x * exact_x + dy * dy > limit * limit);
+  CHECK(consumed_x * consumed_x + dy * dy < limit * limit);
+  safety_mark_occupied(&fx, probe[0], probe[1], probe[2]);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_STATIC_COLLISION);
+  CHECK(fx.result.passed == 0u && fx.result.reason_code == M5_SAFETY_REASON_STATIC_COLLISION);
+  fx.map.cells[voxel].state = M5_MAP_CELL_FREE_CONFIRMED;
+  fx.map.cells[voxel].log_odds = -4;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_PASS);
+}
+
+static void test_m5_safety_s06_101_dynamic_differential(void)
+{
+  SafetyFx fx;
+  ProductMotionPoint sampled;
+  M5DynamicTrack *track;
+  const double preview_s = (double)PRODUCT_PREVIEW_STEP_US * PRODUCT_PREVIEW_COUNT / 1000000.0;
+  double limit, motion, exact_x, consumed_x, dy;
+
+  safety_product_differential_reference(&fx, -0x1.3999cep-1f, 0x1.0cp-12f, 0u, 0x1.0cp-12f);
+  sampled = safety_differential_consumer_midpoint(&fx);
+  track = &fx.map.tracks[0];
+  safety_set_far_dynamic_track(track, 901u, fx.base.now,
+      0.0f, 0.0f, -5.0f, 0.0f, 0.0f, 0.0f);
+  track->radius_m = 0.0625f;
+  track->position_std_m = 0.0f;
+  track->velocity_std_mps = 0.0f;
+  fx.input.max_dynamic_obstacle_accel_mps2 = 0x1p-26f;
+  /* Enclose all motion allowed by the track acceleration bound for the
+     exact curve, including after the first segment. */
+  motion = 0.5 * fx.map.uncertainty_inflation_factor *
+      fx.input.max_dynamic_obstacle_accel_mps2 * preview_s * preview_s;
+  limit = safety_differential_inflation(&fx) + track->radius_m;
+  exact_x = safety_differential_exact_max(&fx, 0u);
+  consumed_x = sampled.position_ned_m[0];
+  dy = sampled.position_ned_m[1];
+  CHECK(exact_x < 0.0 && consumed_x < 0.0 && dy == fx.reference.anchor.point.position_ned_m[1]);
+  CHECK(sampled.position_ned_m[2] == track->position_ned_m[2]);
+  CHECK(exact_x * exact_x + dy * dy > (limit + motion) * (limit + motion));
+  CHECK(consumed_x * consumed_x + dy * dy < limit * limit);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_DYNAMIC_COLLISION);
+  CHECK(fx.result.passed == 0u && fx.result.reason_code == M5_SAFETY_REASON_DYNAMIC_COLLISION);
+  memset(track, 0, sizeof(*track));
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_PASS);
+}
+
+static void test_m5_safety_s06_102_geofence_differential(void)
+{
+  SafetyFx fx;
+  ProductMotionPoint sampled;
+  double upper_edge;
+
+  safety_product_differential_reference(&fx, 0.0f, 0.0f, 2u, 0x1p-14f);
+  sampled = safety_differential_consumer_midpoint(&fx);
+  safety_set_keep_in_fence(&fx, 0x1.1cc984p+2f, 50.0f, 0x1.a36e2ep-13f);
+  upper_edge = (double)fx.base.dir.payload.home.position_ned_m[2] -
+      fx.fence.min_height_above_home_m - fx.fence.vertical_margin_m -
+      safety_differential_inflation(&fx);
+  /* The trajectory is vertically above the inflated floor for its full
+     duration. Both horizontal coordinates stay at the center of the box. */
+  CHECK(sampled.position_ned_m[0] == 0.0f && sampled.position_ned_m[1] == 0.0f);
+  CHECK(safety_differential_exact_max(&fx, 2u) < upper_edge);
+  CHECK(sampled.position_ned_m[2] > upper_edge);
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_GEOFENCE_VIOLATION);
+  CHECK(fx.result.passed == 0u && fx.result.reason_code == M5_SAFETY_REASON_GEOFENCE_VIOLATION);
+  fx.fence.min_height_above_home_m = 4.0f;
+  CHECK(m5_trajectory_safety_validate(&fx.input, &fx.workspace, &fx.result)
+        == M5_SAFETY_PASS);
+}
+
 /* S06-110: production jerk enforcement (spec/02 JERK bit). */
 static void test_m5_safety_jerk_envelope(void)
 {
@@ -6450,6 +6598,9 @@ int main(void)
     {"m5_safety_envelope_static_participation", test_m5_safety_envelope_static_participation},
     {"m5_safety_envelope_dynamic_participation", test_m5_safety_envelope_dynamic_participation},
     {"m5_safety_envelope_geofence_participation", test_m5_safety_envelope_geofence_participation},
+    {"m5_safety_s06_100_static_differential", test_m5_safety_s06_100_static_differential},
+    {"m5_safety_s06_101_dynamic_differential", test_m5_safety_s06_101_dynamic_differential},
+    {"m5_safety_s06_102_geofence_differential", test_m5_safety_s06_102_geofence_differential},
     {"m5_safety_jerk_envelope", test_m5_safety_jerk_envelope},
     {"m5_safety_jerk_interval_bound", test_m5_safety_jerk_interval_bound},
     {"m5_safety_jerk_bound_covers_analytic", test_m5_safety_jerk_bound_covers_analytic},
