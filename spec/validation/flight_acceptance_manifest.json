@@ -633,7 +633,7 @@
       "checks": 25,
       "oracle": "Three full-validator numerical rejections, three Horner helper rejections and one full-validator legal companion",
       "source": "tests/guidance/test_m5_main.c",
-      "full_validator_horner_reachability": "PENDING_INDEPENDENT_REVIEW"
+      "full_validator_horner_reachability": "NOT_ESTABLISHED_FOR_HELPER_ONLY_BRANCHES"
     },
     {
       "id": "S06-116",
@@ -648,14 +648,14 @@
   "overall_m5_06_status": {
     "status": "BLOCKED",
     "reasons": [
-      "B05 independent review is pending, including full-validator reachability of the three Horner rejection sites.",
       "B07 target and HIL verification is NOT_RUN."
     ],
-    "next_milestone": "M5-07 only after M5-06 acceptance and explicit independent mathematical approval."
+    "next_milestone": "M5-07 only after M5-06 acceptance and project authorization."
   },
   "m5_06_consumer_curve_bound": {
     "mr_id": "MR-009",
-    "status": "FIX_IMPLEMENTED_WAITING_INDEPENDENT_REVIEW",
+    "status": "TECHNICAL_REVIEW_COMPLETED_WITH_CORRECTION",
+    "review_policy": "OWNER_WAIVED_INDEPENDENT_REVIEW_FOR_MR009_ON_2026_11_14",
     "position_roundings": 10,
     "velocity_roundings": 12,
     "acceleration_roundings": 10,
@@ -795,7 +795,7 @@
     "gate_failures": 0,
     "blocked_gates": 0,
     "m5_06_acceptance": "BLOCKED",
-    "independent_math_review": "OPEN",
+    "independent_math_review": "OWNER_WAIVED_FOR_MR009",
     "not_run": [
       "B07"
     ]

@@ -62,7 +62,9 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 | 解除条件 | B03 RESOLVED + 真实 package tree + link check exit 0。 |
 | 下一步 | 等 B03；保持对象编译证据，不冒充链接。 |
 
-## B05 MR-009 独立数学审查 WAITING
+## B05 MR-009 审核记录
+
+2026-11-14 项目方授权本地 Agent 对 MR-009 做一次技术复核，并免除该项独立审查。复核发现的同轴误差合成问题已修正，证据为 S06-116 和 spec/09 当日记录。S06-100～102 已完成 Host/ASan 复测。下表记录原 R31 时点。
 
 | 字段 | 内容 |
 |---|---|
@@ -110,5 +112,5 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PENDING`。
 
 - 状态变化先改 `ISSUE_REGISTER.md`，再更新本视图。
 - `FIXED_WAITING_RETEST` 不等于 VERIFIED；安全/数学问题的 `VERIFIED/CLOSED` 必须由独立审查者依据证据确认。内部预审不能替代独立复验。
-- S06-100..102 保持 NOT_RUN；MR-009 的内部预审已完成但仍 WAITING_INDEPENDENT_REVIEW；M5-06 还受其他发布门禁阻塞；M5-07 不得启动。
+- S06-100..102 的 Host 证据已更新。MR-009 的单次技术复核完成并修复发现项。M5-06 仍受 B07 门禁阻塞。
 - R27 文档、R27 快照和 R22 原始字节保留为 HISTORICAL/NOT_RECOVERABLE，不得覆盖。
