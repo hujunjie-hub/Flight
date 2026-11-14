@@ -145,7 +145,7 @@ Native FMT-SIM must still be rerun locally before #17/#18/#19 can close.
 
 按项目方要求，后续 Windows 原生 FMT-SIM 动态复测统一由项目 Owner 在本机完成；远程 Agent 负责代码修改、Host/SIL/CI 和失败分析，不代跑原生引擎。正式操作及证据格式见 [FMT-SIM 本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。
 
-当前产品代码修复基线为 `ce00ff9f0a8eb4989d1a171c3322f3640de2965c`；最新已完成自动化验证的代码 HEAD 为 `5a8e2c3079d230bbb5ca90ebbf229552487c2be9`。[Host #43552823302](https://github.com/hujunjie-hub/Flight/actions/runs/43552823302)、[M6/M7 #43552823284](https://github.com/hujunjie-hub/Flight/actions/runs/43552823284)、[M7 #43552823258](https://github.com/hujunjie-hub/Flight/actions/runs/43552823258) 分别 6/6、5/5、2/2 SUCCESS；M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integration 1,147/0、M5 ASan/UBSan 324,792/0；PowerShell Parser 对两个本地 runner 均 PASS。以上均未启动原生 FMT-SIM；修复后的原生 FMT-SIM 尚未复测。#17 Land、#18 Return、#19 Mission 保持 OPEN，待 Owner 在本机以同一隔离安装、UDP 14653、350 ms、hover 0.62，Owner 显式确认 loopback 127.0.0.1 后顺序运行，并回传 manifest、完整日志和 SHA256。Host/CI 通过不关闭动态仿真 Issue；FMT-SIM 通过也不代表 H723 实机、物理 HIL 或飞行通过。
+当前 main 生产代码修复基线为 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`。R32 在修复前 HEAD `e470f00c` 上执行，Land/Return PASS、Mission 62,793/3 FAIL；修复提交已增加最后 0.50 m / 0.40 m/s 连续速度约束并锁存 touchdown XY，未放宽 FMS 安全门槛。修复提交的 Host/M6-M7/M7 CI 分别 6/6、5/5、2/2 SUCCESS。修复后的原生 FMT-SIM 尚待 Owner 本机完整复测；#17/#18/#19 和 #21/#22 保持 OPEN。
 
 
 ## ENG-07 Native FMT-SIM: local execution tool

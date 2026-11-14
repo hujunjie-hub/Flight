@@ -69,7 +69,7 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；Git
 | 字段 | 内容 |
 |---|---|
 | Issue | FLIGHT-LOCAL-04 |
-| 状态 | **OWNER_WAIVED_INDEPENDENT_REVIEW / TECHNICAL_REVIEW_COMPLETED_WITH_CORRECTION**；项目方 2026-11-14 明确豁免该项独立审查，复核发现已修正；不声称第三方独立 APPROVED。 |
+| 状态 | **OWNER_WAIVED_INDEPENDENT_REVIEW / TECHNICAL_REVIEW_COMPLETED_WITH_CORRECTION / GitHub #8 CLOSED**；项目方 2026-11-14 明确豁免该项独立审查，复核发现已修正；不声称第三方独立 APPROVED。 |
 | 已实现 | R30.3 rounded Horner product/sum recurrence、RN overflow midpoint fail-closed、gamma 定向舍入、正规/次正规误差界、系数构造/速度缩放/加速度缩放首个非有限值短路；R31 修复 velocity/acceleration time-shift derivative 使用实际 rounded vf/af 系数。 |
 | 已测试 | Host #43446380866 6/6、M6/M7 #43446380836 5/5、M7 #43446380724 2/2；M5 Host/ASan、MR-009 focused、S06-099 60,002 offsets 双模型 Fraction、S06-107 rounded-derivative oracle、18 mutation FP audit、ARM 两对象无 FMA、Cortex-M7 模块编译均 PASS。 |
 | 尚未声称 | degree 5/4/3 Horner 拒绝点完整 validator 输入可达性不作声称；H723 FPSCR 实机等价仍 NOT_RUN；M6 40 ms route preview 不在 M5-06 20 ms 证明域。 |
@@ -111,7 +111,7 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；Git
 ## 派生规则
 
 - 状态变化先改 `ISSUE_REGISTER.md`，再更新本视图。
-- `FIXED_WAITING_RETEST` 不等于 VERIFIED；安全/数学问题的 `VERIFIED/CLOSED` 必须由独立审查者依据证据确认。内部预审不能替代独立复验。
+- `FIXED_WAITING_RETEST` 不等于 VERIFIED；除项目方明确豁免的 MR-009/#8 外，安全/数学问题的 `VERIFIED/CLOSED` 必须由适用的独立审查者依据证据确认；#8 的关闭不构成第三方独立 APPROVED。
 - S06-100..102 的 Host 证据已更新。MR-009 的单次技术复核完成并修复发现项。M5-06 仍受 B07 门禁阻塞。
 - R27 文档、R27 快照和 R22 原始字节保留为 HISTORICAL/NOT_RECOVERABLE，不得覆盖。
 
