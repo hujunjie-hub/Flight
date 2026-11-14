@@ -8,7 +8,7 @@
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
 RUN_ID `M5-06-R31-20261113`；validated code `8dcb60b3ac18e6a763c939d3e810984092cdd321`；
-code-validation HEAD `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；latest main HEAD `55552e980345b06657b3bc8483f00ececb3cae07`（文档同步提交）；
+code-validation HEAD `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；main 后续仅有 R32 状态文档同步提交，复测前须 fetch 最新 origin/main；
 唯一开发/验证分支 `main`；历史 R31 证明基线仍为 `8dcb60b3ac18e6a763c939d3e810984092cdd321`。
 
 本文件结论来自历史本地验证记录与本轮 GitHub Actions 远程 Host/SIL/Cortex-M7 编译证据；均不是 H723 实机、HIL、

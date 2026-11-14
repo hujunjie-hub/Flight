@@ -115,7 +115,7 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 
 ## ENG-07 原生 FMT-SIM 本机复测登记
 
-- 当前产品代码修复提交：`3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；最新 main HEAD（其后仅有 R32 状态文档同步）：`55552e980345b06657b3bc8483f00ececb3cae07`。
+- 当前产品代码修复提交：`3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；main 已包含该修复，后续仅有 R32 状态文档同步提交；复测前必须 fetch 最新 origin/main。
 - R32 原生复测 RUN_ID：`FMT-SIM-LOCAL-20261114T072713056Z-e470f00c`，测试 HEAD：`e470f00cd539f438b1923b0faa844456ba2d3b59`。Land 48,043/0 PASS、Return 44,667/0 PASS、Mission 62,793/3 FAIL；总计 155,503 checks / 3 failures，最长状态间隔 145.3 ms。R32 在修复提交之前执行，不是修复后验证。
 - 在线跟踪：GitHub Issues [#17 Land](https://github.com/hujunjie-hub/Flight/issues/17)、[#18 Return](https://github.com/hujunjie-hub/Flight/issues/18)、[#19 Mission](https://github.com/hujunjie-hub/Flight/issues/19)，Mission 子问题 [#21 近地下降速度](https://github.com/hujunjie-hub/Flight/issues/21)、[#22 LANDED/接地点保持](https://github.com/hujunjie-hub/Flight/issues/22)。
 - 修复提交 3d8d29b5dfda21237f8ed02db3c31223c656bfbe 的自动化证据：

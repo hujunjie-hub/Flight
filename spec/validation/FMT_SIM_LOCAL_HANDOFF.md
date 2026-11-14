@@ -4,7 +4,7 @@
 >
 > 适用分支：**main**
 >
-> 当前代码修复基线：**3d8d29b5dfda21237f8ed02db3c31223c656bfbe**（最新 main HEAD：55552e980345b06657b3bc8483f00ececb3cae07）
+> 当前代码修复基线：**3d8d29b5dfda21237f8ed02db3c31223c656bfbe**（main 已包含该修复；运行前 fetch 最新 origin/main）
 >
 > 本方案只覆盖 Windows 原生 FMT-SIM + Flight Host SIL 软件动态复测；不代表 H723 真机、台架 HIL、WCET/RTA、目标栈水位或飞行验收。
 
@@ -33,7 +33,7 @@
 - FMS 首次确认 LANDED 后，M5 锁存实际接地点的水平坐标并保持至解除武装交接结束；LANDED 快照短暂丢失时不再恢复追逐 Home XY。
 - M4 Mission→Return 许可绑定比较使用 M6 capability 的 publish 时间，覆盖 20 ms sample-to-publish 延迟。
 
-生产代码修复提交为 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；最新 main HEAD 为 `55552e980345b06657b3bc8483f00ececb3cae07`（其后仅有 R32 状态文档同步）。R32 原生复测在修复前 HEAD `e470f00cd539f438b1923b0faa844456ba2d3b59` 执行：Land 48,043/0 PASS、Return 44,667/0 PASS、Mission 62,793/3 FAIL；总计 155,503/3，最长状态间隔 145.3 ms。R32 不能作为修复提交的原生验证证据。
+生产代码修复提交为 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；main 后续仅有 R32 状态文档同步提交，Owner 复测前必须 fetch 最新 origin/main。R32 原生复测在修复前 HEAD `e470f00cd539f438b1923b0faa844456ba2d3b59` 执行：Land 48,043/0 PASS、Return 44,667/0 PASS、Mission 62,793/3 FAIL；总计 155,503/3，最长状态间隔 145.3 ms。R32 不能作为修复提交的原生验证证据。
 
 修复提交 3d8d29b5dfda21237f8ed02db3c31223c656bfbe 的三组 CI 全部通过：
 - [Host validation #43574875444](https://github.com/hujunjie-hub/Flight/actions/runs/43574875444)：6/6 jobs SUCCESS。
