@@ -786,9 +786,9 @@
     "archive_script_commit": "bbf3e9205f2a764caaeb9e833c308c8069c6f7fb"
   },
   "latest_local_validation": {
-    "run_id": "M5-06-TAKEOVER-20261113",
+    "run_id": "M5-06-STACK-20261114",
     "branch": "opt/stage-02-m5-06-safety-validator",
-    "validated_code_commit": "36d7b7ce9ed92a319b7112e9952acde6b1ebe5d1",
+    "validated_code_commit": "bbda2028a4d905b54cfc7d6c3879a186d26c210b",
     "scope": "LOCAL_EXECUTION_ONLY",
     "status": "PASS",
     "passed_commands": 30,
