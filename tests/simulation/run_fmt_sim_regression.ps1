@@ -21,7 +21,6 @@ param(
     [ValidateRange(0.1, 0.95)][double]$FmtHover = 0.62,
     [ValidateRange(350, 1000)][int]$FmtStateTimeoutMs = 350,
     [ValidateSet('All', 'Land', 'Return', 'Mission')][string]$Scenario = 'All',
-    [string]$ExpectedBranch = 'opt/stage-02-m5-06-safety-validator',
     [switch]$AllowDirty
 )
 
@@ -75,8 +74,9 @@ if ($LASTEXITCODE -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
 }
 $branch = (& git -C $repoRoot branch --show-current).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Unable to resolve the current Git branch' }
-if ($ExpectedBranch -and $branch -ne $ExpectedBranch) {
-    throw "Expected branch '$ExpectedBranch', found '$branch'. Use -ExpectedBranch to explicitly select another branch."
+$expectedBranch = 'opt/stage-02-m5-06-safety-validator'
+if ($branch -ne $expectedBranch) {
+    throw "Expected branch '$expectedBranch', found '$branch'."
 }
 $gitStatus = @(& git -C $repoRoot status --porcelain=v2 --untracked-files=all)
 if ($LASTEXITCODE -ne 0) { throw 'Unable to read Git working-tree status' }
@@ -278,13 +278,15 @@ $overall = if ($buildStatus -eq 'PASS' -and $allScenarioPass) { 'PASS' } else { 
 $closureReasons = @()
 if ($Scenario -ne 'All') { $closureReasons += 'Only a subset of scenarios was requested.' }
 if ($FmtStateTimeoutMs -ne 350) { $closureReasons += 'State timeout differs from the strict 350 ms gate.' }
+if ($FmtHilPort -ne 14653) { $closureReasons += 'HIL UDP port differs from the required 14653 port.' }
 if ($dirty -or $gitStatusAfter.Count -gt 0) { $closureReasons += 'Git working tree was dirty before or after the run.' }
-if (-not $ExpectedBranch -or $branch -ne $ExpectedBranch) { $closureReasons += 'Branch does not match the expected branch.' }
+if ($branch -ne $expectedBranch) { $closureReasons += 'Branch does not match the required branch.' }
 if (-not $upstreamMatchesHead) { $closureReasons += 'Local HEAD does not match the fetched upstream tracking HEAD.' }
 if (-not $worktreeStable) { $closureReasons += 'Branch, HEAD or working-tree state changed during the run.' }
 $strictGateEligible = $overall -eq 'PASS' -and $Scenario -eq 'All' -and
-    $FmtStateTimeoutMs -eq 350 -and -not $dirty -and $gitStatusAfter.Count -eq 0 -and
-    $ExpectedBranch -and $branch -eq $ExpectedBranch -and $upstreamMatchesHead -and $worktreeStable
+    $FmtStateTimeoutMs -eq 350 -and $FmtHilPort -eq 14653 -and
+    -not $dirty -and $gitStatusAfter.Count -eq 0 -and
+    $branch -eq $expectedBranch -and $upstreamMatchesHead -and $worktreeStable
 
 $logRecords = @()
 foreach ($scenarioResult in $scenarioResults) {
@@ -317,7 +319,7 @@ $manifest = [ordered]@{
     repository = 'hujunjie-hub/Flight'
     branch = $branch
     branch_after = $branchAfter
-    expected_branch = $ExpectedBranch
+    expected_branch = $expectedBranch
     commit = $head
     head_after = $headAfter
     dirty_before = $gitStatus
@@ -402,10 +404,10 @@ Write-Host "FMT-SIM local regression: $overall"
 Write-Host "RUN_ID: $runId"
 Write-Host "Evidence: $runDir"
 Write-Host "Issue closure eligible: $strictGateEligible"
-$archivePath = "$runDir.zip"
+$archivePath = "$($runDir).zip"
 Compress-Archive -Path (Join-Path $runDir '*') -DestinationPath $archivePath -CompressionLevel Optimal -Force
 $archiveSha = Get-Sha256 $archivePath
-[System.IO.File]::WriteAllText("$archivePath.sha256", "$archiveSha  $([System.IO.Path]::GetFileName($archivePath))$([Environment]::NewLine)", [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText("$($archivePath).sha256", "$archiveSha  $([System.IO.Path]::GetFileName($archivePath))$([Environment]::NewLine)", [System.Text.UTF8Encoding]::new($false))
 Write-Host "ARCHIVE=$archivePath"
 Write-Host "ARCHIVE_SHA256=$archiveSha"
 if ($overall -ne 'PASS') { exit 1 }
