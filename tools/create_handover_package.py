@@ -6,15 +6,18 @@ not just a patch. It is intentionally independent of chat history.
 """
 import hashlib
 import json
+import argparse
 import re
 import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN_ID = "M5-06-R28-20261111"
-OUT = ROOT / "build/validation/handover" / RUN_ID
-CODE = "31463cb351d2f55e5da978c75db64e9d25fc2523"
-REMOTE = "51e7e923419733f5aa3b21efa1e46588629623ed"
+# RUN_ID is a command-line argument: a hard-coded one made every later
+# handover claim the R28 baseline.
+RUN_ID = ""
+OUT = ROOT / "build/validation/handover" / "unset"
+CODE = ""
+REMOTE = ""
 
 
 def sha(path):
@@ -37,6 +40,16 @@ def copy(path, dest):
 
 
 def main():
+    global RUN_ID, OUT, CODE, REMOTE
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--code-commit", default="")
+    parser.add_argument("--remote-commit", default="")
+    args = parser.parse_args()
+    RUN_ID = args.run_id
+    OUT = ROOT / "build/validation/handover" / RUN_ID
+    CODE = args.code_commit or git("rev-parse", "HEAD")
+    REMOTE = args.remote_commit or git("rev-parse", "origin/main")
     OUT.mkdir(parents=True, exist_ok=True)
     head = git("rev-parse", "HEAD")
     branch = git("branch", "--show-current")
