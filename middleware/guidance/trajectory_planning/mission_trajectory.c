@@ -232,8 +232,10 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
 
     if (s->landing_stage == LANDING_BRAKE) {
         if (plan_complete &&
-            hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
-            hypotf(velocity[0], velocity[1]) <= 0.15f &&
+            hypotf(position[0] - goal[0], position[1] - goal[1]) <=
+                GUIDANCE_LANDING_APPROACH_MAX_HORIZONTAL_ERROR_M &&
+            hypotf(velocity[0], velocity[1]) <=
+                GUIDANCE_LANDING_APPROACH_MAX_HORIZONTAL_SPEED_MPS &&
             fabsf(position[2] - brake_down) <= 0.10f &&
             fabsf(velocity[2]) <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS)
             s->landing_stage = LANDING_FINAL;
