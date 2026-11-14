@@ -22,7 +22,7 @@
 
 状态必须按 [Issue 工作流](ISSUE_WORKFLOW.md) 更新；关闭前必须完成 [Issue 关闭清单](ISSUE_CLOSURE_CHECKLIST.md)。
 
-GitHub Issues #8–#19、#21–#22 已在线跟踪；#8 已因项目方明确豁免独立审查且技术复核完成而关闭（不代表第三方独立 APPROVED）；
+GitHub Issues #8–#19、#21–#22 已在线跟踪；#8 已因项目方明确豁免独立审查且技术复核完成而关闭（不代表第三方独立 APPROVED）。未映射的历史 FLIGHT-LOCAL 编号仍按本地状态管理；未完成适用的复验/审查不得 VERIFIED/CLOSED。MR-009/#8 的豁免仅限该项，不得扩展到其他安全/数学问题。下方带日期的 R16–R31/CI 条目保留当时快照；其中 GITHUB_PUBLICATION=PENDING、MR-009 WAITING_INDEPENDENT_REVIEW 和旧资源数字均非当前状态，当前状态以本段、末尾 ENG-07 当前记录和 BLOCKER_BOARD 顶部摘要为准。BLOCKER_BOARD.md 只是本文件的派生视图，不得维护独立状态。
 
 ## 历史本地正式登记（部分映射 GitHub Issues）
 
@@ -35,7 +35,7 @@ VERIFIED/CLOSED；FLIGHT-LOCAL-04/MR-009 当前为 OWNER_WAIVED_INDEPENDENT_REVI
 | FLIGHT-LOCAL-01 | S2 | Windows 检出把 *.sh 转 CRLF | R2 修复；`tools/check_line_endings.py` | line_endings PASS | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-02 | S2 | Cortex-M7 只编译 8/14 M5 源 | R2 补全 | M5 ARM 14 对象 | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-03 | S2 | 历史 packages/SConscript 缺失导致链接阻塞 | R3 安装；2026-11-12/13 三包 commit 锁定并核对安装 HEAD | M5-06 接管复验：M4/M5 测试配置 Flight.elf 链接 PASS；完整 Release 产品链接/目标运行仍需复核 | FIXED_WAITING_RETEST |
-| FLIGHT-LOCAL-04 | S2 | MR-009 binary32 consumer/validator error envelope；同轴误差合成缺口已修正 | R31 rounded vf/af derivative、S06-107 oracle、S06-099 Fraction offsets、18 mutation FP audit；同轴误差先按轴合成再做 3-D outward norm，修复 commit 4f1b76d | 项目方 2026-11-14 明确豁免独立审查；S06-116 old-expression fail / corrected-expression pass；Host/ASan 复测通过；GitHub #8 已关闭 | OWNER_WAIVED_INDEPENDENT_REVIEW / TECHNICAL_REVIEW_COMPLETED_WITH_CORRECTION
+| FLIGHT-LOCAL-04 | S2 | MR-009 binary32 consumer/validator error envelope；同轴误差合成缺口已修正 | R31 rounded vf/af derivative、S06-107 oracle、S06-099 Fraction offsets、18 mutation FP audit；同轴误差先按轴合成再做 3-D outward norm，修复 commit 4f1b76d | 项目方 2026-11-14 明确豁免独立审查；S06-116 old-expression fail / corrected-expression pass；Host/ASan 复测通过；GitHub #8 已关闭 | OWNER_WAIVED_INDEPENDENT_REVIEW / TECHNICAL_REVIEW_COMPLETED_WITH_CORRECTION |
 | FLIGHT-LOCAL-05 | S2 | spec/ABI 证据曾钉住 CRLF 哈希 | R3 efc28d7 LF 重基线 | 当前 CI：Spec Audit 145 types / 8 checks PASS；生产 ABI 144 types / 0 mismatch / 0 unexpected Host/ARM | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-06 | S2 | RT-Thread 三个包曾使用 latest，依赖不可复现 | OWNER 批准后固定三个 40-hex commit；跟踪源与锁文件一致 | `check_rt_packages_lock.py` PASS；14 个负向用例；当前 Host CI 未单独重跑此 job | FIXED_WAITING_RETEST |
 | FLIGHT-LOCAL-07 | S1 | 验收脚本 assert 可被 -O 剥离 | R2 修复 | test_audit_optimized PASS | FIXED_WAITING_RETEST |
