@@ -1,6 +1,6 @@
 # FLIGHT-29 Navigation Health and Divergence — Change Request Package
 
-Status: **DESIGN / AWAITING OWNER APPROVAL — NO ESTIMATOR CODE CHANGED**
+Status: **ROOT CAUSE IDENTIFIED (NIS deadlock) / AWAITING OWNER APPROVAL — NO ESTIMATOR CODE CHANGED**
 
 Scope: QUAD_X4 / STM32H723ZGT6 / `OBSTACLE_SOURCE_MODE=NONE` / `BENCH_INHIBIT`.
 All evidence below is Host/SIL and Windows-native FMT-SIM software evidence. It is
@@ -30,25 +30,51 @@ Consequences already implemented (no estimator change):
 
 These two only catch the symptom. They do not stop the estimate from diverging.
 
-## 2. The open question that must be answered before any fix
+## 2. Root cause (static analysis, 2026-11-15)
 
-`horizontal_position_std` growing from 0.062 m to 0.81 m means the filter is not
-fusing position observations. The SIL feeds a synthetic GNSS sample every 100 ms
-at RTK_FIXED with `position_variance_m2 = 0.04` (0.2 m std) taken directly from
-the FMT truth, and the submissions return `STATUS_OK`. Therefore one of these is
-true:
+The filter has a normalised-innovation-squared gate but **no recovery path**:
 
-1. the samples are accepted by the runtime but **not applied** by the estimator
-   adapter (mode/source gating, origin or epoch filter, innovation gate);
-2. they are applied but the filter's process noise grows faster than the
-   correction can pull it back (a tuning/gating defect);
-3. the sample path selected in Mission differs from the path used by Land/Return
-   (which do track truth).
+| Code | Behaviour |
+|---|---|
+| `trimmed_core/src/quad_core.cpp:699-703` | `if (config_.nis_gate_enable && nis > threshold) { ++diagnostics_.nis_rejected; return kErrNisRejected; }` |
+| `trimmed_core/include/kfgins/quad_types.hpp:58-59` | `kNisThresholdDof1 = 6.6348966`, `kNisThresholdDof3 = 11.3448667` (99.5 % chi-square) |
+| `kf_gins_quad_port.cpp:107,229,232` | `nis_gate_enable` is configurable and `nis_rejected` / `last_nis` are exposed by the port |
+| repo-wide search | no covariance inflation, no reset, no "re-accept after N rejections" anywhere |
 
-Nothing in the current evidence distinguishes these three, and each implies a
-different fix. Guessing risks masking a real navigation fault.
+This produces a deadlock: once the INS has drifted, the GNSS position innovation is
+large compared with the (still small) declared covariance, so NIS exceeds the
+threshold and **every** position fix is rejected for ever. The filter then
+integrates without position aiding, `horizontal_position_std` grows, and the
+estimate can only diverge further - while `valid_mask` stays `0xff`.
 
-## 3. Staged plan (each stage is separately approvable)
+It also explains the measured signature better than a "sudden divergence":
+
+- navigation **velocity** follows the truth (e.g. `ve = 1.766 m/s` at t = 37.24 s)
+  because velocity observations are still accepted;
+- navigation **position** does not follow, because position observations are
+  rejected;
+- `meas_rej = 2` from the runtime is a different counter from
+  `diagnostics_.nis_rejected`, so the rejection storm is invisible to every
+  consumer.
+
+The remaining question is what caused the *first* large innovation (a ground
+contact transient, a baro step at touchdown, or an attitude excursion). It sets
+the trigger but not the defect: a filter that cannot recover from a single bad
+innovation is unsafe regardless of the trigger.
+
+## 3. Trigger candidates (Stage A confirms which one fired)
+
+The NIS deadlock explains the divergence; it does not explain which event produced
+the first large innovation. Candidates, all reachable at touchdown:
+
+1. a vertical ground-contact transient that steps the position/velocity estimate;
+2. a barometer step when the airframe reaches the surface;
+3. an attitude excursion during the landing flare that corrupts the mechanisation.
+
+Each is a different upstream defect and each can trigger the same unrecoverable
+NIS rejection, so Stage A must identify the trigger before any additional change.
+
+## 4. Staged plan (each stage is separately approvable)
 
 ### Stage A — read-only instrumentation (no behaviour change)
 
@@ -59,15 +85,26 @@ rejection reason.
 
 - Risk: none in flight code if the counters live behind `FLIGHT_HOST_TEST`
   (precedent: the existing MPC diagnostic records).
-- Exit criterion: one of the three hypotheses above is proven, or all three are
-  disproven.
+- Exit criterion: the trigger from section 3 is identified, and the NIS
+  rejection storm is quantified (`nis_rejected`, `last_nis`) from the same trace.
 
-### Stage B — estimator gating fix (behaviour change, needs approval)
+### Stage B — NIS recovery (behaviour change, needs approval)
 
-Depending on Stage A. Likely shape: apply the GNSS position/velocity update when
-the sample is fresh, same clock and same origin, with an innovation gate sized
-from the declared variance, and stop requiring the mode that currently disables
-it.
+Keep the gate for transient outliers, add a bounded recovery so a single bad
+innovation cannot brick the filter. Candidate shapes:
+
+1. count consecutive NIS rejections per observation kind; after N (for example
+   5) rejections in a row, inflate the corresponding position covariance (or
+   re-seed the position from the accepted fix) once, then resume normal gating;
+2. allow a rejected position fix to update position but not velocity (or the
+   reverse) instead of rejecting the whole record;
+3. bound the gate by an absolute innovation limit sized from the declared
+   variance *and* the expected dynamics, so a genuinely diverged estimate is
+   detected as "reset", not "reject for ever".
+
+Shape 1 is the smallest change and is testable from a recorded trace. All shapes
+must keep rejecting isolated outliers: the NIS thresholds and the
+`nis_gate_enable` switch stay unchanged.
 
 - Risk: navigation response changes on every flight phase; needs a full
   M4/M5/M6/M7 regression plus a native three-scenario batch.
@@ -88,7 +125,7 @@ health signal that consumers can trust. Options:
 Option 1 is cheap but demonstrably late. Option 2 is the only one that lets a
 consumer fail closed *before* the position is unusable.
 
-## 4. Test plan attached to any approved change
+## 5. Test plan attached to any approved change
 
 - Fixed Host regression that reproduces the divergence from a recorded trace
   (the `[settle]` diagnostics added in `9676b07d` carry the needed fields).
@@ -99,7 +136,7 @@ consumer fail closed *before* the position is unusable.
   formal gates, archived with SHA256.
 - H723 target/HIL/WCET/flight stay NOT_RUN and must not be claimed.
 
-## 5. What the owner is being asked to approve
+## 6. What the owner is being asked to approve
 
 1. **Stage A** (instrumentation only) — no flight behaviour change.
 2. In principle, the *scope* of Stage B/C so the work is not blocked again after

@@ -277,3 +277,4 @@ Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析
 - M6 增加消费端 fail-closed 门控（`7b55218e`）：有效标志下的导航加速度超过 20 m/s²/轴即 `STATUS_MODEL_OUT_OF_DOMAIN`，不再把发散估计转成姿态指令。M6 guard 26→28 checks。
 - memory-budget 拒绝过期对象（`dd1ef142`）：旧对象会报 24 B 而非 264 B 余量；修复后双向验证。
 - 仍缺：估计器侧创新门控与 `position_std` 健康标志（#29 未关闭）；M6 近地极限环（#26）待 #29 可信后重新评估。
+- 2026-11-15 静态定位：#29 的根因是 **NIS 门控无恢复路径**。`quad_core.cpp:699-703` 在 `nis > threshold`（dof1 6.6348966 / dof3 11.3448667）时直接拒绝更新，仓库内没有协方差膨胀、重置或"连续拒绝后重新接受"的任何代码。一旦 INS 漂移，GNSS 位置修正被永久拒绝，而速度观测仍被接受，于是出现"速度跟随真值、位置不动、`pos_std` 单调增长、`valid_mask=0xff`"的签名；`diagnostics_.nis_rejected / last_nis` 已存在但未进入消费端健康判断。
