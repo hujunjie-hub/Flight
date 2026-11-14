@@ -1,4 +1,4 @@
-# Flight M5-06 阻塞项视图（R33）
+# Flight M5-06 阻塞项视图（R34）
 
 > **2026-11-13 MR-009 R31 内部预审 CI 快照（代码/证明基线 8dcb60b3ac18e6a763c939d3e810984092cdd321）**：Host validation #43446380866（6/6）、M6/M7 #43446380836（5/5）、M7 #43446380724（2/2）全部 SUCCESS。M5 Host regression、M5 ASan/UBSan、MR-009 focused、S06-099/S06-107、Spec Audit、生产 ABI、18 mutation FP audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer 均 PASS。
 
@@ -120,13 +120,13 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；Git
 
 | Issue | 场景 | 当前状态 | 执行责任 / 解除证据 |
 |---|---|---|---|
-| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / R33 SCENARIO PASS; FULL BATCH NOT CLOSURE-ELIGIBLE | R33 Land 39,388/0; new contact-handoff code not yet native-retested |
-| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R33 SCENARIO PASS; FULL BATCH NOT CLOSURE-ELIGIBLE | R33 Return 40,485/0; new contact-handoff code not yet native-retested |
-| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R33 3 TERMINAL FAILURES; CONTACT HANDOFF FIX COMMITTED / RETEST REQUIRED | R33 Mission 67,112/3; descent 0.374 m/s PASS; terminal ACK, DISARM ACK, arm state fail |
-| [#21](https://github.com/hujunjie-hub/Flight/issues/21) | Mission near-ground speed | OPEN / R33 SPEED METRIC PASS; FULL MISSION/MANIFEST STILL FAILS | R33 final 0.50 m descent 0.374 m/s; keep open under full-manifest closure rule |
-| [#22](https://github.com/hujunjie-hub/Flight/issues/22) | Mission touchdown hold | OPEN / R33 REPRODUCED; ADVISORY CONTACT HANDOFF FIX COMMITTED / NATIVE RETEST REQUIRED | R33 contact=1 but landed UNKNOWN/evidence=0x0; fixes `419f5696` / `15a33756`; FMS thresholds unchanged |
+| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / R34 FAIL; M5 CONTACT-HOLD REPLAN FIX COMMITTED; NATIVE RETEST PENDING | R34 33,837/4; near-ground 0.332 m/s PASS; contact candidate followed by guidance 1550/SPEED rejection and terminal failsafe |
+| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R34 FAIL; M5 CONTACT-HOLD REPLAN FIX COMMITTED; NATIVE RETEST PENDING | R34 33,346/4; near-ground 0.341 m/s PASS; contact candidate followed by guidance 1550/SPEED rejection and terminal failsafe |
+| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R34 FAIL; CONTACT-HOLD AND STAGED-LANDING FIXES COMMITTED; NATIVE RETEST PENDING | R34 49,123/5; terminal failsafe, 0.674 m/s near-ground descent, 0.050 m touchdown; waypoints 0.205/0.283 m |
+| [#21](https://github.com/hujunjie-hub/Flight/issues/21) | Mission near-ground speed | OPEN / R34 0.674 m/s FAIL; STAGED-LANDING FIX COMMITTED; NATIVE RETEST PENDING | R34 peak at 0.490 m height; horizontal Home alignment is now separated from vertical descent |
+| [#22](https://github.com/hujunjie-hub/Flight/issues/22) | Mission touchdown hold | OPEN / R34 CONFIRMS M5 REPLAN FAILURE AFTER ADVISORY CONTACT; FIX COMMITTED; NATIVE RETEST PENDING | R34 contact=1, landed=UNKNOWN, evidence=0x1; raw nav transient caused 1550 rejection; M5 now seeds hold from active reference |
 
-Current-main CI on `3270cff5aec26e3ae0717c62d2d78e9f30752020`: Host [#43593701736](https://github.com/hujunjie-hub/Flight/actions/runs/43593701736) 6/6, M6/M7 [#43593701892](https://github.com/hujunjie-hub/Flight/actions/runs/43593701892) 5/5, M7 [#43593701803](https://github.com/hujunjie-hub/Flight/actions/runs/43593701803) 2/2 SUCCESS. M4 969/0; M5 327,030/0; M4/M5 integration 1,042/0; MR-009 focused 430/0; M7 274/0. 新增 M4 回归 `contact_candidate_not_disarm_authority` / `contact_candidate_requires_valid_navigation`、M5 `landing_alignment_and_speed` / `landing_contact_latches_xy` 均 PASS。以上 CI 不启动原生 FMT-SIM；#17/#18/#19/#21/#22 必须等待 Owner 在 latest main 完整批量复测后再审查关闭。
+CI on exact fixed-code HEAD `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b`: Host [#43599814765](https://github.com/hujunjie-hub/Flight/actions/runs/43599814765) 6/6, M6/M7 [#43599814768](https://github.com/hujunjie-hub/Flight/actions/runs/43599814768) 5/5, M7 [#43599814733](https://github.com/hujunjie-hub/Flight/actions/runs/43599814733) 2/2 SUCCESS. M4 969/0; M5 329,654/0; M5 ASan/UBSan 329,654/0; M4/M5 integration and sanitizer 1,042/0 each; MR-009 focused 430/0; Cortex-M7 production-module compile PASS. These CI workflows do not launch native FMT-SIM. All five Issues remain OPEN pending complete Owner-local batch on latest main.
 
 
 R30 archive SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae9909063` is verified, but its tested HEAD `3299a4f` is 181 commits behind the reviewed current branch HEAD `9063f310`; worktree DIRTY and formal manifest/loopback gate evidence absent. Five diagnostic scenarios failed (29 assertions total). Do not close or repeat code fixes from this old result; wait for a clean current-HEAD formal rerun. [Full archive review](../validation/FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md).

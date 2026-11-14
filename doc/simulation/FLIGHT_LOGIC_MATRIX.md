@@ -1,6 +1,6 @@
 # 飞行与策略仿真验证矩阵
 
-本文件的 PASS 记录均绑定各自历史 RUN_ID。R32 在修复前 HEAD `e470f00c` 上 Land/Return PASS、Mission 3 项 FAIL；R33 在 `5e3b74f` 上 Land/Return PASS、Mission 3 项终端失败，近地下降速度 0.374 m/s 已通过。R33 后 main 增加 advisory contact handoff `419f56962f74fd9d89bc62cfc11ee0923910177c` 和 nav_ok guard `15a33756d4e269800e6778c6180f7086179c9429`；测试-only 回归 `3270cff5aec26e3ae0717c62d2d78e9f30752020` 通过最新三组 CI。修复后的原生 FMT-SIM 尚待 Owner 重跑。
+本文件的 PASS 记录均绑定各自历史 RUN_ID。R34 在 main HEAD `85f02af5` 上正式复测 Land 33,837/4、Return 33,346/4、Mission 49,123/5，均 FAIL；Mission 最后 0.50 m 下降速度 0.674 m/s。R34 后 main 提交 `c9cd1792` 保留 M5 活动有效参考作为 contact-hold 重规划起点，提交 `d8ea0f05` 分离水平对准与垂直下降；精确 HEAD `d8ea0f05` 的 Host/M6-M7/M7 CI 6/6、5/5、2/2 SUCCESS。修复后的原生 FMT-SIM 尚待 Owner 重跑。nd/Return PASS、Mission 3 项 FAIL；R33 在 `5e3b74f` 上 Land/Return PASS、Mission 3 项终端失败，近地下降速度 0.374 m/s 已通过。R33 后 main 增加 advisory contact handoff `419f56962f74fd9d89bc62cfc11ee0923910177c` 和 nav_ok guard `15a33756d4e269800e6778c6180f7086179c9429`；测试-only 回归 `3270cff5aec26e3ae0717c62d2d78e9f30752020` 通过最新三组 CI。修复后的原生 FMT-SIM 尚待 Owner 重跑。
 本轮使用 `SIM_CONTROLLED_STOP` Host 构建和隔离的 FMT-SIM Ground 场景。
 H723 的运行配置仍使用 `BENCH_INHIBIT`。设备固件、UART/DMA、板上时序和实机运动
 留在各自的验证门禁。
@@ -198,3 +198,11 @@ Owner archive RUN_ID `FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4`, tested main H
 Mission's final 0.50 m maximum descent is 0.374 m/s (limit 0.40, PASS), touchdown distance 0.171 m, and both waypoints are reached (0.233 m / 0.331 m closest distances). The only failures are terminal ACK, DISARM ACK and final DISARMED arm state. At t=34.280 s contact becomes true while landed remains UNKNOWN and evidence mask is 0x0; first-contact horizontal speed is about 0.291 m/s. Final state remains contact=1 / landed=UNKNOWN / evidence=0x0 / stable_ms=0; nav_ad=0.688 m/s² exceeds the 0.5 m/s² stable-ground gate. The old UNKNOWN branch discarded the contact hint, so M5 continued Home/probe tracking.
 
 Post-R33 main fixes: `419f56962f74fd9d89bc62cfc11ee0923910177c` preserves advisory contact evidence and M5 latches measured contact XYZ; `15a33756d4e269800e6778c6180f7086179c9429` guards the branch with nav_ok. M4 LANDED / DISARM thresholds and 2 s dwell remain unchanged. Test hardening `3270cff5aec26e3ae0717c62d2d78e9f30752020` covers missing navigation and passes Host CI. Host/M6-M7/M7 workflows: 6/6, 5/5, 2/2 SUCCESS. R33 predates these fixes; keep #17/#18/#19/#21/#22 OPEN pending a new full native batch. [Full R33 archive review](../../spec/validation/FMT_SIM_LOCAL_20261114_5E3B74F4_REVIEW.md).
+
+## ENG-07 R34 FMT-SIM 归档复核与 M5 修复
+
+R34 RUN_ID `FMT-SIM-LOCAL-20261114T125449954Z-85f02af5` 的正式门禁、worktree、upstream、loopback、UDP 14653、hover 0.62 和 350 ms 均有效；ZIP / sidecar 与内部 102 项 SHA256 全部匹配。Land 33,837/4、Return 33,346/4、Mission 49,123/5 均 FAIL；总计 116,306 checks / 13 failures。状态间隔 96.1–113.3 ms，低于 350 ms。
+
+三个场景在 contact=1、landed=UNKNOWN、evidence=0x1 时触发 M5 guidance reason=1550；Land / Return 为 SPEED constraint，Mission 为 ACCELERATION constraint。control rejected=-11 后 FMS 进入 terminal failsafe。Mission 最后 0.50 m 下降速度 0.674 m/s；返航 touchdown 0.050 m，两个航点最近距离 0.205 / 0.283 m。
+
+修复提交 `c9cd1792` 保留当前 M5 有效参考作为 contact-hold 重规划起点；`d8ea0f05` 将着陆拆成水平对准（保持当前高度）、0.60 m 进近架、0.20 m 制动、Home 平面和探针；Host 测试注入 raw nav 垂向速度/加速度瞬态。精确 fixed-code HEAD 的 Host/M6-M7/M7 CI 均 PASS。原生 FMT-SIM 尚未在新 HEAD 上复测；#17/#18/#19/#21/#22 均 OPEN。完整报告见 [R34 review](../../spec/validation/FMT_SIM_LOCAL_20261114_85F02AF5_REVIEW.md)。

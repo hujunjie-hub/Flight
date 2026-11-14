@@ -115,14 +115,30 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 
 ## ENG-07 原生 FMT-SIM 本机复测登记
 
-- R33 RUN_ID：`FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4`；测试 HEAD：`5e3b74f40293a005de693eceb61af4c055f1efdb`。ZIP SHA256 `0d6b75c578e2ae71b501f9f26b827559fe8b0887598253af55d09d09f63cdcfb` 与 sidecar 匹配，manifest SHA256 `6604b49d3fe889c9c022b63dec313b762880d7aa8cc12e736975257e2490971d`，内部 102 项 SHA256 全部通过；branch/upstream 匹配、worktree clean/stable、loopback/UDP/hover/350 ms 门禁均有效。
-- R33 结果：Land 39,388/0 PASS、Return 40,485/0 PASS、Mission 67,112/3 FAIL；总计 146,985/3，最长状态间隔 94.8 ms。Mission 末段最大下降速度 0.374 m/s，touchdown distance 0.171 m；失败仅为 terminal ACK、DISARM ACK、arm state 未 DISARMED。详细证据见 [R33 report](../validation/FMT_SIM_LOCAL_20261114_5E3B74F4_REVIEW.md)。
-- R33 复现接地交接缺陷：t=34.280 s contact=1、landed=UNKNOWN、evidence=0x0；M4 严格稳定门槛未满足，旧代码没有给 M5 保留 advisory contact evidence。新生产修复 `419f56962f74fd9d89bc62cfc11ee0923910177c` / `15a33756d4e269800e6778c6180f7086179c9429` 已提交，M4 安全阈值和 2 s dwell 未放宽。
-- 测试补强 `3270cff5aec26e3ae0717c62d2d78e9f30752020`：缺失导航时不发布接地候选证据；`contact_candidate_not_disarm_authority` 与 `contact_candidate_requires_valid_navigation` 均 PASS。
-- Current-main CI on `3270cff5aec26e3ae0717c62d2d78e9f30752020`: Host [#43593701736](https://github.com/hujunjie-hub/Flight/actions/runs/43593701736) 6/6, M6/M7 [#43593701892](https://github.com/hujunjie-hub/Flight/actions/runs/43593701892) 5/5, M7 [#43593701803](https://github.com/hujunjie-hub/Flight/actions/runs/43593701803) 2/2 SUCCESS. M4 969/0; M5 327,030/0; M4/M5 integration 1,042/0; MR-009 focused 430/0; M7 274/0.
-- R33 测试 HEAD 早于上述生产修复；修复后的原生 FMT-SIM 仍 NOT_RUN。#17/#18/#19/#21/#22 全部继续 OPEN；#17/#18 单场景 PASS 不能替代完整 manifest closure eligibility。
-- Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析和文档。统一方案：`spec/validation/FMT_SIM_LOCAL_HANDOFF.md`；批量入口 `tests/simulation/run_fmt_sim_regression.ps1`。严格门槛为 main、UDP 14653、350 ms、hover 0.62、显式 loopback 127.0.0.1、clean worktree 且 HEAD 与刚 fetch 的 origin/main 一致。
-- FMT-SIM PASS 不替代 B07 H723 实机/HIL/WCET/栈水位/飞行证据。
+### R34 最新归档（FAIL，修复后复测待 Owner 执行）
+
+- RUN_ID：`FMT-SIM-LOCAL-20261114T125449954Z-85f02af5`；测试 HEAD：`85f02af5ff2208f805b870d70593a73733db2f5c`。
+- ZIP SHA256 `aaa98517fdcd5da799942a739eec47eddec6a5aa8fe23267b1617a7172d464c0` 与 sidecar 匹配；manifest SHA256 `8a8813929ba6733b12553b9ef0992e2943fbe2601283bdda69e33cfcf1b4bf82`；104 entries 完整，内部 102 项 SHA256 全部通过。
+- main / origin/main 匹配、worktree clean/stable、loopback、UDP 14653、hover 0.62、350 ms 门禁有效；构建 PASS。
+- R34 结果：Land 33,837/4 FAIL；Return 33,346/4 FAIL；Mission 49,123/5 FAIL；总计 116,306 checks / 13 failures。最长状态间隔 96.1–113.3 ms，均低于 350 ms。
+- Land / Return 在 contact=1、landed=UNKNOWN、evidence=0x1 时，M5 规划分别以 reason 1550 / SPEED constraint=2 拒绝；Mission 以 reason 1550 / ACCELERATION constraint=3 拒绝。随后 control rejected=-11、ACK FAILED reason=12、FMS FAILSAFE_TERMINAL。Mission 末段下降速度 0.674 m/s（限值 0.40），返航落点 0.050 m，航点最近距离 0.205 / 0.283 m。
+- 根因与完整日志见 [R34 report](../validation/FMT_SIM_LOCAL_20261114_85F02AF5_REVIEW.md)：接地候选触发时旧 M5 实现丢弃活动轨迹并从 raw nav p/v/a 重规划；Mission 另有水平对准与下降耦合导致近地速度超限。
+
+### R34 后的 main 修复与自动化验证
+
+- `c9cd17926239e088c105b8506052354fdda0d503` 保留 M5 活动计划作为 contact-hold 重规划边界，避免把接地瞬态 raw nav 加速度当作新轨迹起点。
+- `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b` 将 LAND/RETURN 分成水平对准（保持当前高度）、垂直下降至 0.60 m、0.20 m 制动、Home 平面和探针阶段；M4 安全门槛未放宽。
+- 测试提交 `1f9b4ecdbbe90b3e8be9439ec2170478a8083de2` 增加接地瞬态 raw nav 速度/加速度回归，以及水平未对准时保持当前高度的测试。
+- 精确 HEAD `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b` 的 CI：Host [#43599814765](https://github.com/hujunjie-hub/Flight/actions/runs/43599814765) 6/6、M6/M7 [#43599814768](https://github.com/hujunjie-hub/Flight/actions/runs/43599814768) 5/5、M7 [#43599814733](https://github.com/hujunjie-hub/Flight/actions/runs/43599814733) 2/2 SUCCESS；M4 969/0、M5 329,654/0、M5 ASan/UBSan 329,654/0、M4/M5 integration 1,042/0、integration sanitizer 1,042/0、MR-009 focused 430/0，Cortex-M7 M4/M5/M6/M7 production compile PASS。
+- R34 测试 HEAD 早于上述 M5 修复；`d8ea0f05` 之后的原生 FMT-SIM 尚 NOT_RUN。#17/#18/#19/#21/#22 全部继续 OPEN。
+
+### R33 历史归档（不是最新代码结果）
+
+- RUN_ID：`FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4`；测试 HEAD：`5e3b74f40293a005de693eceb61af4c055f1efdb`。ZIP SHA256 `0d6b75c578e2ae71b501f9f26b827559fe8b0887598253af55d09d09f63cdcfb`，manifest SHA256 `6604b49d3fe889c9c022b63dec313b762880d7aa8cc12e736975257e2490971d`，内部 102 项通过。
+- R33 结果：Land 39,388/0、Return 40,485/0 PASS；Mission 67,112/3 FAIL；总计 146,985/3。Mission 下降速度 0.374 m/s、touchdown 0.171 m；终端 ACK、DISARM ACK、arm state 未 DISARMED。
+- R33 后的 M4 advisory contact evidence / nav_ok guard 已在 `419f5696` / `15a33756` 提交；R34 证明还需要 M5 侧使用有效参考状态安全接管。
+
+Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析和文档。统一方案：`spec/validation/FMT_SIM_LOCAL_HANDOFF.md`；批量入口 `tests/simulation/run_fmt_sim_regression.ps1`。严格门槛为 main、UDP 14653、350 ms、hover 0.62、显式 loopback 127.0.0.1、clean worktree 且 HEAD 与刚 fetch 的 origin/main 一致。FMT-SIM PASS 不替代 B07 H723 实机/HIL/WCET/栈水位/飞行证据。
 
 ## 2026-11-14 R30 归档复核登记
 
