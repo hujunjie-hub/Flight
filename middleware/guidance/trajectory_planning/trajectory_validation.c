@@ -76,11 +76,16 @@ uint8_t guidance_landing_speed_ok(const GuidanceInput *in, const GuidanceQuintic
         return 0u;
     /* Allow a faster approach while still above the contact-sensor band.
      * Bound only the final 6 cm where the SIL contact oracle can assert contact. */
-    if (end_down < contact_down)
-        return 0u; /* Bernstein bound touched the contact band but the endpoint did not: fail closed. */
     check_t = t0;
     if (start_down < contact_down) {
-        float left = t0, right = t1;
+        float left = t0, right = t1, velocity_lo, velocity_hi;
+        /* A single bisection is valid only when the segment is nondecreasing in
+         * NED-down. If the Bernstein position bound enters the contact band but
+         * the endpoint does not, or monotonicity cannot be proved, fail closed. */
+        if (end_down < contact_down ||
+            !guidance_quintic_bounds(down, t0, t1, 1, &velocity_lo, &velocity_hi) ||
+            velocity_lo < -1e-5f)
+            return 0u;
         for (iteration = 0; iteration < 16u; ++iteration) {
             const float mid = 0.5f * (left + right);
             if (guidance_quintic_eval(down, mid, 0) >= contact_down)

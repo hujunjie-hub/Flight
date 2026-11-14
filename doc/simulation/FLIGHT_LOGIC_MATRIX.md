@@ -119,3 +119,14 @@ Host 运行时共 3519 项检查，覆盖释放数传后 ELRS 继续收帧、HIL
 ## 2026-11-14 Stage-02 复测
 
 隔离 Ground/HIL 实例的三个动态场景本轮均失败。Land 的首个落地制导参考被拒绝；Return 已接地但在场景截止前未获接地确认和上锁回执；Mission 完成两个航点后在返航准备阶段超时。三者的状态间隔都低于 350 ms。测试计数和原始日志见 [ENG-07 的现行验收记录](../../spec/09_需求验证实施与发布管理.md#2026-11-14-eng-07-动态-fmt-sim-复测fail)。
+
+
+## ENG-07 Fix Iteration 1
+
+Stage-02 code fixes are in commits 9ac05a3, 1e7ad7c and 31a0d3d. The three CI workflows on 31a0d3d passed. Host evidence: M4 1,074/0; M5 322,777/0; MR-009 focused 430/0; M4/M5 integration 1,147/0; M5 ASan/UBSan 322,777/0; M4/M5 integration sanitizer 1,147/0.
+
+- Land: active trajectory acceleration is carried into vertical automatic LAND only when the previous reference remains valid and active. The vertical LAND builder reports the actual rejection reason/constraint, reaches the Home plane with zero terminal velocity/acceleration, then executes a bounded 4 s below-plane probe.
+- Return: the 0.12 m/s vertical-speed bound applies in the final 6 cm contact-sensor band. Curves entering that band are checked with continuous Bernstein bounds; the boundary bisection now requires a provably nondecreasing NED-down segment and fails closed on ambiguous crossings.
+- Mission: FMS compares M6 capability publication time against the M4 permit-binding event. A 20 ms sample-to-publish delay is covered for both in-mission Return and post-mission Return.
+
+The original Windows FMT-SIM Land/Return/Mission scenarios have NOT been rerun after these changes. The prior 350 ms Stage-02 failures remain the authoritative dynamic baseline; Issues #17/#18/#19 stay OPEN. The next native run uses expanded [settle] trace fields for effective operation/guidance mode, Home validity/position, nav p/v/a, truth velocity, M6 sample/publish timestamps, permit sample/publish timestamps, guidance reference/state/reason and violated constraint. No H723 target/HIL/WCET/stack-watermark result is implied.
