@@ -268,28 +268,23 @@ static void test_landing_aligns_and_limits_final_descent(void)
   CHECK(fx_init(&fx));
   fx.dir.operation_code = PRODUCT_OP_RETURN;
   fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
-  fx.nav.core.position_ned_m[2] = -2.0f;
+  /* Match the Mission return geometry that exposed the 0.50 m descent spike:
+   * a 2.4 m horizontal leg while returning from 2.4 m above Home. */
+  fx.nav.core.position_ned_m[0] = 2.4f;
+  fx.nav.core.position_ned_m[2] = -2.4f;
   CHECK(fx_step(&fx) == STATUS_OK);
   CHECK(fx.out.guidance_status.guidance_state == GUIDANCE_STATE_READY);
   const uint32_t epoch = fx.out.guidance_status.reference_epoch;
-  fx.nav.core.position_ned_m[0] = 0.6f;
-  fx.nav.core.position_ned_m[2] = -0.6f;
-  for (unsigned i = 0; i < 630; ++i)
-    CHECK(fx_step(&fx) == STATUS_OK);
-  CHECK(fx.out.feasibility.feasible);
-  CHECK(fabsf(fx.out.reference.points[23].point.position_ned_m[2] + 0.6f) < 0.001f);
-
-  fx.nav.core.position_ned_m[0] = 0.0f;
   unsigned low_points = 0;
   unsigned capture_points = 0;
   uint8_t failure_logged = 0u;
-  /* Allow the approach, braking waypoint, Home-plane arrival and 4 s probe. */
-  for (unsigned i = 0; i < 1200; ++i) {
+  /* Follow the full long-leg approach, brake, Home-plane arrival and 4 s probe. */
+  for (unsigned i = 0; i < 1800; ++i) {
     CHECK(fx_step(&fx) == STATUS_OK);
     if ((fx.out.feasibility.feasible == 0u ||
          fx.out.guidance_status.reference_epoch != epoch) && failure_logged == 0u) {
-      printf("LAND_STAGE_FAIL step=%u feasible=%u state=%u reason=%u feas_reason=%u constraint=%u "
-             "epoch=%u expected=%u nav_z=%.5f nav_vz=%.5f anchor_z=%.5f anchor_vz=%.5f "
+      printf("LONG_RETURN_LAND_FAIL step=%u feasible=%u state=%u reason=%u feas_reason=%u constraint=%u "
+             "epoch=%u expected=%u nav_x=%.5f nav_z=%.5f nav_vz=%.5f anchor_x=%.5f anchor_z=%.5f "
              "preview_z=%.5f preview_vz=%.5f\\n",
              i, (unsigned)fx.out.feasibility.feasible,
              (unsigned)fx.out.guidance_status.guidance_state,
@@ -297,9 +292,11 @@ static void test_landing_aligns_and_limits_final_descent(void)
              (unsigned)fx.out.feasibility.reason_code,
              (unsigned)fx.out.feasibility.violated_constraint_id,
              fx.out.guidance_status.reference_epoch, epoch,
-             (double)fx.nav.core.position_ned_m[2], (double)fx.nav.core.velocity_ned_mps[2],
+             (double)fx.nav.core.position_ned_m[0],
+             (double)fx.nav.core.position_ned_m[2],
+             (double)fx.nav.core.velocity_ned_mps[2],
+             (double)fx.out.reference.anchor.point.position_ned_m[0],
              (double)fx.out.reference.anchor.point.position_ned_m[2],
-             (double)fx.out.reference.anchor.point.velocity_ned_mps[2],
              (double)fx.out.reference.points[23].point.position_ned_m[2],
              (double)fx.out.reference.points[23].point.velocity_ned_mps[2]);
       failure_logged = 1u;
@@ -316,8 +313,6 @@ static void test_landing_aligns_and_limits_final_descent(void)
       CHECK(fabsf(point->velocity_ned_mps[2]) <=
             GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS + 1e-5f);
     }
-    /* Follow the current reference anchor so the staged approach/brake/final
-     * state machine can advance; this is an idealized tracking fixture, not SIL. */
     const ProductMotionPoint *anchor = &fx.out.reference.anchor.point;
     memcpy(fx.nav.core.position_ned_m, anchor->position_ned_m,
            sizeof(fx.nav.core.position_ned_m));
@@ -328,6 +323,8 @@ static void test_landing_aligns_and_limits_final_descent(void)
   }
   CHECK(capture_points > 0);
   CHECK(low_points > 0);
+  CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[0]) < 0.001f);
+  CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[1]) < 0.001f);
   CHECK(fabsf(fx.out.reference.anchor.point.position_ned_m[2] -
               GUIDANCE_LANDING_PROBE_M) < 0.001f);
   CHECK(guidance_stop() == STATUS_OK);
@@ -340,6 +337,7 @@ static void test_landing_contact_latches_horizontal_hold(void)
   fx.dir.operation_code = PRODUCT_OP_RETURN;
   fx.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
   fx.nav.core.position_ned_m[0] = 2.0f;
+  fx.nav.core.position_ned_m[1] = -1.0f;
   fx.nav.core.position_ned_m[2] = -0.016f;
   fx.nav.core.velocity_ned_mps[0] = -0.40f;
   CHECK(fx_step(&fx) == STATUS_OK);
@@ -351,6 +349,9 @@ static void test_landing_contact_latches_horizontal_hold(void)
   CHECK(fx.out.feasibility.feasible);
   CHECK(fx.out.guidance_status.reference_epoch == epoch);
   CHECK(fx.out.reference.points[23].point.position_ned_m[0] > 1.80f);
+  CHECK(fx.out.reference.points[23].point.position_ned_m[0] < 2.20f);
+  CHECK(fx.out.reference.points[23].point.position_ned_m[1] < -0.80f);
+  CHECK(fx.out.reference.points[23].point.position_ned_m[1] > -1.20f);
 
   /* The touchdown hold remains latched if the LANDED snapshot briefly drops;
    * the vehicle must not resume chasing Home XY while M4 finishes disarming. */
@@ -359,6 +360,9 @@ static void test_landing_contact_latches_horizontal_hold(void)
   CHECK(fx.out.feasibility.feasible);
   CHECK(fx.out.guidance_status.reference_epoch == epoch);
   CHECK(fx.out.reference.points[23].point.position_ned_m[0] > 1.80f);
+  CHECK(fx.out.reference.points[23].point.position_ned_m[0] < 2.20f);
+  CHECK(fx.out.reference.points[23].point.position_ned_m[1] < -0.80f);
+  CHECK(fx.out.reference.points[23].point.position_ned_m[1] > -1.20f);
   CHECK(guidance_stop() == STATUS_OK);
 }
 
