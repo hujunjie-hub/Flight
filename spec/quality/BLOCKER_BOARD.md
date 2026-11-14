@@ -8,7 +8,7 @@
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
 RUN_ID `M5-06-R31-20261113`；validated code `8dcb60b3ac18e6a763c939d3e810984092cdd321`；
-code-validation HEAD `eacb966b502b7f9cb547617e866641504346a5fd`；
+code-validation HEAD `d7666c5aa093dbef36fef11b82909e91fdc61491`；
 唯一开发/验证分支 `main`；历史 R31 证明基线仍为 `8dcb60b3ac18e6a763c939d3e810984092cdd321`。
 
 本文件结论来自历史本地验证记录与本轮 GitHub Actions 远程 Host/SIL/Cortex-M7 编译证据；均不是 H723 实机、HIL、
@@ -131,6 +131,6 @@ R30 archive SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae990
 
 ## 2026-11-14 main 整合与 ENG-07 R31 最新状态
 
-- PR #20 已合并至唯一分支 `main`，merge commit `eacb966b502b7f9cb547617e866641504346a5fd`；整合源 HEAD `bcbe4db5e665e5f678069afc1b206a00ae1cd36d` 的 13 项 CI checks 全部 SUCCESS；main merge commit Host validation #43566259362 为 6/6 SUCCESS。 Main HEAD `5a98ef939eea195297d654ee735e3f5d64798d2c` 的三组工作流全部 SUCCESS：Host [#43567326797](https://github.com/hujunjie-hub/Flight/actions/runs/43567326797) 6/6、M6/M7 [#43567326806](https://github.com/hujunjie-hub/Flight/actions/runs/43567326806) 5/5、M7 [#43567326816](https://github.com/hujunjie-hub/Flight/actions/runs/43567326816) 2/2；Host PowerShell runner parse step PASS。
+- PR #20 已合并至唯一分支 `main`，merge commit `eacb966b502b7f9cb547617e866641504346a5fd`；整合源 HEAD `bcbe4db5e665e5f678069afc1b206a00ae1cd36d` 的 13 项 CI checks 全部 SUCCESS；main merge commit Host validation #43566259362 为 6/6 SUCCESS。 Main HEAD `d7666c5aa093dbef36fef11b82909e91fdc61491` 的三组工作流全部 SUCCESS：Host [#43567633122](https://github.com/hujunjie-hub/Flight/actions/runs/43567633122) 6/6、M6/M7 [#43567633103](https://github.com/hujunjie-hub/Flight/actions/runs/43567633103) 5/5、M7 [#43567633072](https://github.com/hujunjie-hub/Flight/actions/runs/43567633072) 2/2；Host PowerShell runner parse step PASS。
 - Owner 的 R31 本机 FMT-SIM 归档测试 HEAD 为 `304fbd12078679d46b80cb626aba9eb0727b6914`，比整合源 HEAD 落后 7 commits。Land 4、Return 3、Mission 6 failures；总计 116,893 checks / 13 failures。该结果仅绑定旧 HEAD，不能判定当前 main 的原生仿真结果。
 - #17/#18/#19 继续 OPEN，必须在干净的 `main` 与 `origin/main` 完全同步后重新运行正式 FMT-SIM 批量入口。B07 H723 实机、WCET/RTA、栈水位、物理 HIL 与飞行仍 NOT_RUN；M5-07 不启动。
