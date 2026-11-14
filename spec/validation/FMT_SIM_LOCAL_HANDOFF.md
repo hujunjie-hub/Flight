@@ -32,13 +32,13 @@
 - RETURN 分为 0.60 m 进近、0.20 m 制动和最终 Home 段；25% 三轴 jerk 余量只作用于制动和最终段，不压缩长距离进近段。
 - M4 Mission→Return 许可绑定比较使用 M6 capability 的 publish 时间，覆盖 20 ms sample-to-publish 延迟。
 
-代码修复基线为 ce00ff9。其后的文档 HEAD dffba6f 三条 CI 全部通过：
+代码修复基线为 `ce00ff9f0a8eb4989d1a171c3322f3640de2965c`。最新已完成自动化验证的代码 HEAD 为 `5a8e2c3079d230bbb5ca90ebbf229552487c2be9`，三组 CI 全部通过：
 
-- [Host validation #642](https://github.com/hujunjie-hub/Flight/actions/runs/43547823624)：6/6 jobs SUCCESS。
-- [M6/M7 host validation #130](https://github.com/hujunjie-hub/Flight/actions/runs/43547823672)：5/5 jobs SUCCESS。
-- [M7 host validation #91](https://github.com/hujunjie-hub/Flight/actions/runs/43547823542)：2/2 jobs SUCCESS。
+- [Host validation #43552823302](https://github.com/hujunjie-hub/Flight/actions/runs/43552823302)：6/6 jobs SUCCESS。
+- [M6/M7 host validation #43552823284](https://github.com/hujunjie-hub/Flight/actions/runs/43552823284)：5/5 jobs SUCCESS。
+- [M7 host validation #43552823258](https://github.com/hujunjie-hub/Flight/actions/runs/43552823258)：2/2 jobs SUCCESS。
 
-Host 证据包括 M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integration 1,147/0，以及对应 ASan/UBSan 回归 0 failures。
+Host 证据包括 M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integration 1,147/0、M5 ASan/UBSan 324,792/0；Production ABI 144 types / 0 mismatch、Spec Audit 145 types / 8 checks PASS，两个本地 PowerShell runner 的 Parser 检查均 PASS。
 
 **以上均不是本轮修复后的原生 FMT-SIM 证据。** 最新代码修复后的 Land、Return、Mission 原生复测仍为 NOT_RUN；历史 RUN_ID M5-06-SOFTWARE-20261114 的三项失败继续保留为修复前动态基线。GitHub Issues #17/#18/#19 保持 OPEN。
 
