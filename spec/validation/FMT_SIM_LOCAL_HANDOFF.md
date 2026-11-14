@@ -33,7 +33,7 @@
 - FMS 首次确认 LANDED 后，M5 锁存实际接地点的水平坐标并保持至解除武装交接结束；LANDED 快照短暂丢失时不再恢复追逐 Home XY。
 - M4 Mission→Return 许可绑定比较使用 M6 capability 的 publish 时间，覆盖 20 ms sample-to-publish 延迟。
 
-生产代码修复提交为 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；main 后续仅有 R32 状态文档同步提交，Owner 复测前必须 fetch 最新 origin/main。R32 原生复测在修复前 HEAD `e470f00cd539f438b1923b0faa844456ba2d3b59` 执行：Land 48,043/0 PASS、Return 44,667/0 PASS、Mission 62,793/3 FAIL；总计 155,503/3，最长状态间隔 145.3 ms。R32 不能作为修复提交的原生验证证据。
+生产代码修复提交为 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；main 后续新增测试-only 提交 `2f8118f1b149183e5df2d6e9c9941a52bd52562e` 扩展长航段回归，并同步 R32 证据/交接文档；无新的生产代码变更。Owner 复测前必须 fetch 最新 origin/main。
 
 修复提交 3d8d29b5dfda21237f8ed02db3c31223c656bfbe 的三组 CI 全部通过：
 - [Host validation #43574875444](https://github.com/hujunjie-hub/Flight/actions/runs/43574875444)：6/6 jobs SUCCESS。
@@ -41,6 +41,8 @@
 - [M7 host validation #43574875394](https://github.com/hujunjie-hub/Flight/actions/runs/43574875394)：2/2 jobs SUCCESS。
 
 Host 证据包括 M4 945/0、M5 326,004/0、MR-009 focused 430/0、M4/M5 integration 1,018/0、M5 ASan/UBSan 326,004/0、integration sanitizer 1,018/0；Production ABI、Spec Audit、Cortex-M7 production-module compile、MPC RAM checks 和 PowerShell runner parse 均 PASS。
+
+Test-only follow-up `2f8118f1b149183e5df2d6e9c9941a52bd52562e` expands `landing_alignment_and_speed` to the 2.4 m horizontal / 2.4 m above-Home Mission-return geometry and follows the complete approach, brake, Home-plane and probe stages; the touchdown-hold fixture now checks both X and Y after the LANDED snapshot drops. This commit changes tests only; the production fix remains `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`. CI on `2f8118f1`: Host #43576600195 (6/6), M6/M7 #43576600154 (5/5), M7 #43576600112 (2/2), all SUCCESS.
 
 **以上均不是修复后的原生 FMT-SIM 证据。** 修复提交后的完整 Land / Return / Mission 批量复测仍 NOT_RUN；GitHub Issues #17/#18/#19 及子问题 #21/#22 均保持 OPEN。
 

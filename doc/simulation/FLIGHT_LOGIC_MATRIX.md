@@ -1,6 +1,6 @@
 # 飞行与策略仿真验证矩阵
 
-本文件的 PASS 记录均绑定各自历史 RUN_ID。R32 在修复前 main HEAD `e470f00cd539f438b1923b0faa844456ba2d3b59` 上 Land / Return 通过、Mission 3 项失败；修复提交 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` 的 Host / M6-M7 / M7 CI 已通过，但修复后完整原生 FMT-SIM 尚未复跑。详见文末 R32 记录和本机交接方案。
+本文件的 PASS 记录均绑定各自历史 RUN_ID。R32 在修复前 HEAD `e470f00c` 上 Land/Return PASS、Mission 3 项 FAIL；生产修复 `3d8d29b5` 已提交，测试-only follow-up `2f8118f1` 将长航段回归扩展至 2.4 m 水平 / 2.4 m 高度；Host/M6-M7/M7 三组 CI 6/6、5/5、2/2 均通过。修复后的原生 FMT-SIM 尚未复跑。
 本轮使用 `SIM_CONTROLLED_STOP` Host 构建和隔离的 FMT-SIM Ground 场景。
 H723 的运行配置仍使用 `BENCH_INHIBIT`。设备固件、UART/DMA、板上时序和实机运动
 留在各自的验证门禁。
@@ -145,7 +145,7 @@ Native FMT-SIM must still be rerun locally before #17/#18/#19 can close.
 
 按项目方要求，后续 Windows 原生 FMT-SIM 动态复测统一由项目 Owner 在本机完成；远程 Agent 负责代码修改、Host/SIL/CI 和失败分析，不代跑原生引擎。正式操作及证据格式见 [FMT-SIM 本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。
 
-当前 main 生产代码修复基线为 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`。R32 在修复前 HEAD `e470f00c` 上执行，Land/Return PASS、Mission 62,793/3 FAIL；修复提交已增加最后 0.50 m / 0.40 m/s 连续速度约束并锁存 touchdown XY，未放宽 FMS 安全门槛。修复提交的 Host/M6-M7/M7 CI 分别 6/6、5/5、2/2 SUCCESS。修复后的原生 FMT-SIM 尚待 Owner 本机完整复测；#17/#18/#19 和 #21/#22 保持 OPEN。
+当前 main 生产代码修复基线为 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`。测试-only follow-up `2f8118f1b149183e5df2d6e9c9941a52bd52562e` 扩展长航段 landing-speed 回归至 2.4 m 水平返航 / 2.4 m 高度；Host #43576600195 6/6、M6/M7 #43576600154 5/5、M7 #43576600112 2/2 均 SUCCESS。
 
 
 ## ENG-07 Native FMT-SIM: local execution tool
@@ -182,4 +182,4 @@ Owner archive RUN_ID `FMT-SIM-LOCAL-20261114T072713056Z-e470f00c`, tested main H
 
 Mission's failures: final 0.50 m maximum descent 0.665 m/s (limit 0.40); DISARMED ACK rejected with reason 11; arm state not DISARMED. At 41,140 ms Return request 2163 completed; DISARM request 3064 was rejected at 41,160 ms. Final contact=1 but landed=UNKNOWN, nav horizontal speed 0.204 m/s and touchdown distance 0.352 m. This is consistent with the M5 reference continuing to chase Home XY after LANDED confirmation and exceeding the FMS 0.20 m/s stable-ground gate. The old M5 trajectory validator only limited the final 0.20 m to 0.12 m/s, while the native acceptance measured the full final 0.50 m.
 
-Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` adds a 0.50 m / 0.40 m/s bound, retains the final 0.20 m / 0.12 m/s bound, and latches touchdown XY after LANDED. FMS safety thresholds are unchanged. Host #43574875444 6/6, M6/M7 #43574875363 5/5 and M7 #43574875394 2/2 all PASS; new M5 landing speed/contact-hold tests PASS. The patch still needs a new native FMT-SIM batch on latest main. Keep #17/#18/#19 OPEN because the R32 manifest is not closure-eligible. [Full R32 archive review](../../spec/validation/FMT_SIM_LOCAL_20261114_E470F00C_REVIEW.md).
+Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` adds a 0.50 m / 0.40 m/s bound, retains the final 0.20 m / 0.12 m/s bound, and latches touchdown XY after LANDED. FMS safety thresholds are unchanged. Host #43574875444 6/6, M6/M7 #43574875363 5/5 and M7 #43574875394 2/2 all PASS; new M5 landing speed/contact-hold tests PASS. The patch still needs a new native FMT-SIM batch on latest main. Keep #17/#18/#19 OPEN because the R32 manifest is not closure-eligible. [Full R32 archive review](../../spec/validation/FMT_SIM_LOCAL_20261114_E470F00C_REVIEW.md). Test-only follow-up `2f8118f1` extends the long-leg regression to 2.4 m horizontal / 2.4 m above Home; Host/M6-M7/M7 CI 6/6, 5/5, 2/2 PASS.

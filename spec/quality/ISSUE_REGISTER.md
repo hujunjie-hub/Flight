@@ -115,13 +115,14 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 
 ## ENG-07 原生 FMT-SIM 本机复测登记
 
-- 当前产品代码修复提交：`3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；main 已包含该修复，后续仅有 R32 状态文档同步提交；复测前必须 fetch 最新 origin/main。
+- 当前产品代码修复提交：`3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；测试-only follow-up `2f8118f1b149183e5df2d6e9c9941a52bd52562e` 扩展长航段 return landing speed regression；main 后续文档提交不改变生产代码。
 - R32 原生复测 RUN_ID：`FMT-SIM-LOCAL-20261114T072713056Z-e470f00c`，测试 HEAD：`e470f00cd539f438b1923b0faa844456ba2d3b59`。Land 48,043/0 PASS、Return 44,667/0 PASS、Mission 62,793/3 FAIL；总计 155,503 checks / 3 failures，最长状态间隔 145.3 ms。R32 在修复提交之前执行，不是修复后验证。
 - 在线跟踪：GitHub Issues [#17 Land](https://github.com/hujunjie-hub/Flight/issues/17)、[#18 Return](https://github.com/hujunjie-hub/Flight/issues/18)、[#19 Mission](https://github.com/hujunjie-hub/Flight/issues/19)，Mission 子问题 [#21 近地下降速度](https://github.com/hujunjie-hub/Flight/issues/21)、[#22 LANDED/接地点保持](https://github.com/hujunjie-hub/Flight/issues/22)。
 - 修复提交 3d8d29b5dfda21237f8ed02db3c31223c656bfbe 的自动化证据：
 - Host validation [#43574875444](https://github.com/hujunjie-hub/Flight/actions/runs/43574875444)：6/6 jobs SUCCESS；M4 945/0、M5 326,004/0、MR-009 focused 430/0、M4/M5 integration 1,018/0、M5 ASan/UBSan 326,004/0。
 - M6/M7 host validation [#43574875363](https://github.com/hujunjie-hub/Flight/actions/runs/43574875363)：5/5 jobs SUCCESS。
 - M7 host validation [#43574875394](https://github.com/hujunjie-hub/Flight/actions/runs/43574875394)：2/2 jobs SUCCESS。
+- 测试-only follow-up `2f8118f1b149183e5df2d6e9c9941a52bd52562e`：Host [#43576600195](https://github.com/hujunjie-hub/Flight/actions/runs/43576600195) 6/6、M6/M7 [#43576600154](https://github.com/hujunjie-hub/Flight/actions/runs/43576600154) 5/5、M7 [#43576600112](https://github.com/hujunjie-hub/Flight/actions/runs/43576600112) 2/2 SUCCESS；`landing_alignment_and_speed` 扩展到 2.4 m 水平返航 / 2.4 m 高度的完整长航段。
   M5 Host / ASan/UBSan 各 326,004/0；M4 Host 945/0；M4/M5 integration 与 sanitizer 各 1,018/0；新增 landing speed / touchdown XY latch 回归通过。
 - 执行责任：项目 Owner 在 Windows 本机执行；远程 Agent 不代跑原生 FMT-SIM。Agent 负责代码、Host/SIL/CI、分析和下一轮修复。
 - 统一方案：spec/validation/FMT_SIM_LOCAL_HANDOFF.md；批量入口 `tests/simulation/run_fmt_sim_regression.ps1` 一次构建并启动三个独立引擎进程。严格关闭资格固定为 main、UDP 14653、350 ms、hover 0.62、Owner 显式确认 loopback 127.0.0.1、干净工作区且 HEAD 与脚本刚 fetch 的 origin tracking HEAD 一致；需回传 manifest、summary、完整日志、逐场景退出码、SHA256SUMS 和 ZIP sidecar。
