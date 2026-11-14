@@ -259,11 +259,11 @@ if ($buildStatus -eq 'PASS') {
             return_distance_logged = $hasReturnDistance
             mission_waypoint_metrics_logged = $hasMissionMetrics
             engine_log_present = $hasEngineLog
-            executable_sha256 = Get-Sha256 $scenarioExe
-            sil_log_sha256 = Get-Sha256 $silLog
-            engine_log_sha256 = Get-Sha256 $engineLog
-            stdout_sha256 = Get-Sha256 $stdoutPath
-            stderr_sha256 = Get-Sha256 $stderrPath
+            executable_sha256 = (Get-Sha256 $scenarioExe)
+            sil_log_sha256 = (Get-Sha256 $silLog)
+            engine_log_sha256 = (Get-Sha256 $engineLog)
+            stdout_sha256 = (Get-Sha256 $stdoutPath)
+            stderr_sha256 = (Get-Sha256 $stderrPath)
         }
     }
 }
@@ -295,7 +295,7 @@ foreach ($scenarioResult in $scenarioResults) {
             path = $relativePath
             present = $present
             size_bytes = $(if ($present) { (Get-Item -LiteralPath $absolutePath).Length } else { 0 })
-            sha256 = Get-Sha256 $absolutePath
+            sha256 = (Get-Sha256 $absolutePath)
         }
     }
 }
@@ -329,9 +329,9 @@ $manifest = [ordered]@{
     upstream_head = [string]$upstreamHead
     upstream_matches_head = $upstreamMatchesHead
     fmt_sim_exe = [System.IO.Path]::GetFileName($simPath)
-    fmt_sim_sha256 = Get-Sha256 $simPath
+    fmt_sim_sha256 = (Get-Sha256 $simPath)
     settings_path = 'Content/Settings/settings.jason'
-    settings_sha256 = Get-Sha256 $settingsPath
+    settings_sha256 = (Get-Sha256 $settingsPath)
     gcc_dir_name = [System.IO.Path]::GetFileName($GccDir.TrimEnd([System.IO.Path]::DirectorySeparatorChar))
     fmt_hil_port = $FmtHilPort
     graphics_adapter = $FmtGraphicsAdapter
@@ -346,8 +346,8 @@ $manifest = [ordered]@{
         ended_utc = $buildEnded.ToString('o')
         executable = 'build/sil_flight.exe'
         executable_sha256 = $buildExeSha
-        stdout_sha256 = Get-Sha256 $buildStdout
-        stderr_sha256 = Get-Sha256 $buildStderr
+        stdout_sha256 = (Get-Sha256 $buildStdout)
+        stderr_sha256 = (Get-Sha256 $buildStderr)
     }
     scenarios = $scenarioResults
     logs = $logRecords
