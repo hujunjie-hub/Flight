@@ -199,11 +199,24 @@ try {
     & $exe @runArgs 2>&1 | Tee-Object -FilePath $log -Append
     $code = $LASTEXITCODE
 } finally {
-    if ($simProcess -and -not $simProcess.HasExited -and $simProcess.Path -eq $simPath) {
-        [void]$simProcess.CloseMainWindow()
-        if (-not $simProcess.WaitForExit(3000)) {
-            Stop-Process -InputObject $simProcess
-            [void]$simProcess.WaitForExit(3000)
+    if ($simProcess) {
+        try {
+            if (-not $simProcess.HasExited) {
+                [void]$simProcess.CloseMainWindow()
+            }
+            if (-not $simProcess.HasExited -and -not $simProcess.WaitForExit(3000)) {
+                Stop-Process -Id $simProcess.Id -Force -ErrorAction SilentlyContinue
+                if (-not $simProcess.WaitForExit(5000)) {
+                    throw "FMT-SIM process $($simProcess.Id) did not exit after forced termination"
+                }
+            }
+        } catch {
+            if (-not $simProcess.HasExited) {
+                Stop-Process -Id $simProcess.Id -Force -ErrorAction SilentlyContinue
+                if (-not $simProcess.WaitForExit(5000)) {
+                    throw "FMT-SIM process $($simProcess.Id) could not be stopped: $($_.Exception.Message)"
+                }
+            }
         }
     }
 }

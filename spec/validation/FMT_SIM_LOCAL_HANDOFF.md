@@ -51,8 +51,8 @@ Host 证据包括 M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integ
 
    build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FMT_SIM.exe
 
-5. 隔离实例的 Content/Settings/settings.jason 配置恰好一架 HIL 载具：SimMode=HIL、MavproxyFCS.Interface=UDP、本机回环地址 127.0.0.1、本地 UDP 端口 14653、Autobound=true。现有 runner 会检查指定端口恰好匹配一架 HIL UDP 载具。
-6. 运行前关闭占用 UDP 14653 的旧实例/进程。每个场景由 run_sil.ps1 -FmtSimExe 启动并清理同一隔离安装中的 FMT-SIM 进程；三个场景顺序运行，不并发启动。
+5. 隔离实例的 Content/Settings/settings.jason 配置恰好一架 HIL 载具：SimMode=HIL、MavproxyFCS.Interface=UDP、本机回环地址 127.0.0.1、本地 UDP 端口 14653、Autobound=true。现有 runner 会检查指定端口恰好匹配一架 HIL UDP 载具且 Autobound=true；当前脚本不解析地址字段，因此请人工确认 loopback 地址，并随回传提供脱敏配置片段。
+6. 运行前关闭占用 UDP 14653 的旧实例/进程。每个场景由 run_sil.ps1 -FmtSimExe 启动独立 FMT-SIM 进程，并在退出时关闭窗口、超时则按该进程 PID 强制结束并等待退出；三个场景顺序运行，不并发启动。
 7. 图形适配器默认编号 1 是既有测试主机的软件渲染适配器编号。其他电脑按本机情况设置 FmtGraphicsAdapter，并检查 fmt_sim_engine.log 确认实际适配器。
 8. 验收超时固定为 **350 ms**。不得把 650 ms 或更宽松的诊断运行改报为 350 ms 验收通过。
 
@@ -76,7 +76,7 @@ $sim = (Resolve-Path 'build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FM
 pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -FmtHilPort 14653 -FmtStateTimeoutMs 350 -FmtGraphicsAdapter 1 -FmtHover 0.62
 ```
 
-若 FMT-SIM 安装路径不同，只修改 `$sim`；MinGW 路径不同时使用 `-GccDir`。批量入口默认拒绝错误分支、dirty worktree、缺少 upstream tracking ref 或本地 HEAD 与 upstream HEAD 不一致。它也会检查 settings.jason 中指定端口恰好匹配一架 HIL/UDP 载具且 Autobound=true。
+若 FMT-SIM 安装路径不同，只修改 `$sim`；MinGW 路径不同时使用 `-GccDir`。批量入口默认拒绝错误分支、dirty worktree、缺少 upstream tracking ref 或本地 HEAD 与 upstream HEAD 不一致。它也会检查 settings.jason 中指定端口恰好匹配一架 HIL/UDP 载具且 Autobound=true；回环地址 127.0.0.1 仍需按本方案人工核对。
 
 批量入口调用 `run_sil.ps1 -BuildOnly` 构建一次，再通过 `run_sil.ps1 -ReuseBuild` 执行各场景；每个场景有独立 OutDir 和 FMT-SIM 引擎进程。即使一个场景失败，也会继续收集其余场景，逐项记录退出码，不覆盖之前 RUN_ID。
 
