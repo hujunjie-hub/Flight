@@ -1586,6 +1586,7 @@ int main(int argc, char **argv)
         printf("[settle] t=%u mode=%u op=%u guide_mode=%u home_valid=%u home=%.3f,%.3f,%.3f "
                "contact=%u landed=%u landed_stable_ms=%u landed_evidence=0x%x landed_confidence=%.2f height=%.4f p=%.4f,%.4f,%.4f "
                "v=%.4f,%.4f,%.4f a=%.4f,%.4f,%.4f truth_v=%.4f,%.4f,%.4f "
+               "ref=%.4f,%.4f,%.4f refv=%.4f,%.4f,%.4f ref23=%.4f,%.4f,%.4f "
                "scope=%u control_sample=%llu control_publish=%llu permit_sample=%llu permit_publish=%llu "
                "ref_kind=%u ref_epoch=%u guidance=%u/%u feas_reason=%u constraint=%u\n", ms,
                (unsigned)runtime_data.fms.flight_mode,
@@ -1603,6 +1604,15 @@ int main(int argc, char **argv)
                (double)nav->acceleration_ned_mps2[0], (double)nav->acceleration_ned_mps2[1],
                (double)nav->acceleration_ned_mps2[2], (double)fmt_state.velocity_ned_mps[0],
                (double)fmt_state.velocity_ned_mps[1], (double)fmt_state.velocity_ned_mps[2],
+               (double)plan_bundle.guidance.reference.anchor.point.position_ned_m[0],
+               (double)plan_bundle.guidance.reference.anchor.point.position_ned_m[1],
+               (double)plan_bundle.guidance.reference.anchor.point.position_ned_m[2],
+               (double)plan_bundle.guidance.reference.anchor.point.velocity_ned_mps[0],
+               (double)plan_bundle.guidance.reference.anchor.point.velocity_ned_mps[1],
+               (double)plan_bundle.guidance.reference.anchor.point.velocity_ned_mps[2],
+               (double)plan_bundle.guidance.reference.points[23].point.position_ned_m[0],
+               (double)plan_bundle.guidance.reference.points[23].point.position_ned_m[1],
+               (double)plan_bundle.guidance.reference.points[23].point.position_ned_m[2],
                (unsigned)permit->permit_flags,
                (unsigned long long)control->header.timestamp_sample_us,
                (unsigned long long)control->header.timestamp_publish_us,

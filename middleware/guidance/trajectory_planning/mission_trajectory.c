@@ -140,11 +140,24 @@ static uint8_t landing_hold_latch(const GuidanceInput *in, GuidanceState *s)
 {
     const float *position = in->navigation->core.position_ned_m;
 
-    if (s->hold_valid)
+    if (s->hold_valid) {
+        const float home_down = in->directive->payload.home.position_ned_m[2];
+        if (landing_confirmed(in))
+            return 1u; /* M4 latched LANDED: freeze the point for the disarm handoff */
+        if (!landing_contact_observed(in) && finite3(position) &&
+            position[2] < home_down - GUIDANCE_LANDING_CONTACT_HEIGHT_M) {
+            /* Clearly back in the air (for example a small bounce): resume the
+             * final approach instead of holding an airborne point. A one-frame
+             * evidence drop while still at the Home plane keeps the hold. */
+            s->hold_valid = 0u;
+            s->landing_stage = LANDING_FINAL;
+            return 0u;
+        }
         return 1u;
-    if (!landing_confirmed(in) && !(landing_contact_observed(in) && landing_contact_settled(in)))
-        return 0u;
+    }
     if (!finite3(position))
+        return 0u;
+    if (!landing_confirmed(in) && !(landing_contact_observed(in) && landing_contact_settled(in)))
         return 0u;
     /* Latch the measured contact point once. Replanning to it from a still
      * moving reference is jerk-infeasible and rejected the whole reference,

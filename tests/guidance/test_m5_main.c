@@ -503,6 +503,30 @@ static void test_landing_contact_hold_is_ground_gated(void)
     }
   }
 
+  /* Losing the contact before M4 latches LANDED releases the hold and resumes
+   * the final approach instead of holding an airborne point. */
+  skidding.landed.state = LANDED_STATE_UNKNOWN;
+  skidding.landed.evidence_mask = 0u;
+  skidding.nav.core.position_ned_m[2] = -0.30f;
+  CHECK(fx_step(&skidding) == STATUS_OK);
+  CHECK(skidding.out.feasibility.feasible);
+  CHECK(fabsf(skidding.out.reference.points[23].point.position_ned_m[0] - 0.30f) > 1e-4f);
+
+  /* Once M4 confirms LANDED the point freezes for the disarm handoff. */
+  skidding.nav.core.position_ned_m[0] = 0.40f;
+  skidding.nav.core.position_ned_m[2] = -0.016f;
+  skidding.landed.state = LANDED_STATE_LANDED;
+  skidding.landed.evidence_mask = LANDED_EVIDENCE_GROUND_CONTACT |
+                                  LANDED_EVIDENCE_VERTICAL_STABLE;
+  CHECK(fx_step(&skidding) == STATUS_OK);
+  CHECK(skidding.out.feasibility.feasible);
+  {
+    const float held = skidding.out.reference.points[23].point.position_ned_m[0];
+    skidding.nav.core.position_ned_m[0] = 0.60f;
+    CHECK(fx_step(&skidding) == STATUS_OK);
+    CHECK(fabsf(skidding.out.reference.points[23].point.position_ned_m[0] - held) < 1e-5f);
+  }
+
   /* A hint that arrives while the airframe reports a clearly non-landing
    * speed is still ignored: the static hold is not a way to mask bad data. */
   Fx fast;
