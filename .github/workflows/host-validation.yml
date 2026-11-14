@@ -180,6 +180,31 @@ jobs:
             build/m5_host/
             build/m4_m5_host/
 
+  estimator-host:
+    name: KF-GINS estimator host suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # FLIGHT-35: the whole navigation estimator used to run only on a
+    # developer machine. A gating defect lived there unnoticed.
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Prepare evidence directory
+        run: mkdir -p build/ci/estimator
+
+      - name: Run KF-GINS host suite
+        run: |
+          set -o pipefail
+          OUT_DIR=build/ci/estimator bash tests/estimator_backend/run_host_tests.sh | tee build/ci/estimator/estimator_host.log
+
+      - name: Upload estimator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: estimator-host-evidence
+          path: build/ci/estimator/
+
   src-spec-audit:
     name: Spec audit
     runs-on: ubuntu-latest
