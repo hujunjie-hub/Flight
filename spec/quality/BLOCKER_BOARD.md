@@ -1,4 +1,4 @@
-# Flight M5-06 阻塞项视图（R34）
+# Flight M5-06 阻塞项视图（R35）
 
 > **2026-11-13 MR-009 R31 内部预审 CI 快照（代码/证明基线 8dcb60b3ac18e6a763c939d3e810984092cdd321）**：Host validation #43446380866（6/6）、M6/M7 #43446380836（5/5）、M7 #43446380724（2/2）全部 SUCCESS。M5 Host regression、M5 ASan/UBSan、MR-009 focused、S06-099/S06-107、Spec Audit、生产 ABI、18 mutation FP audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer 均 PASS。
 
@@ -14,9 +14,9 @@
 >
 > #17/#18/#19/#21/#23 等待 R36 完整原生复测；#22 的 M4 advisory handoff 已由 R34/R35 确认 evidence=0x1 到达 M5，仍待独立安全复核。唯一分支仍为 `main`。
 >
-历史 R31 证明基线 `8dcb60b3ac18e6a763c939d3e810984092cdd321`、R33 contact-handoff 修复 `419f56962f74fd9d89bc62cfc11ee0923910177c` 和 nav guard `15a33756d4e269800e6778c6180f7086179c9429` 保留为历史记录；R34 后生产修复为 `c9cd17926239e088c105b8506052354fdda0d503` / `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b`，回归测试为 `1f9b4ecdbbe90b3e8be9439ec2170478a8083de2`。唯一开发/验证分支仍为 `main`；Owner 本机必须 fetch 最新 origin/main 后再复测。
+历史 R31 证明基线 `8dcb60b3ac18e6a763c939d3e810984092cdd321`、R33 contact-handoff 修复 `419f56962f74fd9d89bc62cfc11ee0923910177c` 和 nav guard `15a33756d4e269800e6778c6180f7086179c9429` 保留为历史记录；R34 后 M5 生产修复为 `c9cd17926239e088c105b8506052354fdda0d503` / `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b`，R35 后低速接地候选门控修复为 `69626899249e1fd926a0a903447f2ad763f24ba1`。唯一开发/验证分支仍为 `main`；Owner 本机必须 fetch 最新 origin/main 后再复测。
 
-R34 的原生 FMT-SIM 结果与当前修复后 CI 证据已在本视图末尾更新。所有 Host/SIL/Cortex-M7 编译结果均不是 H723 实机、物理 HIL、WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；GitHub Issues #8–#19、#21–#23 已在线跟踪，历史本地编号仅按明确映射关联。
+R35 的原生 FMT-SIM 结果与 `69626899` 修复后的 CI 证据已在本视图末尾更新。所有 Host/SIL/Cortex-M7 编译结果均不是 H723 实机、物理 HIL、WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；GitHub Issues #8–#19、#21–#23 已在线跟踪，历史本地编号仅按明确映射关联。
 
 ## B01 Spec Audit FAIL
 
@@ -128,7 +128,7 @@ R34 的原生 FMT-SIM 结果与当前修复后 CI 证据已在本视图末尾更
 | [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R35 FAIL; LOW-SPEED CONTACT-HOLD GATE COMMITTED; R36 PENDING | R35 39,389/4; near-ground 0.316 m/s PASS; contact hint at ~0.200 m/s; t=25.800 s guidance 1550/JERK rejection, control -11, terminal failsafe |
 | [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R35 FAIL; LOW-SPEED CONTACT-HOLD GATE COMMITTED; R36 PENDING | R35 67,112/3; near-ground 0.330 m/s PASS; waypoints 0.257/0.327 m and touchdown 0.219 m PASS; terminal/disarm ACK still missing |
 | [#21](https://github.com/hujunjie-hub/Flight/issues/21) | Mission near-ground speed | OPEN / R35 METRIC PASS; FULL-MISSION CLOSURE PENDING | R35 Land/Return/Mission final-0.50 m peaks 0.340/0.316/0.330 m/s, all <=0.40; Mission still fails terminal/disarm, so existing full-batch closure rule keeps this OPEN |
-| [#22](https://github.com/hujunjie-hub/Flight/issues/22) | M4 advisory contact handoff | OPEN / R34 CONFIRMS EVIDENCE=0x1 REACHES M5; INDEPENDENT REVIEW PENDING | R33 evidence=0x0 handoff gap fixed by `419f5696` / `15a33756`; R34 confirms contact=1, landed=UNKNOWN, evidence=0x1 at M5. The subsequent M5 replan failure is tracked separately in #23 |
+| [#22](https://github.com/hujunjie-hub/Flight/issues/22) | M4 advisory contact handoff | OPEN / R34+R35 CONFIRM EVIDENCE=0x1 REACHES M5; INDEPENDENT REVIEW PENDING | R33 evidence=0x0 handoff gap fixed by `419f5696` / `15a33756`; R34/R35 confirm contact candidate evidence reaches M5. The subsequent M5 early-consumption / replan failure is tracked separately in #23 |
 | [#23](https://github.com/hujunjie-hub/Flight/issues/23) | M5 contact-hold replan | OPEN / R35 EARLY CONTACT LATCH / JERK FAILURE REPRODUCED; FIX `69626899` COMMITTED; R36 PENDING | M5 now requires measured + active-reference horizontal/vertical speed <=0.15 m/s before consuming advisory contact; confirmed LANDED preserves current plan target |
 
 CI on exact new fixed-code HEAD `69626899249e1fd926a0a903447f2ad763f24ba1`: Host [#43603447251](https://github.com/hujunjie-hub/Flight/actions/runs/43603447251) 6/6, M6/M7 [#43603447288](https://github.com/hujunjie-hub/Flight/actions/runs/43603447288) 5/5, M7 [#43603447340](https://github.com/hujunjie-hub/Flight/actions/runs/43603447340) 2/2 SUCCESS. M4 969/0; M5 329,670/0; M5 ASan/UBSan 329,670/0; M4/M5 integration and sanitizer 1,042/0 each; MR-009 focused 430/0; Spec Audit round 3 and Cortex-M7 production-module compile PASS. These CI workflows do not launch native FMT-SIM. #17/#18/#19/#21/#23 remain OPEN pending complete R36 Owner-local batch on latest main; #22 remains OPEN pending independent safety review.
