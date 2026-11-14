@@ -28,6 +28,9 @@ pwsh tests/simulation/run_sil.ps1 -FmtHilPort 14653 -FmtScenario Mission
 pwsh tests/simulation/run_sil.ps1 -FmtSimExe $sim -FmtHilPort 14653 -FmtScenario Mission
 ```
 
+脚本在编译前读取隔离实例的 `Content/Settings/settings.jason`，并检查请求的端口
+恰好对应一架原生 HIL 载具。`[settle]` 日志包含制导状态、拒绝原因和约束编号。
+
 本机的软件渲染适配器编号为 1。`-FmtGraphicsAdapter` 可按目标 PC 调整，状态流仍按默认 350 ms 验收。
 
 隔离实例的配置和原生状态帧说明见 [联机仿真说明](../../doc/simulation/HIL_LINK.md)。

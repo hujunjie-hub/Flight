@@ -33,6 +33,26 @@ if ($GroundPort -and $GroundPort -eq $FmtHilPort) {
 }
 
 $scriptDir = $PSScriptRoot
+$simPath = $null
+if ($FmtSimExe) {
+    $simPath = (Resolve-Path -LiteralPath $FmtSimExe).Path
+    $simDirectory = Get-Item -LiteralPath (Split-Path $simPath)
+    if ($simDirectory.Name -ne 'Win64' -or $simDirectory.Parent.Name -ne 'Binaries') {
+        throw 'Pass the FMT-SIM executable under Binaries/Win64'
+    }
+    $settingsPath = Join-Path $simDirectory.Parent.Parent.FullName 'Content/Settings/settings.jason'
+    if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
+        throw "FMT-SIM settings missing: $settingsPath"
+    }
+    $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+    $hilVehicles = @($settings.Vehicles | Where-Object {
+        $_.SimMode -eq 'HIL' -and $_.MavproxyFCS.Interface -eq 'UDP' -and
+            $_.MavproxyFCS.LocalPort -eq $FmtHilPort
+    })
+    if ($hilVehicles.Count -ne 1) {
+        throw "Configure one FMT-SIM HIL vehicle on UDP port $FmtHilPort in $settingsPath"
+    }
+}
 $layoutRoot = Get-Item -LiteralPath $PSScriptRoot
 while (-not (Test-Path -LiteralPath (Join-Path $layoutRoot.FullName 'SConstruct'))) {
     if ($null -eq $layoutRoot.Parent) { throw 'Flight root not found' }
@@ -144,12 +164,7 @@ $runArgs = if ($GroundPort) {
 }
 $simProcess = $null
 try {
-    if ($FmtSimExe) {
-        $simPath = (Resolve-Path -LiteralPath $FmtSimExe).Path
-        $simDirectory = Get-Item -LiteralPath (Split-Path $simPath)
-        if ($simDirectory.Name -ne 'Win64' -or $simDirectory.Parent.Name -ne 'Binaries') {
-            throw 'Pass the FMT-SIM executable under Binaries/Win64'
-        }
+    if ($simPath) {
         $network = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
         if ($network.GetActiveUdpListeners().Port -contains $FmtHilPort) {
             throw "UDP port $FmtHilPort is already in use"

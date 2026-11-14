@@ -1563,7 +1563,7 @@ int main(int argc, char **argv)
         const ActuationPermit *permit = &fms_output.actuation_permit;
         printf("[settle] t=%u mode=%u contact=%u landed=%u height=%.4f "
                "v=%.4f,%.4f,%.4f a=%.4f,%.4f,%.4f truth_v=%.4f,%.4f,%.4f "
-               "scope=%u control_sample=%llu permit_sample=%llu\n", ms,
+               "scope=%u control_sample=%llu permit_sample=%llu guidance=%u/%u constraint=%u\n", ms,
                runtime_data.fms.flight_mode, flight_sil_ground_contact(), fms_output.landed_state.state,
                (double)fmt_height(), (double)nav->velocity_ned_mps[0],
                (double)nav->velocity_ned_mps[1], (double)nav->velocity_ned_mps[2],
@@ -1571,7 +1571,10 @@ int main(int argc, char **argv)
                (double)nav->acceleration_ned_mps2[2], (double)fmt_state.velocity_ned_mps[0],
                (double)fmt_state.velocity_ned_mps[1], (double)fmt_state.velocity_ned_mps[2],
                permit->permit_flags, (unsigned long long)control->header.timestamp_sample_us,
-               (unsigned long long)permit->header.timestamp_sample_us);
+               (unsigned long long)permit->header.timestamp_sample_us,
+               plan_bundle.guidance.guidance_status.guidance_state,
+               plan_bundle.guidance.guidance_status.reason_code,
+               plan_bundle.guidance.feasibility.violated_constraint_id);
       }
       /* Keep the vehicle parked through alignment and the first control handshake. */
       fmt_send_committed(takeoff_ack == COMMAND_ACK_ACCEPTED ||
