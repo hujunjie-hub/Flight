@@ -67,7 +67,7 @@ height=0.0597 v=-0.2503,0.1490,0.0869 a=-0.1496,-0.9308,0.0501
 
 R33 后 main 新增生产修复：`419f56962f74fd9d89bc62cfc11ee0923910177c` 在导航/能力/速度数据有效且物理接触可信时保留 UNKNOWN 接地候选证据；M5 识别该提示后锁存实测接触 XYZ 并停止继续追逐 Home。该候选只用于 M5 过渡，不授予 LANDED/DISARM 权限。`15a33756d4e269800e6778c6180f7086179c9429` 增加 nav_ok 检查，避免导航指针缺失时被候选分支解引用。M4 的 0.20 m/s 水平速度、0.15 m/s 垂向速度、0.5 m/s² 垂向加速度与 2 s dwell、DISARM gate 均未放宽。测试提交 `3270cff5aec26e3ae0717c62d2d78e9f30752020` 增加缺失导航回归；两个 contact candidate 测试均通过。
 
-Current-main CI on `3270cff5aec26e3ae0717c62d2d78e9f30752020`: Host [#43593701736](https://github.com/hujunjie-hub/Flight/actions/runs/43593701736) 6/6, M6/M7 [#43593701892](https://github.com/hujunjie-hub/Flight/actions/runs/43593701892) 5/5, M7 [#43593701803](https://github.com/hujunjie-hub/Flight/actions/runs/43593701803) 2/2 SUCCESS. M4 1,042/0; M5 327,030/0; M4/M5 integration 969/0; MR-009 focused 430/0; M7 274/0.
+Current-main CI on `3270cff5aec26e3ae0717c62d2d78e9f30752020`: Host [#43593701736](https://github.com/hujunjie-hub/Flight/actions/runs/43593701736) 6/6, M6/M7 [#43593701892](https://github.com/hujunjie-hub/Flight/actions/runs/43593701892) 5/5, M7 [#43593701803](https://github.com/hujunjie-hub/Flight/actions/runs/43593701803) 2/2 SUCCESS. M4 969/0; M5 327,030/0; M4/M5 integration 1,042/0; MR-009 focused 430/0; M7 274/0.
 
 这些 Host/Sanitizer/CI 结果不是原生 FMT-SIM 结果。R33 没有测试 `419f56962f74fd9d89bc62cfc11ee0923910177c` 或 `15a33756d4e269800e6778c6180f7086179c9429`，因此不能宣称 Mission 已修复。
 
