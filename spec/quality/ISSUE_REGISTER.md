@@ -115,7 +115,7 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 
 ## ENG-07 原生 FMT-SIM 本机复测登记
 
-- R33 RUN_ID：`FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4`；测试 HEAD：`5e3b74f40293a005de693eceb61af4c0552e`。ZIP SHA256 `0d6b75c578e2ae71b501f9f26b827559fe8b0887598253af55d09d09f63cdcfb` 与 sidecar 匹配，manifest SHA256 `6604b49d3fe889c9c022b63dec313b762880d7aa8cc12e736975257e2490971d`，内部 102 项 SHA256 全部通过；branch/upstream 匹配、worktree clean/stable、loopback/UDP/hover/350 ms 门禁均有效。
+- R33 RUN_ID：`FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4`；测试 HEAD：`5e3b74f40293a005de693eceb61af4c055f1efdb`。ZIP SHA256 `0d6b75c578e2ae71b501f9f26b827559fe8b0887598253af55d09d09f63cdcfb` 与 sidecar 匹配，manifest SHA256 `6604b49d3fe889c9c022b63dec313b762880d7aa8cc12e736975257e2490971d`，内部 102 项 SHA256 全部通过；branch/upstream 匹配、worktree clean/stable、loopback/UDP/hover/350 ms 门禁均有效。
 - R33 结果：Land 39,388/0 PASS、Return 40,485/0 PASS、Mission 67,112/3 FAIL；总计 146,985/3，最长状态间隔 94.8 ms。Mission 末段最大下降速度 0.374 m/s，touchdown distance 0.171 m；失败仅为 terminal ACK、DISARM ACK、arm state 未 DISARMED。详细证据见 [R33 report](../validation/FMT_SIM_LOCAL_20261114_5E3B74F4_REVIEW.md)。
 - R33 复现接地交接缺陷：t=34.280 s contact=1、landed=UNKNOWN、evidence=0x0；M4 严格稳定门槛未满足，旧代码没有给 M5 保留 advisory contact evidence。新生产修复 `419f56962f74fd9d89bc62cfc11ee0923910177c` / `15a33756d4e269800e6778c6180f7086179c9429` 已提交，M4 安全阈值和 2 s dwell 未放宽。
 - 测试补强 `3270cff5aec26e3ae0717c62d2d78e9f30752020`：缺失导航时不发布接地候选证据；`contact_candidate_not_disarm_authority` 与 `contact_candidate_requires_valid_navigation` 均 PASS。

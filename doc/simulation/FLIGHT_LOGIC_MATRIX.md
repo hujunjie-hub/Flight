@@ -187,7 +187,7 @@ Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` adds a 0.50 m / 0.40 m/s b
 
 ## ENG-07 R33 FMT-SIM local run — Land/Return PASS, Mission terminal handoff FAIL
 
-Owner archive RUN_ID `FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4`, tested main HEAD `5e3b74f40293a005de693eceb61af4c0552e`. Clean/stable worktree, upstream match, fetch, loopback, UDP 14653, hover 0.62 and 350 ms gate all verified. ZIP/sidecar SHA256 match; all 102 internal hashes pass.
+Owner archive RUN_ID `FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4`, tested main HEAD `5e3b74f40293a005de693eceb61af4c055f1efdb`. Clean/stable worktree, upstream match, fetch, loopback, UDP 14653, hover 0.62 and 350 ms gate all verified. ZIP/sidecar SHA256 match; all 102 internal hashes pass.
 
 | Scenario | Checks | Failures | Longest state gap | Result |
 |---|---:|---:|---:|---|

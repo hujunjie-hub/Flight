@@ -7,7 +7,7 @@
 ## 2. 归档完整性与测试基线
 
 - RUN_ID：`FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4`
-- 测试分支 / HEAD：`main / 5e3b74f40293a005de693eceb61af4c0552e`
+- 测试分支 / HEAD：`main / 5e3b74f40293a005de693eceb61af4c055f1efdb`
 - ZIP：`FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4.zip`
 - ZIP SHA256：`0d6b75c578e2ae71b501f9f26b827559fe8b0887598253af55d09d09f63cdcfb`；sidecar 完全匹配。
 - ZIP 共 104 entries；`SHA256SUMS.txt` 共 102 项，全部重新校验通过；`manifest.sha256` 与 `manifest.json` 匹配。

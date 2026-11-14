@@ -199,7 +199,7 @@ build/validation/fmt-sim-local/<RUN_ID>.zip
 
 ## 2026-11-14 R33 归档复核与接地候选交接修复
 
-R33 RUN_ID `FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4` 在修复前 HEAD `5e3b74f40293a005de693eceb61af4c0552e` 完成：Land 39,388/0 PASS，Return 40,485/0 PASS，Mission 67,112/3 FAIL；总计 146,985 checks / 3 failures，最长状态间隔 94.8 ms。ZIP SHA256 `0d6b75c578e2ae71b501f9f26b827559fe8b0887598253af55d09d09f63cdcfb` 与 sidecar 一致，manifest SHA256 `6604b49d3fe889c9c022b63dec313b762880d7aa8cc12e736975257e2490971d`，内部 102 项 SHA256 全部通过。Mission 最后 0.50 m 最大下降速度 0.374 m/s（上限 0.40，已通过），返航落点距 Home 0.171 m；仅 terminal ACK、DISARM ACK、最终 DISARMED 状态三项失败。
+R33 RUN_ID `FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4` 在修复前 HEAD `5e3b74f40293a005de693eceb61af4c055f1efdb` 完成：Land 39,388/0 PASS，Return 40,485/0 PASS，Mission 67,112/3 FAIL；总计 146,985 checks / 3 failures，最长状态间隔 94.8 ms。ZIP SHA256 `0d6b75c578e2ae71b501f9f26b827559fe8b0887598253af55d09d09f63cdcfb` 与 sidecar 一致，manifest SHA256 `6604b49d3fe889c9c022b63dec313b762880d7aa8cc12e736975257e2490971d`，内部 102 项 SHA256 全部通过。Mission 最后 0.50 m 最大下降速度 0.374 m/s（上限 0.40，已通过），返航落点距 Home 0.171 m；仅 terminal ACK、DISARM ACK、最终 DISARMED 状态三项失败。
 
 R33 在 t=34.280 s 首次记录 ground contact=CONTACT，但 FMS landed=UNKNOWN 且 evidence=0x0；当时水平速度约 0.291 m/s，未满足 M4 的 0.20 m/s 稳定门槛。旧代码在 UNKNOWN 状态清空接地证据，M5 无法提前停止追逐 Home/probe。最终快照 contact=1、landed=UNKNOWN、stable_ms=0、evidence=0x0，nav_vh=0.161 m/s、nav_vd=-0.005 m/s、nav_ad=0.688 m/s²；垂向加速度仍超过 0.5 m/s² 稳定门槛。
 
