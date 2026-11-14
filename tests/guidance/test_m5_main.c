@@ -275,7 +275,8 @@ static void test_landing_aligns_and_limits_final_descent(void)
 
   fx.nav.core.position_ned_m[0] = 0.0f;
   unsigned low_points = 0;
-  for (unsigned i = 0; i < 450; ++i) {
+  /* Allow the full bounded 6.2 s M5 landing horizon plus a short hold margin. */
+  for (unsigned i = 0; i < 700; ++i) {
     CHECK(fx_step(&fx) == STATUS_OK);
     CHECK(fx.out.feasibility.feasible && fx.out.guidance_status.reference_epoch == epoch);
     const ProductMotionPoint *point = &fx.out.reference.points[23].point;

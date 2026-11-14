@@ -77,7 +77,7 @@ uint8_t guidance_landing_speed_ok(const GuidanceInput *in, const GuidanceQuintic
     /* Allow a faster approach while still above the contact-sensor band.
      * Bound only the final 6 cm where the SIL contact oracle can assert contact. */
     if (end_down < contact_down)
-        return 1u;
+        return 0u; /* Bernstein bound touched the contact band but the endpoint did not: fail closed. */
     check_t = t0;
     if (start_down < contact_down) {
         float left = t0, right = t1;
