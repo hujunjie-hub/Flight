@@ -819,17 +819,17 @@
       "analysis": "build/validation/priority-20261113/b06-o0.json"
     },
     "hardware_stack_watermark": "NOT_RUN",
-    "static_headroom_bytes": 8,
-    "icd_m4_static_total_bytes": 49144,
+    "static_headroom_bytes": 264,
+    "icd_m4_static_total_bytes": 48888,
     "icd_m4_limit_bytes": 49152,
-    "static_headroom_note": "Estimated after adding 2 x 112 B GroundStopCertificate bundle copies to the previous 232 B headroom baseline; rerun check_memory_budget.py and inspect the final map."
+    "static_headroom_note": "42,696 B reserved plus 6,192 B aligned M4 BSS. Release map confirms removal of the extra 1,152 B staging copy, bringing the image in line with the one staging slot already in this accounting."
   },
   "blocker_board": "spec/quality/BLOCKER_BOARD.md",
   "issue_register": "spec/quality/ISSUE_REGISTER.md",
   "mr009_review_material": "spec/history/implementation/guidance/MR009_R17_REVIEW_MATERIAL.md",
   "resource_risks": {
     "FLIGHT-LOCAL-26": "roll_map_to_position 40 B + roll_axis_inplace 64 B + map_cell_at 24 B = 128 B; legacy reference 32,840 B is Host-test only",
-    "FLIGHT-LOCAL-27": "Stage-02 object and Release-map checks measured 8 B headroom before compacting the private FMS dedup entries and 264 B after. The sub-1 KiB headroom remains a resource risk (GitHub issue #13).",
+    "FLIGHT-LOCAL-27": "Stage-02 object and Release-map checks measured 8 B headroom before compacting the private FMS dedup entries and 264 B after. Removed the unbudgeted 1,152 B duplicate staging slot. The remaining 264 B budget headroom is below the 1 KiB warning (GitHub issue #13).",
     "FLIGHT-LOCAL-29": "R18 reported 104 B; R19 objdump confirms map_cell_at 24 B, true 128 B",
     "FLIGHT-LOCAL-30": "R19 external sidecar/report; no PENDING in formal manifest"
   },

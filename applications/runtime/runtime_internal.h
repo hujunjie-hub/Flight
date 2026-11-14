@@ -64,7 +64,7 @@ typedef struct {
   MissionUploadCandidate mission;
   FmsStateSnapshot fms;
   PreArmCheckResult prearm;
-  uint8_t have_operator, have_mission, have_demand, bundle_ready;
+  uint8_t have_operator, mission_slot_state, have_demand, bundle_ready;
 } RuntimeData;
 
 extern RuntimeData runtime_data;
@@ -74,6 +74,9 @@ int runtime_data_init(uint64_t start_us);
 void runtime_data_deinit(void);
 int runtime_data_lock(rt_int32_t wait);
 void runtime_data_unlock(void);
+/* Claim under the runtime-data mutex; release after FMS returns. */
+const MissionUploadCandidate *runtime_data_claim_mission(void);
+void runtime_data_release_mission(void);
 void runtime_data_mark_heartbeat(RuntimeOwner owner, uint64_t now);
 uint64_t runtime_data_get_heartbeat(RuntimeOwner owner);
 void runtime_data_record_event(unsigned source, unsigned ns, unsigned reason,

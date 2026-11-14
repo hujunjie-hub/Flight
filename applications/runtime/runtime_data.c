@@ -290,6 +290,25 @@ Status runtime_submit_operator(const OperatorInput *input)
     return STATUS_OK;
 }
 
+enum { MISSION_SLOT_EMPTY, MISSION_SLOT_PENDING, MISSION_SLOT_BORROWED };
+
+const MissionUploadCandidate *runtime_data_claim_mission(void)
+{
+    if (runtime_data.mission_slot_state != MISSION_SLOT_PENDING)
+        return NULL;
+    runtime_data.mission_slot_state = MISSION_SLOT_BORROWED;
+    return &runtime_data.mission;
+}
+
+void runtime_data_release_mission(void)
+{
+    if (!runtime_data_lock(RT_WAITING_FOREVER))
+        return;
+    if (runtime_data.mission_slot_state == MISSION_SLOT_BORROWED)
+        runtime_data.mission_slot_state = MISSION_SLOT_EMPTY;
+    runtime_data_unlock();
+}
+
 Status runtime_submit_mission(const MissionUploadCandidate *candidate)
 {
     Status result = lock_input(candidate ? &candidate->header : NULL);
@@ -297,13 +316,13 @@ Status runtime_submit_mission(const MissionUploadCandidate *candidate)
     {
         return result;
     }
-    if (runtime_data.have_mission)
+    if (runtime_data.mission_slot_state != MISSION_SLOT_EMPTY)
     {
         runtime_data_unlock();
         return STATUS_BUFFER_FULL;
     }
     runtime_data.mission = *candidate;
-    runtime_data.have_mission = 1u;
+    runtime_data.mission_slot_state = MISSION_SLOT_PENDING;
     runtime_data_unlock();
     return STATUS_OK;
 }

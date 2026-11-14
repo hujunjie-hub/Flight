@@ -9,7 +9,6 @@
 
 static ControlBundle plan_bundle;
 static FmsOutputView fms_output;
-static MissionUploadCandidate plan_mission;
 #ifdef FLIGHT_HOST_SIL
 extern uint8_t flight_sil_ground_contact(void);
 #endif
@@ -49,7 +48,7 @@ static void task_mission_step(void) {
   NavigationCapability nav_cap;
   ControlCapability control;
   uint32_t count;
-  uint8_t have_op, have_mission;
+  uint8_t have_op;
   ContractHeader origin;
   uint32_t next_origin;
   uint64_t now;
@@ -62,7 +61,7 @@ static void task_mission_step(void) {
   now=runtime_now_us();
   runtime_data_mark_heartbeat(RUNTIME_OWNER_MISSION,now);
   memset(&input,0,sizeof(input));
-  runtime_data_lock(RT_WAITING_FOREVER);
+  if (!runtime_data_lock(RT_WAITING_FOREVER)) return;
   plan_bundle.nav = runtime_data.nav;
   nav_cap = runtime_data.nav_cap;
   plan_bundle.actuator=runtime_data.actuator; plan_bundle.actuator_cap=runtime_data.actuator_cap;
@@ -70,7 +69,7 @@ static void task_mission_step(void) {
   origin=runtime_data.origin_candidate; next_origin=runtime_data.next_origin_id;
   count=runtime_data_take_requests(requests);
   op=runtime_data.operator_input; have_op=runtime_data.have_operator;
-  have_mission=runtime_data.have_mission; if(have_mission) { plan_mission=runtime_data.mission; runtime_data.have_mission=0; }
+  input.mission_candidate = runtime_data_claim_mission();
   runtime_data_unlock();
   input.navigation = &plan_bundle.nav;
   input.navigation_capability = &nav_cap;
@@ -80,7 +79,7 @@ static void task_mission_step(void) {
   input.guidance_status = &plan_bundle.guidance.guidance_status;
   input.guidance_feasibility = &plan_bundle.guidance.feasibility;
   input.pending_requests=requests; input.pending_request_count=(uint16_t)count;
-  input.operator_input=have_op ? &op : 0; input.mission_candidate=have_mission ? &plan_mission : 0;
+  input.operator_input=have_op ? &op : 0;
   input.presence_mask=FMS_INPUT_HAS_NAV|FMS_INPUT_HAS_NAV_CAPABILITY|FMS_INPUT_HAS_ACTUATOR|
     FMS_INPUT_HAS_CONTROL|FMS_INPUT_HAS_GUIDANCE|FMS_INPUT_HAS_GUIDANCE_STATUS;
 #ifdef FLIGHT_HOST_SIL
@@ -121,11 +120,12 @@ static void task_mission_step(void) {
 #endif
   if(count) input.presence_mask|=FMS_INPUT_HAS_REQUEST;
   if(have_op) input.presence_mask|=FMS_INPUT_HAS_OPERATOR;
-  if(have_mission) input.presence_mask|=FMS_INPUT_HAS_MISSION_CANDIDATE;
+  if(input.mission_candidate) input.presence_mask|=FMS_INPUT_HAS_MISSION_CANDIDATE;
   input.evaluation_time_us=now;
   runtime_stats.planning_status=fms_policy_update(&input,&fms_output); runtime_stats.planning_updates++;
   /* Revoke/renew directly before doing any more planning work. */
   if(!runtime_stats.planning_status) (void)actuator_update_permit(&fms_output.actuation_permit,runtime_now_us());
+  if (input.mission_candidate) runtime_data_release_mission();
   /* Translate only a validated M4 ground-disarm decision plus its matching
    * revoked permit. Keep the short-lived certificate in the bundle long enough
    * for the 1 ms actuator owner to consume it; never synthesize it while airborne. */

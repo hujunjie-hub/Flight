@@ -838,7 +838,7 @@ static void sil_seed_live_fms_inputs(void)
 
   runtime_data.bundle_ready = 0u;
   runtime_data.have_demand = 0u;
-  runtime_data.have_mission = 0u;
+  runtime_data.mission_slot_state = MISSION_SLOT_EMPTY;
   runtime_data.have_operator = 0u;
   runtime_data_unlock();
 }
@@ -1234,6 +1234,46 @@ static void run_ground_stop_task_smoke(void)
   CHECK((runtime_data.receipt.limit_flags & ACTUATOR_GROUND_STOP_OVERRUN_FLAG) == 0u);
 }
 
+/* RT-SIL-04: the one-slot handoff must reject another producer until the
+ * FMS call has finished with its borrowed mission candidate. */
+static void run_mission_staging_smoke(void)
+{
+  MissionUploadCandidate first = {0}, second;
+  const MissionUploadCandidate *borrowed;
+  first.header = h(SOURCE_GCS, test_clock.monotonic_us + 200000u);
+  first.header.message_type = MSG_MISSION_UPLOAD_CANDIDATE;
+  first.transaction_id = 11u;
+  second = first;
+  second.transaction_id = 12u;
+
+  CHECK(runtime_submit_mission(&first) == STATUS_OK);
+  CHECK(runtime_data_lock(RT_WAITING_FOREVER));
+  borrowed = runtime_data_claim_mission();
+  runtime_data_unlock();
+  CHECK(borrowed == &runtime_data.mission);
+  CHECK(borrowed != NULL && borrowed->transaction_id == first.transaction_id);
+  CHECK(runtime_submit_mission(&second) == STATUS_BUFFER_FULL);
+  CHECK(borrowed != NULL && borrowed->transaction_id == first.transaction_id);
+  CHECK(runtime_data_lock(RT_WAITING_FOREVER));
+  CHECK(runtime_data_claim_mission() == NULL);
+  runtime_data_unlock();
+
+  runtime_data_release_mission();
+  CHECK(runtime_submit_mission(&second) == STATUS_OK);
+  CHECK(runtime_data_lock(RT_WAITING_FOREVER));
+  borrowed = runtime_data_claim_mission();
+  runtime_data_unlock();
+  CHECK(borrowed != NULL && borrowed->transaction_id == second.transaction_id);
+  runtime_data_release_mission();
+  CHECK(runtime_data_lock(RT_WAITING_FOREVER));
+  CHECK(runtime_data_claim_mission() == NULL);
+  runtime_data_unlock();
+
+  CHECK(runtime_submit_mission(&first) == STATUS_OK);
+  task_mission_step();
+  CHECK(runtime_submit_mission(&second) == STATUS_OK);
+}
+
 int main(int argc, char **argv)
 {
   unsigned takeoff_commits = 0, takeoff_completed_ms = 0;
@@ -1253,12 +1293,13 @@ int main(int argc, char **argv)
   int motion_request_failed = 0;
   RuntimeStats stats;
 
+  const int mission_staging_smoke = argc == 2 && !strcmp(argv[1], "--mission-staging-smoke");
   const int ground_stop_smoke = argc == 2 && !strcmp(argv[1], "--ground-stop-smoke");
   const int live_fms_ground_stop_smoke =
       argc == 2 && !strcmp(argv[1], "--live-fms-ground-stop-smoke");
   const int live_fms_first_reference_ground_stop_smoke =
       argc == 2 && !strcmp(argv[1], "--live-fms-first-reference-ground-stop-smoke");
-  if (argc != 1 && !ground_stop_smoke && !live_fms_ground_stop_smoke &&
+  if (argc != 1 && !mission_staging_smoke && !ground_stop_smoke && !live_fms_ground_stop_smoke &&
       !live_fms_first_reference_ground_stop_smoke) {
 #ifdef FLIGHT_GROUND_STATION
     if (argc == 6 && !strcmp(argv[3], "Ground")) {
@@ -1312,6 +1353,12 @@ int main(int argc, char **argv)
 #endif
     fmt_sim_host_close();
     return 1;
+  }
+  if (mission_staging_smoke) {
+    run_mission_staging_smoke();
+    runtime_shutdown();
+    printf("sil_mission_staging: %u checks, %u failures\n", checks, failures);
+    return failures ? 1 : 0;
   }
   if (live_fms_first_reference_ground_stop_smoke) {
     run_live_fms_first_reference_task_smoke();

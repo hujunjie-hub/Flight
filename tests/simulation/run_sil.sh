@@ -110,3 +110,7 @@ echo "SIL live FMS first-reference timeout-to-M7 task integration: PASS"
 echo "== SIL ground-stop ramp smoke =="
 "$exe" --ground-stop-smoke
 echo "SIL runtime ground-stop ramp integration: PASS"
+
+echo "== SIL mission staging ownership =="
+"$exe" --mission-staging-smoke
+echo "SIL mission staging ownership: PASS"
