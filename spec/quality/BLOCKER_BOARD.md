@@ -1,4 +1,4 @@
-# Flight M5-06 阻塞项视图（R36）
+# Flight M5-06 阻塞项视图（R39）
 
 > **2026-11-13 MR-009 R31 内部预审 CI 快照（代码/证明基线 8dcb60b3ac18e6a763c939d3e810984092cdd321）**：Host validation #43446380866（6/6）、M6/M7 #43446380836（5/5）、M7 #43446380724（2/2）全部 SUCCESS。M5 Host regression、M5 ASan/UBSan、MR-009 focused、S06-099/S06-107、Spec Audit、生产 ABI、18 mutation FP audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer 均 PASS。
 
@@ -8,19 +8,17 @@
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
 
-> **当前 ENG-07 动态验收状态（R36）**：RUN_ID `FMT-SIM-LOCAL-20261114T150346337Z-3fb4dc23`，测试 HEAD `3fb4dc237e36b55899d3bcf0ca450470e72250ae`；main/origin/main 精确匹配、worktree clean/stable、fetch exit 0、loopback 显式确认、UDP 14653、hover 0.62、350 ms 均有效。ZIP SHA256 `d81bae7ea6684bb4a42b7b523a355dc1f5ff855746542257162c00d9de557ea3`，manifest SHA256 `a48dc4c70b8bc75fcb628add77386c932a0ef37972f7f4a589f89d72fb6ddc99`，104 entries CRC PASS，内部 102 项 SHA256 全通过；构建 PASS。
+> **当前 ENG-07 动态验收状态（R39）**：RUN_ID `FMT-SIM-LOCAL-20261114T174058156Z-547f3788`，测试 HEAD `547f37883186c888d786c4293f2a4341d348b994`；main/origin/main 精确匹配、worktree clean/stable、loopback 显式确认、UDP 14653、hover 0.62、350 ms 均有效。ZIP SHA256 `3a09ba6f4e2f7adda930ffb1633f498f3c8bb31f3c1d581ccc8043cdeeb78dfb`；构建 PASS；`issue_closure_eligible=false`。
 >
-> R36 Land 48,801/3、Return 48,802/4、Mission 67,112/3，全部 FAIL，总计 164,715/10。最长状态间隔 92.3/147.2/112.5 ms，均低于 350 ms。末段 0.50 m 下降速度 0.336/0.338/0.351 m/s 全部满足 0.40 m/s。Return touchdown 0.220 m；Mission touchdown 0.387 m、航点最近距离 0.250/0.367 m。
+> R39 Land **48,801/3**、Return **48,802/3**、Mission **67,112/5**。三个场景均无 `FAILSAFE_TERMINAL`、无控制拒绝；剩余失败为 `terminal_ack`、`disarm_ack`、最终 `DISARMED`（Mission 另加近地实测 0.496 m/s 与结束 `contact=NO_CONTACT`）。Return touchdown 0.143 m、Mission 0.315 m、航点 0.292/0.413 m、近地下降 0.300/0.293 m/s，均通过各自阈值。
 >
-> 根因：R36 首次接地时水平速度 0.220/0.234/0.246 m/s，超过 M4 0.20 m/s ground-stability 门槛。旧 M5 LANDING_APPROACH 初始选择/退出条件允许水平速度至 0.25 m/s，导致水平运动未收敛就开始垂直下降。Land/Mission 最终 landed=UNKNOWN；Return 接地信号丢失、最终 landed=IN_AIR。三个场景 terminal ACK / DISARM ACK / DISARMED 均失败。R36 未复现 R35 reason 1550/JERK、M6 -11 或 FAILSAFE_TERMINAL；M4→M5 advisory evidence=0x1 仍到达。
+> 根因链已闭合到单一剩余项：R38（`a5df9070`）证明 CONTACT_HOLD 的"重新规划到实测接地点"会在接地瞬间以 1550/JERK 拒绝整份参考（Return t=28.28 s、Mission t=40.12 s，锁存 `FAILSAFE_TERMINAL`），而 Land 因 0.25 m/s 高于 0.15 m/s 等待门限永不进入该分支并在地面滑移。`a9a38bbb` + `547f3788` 改为静态零速度保持并加入"失去接地即释放"，确定性失败消失。剩余 [FLIGHT-26](https://github.com/hujunjie-hub/Flight/issues/26)：接地后约 0.2 m/s、周期约 1.4 s 的旋转水平极限环（导航与真值一致），使 M4 的 |vh| ≤ 0.20 与 2 s dwell 无法连续满足；M5 冻结/跟随两种语义均复现，接地前静态参考下亦存在，2 m 悬停 `hold_error` 仅 0.019–0.028 m。
 >
-> R36 后修复已提交：`866f2d79dff583280b9b1e6f657eb29959b46df5` 将 M5 水平误差/速度门槛收紧至 0.15 m / 0.15 m/s，并新增 `landing_speed_only_requires_horizontal_brake`；`507133064b5f9c4176ff793ede8fa6e8a42fcad1` 将 brake-to-final 转换纳入相同门槛。M4 的 0.20 m/s、0.15 m/s、0.5 m/s²、2 s dwell、M5 0.40/0.12 m/s 下降限值和 DISARM 策略均未放宽。
+> 精确 HEAD `547f3788` CI：Host validation、M6/M7 host validation、M7 host validation 全部 SUCCESS。M4 的 0.20 m/s、0.15 m/s、0.5 m/s²、2 s dwell、M5 0.40/0.12 m/s 与 DISARM 策略均未放宽。
 >
-> 最终 HEAD `507133064b5f9c4176ff793ede8fa6e8a42fcad1` CI 全部 SUCCESS：Host [#43612480283](https://github.com/hujunjie-hub/Flight/actions/runs/43612480283) 6/6；M6/M7 [#43612480319](https://github.com/hujunjie-hub/Flight/actions/runs/43612480319) 5/5；M7 [#43612480345](https://github.com/hujunjie-hub/Flight/actions/runs/43612480345) 2/2。
+> #17/#18/#19/#21/#23/#24/#25 保持 OPEN（技术闭合待 #26 与独立复核）；#22 独立安全复核待完成；#26 为本轮新增 S1。唯一开发分支仍为 `main`。详见 [spec/09 R38/R39 节](../09_需求验证实施与发布管理.md)。
 >
-> #17/#18/#19/#24 继续 OPEN 并等待 R37；#21 下降速度指标 PASS 但整批关闭条件未满足；#22 独立安全复核待完成；#23 的原 M5 plan-rejection 在 R36 未复现但仍待完整批次/复核。唯一开发分支仍为 `main`。详见 [R36 review](../validation/FMT_SIM_LOCAL_20261114_3FB4DC23_REVIEW.md)。
->
-> 历史 R31/R33/R34/R35 基线保留在下方历史记录。当前代码基线为 `507133064b5f9c4176ff793ede8fa6e8a42fcad1`；Owner 必须 fetch 最新 origin/main 后复测。Host/SIL/CI 不是 H723 实机、物理 HIL、WCET/RTA、栈水位或飞行放行证据。
+> 历史 R31–R38 基线保留在下方历史记录。Host/SIL/CI 不是 H723 实机、物理 HIL、WCET/RTA、栈水位或飞行放行证据。
 
 ## B01 Spec Audit FAIL
 
@@ -128,16 +126,17 @@
 
 | Issue | 场景 | 当前状态 | 执行责任 / 解除证据 |
 |---|---|---|---|
-| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / R37 FAIL; LANDED ACCEL MARGIN | 48,801/3; `nav_vh=0.166` OK but `nav_ad=0.529` > 0.5 gate; no failsafe |
-| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R37 NEW REGRESSION #25 | 17,088/6; RETURN handoff rejected at ~1.99 m, terminal failsafe |
-| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R37 FAIL: 4 mm TOUCHDOWN MISS | 67,112/4; `return_error=0.504 m` > 0.50; LANDED missing (`nav_vh=0.236`) |
-| [#21](https://github.com/hujunjie-hub/Flight/issues/21) | Mission near-ground speed | OPEN / R37 PASS LAND+MISSION | Land 0.315, Mission 0.340 m/s; Return not measurable (#25) |
-| [#22](https://github.com/hujunjie-hub/Flight/issues/22) | M4 advisory contact handoff | OPEN / INDEPENDENT REVIEW PENDING | M4 advisory evidence reaches M5; LANDED gate handled in #23 |
-| [#23](https://github.com/hujunjie-hub/Flight/issues/23) | M5 contact-hold / LANDED | OPEN / R37 LANDED STILL MISSING | Land blocked by `aD=0.529`, Mission by `vh=0.236`; contact-hold gate still deadlocks |
-| [#24](https://github.com/hujunjie-hub/Flight/issues/24) | Landing descends before horizontal settled | OPEN / R37 PARTIAL | horizontal gate cleared for Land (`vh=0.166`); new #25 and LANDED remain |
-| [#25](https://github.com/hujunjie-hub/Flight/issues/25) | RETURN handoff re-plan regression | OPEN / NEW (S1/M5) | `guidance=4/1550` at ~2 m with `a_z≈8.6`; terminal failsafe |
+| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / R39 48,801/3；仅终端链 | 无 failsafe、落地、近地 0.300 m/s；LANDED 受 #26 阻塞 |
+| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R39 48,802/3；仅终端链 | touchdown 0.143 m；#25 的 12.2 s 失败已消失 |
+| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R39 67,112/5 | touchdown 0.315 m、航点 0.292/0.413 m 通过；近地 0.496 m/s 与结束 `contact=NO_CONTACT` 受 #26 阻塞 |
+| [#21](https://github.com/hujunjie-hub/Flight/issues/21) | Mission near-ground speed | OPEN / R39 LAND+RETURN PASS | Land 0.300、Return 0.293 m/s ≤ 0.40；Mission 本轮 0.496 需复测 |
+| [#22](https://github.com/hujunjie-hub/Flight/issues/22) | M4 advisory contact handoff | OPEN / INDEPENDENT REVIEW PENDING | 证据持续到达 M5；终端链受 #26 阻塞 |
+| [#23](https://github.com/hujunjie-hub/Flight/issues/23) | M5 contact-hold / LANDED | OPEN / 拒绝路径已修 | 1550/JERK 拒绝与 `FAILSAFE_TERMINAL` 不再出现；LANDED 受 #26 阻塞 |
+| [#24](https://github.com/hujunjie-hub/Flight/issues/24) | Landing descends before horizontal settled | OPEN / 部分有效 | 接地水平速度改善；LANDED 受 #26 阻塞 |
+| [#25](https://github.com/hujunjie-hub/Flight/issues/25) | RETURN handoff re-plan regression | OPEN / 修复已验证 | R39 无 handoff 拒绝；等待整批与独立复核 |
+| [#26](https://github.com/hujunjie-hub/Flight/issues/26) | M6 近地水平极限环 | NEW / S1 | ~0.2 m/s、~1.4 s 周期，导航与真值一致；阻断 LANDED 且需 M6/MPC 复核 |
 
-CI on exact new fixed-code HEAD `69626899249e1fd926a0a903447f2ad763f24ba1`: Host [#43603447251](https://github.com/hujunjie-hub/Flight/actions/runs/43603447251) 6/6, M6/M7 [#43603447288](https://github.com/hujunjie-hub/Flight/actions/runs/43603447288) 5/5, M7 [#43603447340](https://github.com/hujunjie-hub/Flight/actions/runs/43603447340) 2/2 SUCCESS. M4 969/0; M5 329,670/0; M5 ASan/UBSan 329,670/0; M4/M5 integration and sanitizer 1,042/0 each; MR-009 focused 430/0; Spec Audit round 3 and Cortex-M7 production-module compile PASS. These CI workflows do not launch native FMT-SIM. #17/#18/#19/#21/#23 remain OPEN pending complete R36 Owner-local batch on latest main; #22 remains OPEN pending independent safety review.
+CI on exact HEAD `547f37883186c888d786c4293f2a4341d348b994`: Host validation, M6/M7 host validation and M7 host validation all SUCCESS. M5 Host and ASan/UBSan 330,302/0 each; M4 969/0; M4/M5 integration 1,042/0; Cortex-M7 module compile PASS. These workflows do not launch native FMT-SIM. #17/#18/#19/#21/#23/#24/#25 remain OPEN pending #26 and independent review; #22 remains OPEN pending independent safety review.
 
 
 R30 archive SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae9909063` is verified, but its tested HEAD `3299a4f` is 181 commits behind the reviewed current branch HEAD `9063f310`; worktree DIRTY and formal manifest/loopback gate evidence absent. Five diagnostic scenarios failed (29 assertions total). Do not close or repeat code fixes from this old result; wait for a clean current-HEAD formal rerun. [Full archive review](../validation/FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md).

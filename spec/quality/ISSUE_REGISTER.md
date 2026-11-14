@@ -213,3 +213,48 @@ Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析
 - 问题：#25 新登记（S1/M5）；#24 部分有效；#23 仍阻塞 LANDED；#19 增加 4 mm 落点超限；#17/#18 保持 OPEN；#21 Land/Mission 通过、Return 不可测。均未 VERIFIED/CLOSED。
 - 证据：manifest SHA256 `dca7ed70…`；ZIP SHA256 `f08b39235e99265abed27520b84a8998a569e3fdd552d93fd534431fd213073c`；内部 102 项全部匹配；日志 SHA256 Land `1cf9b825…`、Return `04eba8b6…`、Mission `793cc286…`。详见 [R37 归档复核报告](../validation/FMT_SIM_LOCAL_20261114_2D219EAD_REVIEW.md)。
 - 未放宽任何阈值、断言或场景输入。
+
+## 2026-11-15 ENG-07 R38/R39 与新增登记
+
+### R38（main `a5df9070`，FAIL）与 R39（main `547f3788`，FAIL）
+
+- R38 RUN_ID `FMT-SIM-LOCAL-20261114T165250972Z-a5df9070`，ZIP SHA256 `77cdd5701334aea8a50a97e8f9149a98634173068d6f5ccce9dfdc620cc2790b`：Land 48,801/3、Return 43,167/4、Mission 61,238/4。`5ed2f3d7` 的 #25 修复生效（Return 不再 12.2 s 失败）。
+- R38 定位单一根因：CONTACT_HOLD 通过"从运动参考重新规划到实测接地点"实现。Return `t=28.28 s`、Mission `t=40.12 s` 在接地瞬间以 1550/JERK 拒绝整份参考并锁存 `FAILSAFE_TERMINAL`；Land 因 0.25 m/s 高于 0.15 m/s 等待门限永不进入该分支，在地面持续滑移。
+- 修复：`a9a38bbb`（静态零速度保持、接地采信条件）、`547f3788`（冻结保持、失去接地释放、SIL 参考日志）。回归 `landing_contact_hold_is_ground_gated`。M5 Host/ASan 各 330,302/0。
+- R39 RUN_ID `FMT-SIM-LOCAL-20261114T174058156Z-547f3788`，ZIP SHA256 `3a09ba6f4e2f7adda930ffb1633f498f3c8bb31f3c1d581ccc8043cdeeb78dfb`：Land **48,801/3**、Return **48,802/3**、Mission **67,112/5**。无 `FAILSAFE_TERMINAL`、无控制拒绝；剩余失败全部为终端链 `terminal_ack`/`disarm_ack`/`DISARMED`（Mission 另加近地 0.496 m/s 与结束时 `contact=NO_CONTACT`）。
+- Return touchdown 0.143 m、Mission 0.315 m、航点 0.292/0.413 m、近地下降 0.300/0.293 m/s。R37 的 Mission 0.504 m 落点超限未复现。
+- 剩余根因：[#26](https://github.com/hujunjie-hub/Flight/issues/26)（S1/M6 近地水平旋转极限环，~0.2 m/s、~1.4 s 周期，导航速度与 FMT 真值一致）。M5 两种保持语义均复现，接地前静态参考下同样存在，2 m 悬停 `hold_error=0.019–0.028 m`。
+
+### 本轮新增或更新
+
+| Issue | 严重度 | 状态 | 说明 |
+|---|---|---|---|
+| [#26](https://github.com/hujunjie-hub/Flight/issues/26) | S1 | NEW | M6 近地水平极限环阻断 LANDED；需 M6/MPC 阻尼工作与独立复核 |
+| [#27](https://github.com/hujunjie-hub/Flight/issues/27) | S2 | NEW | 固化证据不可由当前生成器复现（abi_layout 顺序、round3 handoff 检查、memory-budget 对象新鲜度） |
+| [#28](https://github.com/hujunjie-hub/Flight/issues/28) | S2 | NEW | 仅记录在 spec/09 的验收工作流（Bootloader/MAVLink 安全/设置回滚/长航段/故障场景） |
+| #17/#18/#19 | S1 | OPEN / 技术闭合待 #26 | R39 仅剩终端链断言；落点与下降速度指标通过 |
+| #21 | S1 | OPEN | R39 近地下降 0.300/0.293 m/s 通过；整批关闭条件未满足 |
+| #23 | S1 | OPEN / 回归已修 | 1550/JERK 拒绝不再出现；LANDED 受 #26 阻塞 |
+| #24 | S1 | OPEN / 部分有效 | 接地点水平速度下降；LANDED 仍受 #26 阻塞 |
+| #25 | S1 | OPEN / 修复已验证 | RETURN handoff 不再拒绝；等待整批与独立复核 |
+
+## 线上 Issue 映射（本文件末尾）
+
+`GITHUB_PUBLICATION = PARTIAL`。下表是本文件承诺的本地编号与线上 Issue 映射；未列出的 #9–#12 目前没有对应的 FLIGHT-LOCAL 编号，不得臆造。
+
+| 本地编号 | GitHub Issue | 关系 |
+|---|---|---|
+| FLIGHT-LOCAL-04 | [#8](https://github.com/hujunjie-hub/Flight/issues/8) | 已关闭（OWNER_WAIVED_INDEPENDENT_REVIEW） |
+| FLIGHT-LOCAL-12 | [#15](https://github.com/hujunjie-hub/Flight/issues/15) | 同一差分碰撞夹具问题 |
+| FLIGHT-LOCAL-25 | [#16](https://github.com/hujunjie-hub/Flight/issues/16) | B07 目标/HIL 未执行 |
+| FLIGHT-LOCAL-27 | [#13](https://github.com/hujunjie-hub/Flight/issues/13) | ICD+M4 静态余量风险 |
+| FLIGHT-LOCAL-54 | [#14](https://github.com/hujunjie-hub/Flight/issues/14) | Release enum-size ABI 差异 |
+| — | [#17](https://github.com/hujunjie-hub/Flight/issues/17) | ENG-07 Land 终端 |
+| — | [#18](https://github.com/hujunjie-hub/Flight/issues/18) | ENG-07 Return 终端 |
+| — | [#19](https://github.com/hujunjie-hub/Flight/issues/19) | ENG-07 Mission 终端 |
+| — | [#21](https://github.com/hujunjie-hub/Flight/issues/21) | 近地下降速度指标 |
+| — | [#22](https://github.com/hujunjie-hub/Flight/issues/22) | M4 advisory contact handoff |
+| — | [#23](https://github.com/hujunjie-hub/Flight/issues/23) | contact-hold 拒绝/锁存 |
+| — | [#24](https://github.com/hujunjie-hub/Flight/issues/24) | 下降先于水平收敛 |
+| — | [#25](https://github.com/hujunjie-hub/Flight/issues/25) | RETURN handoff 回归 |
+| — | [#26](https://github.com/hujunjie-hub/Flight/issues/26) | M6 近地极限环（本轮新增） |

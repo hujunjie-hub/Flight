@@ -239,3 +239,13 @@ R34 后 main 修复：
 - `return_handoff_r37` 回放 R37 的四帧导航数据和活动参考交接。旧实现的前三帧可行，第四帧在预览偏移 920 ms 被拒绝（1550 / JERK）。该帧仍使用原有刹停曲线。跨越刹停终点并接入静止段的 Hermite 区间触发了 jerk 拒绝。
 - 修复在仿真位置模式的水平刹停规划中为 jerk 留出裕量，并按原包线逐周期校验消费预览。回归覆盖参考绑定和水平刹停结束。完成原生 ENG-07 验收仍需按 §4 的命令在同步后的干净 `main` 上执行 Land → Return → Mission。
 - R37 `[settle]` 中的 `nav_ad` 是原始导航快照值。`SIM_CONTROLLED_STOP` 的 LandDetector 用速度估计加速度，同时用原始加速度检查输入有效性。仅凭最后一帧 `nav_ad=0.529` 无法定位连续 2 s dwell 的失败。Mission 的 `return_error` 取场景结束时的水平位置，仍须满足 0.50 m 判据。
+
+## 2026-11-15 R38/R39 本机复测与 CONTACT_HOLD 静态保持
+
+- R38 RUN_ID `FMT-SIM-LOCAL-20261114T165250972Z-a5df9070`（ZIP `77cdd570…`）：Land 48,801/3、Return 43,167/4、Mission 61,238/4。`5ed2f3d7` 的 #25 修复生效（Return 不再于 12.2 s 进入终端失效保护）。
+- R38 根因：CONTACT_HOLD 用"从运动参考重新规划到实测接地点"实现。Return `t=28.28 s`、Mission `t=40.12 s` 在接地瞬间以 1550/JERK 拒绝整份参考并锁存 `FAILSAFE_TERMINAL`；Land 因实测 0.25 m/s 高于 0.15 m/s 等待门限而永不进入该分支，只能在地面持续滑移。
+- 修复：`a9a38bbb`（接地确认后锁存实测点并发布静态零速度参考，咨询位仅在 Home 平面或以下且速度仍在着陆区间时采信）、`547f3788`（保持点冻结、失去接地且明显高于 Home 平面时释放并重新进近、SIL `[settle]` 增加参考锚点/预览点日志）。回归 `landing_contact_hold_is_ground_gated`。
+- R39 RUN_ID `FMT-SIM-LOCAL-20261114T174058156Z-547f3788`（ZIP `3a09ba6f…`）：Land **48,801/3**、Return **48,802/3**、Mission **67,112/5**。**三个场景均无终端失效保护、无控制拒绝**；剩余失败仅为 `terminal_ack`、`disarm_ack`、最终 `DISARMED`（Mission 另有近地实测 0.496 m/s 与结束 `contact=NO_CONTACT`）。
+- 正向指标：Return touchdown 0.143 m、Mission 0.315 m、航点 0.292/0.413 m、近地下降 0.300/0.293 m/s。
+- **下一步（Owner/控制负责人）**：[#26](https://github.com/hujunjie-hub/Flight/issues/26) 记录接地后约 0.2 m/s、周期约 1.4 s 的旋转水平极限环（导航速度与 FMT 真值一致）。M5 冻结与跟随两种参考语义都复现；接地前静态参考下同样存在，而 2 m 悬停 `hold_error` 只有 0.019–0.028 m。该问题属 M6 近地水平环阻尼/稳定性，需要控制器侧修改与独立复核。不得放宽 M4 的 0.20/0.15 m/s、0.5 m/s²、2 s dwell。
+- 复测命令不变：在干净且与 `origin/main` 同步的 `main` 上运行 `tests/simulation/run_fmt_sim_regression.ps1`，350 ms / UDP 14653 / hover 0.62 / 显式 loopback。Host/CI PASS 不替代原生 FMT-SIM，FMT-SIM 也不替代 B07 实机证据。
