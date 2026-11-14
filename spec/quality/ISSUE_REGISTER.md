@@ -115,9 +115,9 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 
 ## ENG-07 原生 FMT-SIM 本机复测登记
 
-- 最新验证工具/交接 HEAD：`e2b35ceb34b3d4d090d8daa1c705b5779d7ccd82`；产品代码修复基线：`ce00ff9f0a8eb4989d1a171c3322f3640de2965c`。
+- 最新完整 CI 验证的工具/交接基线：`67289bbc08310a3c99b4149d30252a94ced40ead`；产品代码修复基线：`ce00ff9f0a8eb4989d1a171c3322f3640de2965c`。
 - 在线跟踪：GitHub Issues [#17 Land](https://github.com/hujunjie-hub/Flight/issues/17)、[#18 Return](https://github.com/hujunjie-hub/Flight/issues/18)、[#19 Mission](https://github.com/hujunjie-hub/Flight/issues/19)。
-- 当前证据：[Host #43551514047](https://github.com/hujunjie-hub/Flight/actions/runs/43551514047) 6/6、[M6/M7 #43551514017](https://github.com/hujunjie-hub/Flight/actions/runs/43551514017) 5/5、[M7 #43551514036](https://github.com/hujunjie-hub/Flight/actions/runs/43551514036) 2/2 SUCCESS；M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integration 1,147/0；修复后的原生 FMT-SIM Land/Return/Mission 均 NOT_RUN。
+- 当前证据：[Host #43552232780](https://github.com/hujunjie-hub/Flight/actions/runs/43552232780) 6/6、[M6/M7 #43552232828](https://github.com/hujunjie-hub/Flight/actions/runs/43552232828) 5/5、[M7 #43552232801](https://github.com/hujunjie-hub/Flight/actions/runs/43552232801) 2/2 SUCCESS；M4 1,074/0、M5 324,792/0、MR-009 focused 430/0、M4/M5 integration 1,147/0；PowerShell Parser 对两个本地 runner 均 PASS；修复后的原生 FMT-SIM Land/Return/Mission 均 NOT_RUN。
 - 执行责任：项目 Owner 在 Windows 本机执行；远程 Agent 不代跑原生 FMT-SIM。Agent 负责代码、Host/SIL/CI、分析和下一轮修复。
 - 统一方案：spec/validation/FMT_SIM_LOCAL_HANDOFF.md；批量入口 `tests/simulation/run_fmt_sim_regression.ps1` 一次构建并启动三个独立引擎进程。严格关闭资格固定为目标分支、UDP 14653、350 ms、hover 0.62、Owner 显式确认 loopback 127.0.0.1、干净工作区且 HEAD 与脚本刚 fetch 的 origin tracking HEAD 一致；需回传 manifest、summary、完整日志、逐场景退出码、SHA256SUMS 和 ZIP sidecar。
 - 状态规则：#17/#18/#19 继续 OPEN；收到修复后本机证据并逐项复核前，不标 VERIFIED/CLOSED。Host/CI PASS 不替代原生 FMT-SIM；FMT-SIM PASS 不替代 B07 H723 实机/HIL/WCET/栈水位/飞行证据。
