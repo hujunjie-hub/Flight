@@ -116,8 +116,8 @@ void fms_land_tick(FmsEngine *e, const FmsInputs *in)
     desired = LANDED_STATE_IN_AIR;
     evidence = 0x2u;
     confidence = 0.6f;
-  } else if (in->ground_contact == GROUND_CONTACT_CONTACT && in->cap_ok != 0u &&
-             (in->nav->core.valid_mask & in->cap->capability_mask &
+  } else if (in->ground_contact == GROUND_CONTACT_CONTACT && in->nav_ok != 0u &&
+             in->cap_ok != 0u && (in->nav->core.valid_mask & in->cap->capability_mask &
               (NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY)) ==
                  (NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY) &&
              fms_finite(in->nav->core.velocity_ned_mps[0]) &&
