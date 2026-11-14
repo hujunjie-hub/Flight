@@ -99,21 +99,40 @@ uint8_t guidance_handoff_acceleration(const GuidanceState *s, const GuidanceInpu
 
 static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, float goal[3])
 {
-    enum { LANDING_APPROACH = 1, LANDING_FINAL = 2 };
+    enum { LANDING_APPROACH = 1, LANDING_BRAKE = 2, LANDING_FINAL = 3 };
     const float approach_down = goal[2] - 0.6f;
+    const float brake_down = goal[2] - GUIDANCE_LANDING_BRAKE_HEIGHT_M;
     const float *position = in->navigation->core.position_ned_m;
     const float *velocity = in->navigation->core.velocity_ned_mps;
-    if (s->landing_stage == 0u)
-        s->landing_stage = position[2] < approach_down ? LANDING_APPROACH : LANDING_FINAL;
+    if (s->landing_stage == 0u) {
+        if (position[2] < approach_down)
+            s->landing_stage = LANDING_APPROACH;
+        else if (position[2] < brake_down)
+            s->landing_stage = LANDING_BRAKE;
+        else
+            s->landing_stage = LANDING_FINAL;
+    }
     if (s->landing_stage == LANDING_APPROACH) {
         if (s->plan_valid && in->control_time_us >= s->plan_start_us &&
             (in->control_time_us - s->plan_start_us) * 1e-6f >= s->plan_duration_s &&
             hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
             hypotf(velocity[0], velocity[1]) <= 0.25f &&
             fabsf(position[2] - approach_down) <= 0.20f && fabsf(velocity[2]) <= 0.20f) {
-            s->landing_stage = LANDING_FINAL;
+            s->landing_stage = LANDING_BRAKE;
         } else {
             goal[2] = approach_down;
+        }
+    }
+    if (s->landing_stage == LANDING_BRAKE) {
+        if (s->plan_valid && in->control_time_us >= s->plan_start_us &&
+            (in->control_time_us - s->plan_start_us) * 1e-6f >= s->plan_duration_s &&
+            hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
+            hypotf(velocity[0], velocity[1]) <= 0.15f &&
+            fabsf(position[2] - brake_down) <= 0.10f &&
+            fabsf(velocity[2]) <= GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS) {
+            s->landing_stage = LANDING_FINAL;
+        } else {
+            goal[2] = brake_down;
         }
     }
 }
