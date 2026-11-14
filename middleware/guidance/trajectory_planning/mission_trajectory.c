@@ -126,16 +126,21 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
     if (landing_confirmed(in) || landing_contact_observed(in)) {
         /* Physical contact is an early M5 settling hint, not disarm authority.
          * Stop chasing Home XY and stop the below-plane probe at the measured
-         * contact point; M4 alone decides LANDED after its unchanged 2 s dwell. */
+         * contact point; M4 alone decides LANDED after its unchanged 2 s dwell.
+         *
+         * Keep the active plan until plan() samples its current reference state.
+         * Re-seeding from raw navigation here can inherit a contact impulse or
+         * estimator acceleration spike and make an otherwise safe hold infeasible. */
         s->landing_stage = LANDING_CONTACT_HOLD;
         memcpy(goal, position, sizeof(s->ctx.target_ned));
-        memcpy(s->ctx.target_ned, goal, sizeof(s->ctx.target_ned));
-        s->plan_valid = 0u;
         return;
     }
 
     if (s->landing_stage == 0u) {
-        if (position[2] < approach_down)
+        const float horizontal_error = hypotf(position[0] - goal[0], position[1] - goal[1]);
+        const float horizontal_speed = hypotf(velocity[0], velocity[1]);
+        if (position[2] < approach_down || horizontal_error > 0.30f ||
+            horizontal_speed > 0.25f)
             s->landing_stage = LANDING_APPROACH;
         else if (position[2] < brake_down)
             s->landing_stage = LANDING_BRAKE;
@@ -149,13 +154,14 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
         if (plan_complete &&
             hypotf(position[0] - goal[0], position[1] - goal[1]) <= 0.30f &&
             hypotf(velocity[0], velocity[1]) <= 0.25f &&
-            fabsf(position[2] - approach_down) <= 0.20f &&
+            fabsf(position[2] - s->ctx.target_ned[2]) <= 0.20f &&
             fabsf(velocity[2]) <= 0.20f)
             s->landing_stage = LANDING_BRAKE;
         if (s->landing_stage == LANDING_APPROACH) {
-            /* Keep the completed approach endpoint as a stationary reference
-             * until measured state satisfies the transition gate. */
-            goal[2] = approach_down;
+            /* First align and brake horizontally at the current altitude.
+             * Do not combine a long XY return with the final descent: the
+             * vehicle must settle over Home before entering the landing band. */
+            goal[2] = s->ctx.target_ned[2];
             return;
         }
     }
