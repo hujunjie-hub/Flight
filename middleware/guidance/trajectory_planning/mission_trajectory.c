@@ -105,6 +105,34 @@ static uint8_t landing_contact_observed(const GuidanceInput *in)
         (in->landed_state->evidence_mask & LANDED_EVIDENCE_GROUND_CONTACT) != 0u);
 }
 
+static uint8_t landing_contact_hold_ready(const GuidanceInput *in, const GuidanceState *s)
+{
+    const uint32_t velocity_mask = NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY;
+    const float *velocity = in->navigation->core.velocity_ned_mps;
+    ProductMotionPoint reference;
+
+    /* A contact hint can arrive while the vehicle is still sliding across the
+     * surface. Replanning to the instantaneous measured position from a faster
+     * active reference can require an infeasible jerk impulse. Wait until both
+     * the estimator and the reference being handed off are in the final
+     * low-speed band. M4's LANDED decision and disarm dwell remain authoritative. */
+    if (!s->plan_valid ||
+        (in->navigation->core.valid_mask & velocity_mask) != velocity_mask ||
+        !finite3(velocity))
+        return 0u;
+
+    sample(s, in->control_time_us, &reference);
+    if (!finite3(reference.velocity_ned_mps))
+        return 0u;
+
+    return (uint8_t)(
+        hypotf(velocity[0], velocity[1]) <= GUIDANCE_LANDING_CONTACT_HOLD_MAX_HORIZONTAL_SPEED_MPS &&
+        fabsf(velocity[2]) <= GUIDANCE_LANDING_CONTACT_HOLD_MAX_VERTICAL_SPEED_MPS &&
+        hypotf(reference.velocity_ned_mps[0], reference.velocity_ned_mps[1]) <=
+            GUIDANCE_LANDING_CONTACT_HOLD_MAX_HORIZONTAL_SPEED_MPS &&
+        fabsf(reference.velocity_ned_mps[2]) <= GUIDANCE_LANDING_CONTACT_HOLD_MAX_VERTICAL_SPEED_MPS);
+}
+
 static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, float goal[3])
 {
     const float home_down = in->directive->payload.home.position_ned_m[2];
@@ -123,14 +151,22 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
         memcpy(goal, s->ctx.target_ned, sizeof(s->ctx.target_ned));
         return;
     }
-    if (landing_confirmed(in) || landing_contact_observed(in)) {
-        /* Physical contact is an early M5 settling hint, not disarm authority.
-         * Stop chasing Home XY and stop the below-plane probe at the measured
-         * contact point; M4 alone decides LANDED after its unchanged 2 s dwell.
-         *
-         * Keep the active plan until plan() samples its current reference state.
-         * Re-seeding from raw navigation here can inherit a contact impulse or
-         * estimator acceleration spike and make an otherwise safe hold infeasible. */
+    if (landing_confirmed(in)) {
+        /* M4 has completed its strict LANDED dwell. Preserve the already
+         * validated trajectory target rather than introducing a last-moment
+         * replan while the ground-stop/disarm handoff is taking place. */
+        s->landing_stage = LANDING_CONTACT_HOLD;
+        if (s->plan_valid)
+            memcpy(goal, s->ctx.target_ned, sizeof(s->ctx.target_ned));
+        else
+            memcpy(goal, position, sizeof(s->ctx.target_ned));
+        return;
+    }
+    if (landing_contact_observed(in) && landing_contact_hold_ready(in, s)) {
+        /* The UNKNOWN + ground-contact snapshot is only an advisory hint.
+         * Do not latch it while either measured or active-reference velocity
+         * is outside the final low-speed band: that would stop the Home return
+         * too early and can make the hold replan jerk-infeasible. */
         s->landing_stage = LANDING_CONTACT_HOLD;
         memcpy(goal, position, sizeof(s->ctx.target_ned));
         return;

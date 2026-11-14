@@ -40,6 +40,10 @@ CONTRACT_STATIC_ASSERT(GUIDANCE_MAX_DURATION_US == 6200000u,
 #define GUIDANCE_LANDING_MAX_VERTICAL_SPEED_MPS 0.12f
 /* The Host/SIL contact oracle asserts physical contact within 6 cm. */
 #define GUIDANCE_LANDING_CONTACT_HEIGHT_M 0.06f
+/* M5 only latches an advisory contact hint after both measured and active-reference
+ * horizontal/vertical speeds enter the final low-speed band. */
+#define GUIDANCE_LANDING_CONTACT_HOLD_MAX_HORIZONTAL_SPEED_MPS 0.15f
+#define GUIDANCE_LANDING_CONTACT_HOLD_MAX_VERTICAL_SPEED_MPS 0.15f
 /* Start the final low-speed brake band before entering contact range. */
 #define GUIDANCE_LANDING_BRAKE_HEIGHT_M 0.20f
 /* Margin for M6's 20 ms float-boundary reconstruction of the landing curve. */
