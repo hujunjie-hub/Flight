@@ -1,6 +1,6 @@
 # 飞行与策略仿真验证矩阵
 
-本文件的 PASS 记录均绑定各自历史 RUN_ID。R32 在修复前 HEAD `e470f00c` 上 Land/Return PASS、Mission 3 项 FAIL；生产修复 `3d8d29b5` 已提交，测试-only follow-up `2f8118f1` 将长航段回归扩展至 2.4 m 水平 / 2.4 m 高度；Host/M6-M7/M7 三组 CI 6/6、5/5、2/2 均通过。修复后的原生 FMT-SIM 尚未复跑。
+本文件的 PASS 记录均绑定各自历史 RUN_ID。R32 在修复前 HEAD `e470f00c` 上 Land/Return PASS、Mission 3 项 FAIL；R33 在 `5e3b74f` 上 Land/Return PASS、Mission 3 项终端失败，近地下降速度 0.374 m/s 已通过。R33 后 main 增加 advisory contact handoff `419f56962f74fd9d89bc62cfc11ee0923910177c` 和 nav_ok guard `15a33756d4e269800e6778c6180f7086179c9429`；测试-only 回归 `3270cff5aec26e3ae0717c62d2d78e9f30752020` 通过最新三组 CI。修复后的原生 FMT-SIM 尚待 Owner 重跑。
 本轮使用 `SIM_CONTROLLED_STOP` Host 构建和隔离的 FMT-SIM Ground 场景。
 H723 的运行配置仍使用 `BENCH_INHIBIT`。设备固件、UART/DMA、板上时序和实机运动
 留在各自的验证门禁。
@@ -145,7 +145,7 @@ Native FMT-SIM must still be rerun locally before #17/#18/#19 can close.
 
 按项目方要求，后续 Windows 原生 FMT-SIM 动态复测统一由项目 Owner 在本机完成；远程 Agent 负责代码修改、Host/SIL/CI 和失败分析，不代跑原生引擎。正式操作及证据格式见 [FMT-SIM 本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。
 
-当前 main 生产代码修复基线为 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`。测试-only follow-up `2f8118f1b149183e5df2d6e9c9941a52bd52562e` 扩展长航段 landing-speed 回归至 2.4 m 水平返航 / 2.4 m 高度；Host #43576600195 6/6、M6/M7 #43576600154 5/5、M7 #43576600112 2/2 均 SUCCESS。
+当前 main 生产代码修复基线为 `15a33756d4e269800e6778c6180f7086179c9429`；接地候选 handoff 修复 `419f56962f74fd9d89bc62cfc11ee0923910177c`，缺失导航 guard `15a33756d4e269800e6778c6180f7086179c9429`；测试-only 回归基线 `3270cff5aec26e3ae0717c62d2d78e9f30752020`。Host #43593701736 6/6、M6/M7 #43593701892 5/5、M7 #43593701803 2/2 SUCCESS。
 
 
 ## ENG-07 Native FMT-SIM: local execution tool
@@ -183,3 +183,18 @@ Owner archive RUN_ID `FMT-SIM-LOCAL-20261114T072713056Z-e470f00c`, tested main H
 Mission's failures: final 0.50 m maximum descent 0.665 m/s (limit 0.40); DISARMED ACK rejected with reason 11; arm state not DISARMED. At 41,140 ms Return request 2163 completed; DISARM request 3064 was rejected at 41,160 ms. Final contact=1 but landed=UNKNOWN, nav horizontal speed 0.204 m/s and touchdown distance 0.352 m. This is consistent with the M5 reference continuing to chase Home XY after LANDED confirmation and exceeding the FMS 0.20 m/s stable-ground gate. The old M5 trajectory validator only limited the final 0.20 m to 0.12 m/s, while the native acceptance measured the full final 0.50 m.
 
 Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` adds a 0.50 m / 0.40 m/s bound, retains the final 0.20 m / 0.12 m/s bound, and latches touchdown XY after LANDED. FMS safety thresholds are unchanged. Host #43574875444 6/6, M6/M7 #43574875363 5/5 and M7 #43574875394 2/2 all PASS; new M5 landing speed/contact-hold tests PASS. The patch still needs a new native FMT-SIM batch on latest main. Keep #17/#18/#19 OPEN because the R32 manifest is not closure-eligible. [Full R32 archive review](../../spec/validation/FMT_SIM_LOCAL_20261114_E470F00C_REVIEW.md). Test-only follow-up `2f8118f1` extends the long-leg regression to 2.4 m horizontal / 2.4 m above Home; Host/M6-M7/M7 CI 6/6, 5/5, 2/2 PASS.
+
+
+## ENG-07 R33 FMT-SIM local run — Land/Return PASS, Mission terminal handoff FAIL
+
+Owner archive RUN_ID `FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4`, tested main HEAD `5e3b74f40293a005de693eceb61af4c0552e`. Clean/stable worktree, upstream match, fetch, loopback, UDP 14653, hover 0.62 and 350 ms gate all verified. ZIP/sidecar SHA256 match; all 102 internal hashes pass.
+
+| Scenario | Checks | Failures | Longest state gap | Result |
+|---|---:|---:|---:|---|
+| Land | 39,388 | 0 | 94.8 ms | PASS |
+| Return | 40,485 | 0 | 94.8 ms | PASS |
+| Mission | 67,112 | 3 | 94.8 ms | FAIL |
+
+Mission's final 0.50 m maximum descent is 0.374 m/s (limit 0.40, PASS), touchdown distance 0.171 m, and both waypoints are reached (0.233 m / 0.331 m closest distances). The only failures are terminal ACK, DISARM ACK and final DISARMED arm state. At t=34.280 s contact becomes true while landed remains UNKNOWN and evidence mask is 0x0; first-contact horizontal speed is about 0.291 m/s. Final state remains contact=1 / landed=UNKNOWN / evidence=0x0 / stable_ms=0; nav_ad=0.688 m/s² exceeds the 0.5 m/s² stable-ground gate. The old UNKNOWN branch discarded the contact hint, so M5 continued Home/probe tracking.
+
+Post-R33 main fixes: `419f56962f74fd9d89bc62cfc11ee0923910177c` preserves advisory contact evidence and M5 latches measured contact XYZ; `15a33756d4e269800e6778c6180f7086179c9429` guards the branch with nav_ok. M4 LANDED / DISARM thresholds and 2 s dwell remain unchanged. Test hardening `3270cff5aec26e3ae0717c62d2d78e9f30752020` covers missing navigation and passes Host CI. Host/M6-M7/M7 workflows: 6/6, 5/5, 2/2 SUCCESS. R33 predates these fixes; keep #17/#18/#19/#21/#22 OPEN pending a new full native batch. [Full R33 archive review](../../spec/validation/FMT_SIM_LOCAL_20261114_5E3B74F4_REVIEW.md).

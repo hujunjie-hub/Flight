@@ -115,18 +115,14 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 
 ## ENG-07 原生 FMT-SIM 本机复测登记
 
-- 当前产品代码修复提交：`3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；测试-only follow-up `2f8118f1b149183e5df2d6e9c9941a52bd52562e` 扩展长航段 return landing speed regression；main 后续文档提交不改变生产代码。
-- R32 原生复测 RUN_ID：`FMT-SIM-LOCAL-20261114T072713056Z-e470f00c`，测试 HEAD：`e470f00cd539f438b1923b0faa844456ba2d3b59`。Land 48,043/0 PASS、Return 44,667/0 PASS、Mission 62,793/3 FAIL；总计 155,503 checks / 3 failures，最长状态间隔 145.3 ms。R32 在修复提交之前执行，不是修复后验证。
-- 在线跟踪：GitHub Issues [#17 Land](https://github.com/hujunjie-hub/Flight/issues/17)、[#18 Return](https://github.com/hujunjie-hub/Flight/issues/18)、[#19 Mission](https://github.com/hujunjie-hub/Flight/issues/19)，Mission 子问题 [#21 近地下降速度](https://github.com/hujunjie-hub/Flight/issues/21)、[#22 LANDED/接地点保持](https://github.com/hujunjie-hub/Flight/issues/22)。
-- 修复提交 3d8d29b5dfda21237f8ed02db3c31223c656bfbe 的自动化证据：
-- Host validation [#43574875444](https://github.com/hujunjie-hub/Flight/actions/runs/43574875444)：6/6 jobs SUCCESS；M4 945/0、M5 326,004/0、MR-009 focused 430/0、M4/M5 integration 1,018/0、M5 ASan/UBSan 326,004/0。
-- M6/M7 host validation [#43574875363](https://github.com/hujunjie-hub/Flight/actions/runs/43574875363)：5/5 jobs SUCCESS。
-- M7 host validation [#43574875394](https://github.com/hujunjie-hub/Flight/actions/runs/43574875394)：2/2 jobs SUCCESS。
-- 测试-only follow-up `2f8118f1b149183e5df2d6e9c9941a52bd52562e`：Host [#43576600195](https://github.com/hujunjie-hub/Flight/actions/runs/43576600195) 6/6、M6/M7 [#43576600154](https://github.com/hujunjie-hub/Flight/actions/runs/43576600154) 5/5、M7 [#43576600112](https://github.com/hujunjie-hub/Flight/actions/runs/43576600112) 2/2 SUCCESS；`landing_alignment_and_speed` 扩展到 2.4 m 水平返航 / 2.4 m 高度的完整长航段。
-  M5 Host / ASan/UBSan 各 326,004/0；M4 Host 945/0；M4/M5 integration 与 sanitizer 各 1,018/0；新增 landing speed / touchdown XY latch 回归通过。
-- 执行责任：项目 Owner 在 Windows 本机执行；远程 Agent 不代跑原生 FMT-SIM。Agent 负责代码、Host/SIL/CI、分析和下一轮修复。
-- 统一方案：spec/validation/FMT_SIM_LOCAL_HANDOFF.md；批量入口 `tests/simulation/run_fmt_sim_regression.ps1` 一次构建并启动三个独立引擎进程。严格关闭资格固定为 main、UDP 14653、350 ms、hover 0.62、Owner 显式确认 loopback 127.0.0.1、干净工作区且 HEAD 与脚本刚 fetch 的 origin tracking HEAD 一致；需回传 manifest、summary、完整日志、逐场景退出码、SHA256SUMS 和 ZIP sidecar。
-- 状态规则：#17/#18/#19/#21/#22 均继续 OPEN；修复后的完整三场景批量复测尚未运行。收到新归档并逐项复核前，不标 VERIFIED/CLOSED。Host/CI PASS 不替代原生 FMT-SIM；FMT-SIM PASS 不替代 B07 H723 实机/HIL/WCET/栈水位/飞行证据。
+- R33 RUN_ID：`FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4`；测试 HEAD：`5e3b74f40293a005de693eceb61af4c0552e`。ZIP SHA256 `0d6b75c578e2ae71b501f9f26b827559fe8b0887598253af55d09d09f63cdcfb` 与 sidecar 匹配，manifest SHA256 `6604b49d3fe889c9c022b63dec313b762880d7aa8cc12e736975257e2490971d`，内部 102 项 SHA256 全部通过；branch/upstream 匹配、worktree clean/stable、loopback/UDP/hover/350 ms 门禁均有效。
+- R33 结果：Land 39,388/0 PASS、Return 40,485/0 PASS、Mission 67,112/3 FAIL；总计 146,985/3，最长状态间隔 94.8 ms。Mission 末段最大下降速度 0.374 m/s，touchdown distance 0.171 m；失败仅为 terminal ACK、DISARM ACK、arm state 未 DISARMED。详细证据见 [R33 report](../validation/FMT_SIM_LOCAL_20261114_5E3B74F4_REVIEW.md)。
+- R33 复现接地交接缺陷：t=34.280 s contact=1、landed=UNKNOWN、evidence=0x0；M4 严格稳定门槛未满足，旧代码没有给 M5 保留 advisory contact evidence。新生产修复 `419f56962f74fd9d89bc62cfc11ee0923910177c` / `15a33756d4e269800e6778c6180f7086179c9429` 已提交，M4 安全阈值和 2 s dwell 未放宽。
+- 测试补强 `3270cff5aec26e3ae0717c62d2d78e9f30752020`：缺失导航时不发布接地候选证据；`contact_candidate_not_disarm_authority` 与 `contact_candidate_requires_valid_navigation` 均 PASS。
+- Current-main CI on `3270cff5aec26e3ae0717c62d2d78e9f30752020`: Host [#43593701736](https://github.com/hujunjie-hub/Flight/actions/runs/43593701736) 6/6, M6/M7 [#43593701892](https://github.com/hujunjie-hub/Flight/actions/runs/43593701892) 5/5, M7 [#43593701803](https://github.com/hujunjie-hub/Flight/actions/runs/43593701803) 2/2 SUCCESS. M4 1,042/0; M5 327,030/0; M4/M5 integration 969/0; MR-009 focused 430/0; M7 274/0.
+- R33 测试 HEAD 早于上述生产修复；修复后的原生 FMT-SIM 仍 NOT_RUN。#17/#18/#19/#21/#22 全部继续 OPEN；#17/#18 单场景 PASS 不能替代完整 manifest closure eligibility。
+- Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析和文档。统一方案：`spec/validation/FMT_SIM_LOCAL_HANDOFF.md`；批量入口 `tests/simulation/run_fmt_sim_regression.ps1`。严格门槛为 main、UDP 14653、350 ms、hover 0.62、显式 loopback 127.0.0.1、clean worktree 且 HEAD 与刚 fetch 的 origin/main 一致。
+- FMT-SIM PASS 不替代 B07 H723 实机/HIL/WCET/栈水位/飞行证据。
 
 ## 2026-11-14 R30 归档复核登记
 

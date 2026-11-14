@@ -4,7 +4,7 @@
 >
 > 适用分支：**main**
 >
-> 当前代码修复基线：**3d8d29b5dfda21237f8ed02db3c31223c656bfbe**（main 已包含该修复；运行前 fetch 最新 origin/main）
+> 当前生产代码修复基线：**15a33756d4e269800e6778c6180f7086179c9429**；接地候选交接修复：**419f56962f74fd9d89bc62cfc11ee0923910177c**；测试补强：**3270cff5aec26e3ae0717c62d2d78e9f30752020**（运行前 fetch 最新 origin/main）
 >
 > 本方案只覆盖 Windows 原生 FMT-SIM + Flight Host SIL 软件动态复测；不代表 H723 真机、台架 HIL、WCET/RTA、目标栈水位或飞行验收。
 
@@ -31,9 +31,10 @@
 - LAND / RETURN 在 Home 上方最后 0.50 m 内限制垂向速度不超过 0.40 m/s；最后 0.20 m 继续限制为 0.12 m/s。物理接地判据仍为 0.06 m，LandDetector 原有接地、速度、加速度和 dwell 条件未放宽。
 - RETURN 分为 0.60 m 进近、0.20 m 制动和最终 Home 段；25% 三轴 jerk 余量只作用于制动和最终段，不压缩长距离进近段。
 - FMS 首次确认 LANDED 后，M5 锁存实际接地点的水平坐标并保持至解除武装交接结束；LANDED 快照短暂丢失时不再恢复追逐 Home XY。
+- 新增 UNKNOWN 状态下的 advisory physical-contact evidence：在 ground contact、导航/能力/速度字段有效且垂向速度满足候选条件时，M5 提前锁存实测接触 XYZ 并停止追逐 Home/probe；该提示不授予 LANDED 或 DISARM 权限。M4 仍要求水平速度 ≤0.20 m/s、垂向速度 ≤0.15 m/s、垂向加速度 ≤0.5 m/s² 和完整 2 s dwell。导航无效时不得读取候选数据。
 - M4 Mission→Return 许可绑定比较使用 M6 capability 的 publish 时间，覆盖 20 ms sample-to-publish 延迟。
 
-生产代码修复提交为 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；main 后续新增测试-only 提交 `2f8118f1b149183e5df2d6e9c9941a52bd52562e` 扩展长航段回归，并同步 R32 证据/交接文档；无新的生产代码变更。Owner 复测前必须 fetch 最新 origin/main。
+生产代码修复提交 `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` 负责 0.50 m 速度包络与 LANDED touchdown XY latch；R33 后的接地候选交接修复提交 `419f56962f74fd9d89bc62cfc11ee0923910177c`，导航有效性 guard 提交 `15a33756d4e269800e6778c6180f7086179c9429`。测试补强提交 `3270cff5aec26e3ae0717c62d2d78e9f30752020` 增加缺失导航回归。Owner 复测前必须 fetch 最新 origin/main；生产代码修复基线为 `15a33756d4e269800e6778c6180f7086179c9429`。
 
 修复提交 3d8d29b5dfda21237f8ed02db3c31223c656bfbe 的三组 CI 全部通过：
 - [Host validation #43574875444](https://github.com/hujunjie-hub/Flight/actions/runs/43574875444)：6/6 jobs SUCCESS。
@@ -44,7 +45,9 @@ Host 证据包括 M4 945/0、M5 326,004/0、MR-009 focused 430/0、M4/M5 integra
 
 Test-only follow-up `2f8118f1b149183e5df2d6e9c9941a52bd52562e` expands `landing_alignment_and_speed` to the 2.4 m horizontal / 2.4 m above-Home Mission-return geometry and follows the complete approach, brake, Home-plane and probe stages; the touchdown-hold fixture now checks both X and Y after the LANDED snapshot drops. This commit changes tests only; the production fix remains `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`. CI on `2f8118f1`: Host #43576600195 (6/6), M6/M7 #43576600154 (5/5), M7 #43576600112 (2/2), all SUCCESS.
 
-**以上均不是修复后的原生 FMT-SIM 证据。** 修复提交后的完整 Land / Return / Mission 批量复测仍 NOT_RUN；GitHub Issues #17/#18/#19 及子问题 #21/#22 均保持 OPEN。
+接地候选修复 `419f56962f74fd9d89bc62cfc11ee0923910177c` / nav guard `15a33756d4e269800e6778c6180f7086179c9429` 后，最新测试提交 `3270cff5aec26e3ae0717c62d2d78e9f30752020` 的 CI：Host #43593701736（6/6）、M6/M7 #43593701892（5/5）、M7 #43593701803（2/2）全部 SUCCESS；M4 1,042/0、M5 327,030/0、M4/M5 integration 969/0、MR-009 focused 430/0、M7 274/0。
+
+**以上均不是 R33 后接地候选修复的原生 FMT-SIM 证据。** R33 测试 HEAD `5e3b74f` 早于 `419f5696` / `15a33756`，完整 Land / Return / Mission 批量复测仍 NOT_RUN；#17/#18/#19/#21/#22 均保持 OPEN。
 
 ## 3. 本机运行前置条件
 
@@ -193,3 +196,15 @@ build/validation/fmt-sim-local/<RUN_ID>.zip
 - 根因修复提交：`3d8d29b5dfda21237f8ed02db3c31223c656bfbe`。M5 增加最后 0.50 m / 0.40 m/s 速度包络（最后 0.20 m / 0.12 m/s 保持不变）；首次 LANDED 后锁存 touchdown XY，避免解除武装期间继续追 Home。FMS 接地、速度、加速度、dwell 和 DISARM 判据均未放宽。SIL 新增 LandDetector 稳定时间/证据位/置信度与 near-ground peak 时高诊断。
 - Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` passed Host validation [#43574875444](https://github.com/hujunjie-hub/Flight/actions/runs/43574875444) 6/6, M6/M7 [#43574875363](https://github.com/hujunjie-hub/Flight/actions/runs/43574875363) 5/5 and M7 [#43574875394](https://github.com/hujunjie-hub/Flight/actions/runs/43574875394) 2/2. M5 Host and ASan/UBSan each passed 326,004/0; M4 Host 945/0; M4/M5 integration and its sanitizer each 1,018/0; MR-009 focused 430/0. New tests `landing_alignment_and_speed` and `landing_contact_latches_xy` passed.
 - **下一轮必须在最新 main 上重跑完整 Land → Return → Mission。** R32 的 Land、Return 场景虽然通过，但 manifest 的 `issue_closure_eligible=false`；#17/#18/#19 暂均保持 OPEN，不能以单场景 PASS 或 Host/CI PASS 代替完整原生验收。
+
+## 2026-11-14 R33 归档复核与接地候选交接修复
+
+R33 RUN_ID `FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4` 在修复前 HEAD `5e3b74f40293a005de693eceb61af4c0552e` 完成：Land 39,388/0 PASS，Return 40,485/0 PASS，Mission 67,112/3 FAIL；总计 146,985 checks / 3 failures，最长状态间隔 94.8 ms。ZIP SHA256 `0d6b75c578e2ae71b501f9f26b827559fe8b0887598253af55d09d09f63cdcfb` 与 sidecar 一致，manifest SHA256 `6604b49d3fe889c9c022b63dec313b762880d7aa8cc12e736975257e2490971d`，内部 102 项 SHA256 全部通过。Mission 最后 0.50 m 最大下降速度 0.374 m/s（上限 0.40，已通过），返航落点距 Home 0.171 m；仅 terminal ACK、DISARM ACK、最终 DISARMED 状态三项失败。
+
+R33 在 t=34.280 s 首次记录 ground contact=CONTACT，但 FMS landed=UNKNOWN 且 evidence=0x0；当时水平速度约 0.291 m/s，未满足 M4 的 0.20 m/s 稳定门槛。旧代码在 UNKNOWN 状态清空接地证据，M5 无法提前停止追逐 Home/probe。最终快照 contact=1、landed=UNKNOWN、stable_ms=0、evidence=0x0，nav_vh=0.161 m/s、nav_vd=-0.005 m/s、nav_ad=0.688 m/s²；垂向加速度仍超过 0.5 m/s² 稳定门槛。
+
+R33 后 main 新增生产修复：`419f56962f74fd9d89bc62cfc11ee0923910177c` 在导航/能力/速度数据有效且物理接触可信时保留 UNKNOWN 接地候选证据；M5 识别该提示后锁存实测接触 XYZ 并停止继续追逐 Home。该候选只用于 M5 过渡，不授予 LANDED/DISARM 权限。`15a33756d4e269800e6778c6180f7086179c9429` 增加 nav_ok 检查，避免导航指针缺失时被候选分支解引用。M4 的 0.20 m/s 水平速度、0.15 m/s 垂向速度、0.5 m/s² 垂向加速度与 2 s dwell、DISARM gate 均未放宽。测试提交 `3270cff5aec26e3ae0717c62d2d78e9f30752020` 增加缺失导航回归；两个 contact candidate 测试均通过。
+
+Current-main CI on `3270cff5aec26e3ae0717c62d2d78e9f30752020`: Host [#43593701736](https://github.com/hujunjie-hub/Flight/actions/runs/43593701736) 6/6, M6/M7 [#43593701892](https://github.com/hujunjie-hub/Flight/actions/runs/43593701892) 5/5, M7 [#43593701803](https://github.com/hujunjie-hub/Flight/actions/runs/43593701803) 2/2 SUCCESS. M4 1,042/0; M5 327,030/0; M4/M5 integration 969/0; MR-009 focused 430/0; M7 274/0.
+
+详细哈希、失败断言、逐帧分析和下一步见 [R33 归档复核报告](FMT_SIM_LOCAL_20261114_5E3B74F4_REVIEW.md)。下一轮必须在最新 main 上执行完整 Land → Return → Mission；R33 的 Land/Return 单场景 PASS 不构成整批关闭资格。

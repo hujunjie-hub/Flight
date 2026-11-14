@@ -8,7 +8,7 @@
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
 RUN_ID `M5-06-R31-20261113`；validated code `8dcb60b3ac18e6a763c939d3e810984092cdd321`；
-code-validation HEAD `3d8d29b5dfda21237f8ed02db3c31223c656bfbe`；test-only follow-up `2f8118f1b149183e5df2d6e9c9941a52bd52562e` expands the long-leg landing regression; no further production-code change; fetch latest origin/main before owner-local retest;
+production fix HEAD `15a33756d4e269800e6778c6180f7086179c9429`；contact handoff fix `419f56962f74fd9d89bc62cfc11ee0923910177c`；test-only regression HEAD `3270cff5aec26e3ae0717c62d2d78e9f30752020`；no further production-code changes after `15a33756`; fetch latest origin/main before owner-local retest;
 唯一开发/验证分支 `main`；历史 R31 证明基线仍为 `8dcb60b3ac18e6a763c939d3e810984092cdd321`。
 
 本文件结论来自历史本地验证记录与本轮 GitHub Actions 远程 Host/SIL/Cortex-M7 编译证据；均不是 H723 实机、HIL、
@@ -120,13 +120,13 @@ WCET/RTA、栈水位或飞行放行证据。`GITHUB_PUBLICATION = PARTIAL`；Git
 
 | Issue | 场景 | 当前状态 | 执行责任 / 解除证据 |
 |---|---|---|---|
-| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / R32 SCENARIO PASS; FULL BATCH NOT CLOSURE-ELIGIBLE | R32 Land 48,043/0; rerun all scenarios after fix `3d8d29b` |
-| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R32 SCENARIO PASS; FULL BATCH NOT CLOSURE-ELIGIBLE | R32 Return 44,667/0; rerun all scenarios after fix `3d8d29b` |
-| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R32 3 FAILURES; FIX COMMITTED / RETEST REQUIRED | R32 62,793/3; near-ground descent 0.665 m/s, disarm reason 11, arm not DISARMED |
-| [#21](https://github.com/hujunjie-hub/Flight/issues/21) | Mission near-ground speed | OPEN / FIX COMMITTED / NATIVE RETEST REQUIRED | 3d8d29 adds 0.50 m / 0.40 m/s plus 0.20 m / 0.12 m/s continuous bounds |
-| [#22](https://github.com/hujunjie-hub/Flight/issues/22) | Mission touchdown hold | OPEN / FIX COMMITTED / NATIVE RETEST REQUIRED | 3d8d29 latches touchdown XY after LANDED; FMS thresholds unchanged |
+| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / R33 SCENARIO PASS; FULL BATCH NOT CLOSURE-ELIGIBLE | R33 Land 39,388/0; new contact-handoff code not yet native-retested |
+| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / R33 SCENARIO PASS; FULL BATCH NOT CLOSURE-ELIGIBLE | R33 Return 40,485/0; new contact-handoff code not yet native-retested |
+| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / R33 3 TERMINAL FAILURES; CONTACT HANDOFF FIX COMMITTED / RETEST REQUIRED | R33 Mission 67,112/3; descent 0.374 m/s PASS; terminal ACK, DISARM ACK, arm state fail |
+| [#21](https://github.com/hujunjie-hub/Flight/issues/21) | Mission near-ground speed | OPEN / R33 SPEED METRIC PASS; FULL MISSION/MANIFEST STILL FAILS | R33 final 0.50 m descent 0.374 m/s; keep open under full-manifest closure rule |
+| [#22](https://github.com/hujunjie-hub/Flight/issues/22) | Mission touchdown hold | OPEN / R33 REPRODUCED; ADVISORY CONTACT HANDOFF FIX COMMITTED / NATIVE RETEST REQUIRED | R33 contact=1 but landed UNKNOWN/evidence=0x0; fixes `419f5696` / `15a33756`; FMS thresholds unchanged |
 
-Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` 的 Host validation #43574875444（6/6）、M6/M7 #43574875363（5/5）、M7 #43574875394（2/2）全部 SUCCESS；M5 Host 326,004/0、M5 ASan/UBSan 326,004/0、M4 Host 945/0、M4/M5 integration 1,018/0、integration sanitizer 1,018/0、MR-009 focused 430/0。新增 `landing_alignment_and_speed` 与 `landing_contact_latches_xy` 均 PASS。以上 CI 不启动原生 FMT-SIM。后续原生 FMT-SIM 均由项目 Owner 在 Windows 本机执行，远程 Agent 不代跑。Agent 负责代码修复、Host/SIL/CI、日志分析和分支交付。命令、环境指纹、归档和回传规则见 [FMT-SIM 本机复测交接方案](../validation/FMT_SIM_LOCAL_HANDOFF.md)；批量入口为 `tests/simulation/run_fmt_sim_regression.ps1`。严格关闭资格另要求 hover 0.62、显式 `-ConfirmLoopbackAddress`、UDP 14653 和 350 ms。三项 Issue 在本机证据回传并复核前保持 OPEN；不得用 Host/CI PASS 或 650 ms 诊断运行关闭。 Test-only follow-up `2f8118f1` covers 2.4 m horizontal / 2.4 m above-Home return landing geometry; Host #43576600195 6/6, M6/M7 #43576600154 5/5 and M7 #43576600112 2/2 all SUCCESS.
+Current-main CI on `3270cff5aec26e3ae0717c62d2d78e9f30752020`: Host [#43593701736](https://github.com/hujunjie-hub/Flight/actions/runs/43593701736) 6/6, M6/M7 [#43593701892](https://github.com/hujunjie-hub/Flight/actions/runs/43593701892) 5/5, M7 [#43593701803](https://github.com/hujunjie-hub/Flight/actions/runs/43593701803) 2/2 SUCCESS. M4 1,042/0; M5 327,030/0; M4/M5 integration 969/0; MR-009 focused 430/0; M7 274/0. 新增 M4 回归 `contact_candidate_not_disarm_authority` / `contact_candidate_requires_valid_navigation`、M5 `landing_alignment_and_speed` / `landing_contact_latches_xy` 均 PASS。以上 CI 不启动原生 FMT-SIM；#17/#18/#19/#21/#22 必须等待 Owner 在 latest main 完整批量复测后再审查关闭。
 
 
 R30 archive SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae9909063` is verified, but its tested HEAD `3299a4f` is 181 commits behind the reviewed current branch HEAD `9063f310`; worktree DIRTY and formal manifest/loopback gate evidence absent. Five diagnostic scenarios failed (29 assertions total). Do not close or repeat code fixes from this old result; wait for a clean current-HEAD formal rerun. [Full archive review](../validation/FMT_SIM_R30_20261114_ARCHIVE_REVIEW.md).
@@ -145,3 +145,16 @@ R30 archive SHA256 `eb52b0d6430662cc0a88869570dcf23c00c964add676d2ef31870c4ae990
 - Fix commit `3d8d29b5dfda21237f8ed02db3c31223c656bfbe` 已增加 final 0.50 m / 0.40 m/s 限制并锁存 touchdown XY；FMS 安全阈值未放宽。Host/M6-M7/M7 全部通过（6/6、5/5、2/2），新增 M5 测试 PASS。
 - R32 的 #17/#18 单场景 PASS 不构成全批次 closure eligibility；#17/#18/#19 继续 OPEN，等待 fix commit 上完整原生三场景复测。B07 H723、WCET/RTA、栈水位、物理 HIL、飞行仍 NOT_RUN。
 - 完整报告：[R32 FMT-SIM archive review](../validation/FMT_SIM_LOCAL_20261114_E470F00C_REVIEW.md)。
+
+
+## 2026-11-14 R33 原生 FMT-SIM 复测
+
+R33 RUN_ID `FMT-SIM-LOCAL-20261114T084723472Z-5e3b74f4` 在修复前 HEAD `5e3b74f40293a005de693eceb61af4c0552e` 完成：Land 39,388/0 PASS，Return 40,485/0 PASS，Mission 67,112/3 FAIL；总计 146,985 checks / 3 failures，最长状态间隔 94.8 ms。ZIP SHA256 `0d6b75c578e2ae71b501f9f26b827559fe8b0887598253af55d09d09f63cdcfb` 与 sidecar 一致，manifest SHA256 `6604b49d3fe889c9c022b63dec313b762880d7aa8cc12e736975257e2490971d`，内部 102 项 SHA256 全部通过。Mission 最后 0.50 m 最大下降速度 0.374 m/s（上限 0.40，已通过），返航落点距 Home 0.171 m；仅 terminal ACK、DISARM ACK、最终 DISARMED 状态三项失败。
+
+R33 在 t=34.280 s 首次记录 ground contact=CONTACT，但 FMS landed=UNKNOWN 且 evidence=0x0；当时水平速度约 0.291 m/s，未满足 M4 的 0.20 m/s 稳定门槛。旧代码在 UNKNOWN 状态清空接地证据，M5 无法提前停止追逐 Home/probe。最终快照 contact=1、landed=UNKNOWN、stable_ms=0、evidence=0x0，nav_vh=0.161 m/s、nav_vd=-0.005 m/s、nav_ad=0.688 m/s²；垂向加速度仍超过 0.5 m/s² 稳定门槛。
+
+R33 后 main 新增生产修复：`419f56962f74fd9d89bc62cfc11ee0923910177c` 在导航/能力/速度数据有效且物理接触可信时保留 UNKNOWN 接地候选证据；M5 识别该提示后锁存实测接触 XYZ 并停止继续追逐 Home。该候选只用于 M5 过渡，不授予 LANDED/DISARM 权限。`15a33756d4e269800e6778c6180f7086179c9429` 增加 nav_ok 检查，避免导航指针缺失时被候选分支解引用。M4 的 0.20 m/s 水平速度、0.15 m/s 垂向速度、0.5 m/s² 垂向加速度与 2 s dwell、DISARM gate 均未放宽。测试提交 `3270cff5aec26e3ae0717c62d2d78e9f30752020` 增加缺失导航回归；两个 contact candidate 测试均通过。
+
+Current-main CI on `3270cff5aec26e3ae0717c62d2d78e9f30752020`: Host [#43593701736](https://github.com/hujunjie-hub/Flight/actions/runs/43593701736) 6/6, M6/M7 [#43593701892](https://github.com/hujunjie-hub/Flight/actions/runs/43593701892) 5/5, M7 [#43593701803](https://github.com/hujunjie-hub/Flight/actions/runs/43593701803) 2/2 SUCCESS. M4 1,042/0; M5 327,030/0; M4/M5 integration 969/0; MR-009 focused 430/0; M7 274/0.
+
+完整报告：[R33 archive review](../validation/FMT_SIM_LOCAL_20261114_5E3B74F4_REVIEW.md)。
