@@ -1,11 +1,21 @@
 # 飞行与策略仿真验证矩阵
 
-本文件的 PASS 记录均绑定各自历史 RUN_ID。最新原生复测 R34 在 main HEAD `85f02af5` 上完成：Land 33,837/4、Return 33,346/4、Mission 49,123/5，三场景均 FAIL；Mission 最后 0.50 m 下降速度为 0.674 m/s。R34 后 main 提交 `c9cd1792` 修复 M5 contact-hold 重新规划，提交 `d8ea0f05` 将水平对准与垂直下降拆分为独立阶段；精确修复代码 HEAD `d8ea0f05` 的 Host/M6-M7/M7 CI 分别 6/6、5/5、2/2 SUCCESS。修复后的原生 FMT-SIM 尚待 Owner 在 Windows 本机重跑；#17/#18/#19/#21/#23 保持 OPEN，#22 的 advisory handoff 已在 R34 观察到 evidence=0x1 到达 M5，仍待独立安全复核。R33 及更早的 PASS 记录均为历史证据，不代表 R34 后代码已通过原生复测。
+本文件的 PASS 记录均绑定各自历史 RUN_ID。最新原生复测 R35 在 main HEAD `ac2d47ff` 上完成：Land 48,801/4、Return 39,389/4、Mission 67,112/3，三场景均 FAIL；最后 0.50 m 下降速度 0.340/0.316/0.330 m/s 均 PASS。R35 后 main 提交 `69626899` 修复 M5 过早消费接地候选的问题；精确 HEAD `69626899` 的 Host/M6-M7/M7 CI 分别 6/6、5/5、2/2 SUCCESS。修复后的原生 FMT-SIM 尚待 Owner 在 Windows 本机重跑；#17/#18/#19/#21/#23 保持 OPEN，#22 的 advisory handoff 已在 R34/R35 观察到 evidence=0x1 到达 M5，仍待独立安全复核。R34 及更早的 PASS/FAIL 记录均为历史证据，不代表 R35 后代码已通过原生复测。
 历史整链记录使用 `SIM_CONTROLLED_STOP` Host 构建和隔离的 FMT-SIM Ground 场景。
 H723 的运行配置仍使用 `BENCH_INHIBIT`。设备固件、UART/DMA、板上时序和实机运动
 留在各自的验证门禁。
 
-> **历史记录说明：** 以下整链证据表和早期通过项来自更早的 RUN_ID，保留用于追溯；R34 是当前最新原生 FMT-SIM 归档，结果为三场景 FAIL。当前代码修复后的原生复测尚未执行，不得把下方历史 PASS 视为当前放行。
+> **历史记录说明：** 以下整链证据表和早期通过项来自更早的 RUN_ID，保留用于追溯；R35 是当前最新原生 FMT-SIM 归档，结果为三场景 FAIL。`69626899` 修复后的原生复测尚未执行，不得把下方历史 PASS 视为当前放行。
+
+## ENG-07 R35 FMT-SIM 归档复核与 M5 低速接地候选修复
+
+R35 RUN_ID `FMT-SIM-LOCAL-20261114T134046188Z-ac2d47ff`，测试 HEAD `ac2d47ff3d36153960d6103056ae2aff1832a8a1`。branch/main、origin/main、clean worktree、fetch、loopback、UDP 14653、hover 0.62 和 350 ms 门禁均有效。ZIP SHA256 `00c926b92fd95d28494bff2b5daa3b7cc9488402ab18643ece6f7e0e090b4e7d`；manifest SHA256 `4d1155034f09dc993c18aa5433706caea462a881d3ef21039189b1c78b28c93c`；内部 102 项 SHA256 全部通过；构建 PASS。
+
+Land 48,801/4、Return 39,389/4、Mission 67,112/3，全部 FAIL；总计 155,302/11，状态间隔 95.0/108.8/92.7 ms。最后 0.50 m 下降速度 0.340/0.316/0.330 m/s，均 PASS。Mission 航点最近距离 0.257/0.327 m，Return touchdown 0.067 m。Return t=25.800 s M5 reason=1550 / JERK constraint=4，随后 control -11 和 terminal failsafe；Land/Mission 在较高水平速度时过早消费 advisory contact，未完成 LANDED/terminal DISARM。
+
+新根因是 M5 过早消费 UNKNOWN + GROUND_CONTACT 候选。修复提交 `69626899` 要求导航实测和活动轨迹参考的水平/垂直速度均进入 0.15 m/s 低速区间后才锁存；已确认 LANDED 时保留当前已验证目标。新增高速接地候选对照回归 `landing_contact_waits_for_low_speed`。
+
+精确 HEAD `69626899` 的 Host/M6-M7/M7 CI 6/6、5/5、2/2 SUCCESS；M4 969/0、M5 329,670/0、M5 ASan/UBSan 329,670/0、M4/M5 integration 与 sanitizer 各 1,042/0、MR-009 focused 430/0。R35 早于该修复，修复后原生 FMT-SIM NOT_RUN；#17/#18/#19/#21/#23 保持 OPEN，#22 等待独立安全复核。完整逐帧证据见 [R35 review](../../spec/validation/FMT_SIM_LOCAL_20261114_AC2D47FF_REVIEW.md)。
 
 ## 整链证据
 

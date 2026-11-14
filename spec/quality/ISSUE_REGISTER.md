@@ -115,7 +115,28 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 
 ## ENG-07 原生 FMT-SIM 本机复测登记
 
-### R34 最新归档（FAIL，修复后复测待 Owner 执行）
+### R35 最新归档（FAIL；R36 修复后复测待 Owner 执行）
+
+- RUN_ID：`FMT-SIM-LOCAL-20261114T134046188Z-ac2d47ff`；测试 branch `main`；测试 HEAD `ac2d47ff3d36153960d6103056ae2aff1832a8a1`。测试 HEAD 与当时 `origin/main` 精确匹配；worktree clean/stable；fetch exit 0；loopback 显式确认；UDP 14653、hover 0.62、350 ms 均有效。
+- ZIP SHA256 `00c926b92fd95d28494bff2b5daa3b7cc9488402ab18643ece6f7e0e090b4e7d` 与 sidecar 匹配；manifest SHA256 `4d1155034f09dc993c18aa5433706caea462a881d3ef21039189b1c78b28c93c`；104 entries CRC PASS，内部 102 项 SHA256 全部通过。Manifest `issue_closure_eligible=false`。
+- FMT-SIM EXE SHA256 `4f9a0f12c78e3964b3e472ee579c547d13ea629456dc6a4c7fe72ea18ae2a6d6`；settings SHA256 `f556717bcd96a32206065d5dbb97a8f9e57e2267c055bd75e3d6bc501102948b`；Host SIL 构建 PASS，exit 0，binary SHA256 `3d88ddba5aab3f1293e8e5712e32836acb8c3077110f7bd61bd1aa18ddfcaa43`。
+- R35 结果：Land 48,801/4 FAIL；Return 39,389/4 FAIL；Mission 67,112/3 FAIL；总计 155,302 checks / 11 failures。最长状态间隔分别 95.0 / 108.8 / 92.7 ms，全部低于 350 ms。
+- 最后 0.50 m 最大下降速度：Land 0.340、Return 0.316、Mission 0.330 m/s，三者均满足 0.40 m/s 上限。Mission 两个航点最近距离 0.257 / 0.327 m，Return touchdown 距 Home 0.067 m。R34 的 Mission 0.674 m/s 超限在 R35 已不再复现；#21 的速度指标通过，但因 Mission 整场仍失败，Issue #21 按既有整批 closure 规则继续 OPEN。
+- Land：接地候选在 t=23.100 s 到达时，水平速度约 0.248 m/s；M5 过早锁定实测接触点。最终 contact=NO_CONTACT、landed=UNKNOWN，terminal ACK、DISARM ACK、DISARMED 和 ground-contact 断言失败。
+- Return：接地候选在 t=25.780 s 到达时，水平速度约 0.200 m/s；t=25.800 s M5 重新规划以 reason 1550 / JERK constraint=4 拒绝，随后 control rejected=-11、FMS FAILSAFE_TERMINAL。Near-ground speed 0.316 m/s、touchdown 0.067 m 均通过，但终端 ACK、DISARM ACK 和 DISARMED 失败。
+- Mission：接地候选在 t=37.020 s 到达时，水平速度约 0.301 m/s；M5 过早锁定接触点。航点、下降速度和 touchdown 距离指标均通过，但最终 landed=UNKNOWN，terminal ACK、DISARM ACK 和 DISARMED 失败。
+- 根因：M5 把 M4 的 UNKNOWN + GROUND_CONTACT advisory evidence 当作立即进入 CONTACT_HOLD 的充分条件，没有确认导航实测速度与当前有效轨迹参考速度已进入低速区间。用当前实测位置作为新目标时，活动参考仍带有较大速度，Return 会产生 JERK 不可行；Land/Mission 则过早停止 Home 末段收敛，不能稳定完成接地。
+- 完整逐帧证据见 [R35 归档复核报告](../validation/FMT_SIM_LOCAL_20261114_AC2D47FF_REVIEW.md)。
+
+### R35 后 main 修复与自动化验证
+
+- 修复提交 `69626899249e1fd926a0a903447f2ad763f24ba1`：M5 仅在导航实测速度和活动参考速度的水平/垂直分量均不超过 0.15 m/s 时，才消费 UNKNOWN 接地候选并锁定 CONTACT_HOLD；已确认 LANDED 时保留当前已验证轨迹目标，不再进行末端不必要重规划。
+- 新增回归 `landing_contact_waits_for_low_speed`：同一高速 Home-return 参考下，有无 advisory contact hint 的输出必须一致；原接地瞬态回归调整为低速条件，继续覆盖 vD=0.128 m/s 与 raw aD=2.95 m/s²。
+- 精确 HEAD `69626899249e1fd926a0a903447f2ad763f24ba1` 三组 CI 全部 SUCCESS：Host [#43603447251](https://github.com/hujunjie-hub/Flight/actions/runs/43603447251) 6/6；M6/M7 [#43603447288](https://github.com/hujunjie-hub/Flight/actions/runs/43603447288) 5/5；M7 [#43603447340](https://github.com/hujunjie-hub/Flight/actions/runs/43603447340) 2/2。
+- Host 证据：M4 969/0；M5 329,670/0；M5 ASan/UBSan 329,670/0；M4/M5 integration 与 integration sanitizer 各 1,042/0；MR-009 focused 430/0；Spec Audit round 3（145 types / 8 checks）PASS；Cortex-M7 M4/M5/M6/M7 production-module compile PASS。
+- R35 测试 HEAD `ac2d47ff` 早于 `69626899`；R35 之后的原生 FMT-SIM 仍 NOT_RUN。#17/#18/#19/#21/#23 均保持 OPEN，#22 继续等待独立安全复核。下一轮 Owner 必须 fetch 最新 `origin/main` 后运行完整 Land → Return → Mission 批量入口；不放宽 350 ms、速度、接地、2 s dwell 或 DISARM 条件。
+
+### R34 历史归档（FAIL；已由 R35 更新后续状态）
 
 - RUN_ID：`FMT-SIM-LOCAL-20261114T125449954Z-85f02af5`；测试 HEAD：`85f02af5ff2208f805b870d70593a73733db2f5c`。
 - ZIP SHA256 `aaa98517fdcd5da799942a739eec47eddec6a5aa8fe23267b1617a7172d464c0` 与 sidecar 匹配；manifest SHA256 `8a8813929ba6733b12553b9ef0992e2943fbe2601283bdda69e33cfcf1b4bf82`；104 entries 完整，内部 102 项 SHA256 全部通过。
@@ -130,7 +151,7 @@ FLIGHT-LOCAL-54 的 `readelf -A` 复查显示，CubeCLT `crtbegin.o`、`crtend.o
 - `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b` 将 LAND/RETURN 分成水平对准（保持当前高度）、垂直下降至 0.60 m、0.20 m 制动、Home 平面和探针阶段；M4 安全门槛未放宽。
 - 测试提交 `1f9b4ecdbbe90b3e8be9439ec2170478a8083de2` 增加接地瞬态 raw nav 速度/加速度回归，以及水平未对准时保持当前高度的测试。
 - 精确 HEAD `d8ea0f05915d0dc52bd73d606c1f3963fff7d25b` 的 CI：Host [#43599814765](https://github.com/hujunjie-hub/Flight/actions/runs/43599814765) 6/6、M6/M7 [#43599814768](https://github.com/hujunjie-hub/Flight/actions/runs/43599814768) 5/5、M7 [#43599814733](https://github.com/hujunjie-hub/Flight/actions/runs/43599814733) 2/2 SUCCESS；M4 969/0、M5 329,654/0、M5 ASan/UBSan 329,654/0、M4/M5 integration 1,042/0、integration sanitizer 1,042/0、MR-009 focused 430/0，Cortex-M7 M4/M5/M6/M7 production compile PASS。
-- R34 测试 HEAD 早于上述 M5 修复；`d8ea0f05` 之后的原生 FMT-SIM 尚 NOT_RUN。#17/#18/#19/#21/#22/#23 均保持 OPEN。#22 单独跟踪 M4 advisory contact evidence handoff：R34 已确认 evidence=0x1 到达 M5，等待独立安全复核；#23 跟踪 handoff 后 M5 contact-hold 重规划拒绝，修复已提交，等待完整原生复测。
+- R35 测试 HEAD `ac2d47ff` 早于 `69626899`；新修复后的原生 FMT-SIM 尚 NOT_RUN。#17/#18/#19/#21/#23 均保持 OPEN，等待完整 R36 原生复测；#22 单独跟踪 M4 advisory contact evidence handoff，R34/R35 均确认 evidence=0x1 到达 M5，仍等待独立安全复核。
 
 ### R33 历史归档（不是最新代码结果）
 
