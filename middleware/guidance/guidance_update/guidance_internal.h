@@ -45,9 +45,12 @@ CONTRACT_STATIC_ASSERT(GUIDANCE_MAX_DURATION_US == 6200000u,
  * ground-stability limit and is shared by the contact-hold handoff. */
 #define GUIDANCE_LANDING_APPROACH_MAX_HORIZONTAL_ERROR_M 0.15f
 #define GUIDANCE_LANDING_APPROACH_MAX_HORIZONTAL_SPEED_MPS 0.15f
-#define GUIDANCE_LANDING_CONTACT_HOLD_MAX_HORIZONTAL_SPEED_MPS \
-    GUIDANCE_LANDING_APPROACH_MAX_HORIZONTAL_SPEED_MPS
-#define GUIDANCE_LANDING_CONTACT_HOLD_MAX_VERTICAL_SPEED_MPS 0.15f
+/* A corroborated contact observation (ground-contact evidence plus the vehicle
+ * at or below the Home plane) stops horizontal pursuit immediately. The bound
+ * only rejects a clearly invalid hint on a still-flying airframe; it is not an
+ * acceptance gate, and M4 alone still decides LANDED and DISARM. */
+#define GUIDANCE_LANDING_CONTACT_HOLD_MAX_HORIZONTAL_SPEED_MPS 0.60f
+#define GUIDANCE_LANDING_CONTACT_HOLD_MAX_VERTICAL_SPEED_MPS 0.30f
 /* Start the final low-speed brake band before entering contact range. */
 #define GUIDANCE_LANDING_BRAKE_HEIGHT_M 0.20f
 /* Margin for M6's 20 ms float-boundary reconstruction of the landing curve. */
@@ -152,6 +155,15 @@ typedef struct {
   GuidanceQuintic plan[4];          /* N/E/D and unwrapped yaw */
   uint8_t plan_valid;
   uint8_t landing_stage;
+  /* Measured contact point held as a static zero-velocity reference once the
+   * airframe is on the ground. Replanning to that point from a still-moving
+   * reference can be jerk-infeasible and rejects the whole reference, while
+   * deliberately waiting for 0.15 m/s lets the vehicle keep skidding under
+   * position control. A static setpoint stops both without touching M4's
+   * LANDED/DISARM gates. */
+  uint8_t hold_valid;
+  float hold_position_ned_m[3];
+  float hold_yaw_rad;
   uint8_t pilot_valid;
   float pilot_yaw_rad;
   float pilot_height_up_m;

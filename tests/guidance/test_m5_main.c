@@ -425,18 +425,18 @@ static void test_landing_contact_latches_horizontal_hold(void)
   CHECK(guidance_stop() == STATUS_OK);
 }
 
-static void test_landing_contact_waits_for_low_speed(void)
+static void test_landing_contact_hold_is_ground_gated(void)
 {
-  Fx baseline, candidate;
+  Fx baseline, airborne, skidding;
   ProductMotionPoint expected;
 
-  /* Establish the same fast Home-return reference without a contact hint. */
+  /* Baseline: the same fast Home-return state without any contact hint. */
   CHECK(fx_init(&baseline));
   baseline.dir.operation_code = PRODUCT_OP_RETURN;
   baseline.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
   baseline.nav.core.position_ned_m[0] = 2.0f;
   baseline.nav.core.position_ned_m[1] = -1.0f;
-  baseline.nav.core.position_ned_m[2] = -0.016f;
+  baseline.nav.core.position_ned_m[2] = -2.0f; /* 2 m above the Home plane */
   baseline.nav.core.velocity_ned_mps[0] = -0.40f;
   CHECK(fx_step(&baseline) == STATUS_OK);
   baseline.nav.core.velocity_ned_mps[2] = 0.128f;
@@ -445,32 +445,81 @@ static void test_landing_contact_waits_for_low_speed(void)
   expected = baseline.out.reference.points[23].point;
   CHECK(guidance_stop() == STATUS_OK);
 
-  /* The same high-speed state with an advisory contact hint must not retarget
-   * the trajectory to the current position. M5 waits for measured and
-   * reference velocities to settle before entering CONTACT_HOLD. */
-  CHECK(fx_init(&candidate));
-  candidate.dir.operation_code = PRODUCT_OP_RETURN;
-  candidate.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
-  candidate.nav.core.position_ned_m[0] = 2.0f;
-  candidate.nav.core.position_ned_m[1] = -1.0f;
-  candidate.nav.core.position_ned_m[2] = -0.016f;
-  candidate.nav.core.velocity_ned_mps[0] = -0.40f;
-  CHECK(fx_step(&candidate) == STATUS_OK);
-  const uint32_t epoch = candidate.out.guidance_status.reference_epoch;
-  candidate.has_landed = 1u;
-  candidate.landed.state = LANDED_STATE_UNKNOWN;
-  candidate.landed.evidence_mask = LANDED_EVIDENCE_GROUND_CONTACT;
-  candidate.nav.core.velocity_ned_mps[2] = 0.128f;
-  candidate.nav.core.acceleration_ned_mps2[2] = 2.95f;
-  CHECK(fx_step(&candidate) == STATUS_OK);
-  CHECK(candidate.out.feasibility.feasible);
-  CHECK(candidate.out.guidance_status.reference_epoch == epoch);
-
-  const ProductMotionPoint *actual = &candidate.out.reference.points[23].point;
-  for (unsigned axis = 0; axis < 3u; ++axis) {
-    CHECK(fabsf(actual->position_ned_m[axis] - expected.position_ned_m[axis]) < 1e-5f);
-    CHECK(fabsf(actual->velocity_ned_mps[axis] - expected.velocity_ned_mps[axis]) < 1e-5f);
+  /* A contact bit while still well above the Home plane is not physical
+   * contact. The return reference must be bit-identical to the baseline, so a
+   * transient hint can never stop the vehicle in the air. */
+  CHECK(fx_init(&airborne));
+  airborne.dir.operation_code = PRODUCT_OP_RETURN;
+  airborne.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
+  airborne.nav.core.position_ned_m[0] = 2.0f;
+  airborne.nav.core.position_ned_m[1] = -1.0f;
+  airborne.nav.core.position_ned_m[2] = -2.0f;
+  airborne.nav.core.velocity_ned_mps[0] = -0.40f;
+  CHECK(fx_step(&airborne) == STATUS_OK);
+  airborne.has_landed = 1u;
+  airborne.landed.state = LANDED_STATE_UNKNOWN;
+  airborne.landed.evidence_mask = LANDED_EVIDENCE_GROUND_CONTACT;
+  airborne.nav.core.velocity_ned_mps[2] = 0.128f;
+  airborne.nav.core.acceleration_ned_mps2[2] = 2.95f;
+  CHECK(fx_step(&airborne) == STATUS_OK);
+  CHECK(airborne.out.feasibility.feasible);
+  {
+    const ProductMotionPoint *actual = &airborne.out.reference.points[23].point;
+    for (unsigned axis = 0; axis < 3u; ++axis) {
+      CHECK(fabsf(actual->position_ned_m[axis] - expected.position_ned_m[axis]) < 1e-5f);
+      CHECK(fabsf(actual->velocity_ned_mps[axis] - expected.velocity_ned_mps[axis]) < 1e-5f);
+    }
   }
+  CHECK(guidance_stop() == STATUS_OK);
+
+  /* Corroborated contact at the Home plane while the airframe still slides:
+   * the horizontal pursuit stops immediately. Replanning to the measured point
+   * from the moving reference was rejected as jerk-infeasible, and waiting for
+   * 0.15 m/s let the skid persist, so the reference is a static setpoint. */
+  CHECK(fx_init(&skidding));
+  skidding.dir.operation_code = PRODUCT_OP_RETURN;
+  skidding.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
+  skidding.nav.core.position_ned_m[0] = 0.30f;
+  skidding.nav.core.position_ned_m[1] = -0.12f;
+  skidding.nav.core.position_ned_m[2] = -0.016f; /* on the Home plane */
+  skidding.nav.core.velocity_ned_mps[0] = -0.40f;
+  CHECK(fx_step(&skidding) == STATUS_OK);
+  const uint32_t epoch = skidding.out.guidance_status.reference_epoch;
+  skidding.has_landed = 1u;
+  skidding.landed.state = LANDED_STATE_UNKNOWN;
+  skidding.landed.evidence_mask = LANDED_EVIDENCE_GROUND_CONTACT;
+  CHECK(fx_step(&skidding) == STATUS_OK);
+  CHECK(skidding.out.feasibility.feasible);
+  CHECK(skidding.out.feasibility.violated_constraint_id == GUIDANCE_PLAN_CONSTRAINT_NONE);
+  CHECK(skidding.out.guidance_status.reference_epoch == epoch);
+  for (unsigned i = 0; i <= GUIDANCE_PREVIEW_POINTS; ++i) {
+    const ProductMotionPoint *point = i == 0 ? &skidding.out.reference.anchor.point
+                                             : &skidding.out.reference.points[i - 1].point;
+    CHECK(fabsf(point->position_ned_m[0] - 0.30f) < 1e-5f);
+    CHECK(fabsf(point->position_ned_m[1] + 0.12f) < 1e-5f);
+    for (unsigned axis = 0; axis < 3u; ++axis) {
+      CHECK(fabsf(point->velocity_ned_mps[axis]) < 1e-6f);
+      CHECK(fabsf(point->acceleration_ned_mps2[axis]) < 1e-6f);
+    }
+  }
+
+  /* A hint that arrives while the airframe reports a clearly non-landing
+   * speed is still ignored: the static hold is not a way to mask bad data. */
+  Fx fast;
+  CHECK(guidance_stop() == STATUS_OK);
+  CHECK(fx_init(&fast));
+  fast.dir.operation_code = PRODUCT_OP_RETURN;
+  fast.dir.guidance_mode_code = PRODUCT_GUIDANCE_MODE_TRAJECTORY;
+  fast.nav.core.position_ned_m[0] = 0.30f;
+  fast.nav.core.position_ned_m[1] = -0.12f;
+  fast.nav.core.position_ned_m[2] = -0.016f;
+  fast.nav.core.velocity_ned_mps[0] = -1.20f;
+  CHECK(fx_step(&fast) == STATUS_OK);
+  fast.has_landed = 1u;
+  fast.landed.state = LANDED_STATE_UNKNOWN;
+  fast.landed.evidence_mask = LANDED_EVIDENCE_GROUND_CONTACT;
+  CHECK(fx_step(&fast) == STATUS_OK);
+  CHECK(fabsf(fast.out.reference.anchor.point.velocity_ned_mps[0]) > 0.50f);
   CHECK(guidance_stop() == STATUS_OK);
 }
 
@@ -6800,7 +6849,7 @@ int main(void)
     {"landing_speed_only_requires_horizontal_brake", test_landing_speed_only_requires_horizontal_brake},
     {"return_handoff_r37", test_return_handoff_r37},
     {"landing_contact_latches_xy", test_landing_contact_latches_horizontal_hold},
-    {"landing_contact_waits_for_low_speed", test_landing_contact_waits_for_low_speed},
+    {"landing_contact_hold_is_ground_gated", test_landing_contact_hold_is_ground_gated},
     {"trajectory_handoff_acceleration", test_trajectory_handoff_uses_active_reference_acceleration},
     {"vertical_land_reports_constraint", test_vertical_land_reports_actual_constraint},
     {"vertical_land_handoff_acceleration", test_vertical_land_handoff_uses_active_reference_acceleration},

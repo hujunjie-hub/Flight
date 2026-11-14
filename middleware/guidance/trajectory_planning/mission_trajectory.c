@@ -54,6 +54,13 @@ static void sample(const GuidanceState *s, uint64_t when, ProductMotionPoint *p)
     unsigned axis;
     float t = when > s->plan_start_us ? (float)(when-s->plan_start_us)*1e-6f : 0;
     uint8_t ended = t >= s->plan_duration_s;
+    if (s->hold_valid) {
+        memcpy(p->position_ned_m, s->hold_position_ned_m, sizeof(p->position_ned_m));
+        memset(p->velocity_ned_mps, 0, sizeof(p->velocity_ned_mps));
+        memset(p->acceleration_ned_mps2, 0, sizeof(p->acceleration_ned_mps2));
+        p->yaw_rad = s->hold_yaw_rad; p->yaw_rate_radps = 0; p->valid_mask = 0x1Fu;
+        return;
+    }
     t = fminf(t, s->plan_duration_s);
     for (axis = 0; axis < 3; ++axis) {
         p->position_ned_m[axis] = guidance_quintic_eval(&s->plan[axis], t, 0);
@@ -105,32 +112,49 @@ static uint8_t landing_contact_observed(const GuidanceInput *in)
         (in->landed_state->evidence_mask & LANDED_EVIDENCE_GROUND_CONTACT) != 0u);
 }
 
-static uint8_t landing_contact_hold_ready(const GuidanceInput *in, const GuidanceState *s)
+/* Corroborated ground contact: an advisory contact bit is only trusted when the
+ * airframe is at or below the Home plane and the reported velocity is still in
+ * a landing-relevant band. M4's LANDED evidence remains authoritative. */
+static uint8_t landing_contact_settled(const GuidanceInput *in)
 {
-    const uint32_t velocity_mask = NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY;
+    const float *position = in->navigation->core.position_ned_m;
     const float *velocity = in->navigation->core.velocity_ned_mps;
-    ProductMotionPoint reference;
+    const uint32_t mask = NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY;
+    const float home_down = in->directive->payload.home.position_ned_m[2];
 
-    /* A contact hint can arrive while the vehicle is still sliding across the
-     * surface. Replanning to the instantaneous measured position from a faster
-     * active reference can require an infeasible jerk impulse. Wait until both
-     * the estimator and the reference being handed off are in the final
-     * low-speed band. M4's LANDED decision and disarm dwell remain authoritative. */
-    if (!s->plan_valid ||
-        (in->navigation->core.valid_mask & velocity_mask) != velocity_mask ||
-        !finite3(velocity))
+    if (!finite3(position) || !finite3(velocity) ||
+        (in->navigation->core.valid_mask & mask) != mask)
         return 0u;
-
-    sample(s, in->control_time_us, &reference);
-    if (!finite3(reference.velocity_ned_mps))
+    /* Above the Home plane the advisory hint cannot be physical contact; do not
+     * stop the return early on a transient bit (same class as the RETURN
+     * handoff regression). */
+    if (position[2] < home_down - GUIDANCE_LANDING_CONTACT_HEIGHT_M)
         return 0u;
-
     return (uint8_t)(
-        hypotf(velocity[0], velocity[1]) <= GUIDANCE_LANDING_CONTACT_HOLD_MAX_HORIZONTAL_SPEED_MPS &&
-        fabsf(velocity[2]) <= GUIDANCE_LANDING_CONTACT_HOLD_MAX_VERTICAL_SPEED_MPS &&
-        hypotf(reference.velocity_ned_mps[0], reference.velocity_ned_mps[1]) <=
+        hypotf(velocity[0], velocity[1]) <=
             GUIDANCE_LANDING_CONTACT_HOLD_MAX_HORIZONTAL_SPEED_MPS &&
-        fabsf(reference.velocity_ned_mps[2]) <= GUIDANCE_LANDING_CONTACT_HOLD_MAX_VERTICAL_SPEED_MPS);
+        fabsf(velocity[2]) <= GUIDANCE_LANDING_CONTACT_HOLD_MAX_VERTICAL_SPEED_MPS);
+}
+
+static uint8_t landing_hold_latch(const GuidanceInput *in, GuidanceState *s)
+{
+    const float *position = in->navigation->core.position_ned_m;
+
+    if (s->hold_valid)
+        return 1u;
+    if (!landing_confirmed(in) && !(landing_contact_observed(in) && landing_contact_settled(in)))
+        return 0u;
+    if (!finite3(position))
+        return 0u;
+    /* Latch the measured contact point once. Replanning to it from a still
+     * moving reference is jerk-infeasible and rejected the whole reference,
+     * while waiting for 0.15 m/s let the vehicle skid under position control.
+     * A static zero-velocity setpoint ends both behaviours. */
+    memcpy(s->hold_position_ned_m, position, sizeof(s->hold_position_ned_m));
+    s->hold_yaw_rad = guidance_yaw_from_quat(in->navigation->core.q_nb_wxyz);
+    s->hold_valid = 1u;
+    s->landing_stage = LANDING_CONTACT_HOLD;
+    return 1u;
 }
 
 static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, float goal[3])
@@ -145,30 +169,8 @@ static void landing_stage_target(const GuidanceInput *in, GuidanceState *s, floa
         in->control_time_us >= s->plan_start_us &&
         (in->control_time_us - s->plan_start_us) * 1e-6f >= s->plan_duration_s);
 
-    if (s->landing_stage == LANDING_CONTACT_HOLD) {
-        /* Keep the measured contact point latched through the FMS dwell and
-         * disarm handoff, even if the contact/LANDED evidence briefly drops. */
-        memcpy(goal, s->ctx.target_ned, sizeof(s->ctx.target_ned));
-        return;
-    }
-    if (landing_confirmed(in)) {
-        /* M4 has completed its strict LANDED dwell. Preserve the already
-         * validated trajectory target rather than introducing a last-moment
-         * replan while the ground-stop/disarm handoff is taking place. */
-        s->landing_stage = LANDING_CONTACT_HOLD;
-        if (s->plan_valid)
-            memcpy(goal, s->ctx.target_ned, sizeof(s->ctx.target_ned));
-        else
-            memcpy(goal, position, sizeof(s->ctx.target_ned));
-        return;
-    }
-    if (landing_contact_observed(in) && landing_contact_hold_ready(in, s)) {
-        /* The UNKNOWN + ground-contact snapshot is only an advisory hint.
-         * Do not latch it while either measured or active-reference velocity
-         * is outside the final low-speed band: that would stop the Home return
-         * too early and can make the hold replan jerk-infeasible. */
-        s->landing_stage = LANDING_CONTACT_HOLD;
-        memcpy(goal, position, sizeof(s->ctx.target_ned));
+    if (s->hold_valid) {
+        memcpy(goal, s->hold_position_ned_m, sizeof(s->hold_position_ned_m));
         return;
     }
 
@@ -365,7 +367,7 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
     SafetyEnvelope envelope;
     ProductGuidanceConfig planning_config = s->config;
     const uint8_t has_landing_plane = guidance_has_landing_plane(in);
-    uint8_t landing_approach;
+    uint8_t landing_approach = 0u;
     *reason = GUIDANCE_PLAN_REASON_NONE; *constraint = GUIDANCE_PLAN_CONSTRAINT_NONE; s->violation_offset_us = 0;
     if (in->directive->operation_code == PRODUCT_OP_MISSION &&
         (in->authorized_mission->mission.flags & PRODUCT_MISSION_REQUIRES_OBSTACLE_AVOIDANCE)) {
@@ -383,28 +385,38 @@ Status guidance_build_trajectory(GuidanceState *s, const GuidanceInput *in, Guid
     if ((in->geofence_count && !guidance_home_ok(in)) || !target(in, s, goal, &yaw)) {
         *reason = GUIDANCE_PLAN_REASON_GEOFENCE_INVALID; *constraint = GUIDANCE_PLAN_CONSTRAINT_GEOFENCE; return STATUS_INVALID_ARGUMENT;
     }
-    if (has_landing_plane)
+    if (has_landing_plane) {
+        (void)landing_hold_latch(in, s);
         landing_stage_target(in, s, goal);
-    landing_approach = has_landing_plane && s->landing_stage == LANDING_APPROACH;
-    /* Preserve the tighter envelope for the near-ground segments. */
-    if (has_landing_plane &&
-        (s->landing_stage == LANDING_BRAKE || s->landing_stage == LANDING_FINAL ||
-         s->landing_stage == LANDING_PROBE || s->landing_stage == LANDING_CONTACT_HOLD)) {
-        for (i = 0; i < 3; ++i)
-            planning_config.payload.max_jerk_ned_mps3[i] *= GUIDANCE_LANDING_JERK_MARGIN;
     }
-    if (landing_approach) {
-        /* A rolling preview interval can straddle the end of the horizontal
-         * brake. Reserve jerk headroom in the source curve so that the
-         * consumer's reconstruction across the transition to rest fits. */
-        for (i = 0; i < 3; ++i)
-            planning_config.payload.max_jerk_ned_mps3[i] = GUIDANCE_LANDING_JERK_MARGIN *
-                fminf(planning_config.payload.max_jerk_ned_mps3[i],
-                      in->safety_envelope->vehicle_extension.max_jerk_ned_mps3[i]);
+    if (s->hold_valid) {
+        /* The measured contact point is held as a static zero-velocity
+         * reference: no replan, so nothing can be rejected as infeasible
+         * while the vehicle settles for the FMS dwell and disarm handoff. */
+        memcpy(goal, s->hold_position_ned_m, sizeof(goal));
+        yaw = s->hold_yaw_rad;
+    } else {
+        landing_approach = has_landing_plane && s->landing_stage == LANDING_APPROACH;
+        /* Preserve the tighter envelope for the near-ground segments. */
+        if (has_landing_plane &&
+            (s->landing_stage == LANDING_BRAKE || s->landing_stage == LANDING_FINAL ||
+             s->landing_stage == LANDING_PROBE || s->landing_stage == LANDING_CONTACT_HOLD)) {
+            for (i = 0; i < 3; ++i)
+                planning_config.payload.max_jerk_ned_mps3[i] *= GUIDANCE_LANDING_JERK_MARGIN;
+        }
+        if (landing_approach) {
+            /* A rolling preview interval can straddle the end of the horizontal
+             * brake. Reserve jerk headroom in the source curve so that the
+             * consumer's reconstruction across the transition to rest fits. */
+            for (i = 0; i < 3; ++i)
+                planning_config.payload.max_jerk_ned_mps3[i] = GUIDANCE_LANDING_JERK_MARGIN *
+                    fminf(planning_config.payload.max_jerk_ned_mps3[i],
+                          in->safety_envelope->vehicle_extension.max_jerk_ned_mps3[i]);
+        }
+        if (!s->plan_valid || memcmp(goal, s->ctx.target_ned, sizeof(goal)) || yaw != s->ctx.target_yaw_rad)
+            if (!plan(s, in, goal, yaw, &planning_config, handoff_acceleration, reason, constraint))
+                return STATUS_OUT_OF_RANGE;
     }
-    if (!s->plan_valid || memcmp(goal, s->ctx.target_ned, sizeof(goal)) || yaw != s->ctx.target_yaw_rad)
-        if (!plan(s, in, goal, yaw, &planning_config, handoff_acceleration, reason, constraint))
-            return STATUS_OUT_OF_RANGE;
     /* Keep the wider spacing through hold/land at a distant waypoint. At 8 m
      * the float position quantum doubles, and 20 ms Hermite intervals can
      * turn that rounding into excessive jerk even on a smooth stop. */

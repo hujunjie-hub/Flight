@@ -96,6 +96,7 @@ static void guidance_new_reference(GuidanceState *m5)
   m5->active = 0u;
   m5->plan_valid = 0u;
   m5->landing_stage = 0u;
+  m5->hold_valid = 0u;
   m5->pilot_valid = 0u;
 }
 
