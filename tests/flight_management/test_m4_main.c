@@ -446,6 +446,36 @@ static int fx_init(Fx *fx)
   return 1;
 }
 
+static void test_origin_reset_requires_disarmed(void)
+{
+  Fx fx;
+  ContractHeader candidate;
+  EstimatorResetRequest reset;
+  uint64_t sample_us;
+
+  CHECK(fx_init(&fx));
+  CHECK(fx_step(&fx) == STATUS_OK); /* Bind the FMS clock and origin. */
+
+  sample_us = fx.now - STEP_US;
+  fill_header(&candidate, MSG_GNSS_SAMPLE, SOURCE_GNSS, sample_us, 20000u, sample_us);
+  candidate.frame_id = FRAME_WGS84_GEODETIC;
+  memset(&reset, 0, sizeof(reset));
+  CHECK(fms_authorize_origin_reset(&candidate, T_ORIGIN + 1u, &reset) == STATUS_OK);
+  CHECK(reset.reset_type == RESET_TYPE_ORIGIN_REBUILD);
+  CHECK(reset.initial_source == RESET_SOURCE_GNSS_ASSISTED);
+  CHECK(reset.requested_origin_id == T_ORIGIN + 1u);
+
+  /* The same fresh origin candidate must not clear the estimator latch while
+   * the vehicle is armed; FMS must be the only authority for re-alignment. */
+  fx_arm(&fx);
+  sample_us = fx.now - STEP_US;
+  fill_header(&candidate, MSG_GNSS_SAMPLE, SOURCE_GNSS, sample_us, 20000u, sample_us);
+  candidate.frame_id = FRAME_WGS84_GEODETIC;
+  CHECK(fms_authorize_origin_reset(&candidate, T_ORIGIN + 1u, &reset) ==
+        STATUS_NOT_PERMITTED);
+  CHECK(fms_policy_stop() == STATUS_OK);
+}
+
 static void test_arm_requires_fresh_prearm_epoch(void)
 {
   Fx fx;
@@ -1675,6 +1705,7 @@ int main(void)
     const char *name;
     void (*fn)(void);
   } tests[] = {
+    {"origin_reset_requires_disarmed", test_origin_reset_requires_disarmed},
     {"arm_requires_fresh_prearm_epoch", test_arm_requires_fresh_prearm_epoch},
     {"arm_rechecks_current_inputs", test_arm_rechecks_current_inputs},
     {"idle_lease_renewal_bounded", test_idle_lease_renewal_bounded},
