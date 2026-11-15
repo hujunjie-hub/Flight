@@ -203,3 +203,16 @@ navigation capability. H723 target/HIL/WCET/flight remain NOT_RUN.
   SensorUsePolicy was changed. Checkpoint remains 2,304 bytes.
 - Rollback is a single commit revert. Keep FLIGHT-29 OPEN until R46 and the
   separate controlled re-alignment decision are complete.
+
+
+## 8. 2026-11-15 FMS origin-reset authorization guard
+
+The Stage B1 latch is cleared only through the existing estimator reset path. The current call chain was checked on main:
+
+- `ins_model_get_pending_origin()` returns the original GNSS sample header only after M3 validates its freshness, timestamp provenance, sensor policy and position covariance.
+- `task_mission` is the only current application call site for `fms_authorize_origin_reset()`; it calls the FMS authorization after the ordinary FMS update and queues the resulting `EstimatorResetRequest` for the sensor owner.
+- `fms_model_authorize_origin_reset()` requires a bound clock, a sequential next origin, `ARM_STATE_DISARMED`, no active permit, and a fresh valid GNSS header. FMS revokes permits while DISARMED.
+- Host regression `origin_reset_requires_disarmed` was added in `tests/flight_management/test_m4_main.c` (commit `a1941c6f37f50bbf034c3a5a097433a9ff8d74e1`). It verifies a valid GNSS candidate is authorized while disarmed and the same fresh candidate is rejected while armed. The fixture explicitly sets hardware timestamp provenance to match the real GNSS candidate contract.
+- CI for `a1941c6f37f50bbf034c3a5a097433a9ff8d74e1`: [Host validation #43670253254](https://github.com/hujunjie-hub/Flight/actions/runs/43670253254) 7/7 SUCCESS, [M6/M7 #43670253274](https://github.com/hujunjie-hub/Flight/actions/runs/43670253274) 5/5 SUCCESS, and [M7 #43670253241](https://github.com/hujunjie-hub/Flight/actions/runs/43670253241) 2/2 SUCCESS. Host, integration, ASan/UBSan and Cortex-M7 compile jobs passed.
+
+This closes the reset-authorization test gap only. It does **not** implement Stage B2 controlled re-alignment, does not permit in-flight latch clearing, and does not close FLIGHT-29. R46 exact-main native FMT-SIM and the separately reviewed Stage B2 design remain open.
