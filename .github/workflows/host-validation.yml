@@ -69,9 +69,7 @@ jobs:
 
       - name: Test parameter catalog and archive metadata contracts
         run: |
-          python tests/tools/test_generate_ground_config.py
-          python tests/tools/test_prepare_archive_metadata.py
-          python tests/tools/test_validation_evidence_archive.py
+          python -m unittest -v tests.tools.test_generate_ground_config tests.tools.test_prepare_archive_metadata tests.tools.test_validation_evidence_archive
 
       - name: Test python -O audit guard
         run: python tests/guidance/test_audit_optimized.py
