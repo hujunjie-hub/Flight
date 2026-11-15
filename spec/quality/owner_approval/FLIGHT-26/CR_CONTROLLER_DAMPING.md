@@ -1,6 +1,6 @@
 # FLIGHT-26 Near-Ground Horizontal Limit Cycle — Change Request Package
 
-Status: **EXPERIMENTS COMPLETE / FIX NOT MERGED / AWAITING CONTROL REVIEW**
+Status: **FMT-SIM FIX IMPLEMENTED LOCALLY / NATIVE BATCH PASS / INDEPENDENT REVIEW OPEN**
 
 Scope: QUAD_X4 / STM32H723ZGT6 / `OBSTACLE_SOURCE_MODE=NONE` / `BENCH_INHIBIT`.
 Windows-native FMT-SIM plus Flight Host SIL only. H723 target, HIL, WCET and
@@ -81,3 +81,15 @@ campaign (step/sweep on the Host plant) before any gain change.
 1. **A**: approve the FMT-SIM horizon extension (no threshold change).
 2. **B**: approve in principle the SIM_ONLY rate-loop damping, to be executed
    after FLIGHT-29 and validated by the plan above.
+
+## 7. Native batch on the local fix
+
+The native FMT-SIM fixture applies `Kp=0.30` and `Kd=0.004` on all three axes.
+The Mission driver allows 56 s for the route and terminal sequence. Land and
+Return use the existing 32 s duration. The UDP receiver delivers queued states
+sequentially to the SIL clock.
+
+RUN_ID `FMT-SIM-LOCAL-20261115T011452219Z-ada6bd65` returned Land 46,313/0,
+Return 48,196/0 and Mission 83,130/0. The three scenarios completed both ACKs
+and DISARMED. See [the verification ledger](../../../09_需求验证实施与发布管理.md).
+Official closure and independent control review remain open.

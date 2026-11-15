@@ -1,6 +1,6 @@
 # FLIGHT-29 Navigation Health and Divergence — Change Request Package
 
-Status: **PERSISTENT NIS REJECTION REPRODUCED ON HOST / HOST-SIL TRACE IMPLEMENTED / NATIVE TRIGGER OPEN**
+Status: **NATIVE FMT-SIM FRAME DELIVERY FIX VERIFIED LOCALLY / GENERAL ESTIMATOR RECOVERY OPEN**
 
 Scope: QUAD_X4 / STM32H723ZGT6 / `OBSTACLE_SOURCE_MODE=NONE` / `BENCH_INHIBIT`.
 All evidence below is Host/SIL and Windows-native FMT-SIM software evidence. It is
@@ -167,5 +167,19 @@ consumer fail closed *before* the position is unusable.
 2. In principle, the *scope* of Stage B/C so the work is not blocked again after
    Stage A lands.
 
-Native Stage A capture and Stage B/C decisions remain outstanding. FLIGHT-29
-remains OPEN.
+FLIGHT-29 remains OPEN pending the Stage B/C decisions and formal verification.
+
+## 7. Native FMT-SIM trigger and local batch
+
+In `FMT-SIM-LOCAL-20261115T010454526Z-3652a608`, the Mission receiver had
+dequeued 18 more states than the SIL clock had advanced by t=26 s. GNSS
+velocity rejected at t=26.290 s, then horizontal/vertical divergence was
+reported at t=29.350 s. The old receive routine overwrote earlier decoded
+states when a scheduler turn received a burst. A loopback test reproduced
+the loss from two frames in one datagram and a third in a queued datagram.
+
+Commit `ada6bd65` delivers one state at a time and preserves queued samples.
+The next native batch, `FMT-SIM-LOCAL-20261115T011452219Z-ada6bd65`, passed all
+three scenarios. Mission had 535 position/velocity pairs, no NIS rejection,
+and a maximum horizontal separation of 0.055 m. This verifies the corrected
+simulation transport. The Stage B/C production decisions remain open.
