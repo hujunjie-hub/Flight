@@ -305,7 +305,7 @@ class ArchiveZipCheckerTests(unittest.TestCase):
         self.assertEqual(result["status"], "FAIL")
 
     def test_rejects_report_branch_mismatch(self):
-        self.ctx["archive_report"]["branch"] = "main"
+        self.ctx["archive_report"]["branch"] = "feature/not-main"
         result = checker.check_archive(self.ctx)
         self.assertEqual(result["status"], "FAIL")
 
