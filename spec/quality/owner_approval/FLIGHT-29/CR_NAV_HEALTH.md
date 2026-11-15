@@ -33,14 +33,14 @@ Existing symptom guards and the new navigation-capability response:
 
 ## 2. Root cause (static analysis, 2026-11-15)
 
-The filter has a normalised-innovation-squared gate but **no recovery path**:
+The QuadCore has a normalised-innovation-squared gate but **no automatic recovery path**:
 
 | Code | Behaviour |
 |---|---|
 | `middleware/model/ins/kf_gins/trimmed_core/src/quad_core.cpp` | `if (config_.nis_gate_enable && nis > threshold) return kErrNisRejected;`；NIS rejection still does not auto-reseed the core |
 | `middleware/model/ins/kf_gins/trimmed_core/include/kfgins/quad_types.hpp` | `kNisThresholdDof1 = 6.6348966`, `kNisThresholdDof3 = 11.3448667` (99 % chi-square) |
 | `kf_gins_quad_port.cpp:107,229,232` | `nis_gate_enable` is configurable and `nis_rejected` / `last_nis` are exposed by the port |
-| repo-wide search | no covariance inflation, no reset, no "re-accept after N rejections" anywhere |
+| QuadCore recovery path | no covariance inflation or automatic re-accept after N rejections; M3 has an explicit authorized reset/re-alignment path, but the NIS gate does not invoke it automatically |
 
 The core can remain in a rejection deadlock: after the estimate and GNSS
 position disagree, subsequent fixes can remain above the NIS threshold. This is
