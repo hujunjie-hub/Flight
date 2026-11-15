@@ -56,6 +56,25 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
         self.assertEqual(parameters[0]["modelProfiles"], ["QUAD_X4"])
         self.assertEqual(self.parameter_document["modelProfiles"], ["QUAD_X4"])
 
+    def test_reboot_requirement_is_unknown_unless_source_declares_it(self):
+        self.assertNotIn("rebootRequired", self.parameter_document["parameters"][0])
+        self.assertNotIn("rebootRequired", self.parameter_document["parameters"][1])
+
+        catalog = dict(self.catalog)
+        catalog["parameters"] = [dict(item) for item in self.catalog["parameters"]]
+        catalog["parameters"][0]["reboot_required"] = False
+        catalog["parameters"][1]["rebootRequired"] = True
+        document = build_parameter_document(catalog, self.model)
+        self.assertIs(document["parameters"][0]["rebootRequired"], False)
+        self.assertIs(document["parameters"][1]["rebootRequired"], True)
+
+    def test_invalid_reboot_requirement_is_rejected(self):
+        catalog = dict(self.catalog)
+        catalog["parameters"] = [dict(item) for item in self.catalog["parameters"]]
+        catalog["parameters"][0]["reboot_required"] = "false"
+        with self.assertRaises(ValueError):
+            build_parameter_document(catalog, self.model)
+
     def test_model_sources_must_share_the_same_profile(self):
         with self.assertRaises(ValueError):
             validate_profile_alignment(
