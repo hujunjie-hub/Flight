@@ -19,7 +19,10 @@ velocity-derived filter from an R39 Return trace (251 samples, last 5 s) gives
 `|a_z| <= 0.237 m/s^2` (0.263 m/s^2 margin) and `|v_z| <= 0.113 m/s`, while
 `|v_h|` exceeds 0.20 in 100 of 251 samples.
 
-## 2. Experiments (single variable, formal FMT-SIM gates each time)
+## 2. FMT-SIM tuning experiments
+
+The tuning batches changed tracked files and have diagnostic status in their
+run manifests. The acceptance gates still require a stable, clean checkout.
 
 | # | Change | Result |
 |---|---|---|
@@ -27,8 +30,9 @@ velocity-derived filter from an R39 Return trace (251 samples, last 5 s) gives
 | 2 | `mpc_r_diag` 0.8/0.8/1.0 -> 2.4/2.4/3.0 | touchdown bounce, final `contact=NO_CONTACT` |
 | 3 | `rate_kp_nm_per_radps` 0.12 -> 0.3, `rate_kd_nm_per_radps2` 0.002 -> 0.004 | **Land PASS: 47,125 checks / 0 failures**, `landed=1 evidence=0x3 stable_ms=2020`, terminal ACK and DISARM complete, near-ground descent 0.323 m/s |
 
-Experiment 3 proves the limit cycle lives in the **inner attitude/rate loop**.
-Changing only the outer MPC (experiments 1-2) cannot fix it.
+Experiment 3 shows that the inner attitude/rate gains affect settling. The
+two tested outer-loop adjustments failed to restore settling. The available
+data leave the relative contributions of the inner loop and ground dynamics open.
 
 ## 3. Why it is not merged
 

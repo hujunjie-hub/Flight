@@ -57,48 +57,20 @@ void traceGnss(const ObservationRecord &record, const char *path,
 }
 #endif
 
-kfg::Status applyObservation(kfg::QuadCore &core, const ObservationRecord &record,
-                             const char *path, std::uint64_t imu_time_us) {
-#ifndef FLIGHT_HOST_SIL
-    (void)path;
-    (void)imu_time_us;
-#endif
+kfg::Status applyObservation(kfg::QuadCore &core, const ObservationRecord &record) {
     switch (record.id.kind) {
     case ObservationKind::kGnssPosition: {
         kfg::GnssPositionObs observation;
         observation.blh = kfg::vec3(record.a[0], record.a[1], record.a[2]);
         observation.std = kfg::vec3(record.b[0], record.b[1], record.b[2]);
-#ifdef FLIGHT_HOST_SIL
-        /* Express antenna position in the NED tangent frame at the pre-update
-         * INS position. The subtraction gives the production innovation in m. */
-        const auto &nominal = core.nominal();
-        const auto dr = kfg::earthDR(nominal.pos);
-        const auto observed = kfg::matvec(dr, observation.blh - nominal.pos);
-        const auto predicted = kfg::matvec(dr,
-            kfg::gnssPositionPrediction(nominal, core.config()) - nominal.pos);
-        const auto status = core.updateGnssPosition(observation);
-        traceGnss(record, path, imu_time_us, observed, predicted, status,
-                  core.diagnostics().last_nis);
-        return status;
-#else
         return core.updateGnssPosition(observation);
-#endif
     }
     case ObservationKind::kGnssVelocity: {
         kfg::GnssVelocityObs observation;
         observation.vel_ned = kfg::vec3(record.a[0], record.a[1], record.a[2]);
         observation.std = kfg::vec3(record.b[0], record.b[1], record.b[2]);
         observation.omega_ib = kfg::vec3(record.omega[0], record.omega[1], record.omega[2]);
-#ifdef FLIGHT_HOST_SIL
-        const auto predicted = kfg::gnssVelocityPrediction(core.nominal(), core.config(),
-                                                            observation.omega_ib);
-        const auto status = core.updateGnssVelocity(observation);
-        traceGnss(record, path, imu_time_us, observation.vel_ned, predicted, status,
-                  core.diagnostics().last_nis);
-        return status;
-#else
         return core.updateGnssVelocity(observation);
-#endif
     }
     case ObservationKind::kBaroHeight: {
         kfg::BaroObs observation;
@@ -119,6 +91,32 @@ kfg::Status applyObservation(kfg::QuadCore &core, const ObservationRecord &recor
     }
     return kfg::kErrArgument;
 }
+
+#ifdef FLIGHT_HOST_SIL
+kfg::Status applyObservationWithTrace(kfg::QuadCore &core, const ObservationRecord &record,
+                                      const char *path, std::uint64_t imu_time_us) {
+    const bool position = record.id.kind == ObservationKind::kGnssPosition;
+    if (!position && record.id.kind != ObservationKind::kGnssVelocity)
+        return applyObservation(core, record);
+
+    const auto &nominal = core.nominal();
+    auto observed = kfg::vec3(record.a[0], record.a[1], record.a[2]);
+    kfg::Vec3 predicted;
+    if (position) {
+        /* Position in the NED tangent frame at the pre-update INS position. */
+        const auto dr = kfg::earthDR(nominal.pos);
+        observed = kfg::matvec(dr, observed - nominal.pos);
+        predicted = kfg::matvec(dr, kfg::gnssPositionPrediction(nominal, core.config()) - nominal.pos);
+    } else {
+        const auto omega = kfg::vec3(record.omega[0], record.omega[1], record.omega[2]);
+        predicted = kfg::gnssVelocityPrediction(nominal, core.config(), omega);
+    }
+    const auto status = applyObservation(core, record);
+    traceGnss(record, path, imu_time_us, observed, predicted, status,
+              core.diagnostics().last_nis);
+    return status;
+}
+#endif
 
 } // namespace
 
@@ -440,7 +438,11 @@ kfg::Status ReplayEngine::replay(const InsHistory &history, std::uint32_t checkp
                     record.omega[axis]=(increment.dtheta(axis,0)/increment.dt-shadow.nominal().gyrbias(axis,0))/
                         (1.0+shadow.nominal().gyrscale(axis,0));
             }
-            const kfg::Status observation_status = applyObservation(shadow, record, "full", sample_time_us);
+#ifdef FLIGHT_HOST_SIL
+            const auto observation_status = applyObservationWithTrace(shadow, record, "full", sample_time_us);
+#else
+            const auto observation_status = applyObservation(shadow, record);
+#endif
             if(observation_status!=kfg::kOk && observation_status!=kfg::kErrNisRejected)
                 return observation_status;
             {
@@ -521,7 +523,11 @@ kfg::Status ReplayCursor::step(const InsHistory &h,std::uint64_t target,
             for(unsigned axis=0;axis<3;++axis)
                 observation.omega[axis]=(increment_.dtheta(axis,0)/increment_.dt-shadow.nominal().gyrbias(axis,0))/
                     (1.0+shadow.nominal().gyrscale(axis,0));
-        auto result=applyObservation(shadow,observation,probe_count_ ? "probe" : "cursor",time_);
+#ifdef FLIGHT_HOST_SIL
+        auto result=applyObservationWithTrace(shadow,observation,probe_count_ ? "probe" : "cursor",time_);
+#else
+        auto result=applyObservation(shadow,observation);
+#endif
         if(result!=kfg::kOk && result!=kfg::kErrNisRejected) return result;
         const auto kind=static_cast<unsigned>(observation.id.kind);
         if(kind>=1 && kind<=4) latest_evaluation_[kind-1]={observation.id.source_id,

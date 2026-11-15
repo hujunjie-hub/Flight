@@ -8,11 +8,11 @@
 
 本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
 
-> **当前 ENG-07 动态验收状态（R39）**：RUN_ID `FMT-SIM-LOCAL-20261114T174058156Z-547f3788`，测试 HEAD `547f37883186c888d786c4293f2a4341d348b994`；main/origin/main 精确匹配、worktree clean/stable、loopback 显式确认、UDP 14653、hover 0.62、350 ms 均有效。ZIP SHA256 `3a09ba6f4e2f7adda930ffb1633f498f3c8bb31f3c1d581ccc8043cdeeb78dfb`；构建 PASS；`issue_closure_eligible=false`。
+> **ENG-07 R39 诊断证据**。RUN_ID `FMT-SIM-LOCAL-20261114T174058156Z-547f3788`，测试 HEAD `547f37883186c888d786c4293f2a4341d348b994`。main/origin/main 匹配，loopback、UDP 14653、hover 0.62、350 ms 已核对。归档记录工作区启动前干净，结束时有 9 个 ABI 证据文件变更，`worktree_stable=false`、`issue_closure_eligible=false`。ZIP SHA256 `3a09ba6f4e2f7adda930ffb1633f498f3c8bb31f3c1d581ccc8043cdeeb78dfb`。
 >
 > R39 Land **48,801/3**、Return **48,802/3**、Mission **67,112/5**。三个场景均无 `FAILSAFE_TERMINAL`、无控制拒绝；剩余失败为 `terminal_ack`、`disarm_ack`、最终 `DISARMED`（Mission 另加近地实测 0.496 m/s 与结束 `contact=NO_CONTACT`）。Return touchdown 0.143 m、Mission 0.315 m、航点 0.292/0.413 m、近地下降 0.300/0.293 m/s，均通过各自阈值。
 >
-> 根因链已闭合到单一剩余项：R38（`a5df9070`）证明 CONTACT_HOLD 的"重新规划到实测接地点"会在接地瞬间以 1550/JERK 拒绝整份参考（Return t=28.28 s、Mission t=40.12 s，锁存 `FAILSAFE_TERMINAL`），而 Land 因 0.25 m/s 高于 0.15 m/s 等待门限永不进入该分支并在地面滑移。`a9a38bbb` + `547f3788` 改为静态零速度保持并加入"失去接地即释放"，确定性失败消失。剩余 [FLIGHT-26](https://github.com/hujunjie-hub/Flight/issues/26)：接地后约 0.2 m/s、周期约 1.4 s 的旋转水平极限环（导航与真值一致），使 M4 的 |vh| ≤ 0.20 与 2 s dwell 无法连续满足；M5 冻结/跟随两种语义均复现，接地前静态参考下亦存在，2 m 悬停 `hold_error` 仅 0.019–0.028 m。
+> R38（`a5df9070`）在 CONTACT_HOLD 重新规划时以 1550/JERK 拒绝参考（Return t=28.28 s、Mission t=40.12 s）。`a9a38bbb` 与 `547f3788` 改用静态零速度保持并在失去接地时释放。R39 没有再出现该拒绝。[FLIGHT-26](https://github.com/hujunjie-hub/Flight/issues/26) 的水平速度振荡仍阻塞 2 s dwell。[FLIGHT-29](https://github.com/hujunjie-hub/Flight/issues/29) 的导航与真值偏离在后续 Mission 诊断中出现，优先于阻尼调参。现行顺序见 [spec/09](../09_需求验证实施与发布管理.md#eng-07-剩余问题与定位顺序)。
 >
 > 精确 HEAD `547f3788` CI：Host validation、M6/M7 host validation、M7 host validation 全部 SUCCESS。M4 的 0.20 m/s、0.15 m/s、0.5 m/s²、2 s dwell、M5 0.40/0.12 m/s 与 DISARM 策略均未放宽。
 >

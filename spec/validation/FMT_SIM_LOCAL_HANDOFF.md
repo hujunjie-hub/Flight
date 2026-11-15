@@ -86,7 +86,7 @@ $sim = (Resolve-Path 'build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FM
 pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -FmtHilPort 14653 -FmtStateTimeoutMs 350 -FmtGraphicsAdapter 1 -FmtHover 0.62 -ConfirmLoopbackAddress
 ```
 
-若 FMT-SIM 安装路径不同，只修改 `$sim`；MinGW 路径不同时使用 `-GccDir`。批量入口自身先执行 `git fetch --prune origin`，再拒绝错误分支、dirty worktree、非 `origin/main` upstream 或本地 HEAD 与刚拉取的 upstream HEAD 不一致。正式关闭资格还要求命令显式带 `-ConfirmLoopbackAddress`（表示 Owner 已人工确认 settings 中的地址为 127.0.0.1）、hover 保持 0.62、端口 14653 和 350 ms；否则只生成诊断证据。它也会检查 settings.jason 中指定端口恰好匹配一架 HIL/UDP 载具且 Autobound=true；回环地址 127.0.0.1 仍需按本方案人工核对。
+若 FMT-SIM 安装路径不同，只修改 `$sim`；MinGW 路径不同时使用 `-GccDir`。批量入口拒绝错误分支，默认拒绝启动时存在未提交改动的工作区，并执行 `git fetch --prune origin`。正式关闭资格要求工作区全程干净且稳定、本地 HEAD 与刚拉取的 `origin/main` 一致，并显式带 `-ConfirmLoopbackAddress`（Owner 已人工确认 settings 中的地址为 127.0.0.1）、hover 0.62、端口 14653 和 350 ms。upstream 不一致或只运行部分场景时，runner 仍可收集诊断证据。它也检查 settings.jason 中指定端口恰好匹配一架 HIL/UDP 载具且 Autobound=true。
 
 批量入口调用 `run_sil.ps1 -BuildOnly` 构建一次，再通过 `run_sil.ps1 -ReuseBuild` 执行各场景；每个场景有独立 OutDir 和 FMT-SIM 引擎进程。即使一个场景失败，也会继续收集其余场景，逐项记录退出码，不覆盖之前 RUN_ID。
 
@@ -249,3 +249,7 @@ R34 后 main 修复：
 - 正向指标：Return touchdown 0.143 m、Mission 0.315 m、航点 0.292/0.413 m、近地下降 0.300/0.293 m/s。
 - **下一步（Owner/控制负责人）**：[#26](https://github.com/hujunjie-hub/Flight/issues/26) 记录接地后约 0.2 m/s、周期约 1.4 s 的旋转水平极限环（导航速度与 FMT 真值一致）。M5 冻结与跟随两种参考语义都复现；接地前静态参考下同样存在，而 2 m 悬停 `hold_error` 只有 0.019–0.028 m。该问题属 M6 近地水平环阻尼/稳定性，需要控制器侧修改与独立复核。不得放宽 M4 的 0.20/0.15 m/s、0.5 m/s²、2 s dwell。
 - 复测命令不变：在干净且与 `origin/main` 同步的 `main` 上运行 `tests/simulation/run_fmt_sim_regression.ps1`，350 ms / UDP 14653 / hover 0.62 / 显式 loopback。Host/CI PASS 不替代原生 FMT-SIM，FMT-SIM 也不替代 B07 实机证据。
+
+### FLIGHT-29 原生诊断
+
+先在包含 GNSS 融合日志的干净 `main` 上，以 §4 相同参数加 `-Scenario Mission`。该单场景输出用于定位。回传归档中的 `Mission/sil_flight.log`、`manifest.json` 和 ZIP SHA256。合并查看 `[gnss-fusion]`、`[gnss-commit]`、`[settle]` 与 `[nav]`，确认首次偏离真值时最近一次成功提交的 GNSS 位置和速度观测。检查 t≈30 s 接地前的窗口，必要时回溯到返航命令。正式复测仍使用 §4 的三场景入口。

@@ -101,7 +101,8 @@ NIS rejection, so Stage A must identify the trigger before any additional change
 
 `[gnss-fusion]` logs each replayed GNSS position or velocity observation with
 sample time, aligned IMU time, source/journal sequence, replay path, observed
-and predicted antenna values, innovation, result and NIS. Position values are
+and predicted antenna values, innovation, result and NIS. Result `0` means the
+update passed and `5` means the NIS gate rejected it. Position values are
 metres in the NED tangent frame at the pre-update INS position. Velocity values
 are m/s in NED. `[gnss-commit]` identifies the latest position and velocity
 evaluated by each successfully committed candidate. A replay row can recur or
