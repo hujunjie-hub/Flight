@@ -1,10 +1,10 @@
 # ENG-07 原生 FMT-SIM 本机复测交接方案
 
-> 状态：**R37 已在 main `2d219ead`（含 `866f2d79`/`50713306`）完成 350 ms 三场景复测：Land 水平门槛已达标但 accel 差 0.029；Return 新回归 #25（RETURN handoff 约 2 m 被拒、terminal failsafe）；Mission 落点 0.504 m 超 0.50 限值 4 mm**
+> 状态：**R45 在 `ada6bd65` 上完成 350 ms Land / Return / Mission 三场景 PASS（177,639 checks / 0 failures），但该测试 HEAD 早于 FLIGHT-29 Stage B1；R46 exact-main 三场景复测仍 NOT_RUN，#17/#18/#19/#21/#23/#24/#25 不得关闭。**
 >
-> 适用分支：**main**
+> 适用分支：**main（唯一远程分支）**
 >
-> 当前最新代码基线：**507133064b5f9c4176ff793ede8fa6e8a42fcad1**；M5 水平对准/制动门槛修复：**866f2d79dff583280b9b1e6f657eb29959b46df5** / **507133064b5f9c4176ff793ede8fa6e8a42fcad1**；最新本机复测 HEAD：**2d219ead6e3bcdbc5adff2fb7dfa365ab2a15bbb**（运行前必须 fetch 最新 origin/main）
+> 当前代码基线（本次接管核对）：**27763cd0c3463a96b31ae1a8e7faf3ed32a94416**；FLIGHT-29 Stage B1 代码提交：**28748c717e83b868ae58957c04bcd9dbe1c23e1b**。R46 必须在拉取本方案更新后的最新 `origin/main` 上运行，并确认 Stage B1 是测试 HEAD 的祖先。
 >
 > 本方案只覆盖 Windows 原生 FMT-SIM + Flight Host SIL 软件动态复测；不代表 H723 真机、台架 HIL、WCET/RTA、目标栈水位或飞行验收。
 

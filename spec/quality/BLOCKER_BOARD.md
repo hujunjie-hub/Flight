@@ -2,7 +2,7 @@
 
 > **2026-11-13 MR-009 R31 内部预审 CI 快照（代码/证明基线 8dcb60b3ac18e6a763c939d3e810984092cdd321）**：Host validation #43446380866（6/6）、M6/M7 #43446380836（5/5）、M7 #43446380724（2/2）全部 SUCCESS。M5 Host regression、M5 ASan/UBSan、MR-009 focused、S06-099/S06-107、Spec Audit、生产 ABI、18 mutation FP audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer 均 PASS。
 
-> **当前状态（2026-11-15）**：B01～B04 的本地规范/生产 ABI/安装包锁/默认 Release 链接通过。B05 MR-009 按项目方指示完成技术复核，S06-100～102 Host 与 ASan/UBSan 通过。B06 的 Cortex-M7 专用镜像静态链为 `-O2` 3,576/4,096 B、`-O0` 3,968/4,096 B，均 COMPLETE。B07 实机、WCET/RTA、栈水位、台架 HIL 与飞行仍 NOT_RUN。M5-07 未启动。FLIGHT-29 Stage B1 已加入 M3 连续 NIS 拒绝 fail-closed 能力锁存并通过三组 CI；R46 exact-main 原生 FMT-SIM 复测仍待执行。
+> **当前状态（2026-11-15；接管核对 HEAD `27763cd0c3463a96b31ae1a8e7faf3ed32a94416`）**：远程仅保留 `main`。B01～B04 的本地规范/生产 ABI/安装包锁/默认 Release 链接通过。B05 MR-009 按项目方指示完成技术复核，S06-100～102 Host 与 ASan/UBSan 通过。B06 的 Cortex-M7 专用镜像静态链为 `-O2` 3,576/4,096 B、`-O0` 3,968/4,096 B，均 COMPLETE。B07 实机、WCET/RTA、栈水位、台架 HIL 与飞行仍 NOT_RUN。M5-07 未启动。FLIGHT-29 Stage B1 已加入 M3 连续 NIS 拒绝 fail-closed 能力锁存并通过 CI；最新 HEAD 的 Host validation 7/7、M6/M7 5/5、M7 2/2 SUCCESS。R45 原生三场景 177,639/0 运行在 `ada6bd65`，早于 Stage B1；R46 exact-main 原生 FMT-SIM 复测仍待执行。
 
 > **开放风险**：ICD+M4 余量 264 B（FLIGHT-13）；Release 的工具链枚举属性仍有 228 条链接警告（FLIGHT-14）。下方 B01～B06 的表格保留各原始验证时点。
 
@@ -135,7 +135,7 @@
 | [#24](https://github.com/hujunjie-hub/Flight/issues/24) | Landing descends before horizontal settled | OPEN / 部分有效 | 接地水平速度改善；LANDED 受 #26 阻塞 |
 | [#25](https://github.com/hujunjie-hub/Flight/issues/25) | RETURN handoff re-plan regression | OPEN / 修复已验证 | R39 无 handoff 拒绝；等待整批与独立复核 |
 | [#26](https://github.com/hujunjie-hub/Flight/issues/26) | M6 近地水平极限环 | NEW / S1 | ~0.2 m/s、~1.4 s 周期，导航与真值一致；阻断 LANDED 且需 M6/MPC 复核 |
-| [#29](https://github.com/hujunjie-hub/Flight/issues/29) | 导航估计与真值发散 | NEW / S1 | Mission 延长视界下分离 10.441 m、`return_error` 16.927 m、`pos_std` 0.062→0.81、导航加速度 -80.7/-137.6 m/s²；SIL 已有 `ESTIMATOR_DIVERGENCE` 断言与 M6 fail-closed 门控，估计器侧修复仍未做 |
+| [#29](https://github.com/hujunjie-hub/Flight/issues/29) | 导航估计与真值发散 | OPEN / Stage B1 已实现 | R45 定位并修复 FMT-SIM UDP 状态帧覆盖触发；main `28748c717e83b868ae58957c04bcd9dbe1c23e1b` 增加 5 次连续 GNSS position/velocity NIS 拒绝后的 M3 能力 fail-closed 锁存；R46 exact-main 复测与 Stage B2 受控重新对准仍开放 |
 
 CI on exact HEAD `547f37883186c888d786c4293f2a4341d348b994`: Host validation, M6/M7 host validation and M7 host validation all SUCCESS. M5 Host and ASan/UBSan 330,302/0 each; M4 969/0; M4/M5 integration 1,042/0; Cortex-M7 module compile PASS. These workflows do not launch native FMT-SIM. #17/#18/#19/#21/#23/#24/#25 remain OPEN pending #26 and independent review; #22 remains OPEN pending independent safety review.
 
