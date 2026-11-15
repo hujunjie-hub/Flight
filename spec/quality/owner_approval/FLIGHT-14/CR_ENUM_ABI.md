@@ -1,6 +1,6 @@
 # FLIGHT-14 Release Enum-Size ABI — Change Request Package
 
-Status: **OPEN / AWAITING ABI OWNER DECISION — NO TOOLCHAIN OR ABI CHANGE MADE**
+Status: **OPEN / AWAITING ABI OWNER DECISION**
 
 Scope: QUAD_X4 / STM32H723ZGT6 production Release build with CubeCLT
 GNU Tools for STM32 14.3.1. Host/SIL evidence only; H723 target and HIL remain
@@ -40,19 +40,26 @@ between the two conventions.
   enum-typed value through a libc API or through a callback implemented on the
   other side of the boundary.
 
-The 228 warnings are the only visible signal, and they are treated as noise
-today. That is the actual defect: a real ABI hazard is indistinguishable from
-expected noise.
+The linker reports the enum policy for the whole object. The diagnostic does
+not identify a call or prove that any argument has incompatible layout.
 
 ## 3. Options
 
 ### Option A — keep the toolchain, make the hazard explicit (recommended first step)
 
 - Keep `-fno-short-enums` and the ABI lock unchanged.
-- Record the 228 warnings as a **known baseline** with the exact composition
-  (which libraries, which members) so a new warning is visible.
-- Add a source check that rejects passing public enum types through libc APIs
-  (the boundary is small and reviewable today).
+- T18 checks the exact 228 warning objects, runtime file hashes and load order,
+  120 selected archive members, and 65 cross-runtime symbols against
+  [`release_enum_link_baseline.json`](../../../../tests/abi/release_enum_link_baseline.json).
+  A change fails T18 and preserves the full linker log. A matching run prints
+  the count and retains the raw diagnostics in `scons.log`.
+- To check a fresh default Release link separately, save the SCons output and
+  run `python tools/check_enum_link.py <release-log> Flight.map` from the repo
+  root. The check requires the original `LINK Flight.elf` line and `-cref` map.
+- The map detects new named runtime interfaces. A source or type-level check
+  for arguments and indirect callbacks through existing symbols is still open.
+  In the current `snprintf` calls, the GCS calibration enum values are cast to
+  `unsigned` before `%u` formatting.
 - Risk: none to the binary; residual risk stays latent but is now measured.
 - Effort: small, Host-only.
 
@@ -95,6 +102,7 @@ expected noise.
 
 ## 6. What the owner is being asked to decide
 
-1. Approve **Option A** as the near-term disposition (no binary change).
-2. State whether the enum-size attribute is contractual, which decides whether
-   Option B is ever required.
+1. Decide whether the current diagnostic baseline is acceptable as a temporary
+   disposition.
+2. Decide whether the enum-size attribute is contractual and approve an
+   isolated 32-bit-enum multilib qualification if needed.
