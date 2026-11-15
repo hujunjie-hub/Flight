@@ -16,7 +16,17 @@ CATALOG = ROOT / "middleware/protocol/mavlink/parameters/ground_parameters.json"
 MODEL_CONFIG = ROOT / "config/vehicle_model.yaml"
 CONTROLLER_CONFIG = ROOT / "config/controller_tuning.yaml"
 ESTIMATOR_CONFIG = ROOT / "config/estimator_tuning.yaml"
-DEFAULT_OUTPUT = (ROOT.parent / "FMT_GroundControl/src/FirmwarePlugin/Flight"
+def _ground_control_root() -> Path:
+    # The repository was renamed from FMT_GroundControl to Flight_GroundControl.
+    # Prefer the current name, while keeping compatibility with existing local clones.
+    candidates = (
+        ROOT.parent / "Flight_GroundControl",
+        ROOT.parent / "FMT_GroundControl",
+    )
+    return next((path for path in candidates if path.exists()), candidates[0])
+
+
+DEFAULT_OUTPUT = (_ground_control_root() / "src/FirmwarePlugin/Flight"
                   / "FlightParameterFactMetaData.json")
 DEFAULT_CATALOG_OUTPUT = DEFAULT_OUTPUT.with_name("FlightVehicleModelCatalog.json")
 
