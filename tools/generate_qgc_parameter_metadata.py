@@ -34,7 +34,7 @@ DOMAIN_BY_GROUP = {
 
 
 def _yaml_scalar(text: str, key: str) -> str:
-    match = re.search(rf"^{re.escape(key)}:\\s*([A-Za-z0-9_]+)\\s*$", text, re.MULTILINE)
+    match = re.search(rf"^{re.escape(key)}:\s*([A-Za-z0-9_]+)\s*$", text, re.MULTILINE)
     if not match:
         raise ValueError(f"{key} missing in {ESTIMATOR_CONFIG}")
     return match.group(1)
