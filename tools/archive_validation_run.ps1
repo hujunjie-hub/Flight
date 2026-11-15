@@ -187,7 +187,15 @@ if ($LASTEXITCODE -eq 0) {
     foreach ($relative in $untracked) {
         $relative = "$relative".Trim()
         if ([string]::IsNullOrWhiteSpace($relative)) { continue }
-        if ($relative -match '(^|[\\/])(\.env($|\.)|secrets?($|[\\/])|credentials?($|[\\/]))|\.(pem|p12|pfx|key)$') {
+        $relativeLower = $relative.ToLowerInvariant()
+        $relativeName = [System.IO.Path]::GetFileName($relativeLower)
+        $relativeExtension = [System.IO.Path]::GetExtension($relativeLower)
+        if ($relativeExtension -in @(".pem", ".p12", ".pfx", ".key") -or
+            $relativeName.StartsWith(".env") -or
+            $relativeLower.Contains("secret") -or
+            $relativeLower.Contains("credential") -or
+            $relativeLower.Contains("token") -or
+            $relativeLower.Contains("password")) {
             continue
         }
         $source = Join-Path $repoRoot $relative
@@ -438,7 +446,15 @@ if ($LASTEXITCODE -eq 0) {
     foreach ($relative in $untracked) {
         $relative = "$relative".Trim()
         if ([string]::IsNullOrWhiteSpace($relative)) { continue }
-        if ($relative -match '(^|[\\/])(\.env($|\.)|secrets?($|[\\/])|credentials?($|[\\/]))|\.(pem|p12|pfx|key)$') {
+        $relativeLower = $relative.ToLowerInvariant()
+        $relativeName = [System.IO.Path]::GetFileName($relativeLower)
+        $relativeExtension = [System.IO.Path]::GetExtension($relativeLower)
+        if ($relativeExtension -in @(".pem", ".p12", ".pfx", ".key") -or
+            $relativeName.StartsWith(".env") -or
+            $relativeLower.Contains("secret") -or
+            $relativeLower.Contains("credential") -or
+            $relativeLower.Contains("token") -or
+            $relativeLower.Contains("password")) {
             continue
         }
         $source = Join-Path $repoRoot $relative
@@ -707,7 +723,15 @@ if ($LASTEXITCODE -eq 0) {
     foreach ($relative in $untracked) {
         $relative = "$relative".Trim()
         if ([string]::IsNullOrWhiteSpace($relative)) { continue }
-        if ($relative -match '(^|[\\/])(\.env($|\.)|secrets?($|[\\/])|credentials?($|[\\/]))|\.(pem|p12|pfx|key)$') {
+        $relativeLower = $relative.ToLowerInvariant()
+        $relativeName = [System.IO.Path]::GetFileName($relativeLower)
+        $relativeExtension = [System.IO.Path]::GetExtension($relativeLower)
+        if ($relativeExtension -in @(".pem", ".p12", ".pfx", ".key") -or
+            $relativeName.StartsWith(".env") -or
+            $relativeLower.Contains("secret") -or
+            $relativeLower.Contains("credential") -or
+            $relativeLower.Contains("token") -or
+            $relativeLower.Contains("password")) {
             continue
         }
         $source = Join-Path $repoRoot $relative
@@ -989,7 +1013,15 @@ if ($LASTEXITCODE -eq 0) {
     foreach ($relative in $untracked) {
         $relative = "$relative".Trim()
         if ([string]::IsNullOrWhiteSpace($relative)) { continue }
-        if ($relative -match '(^|[\\/])(\.env($|\.)|secrets?($|[\\/])|credentials?($|[\\/]))|\.(pem|p12|pfx|key)$') {
+        $relativeLower = $relative.ToLowerInvariant()
+        $relativeName = [System.IO.Path]::GetFileName($relativeLower)
+        $relativeExtension = [System.IO.Path]::GetExtension($relativeLower)
+        if ($relativeExtension -in @(".pem", ".p12", ".pfx", ".key") -or
+            $relativeName.StartsWith(".env") -or
+            $relativeLower.Contains("secret") -or
+            $relativeLower.Contains("credential") -or
+            $relativeLower.Contains("token") -or
+            $relativeLower.Contains("password")) {
             continue
         }
         $source = Join-Path $repoRoot $relative
