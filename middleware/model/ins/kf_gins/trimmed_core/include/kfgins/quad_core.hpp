@@ -36,7 +36,8 @@ constexpr std::size_t covarianceUpperDiagonalIndex(std::size_t row) {
  * Layout: 32 B header + 7 doubles of the previous compensated IMU increment
  * (the coning/sculling "previous value") + 23 doubles of nominal state
  * (euler is recomputed from the quaternion) + the 253 doubles of the upper
- * triangle of P.  Total 2296 B, padded to the fixed 2304 B slot.
+ * triangle of P.  reserved[0]/[1] store GNSS position/velocity NIS reject
+ * streaks; reserved[2..7] remain zero. Total remains 2304 B.
  *
  * The checkpoint is a byte-stable POD so a replay candidate can be copied and
  * compared without touching the active filter.
@@ -61,7 +62,7 @@ struct QuadCheckpoint {
 };
 
 constexpr std::uint32_t kQuadCheckpointMagic = 0x4B464743u; /* "KFGC" */
-constexpr std::uint16_t kQuadCheckpointVersion = 1u;
+constexpr std::uint16_t kQuadCheckpointVersion = 2u;
 constexpr std::size_t kQuadCheckpointBytes = 2304u;
 
 static_assert(sizeof(QuadCheckpoint) == kQuadCheckpointBytes,
@@ -112,6 +113,8 @@ public:
     const Mat22 &covariance() const { return covariance_; }
     const QuadConfig &config() const { return config_; }
     const QuadDiagnostics &diagnostics() const { return diagnostics_; }
+    std::uint8_t gnssPositionNisRejectStreak() const { return gnss_position_nis_reject_streak_; }
+    std::uint8_t gnssVelocityNisRejectStreak() const { return gnss_velocity_nis_reject_streak_; }
     bool initialized() const { return initialized_; }
 
     /* Copies the full covariance into 'out' (row-major 22x22). */
@@ -166,6 +169,8 @@ private:
     bool has_previous_increment_;
     bool initialized_;
     QuadDiagnostics diagnostics_;
+    std::uint8_t gnss_position_nis_reject_streak_ = 0u;
+    std::uint8_t gnss_velocity_nis_reject_streak_ = 0u;
     Workspace workspace_;
 };
 

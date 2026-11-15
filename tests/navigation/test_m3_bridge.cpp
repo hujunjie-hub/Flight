@@ -8,6 +8,7 @@
 
 #include "observation_replay/ins_observation.hpp"
 #include "observation_replay/ins_replay.hpp"
+#include "navigation_estimator/nis_health.hpp"
 #include "kfgins/quad_core.hpp"
 #include "kfgins/quad_models.hpp"
 
@@ -207,6 +208,131 @@ void test_replay_with_bridge_records(void) {
     CHECK(worst < 1.0e-7);
 }
 
+void test_nis_capability_latch() {
+    NisCapabilityLatch latch;
+    CHECK(latch.positionUsable());
+    CHECK(latch.velocityUsable());
+    CHECK(latch.update(1u, 0u) == 0u);
+    CHECK(latch.update(4u, 0u) == 0u);
+    CHECK(latch.update(kNisConsecutiveRejectLimit, 0u) ==
+          NisCapabilityLatch::kPositionLatched);
+    CHECK(!latch.positionUsable());
+    CHECK(latch.velocityUsable());
+
+    /* A later accepted update does not silently revalidate a latched capability. */
+    CHECK(latch.update(0u, 0u) == 0u);
+    CHECK(!latch.positionUsable());
+    CHECK(latch.update(0u, kNisConsecutiveRejectLimit) ==
+          NisCapabilityLatch::kVelocityLatched);
+    CHECK(!latch.velocityUsable());
+
+    latch.reset();
+    CHECK(latch.positionUsable());
+    CHECK(latch.velocityUsable());
+}
+
+void test_replay_preserves_nis_streak_and_latches_capability() {
+    QuadConfig config;
+    config.imunoise.gyr_arw = vec3(0.0015, 0.0015, 0.0015);
+    config.imunoise.acc_vrw = vec3(0.025, 0.025, 0.025);
+    config.imunoise.gyrbias_std = vec3(5.0e-4, 5.0e-4, 5.0e-4);
+    config.imunoise.accbias_std = vec3(0.02, 0.02, 0.02);
+    config.imunoise.gyrscale_std = vec3(1.0e-4, 1.0e-4, 1.0e-4);
+    config.imunoise.accscale_std = vec3(1.0e-4, 1.0e-4, 1.0e-4);
+    config.imunoise.corr_time = 3600.0;
+    config.imunoise.baro_bias_walk = 1.0e-4;
+    config.antlever = vec3(0.12, -0.05, 0.21);
+    config.nis_gate_enable = true;
+    config.baro_origin_height_m = 30.0;
+
+    QuadInitState init;
+    init.nominal.pos = vec3(30.5 * kD2R, 114.3 * kD2R, 35.0);
+    init.nominal.vel = vec3(0.0, 0.0, 0.0);
+    init.nominal.euler = vec3(0.01, -0.02, 0.4);
+    init.nominal.cbn = eulerToMatrix(init.nominal.euler);
+    init.nominal.qbn = matrixToQuat(init.nominal.cbn);
+    init.nominal.gyrbias = vec3(1.0e-4, -2.0e-4, 3.0e-4);
+    init.nominal.accbias = vec3(0.01, -0.02, 0.03);
+    init.nominal.gyrscale = vec3(0.0, 0.0, 0.0);
+    init.nominal.accscale = vec3(0.0, 0.0, 0.0);
+    init.nominal.baro_bias = 0.5;
+    init.pos_std = vec3(1.0, 1.0, 1.5);
+    init.vel_std = vec3(0.1, 0.1, 0.1);
+    init.euler_std = vec3(0.02, 0.02, 0.1);
+    init.gyrbias_std = config.imunoise.gyrbias_std;
+    init.accbias_std = config.imunoise.accbias_std;
+    init.gyrscale_std = config.imunoise.gyrscale_std;
+    init.accscale_std = config.imunoise.accscale_std;
+    init.baro_bias_std = 1.5;
+
+    QuadCore active;
+    CHECK(active.initialize(config, init) == kOk);
+    InsHistory history;
+    ReplayEngine engine;
+    ReplayCandidate candidate;
+
+    for (std::uint32_t step = 1u; step <= 16u; ++step) {
+        const std::uint64_t time_us = static_cast<std::uint64_t>(step) * 1000u;
+        const Vec3 f_nav = vec3(0.0, 0.0, -gravity(active.nominal().pos));
+        const Vec3 f_body = matvecTransposed(active.nominal().cbn, f_nav);
+        ImuIncrement increment;
+        increment.dt = 0.001;
+        for (int i = 0; i < 3; ++i) {
+            increment.dtheta(i, 0) = active.nominal().gyrbias(i, 0) * 0.001;
+            increment.dvel(i, 0) =
+                (f_body(i, 0) + active.nominal().accbias(i, 0)) * 0.001;
+        }
+        CHECK(active.propagate(increment) == kOk);
+        CHECK(history.pushImu(time_us, increment, step));
+
+        if (step == 8u) {
+            QuadCheckpoint checkpoint;
+            CHECK(active.saveCheckpoint(&checkpoint, 1u, 1u, 1u, time_us, step) == kOk);
+            CHECK(history.pushCheckpoint(checkpoint));
+        }
+
+        if (step >= 9u && step <= 13u) {
+            GnssSample displaced = gnssSample(0xB00B00ULL, 100u + step, time_us);
+            displaced.quality_flags =
+                GNSS_Q_POSITION_VALID | GNSS_Q_POSITION_COV_VALID;
+            displaced.latitude_deg +=
+                (40.0 / (WGS84_RA + displaced.altitude_m)) / kD2R;
+            CHECK(acceptGnssSample(history, displaced, time_us + 100u,
+                                   1u, 5u, 1u, 1u) == AcceptStatus::kAccepted);
+        }
+    }
+
+    std::uint32_t checkpoint_index = 0u;
+    CHECK(history.findCheckpoint(8000u, &checkpoint_index));
+    QuadCore shadow;
+    CHECK(shadow.initialize(config, init) == kOk);
+    CHECK(engine.replay(history, checkpoint_index, 16000u, 16u, 1u,
+                        shadow, &candidate) == kOk);
+    CHECK(shadow.gnssPositionNisRejectStreak() == kNisConsecutiveRejectLimit);
+
+    CHECK(engine.commit(active, candidate, 1u, 16u) == kOk);
+    CHECK(active.gnssPositionNisRejectStreak() == kNisConsecutiveRejectLimit);
+
+    NisCapabilityLatch latch;
+    CHECK(latch.update(active.gnssPositionNisRejectStreak(),
+                       active.gnssVelocityNisRejectStreak()) ==
+          NisCapabilityLatch::kPositionLatched);
+    CHECK(!latch.positionUsable());
+    CHECK(latch.velocityUsable());
+
+    /* A later consistent sample resets the numerical streak but cannot silently
+     * restore the capability; only an explicit estimator reset clears the latch. */
+    GnssPositionObs good;
+    good.blh = gnssPositionPrediction(active.nominal(), config);
+    good.std = vec3(0.5, 0.5, 0.5);
+    CHECK(active.updateGnssPosition(good) == kOk);
+    CHECK(active.gnssPositionNisRejectStreak() == 0u);
+    CHECK(latch.update(0u, 0u) == 0u);
+    CHECK(!latch.positionUsable());
+    latch.reset();
+    CHECK(latch.positionUsable());
+}
+
 } // namespace
 
 int main() {
@@ -214,6 +340,8 @@ int main() {
     test_gnss_conversion();
     test_baro_conversion();
     test_replay_with_bridge_records();
+    test_nis_capability_latch();
+    test_replay_preserves_nis_streak_and_latches_capability();
     std::printf("test_m3_bridge: %d checks, %d failures\n", g_checks, g_failures);
     return (g_failures == 0) ? 0 : 1;
 }

@@ -3,6 +3,7 @@
  * operation WCET and server RTA still need target evidence. */
 #include "contract_checks/algorithm_checks.h"
 #include "observation_replay/ins_replay.hpp"
+#include "nis_health.hpp"
 #include "backend_adapter/kf_gins_adapter.hpp"
 #include "ins_model.h"
 #include <algorithm>
@@ -61,6 +62,7 @@ struct Estimator {
   NavigationOriginSnapshot origin{};
   NavigationCapability capability{};
   EstimatorHealth health{};
+  ins::NisCapabilityLatch nis_health;
   StateResetEvent reset_event{};
   ImuSample last_imu{};
   GnssSample initial_gnss{};
@@ -298,6 +300,7 @@ Status initialize_core(const NavStateCore &state, bool provided) {
     return STATUS_NUMERIC_ERROR;
   nav.ready = true;
   nav.lost = false;
+  nav.nis_health.reset();
   nav.history.reset();
   nav.builder.reset();
   nav.cursor.cancel();
@@ -396,10 +399,10 @@ void publish(uint64_t now) {
           NAV_VALID_ATTITUDE | NAV_VALID_BODY_RATE | NAV_VALID_ACCELERATION;
       if (nav.heading_observed && out.attitude_std_rad[2] < .5f)
         out.valid_mask |= NAV_VALID_HEADING;
-      if (nav.position_observed)
+      if (nav.position_observed && nav.nis_health.positionUsable())
         out.valid_mask |=
             NAV_VALID_HORIZONTAL_POSITION | NAV_VALID_VERTICAL_POSITION;
-      if (nav.velocity_observed)
+      if (nav.velocity_observed && nav.nis_health.velocityUsable())
         out.valid_mask |=
             NAV_VALID_HORIZONTAL_VELOCITY | NAV_VALID_VERTICAL_VELOCITY;
       if (nav.baro_reference && nav.last_baro && now - nav.last_baro < 1000000)
@@ -415,7 +418,8 @@ void publish(uint64_t now) {
   nav.capability.capability_mask = out.valid_mask;
   if (out.valid_mask & NAV_VALID_BODY_RATE)
     nav.capability.active_source_mask |= 1u << SOURCE_IMU;
-  if (nav.last_gnss && now >= nav.last_gnss && now - nav.last_gnss < 1000000)
+  if (nav.last_gnss && now >= nav.last_gnss && now - nav.last_gnss < 1000000 &&
+      (nav.nis_health.positionUsable() || nav.nis_health.velocityUsable()))
     nav.capability.active_source_mask |= 1u << SOURCE_GNSS;
   if (nav.last_baro && now >= nav.last_baro && now - nav.last_baro < 100000)
     nav.capability.active_source_mask |= 1u << SOURCE_BARO;
@@ -644,6 +648,7 @@ extern "C" Status ins_model_init(const ProductEstimatorConfig *config) {
   nav.snapshot = {};
   nav.capability = {};
   nav.health = {};
+  nav.nis_health.reset();
   nav.initial_gnss = {};
   nav.initial_mag = {};
   nav.last_imu = {};
@@ -1123,6 +1128,16 @@ extern "C" Status ins_model_update(uint64_t now) {
                                  nav.last_imu.sample_sequence) != kfg::kOk)
         result = STATUS_NUMERIC_ERROR;
       else {
+        const std::uint8_t newly_latched = nav.nis_health.update(
+            nav.active.gnssPositionNisRejectStreak(),
+            nav.active.gnssVelocityNisRejectStreak());
+        if (newly_latched != 0u) {
+          nav.health.common.last_error_code = static_cast<std::uint32_t>(STATUS_NUMERIC_ERROR);
+          if (newly_latched & ins::NisCapabilityLatch::kPositionLatched)
+            nav.position_observed = false;
+          if (newly_latched & ins::NisCapabilityLatch::kVelocityLatched)
+            nav.velocity_observed = false;
+        }
 #ifdef FLIGHT_HOST_SIL
         const auto &position = nav.candidate.latest_evaluation[0];
         const auto &velocity = nav.candidate.latest_evaluation[1];
@@ -1143,11 +1158,11 @@ extern "C" Status ins_model_update(uint64_t now) {
         /* Only report source observability after a successful numerical
            update; a queued or NIS-rejected sample is not aiding evidence. */
         const auto *accepted = nav.candidate.accepted_sample_time_us;
-        if (accepted[0]) {
+        if (accepted[0] && nav.nis_health.positionUsable()) {
           nav.position_observed = true;
           nav.last_gnss = accepted[0];
         }
-        if (accepted[1]) {
+        if (accepted[1] && nav.nis_health.velocityUsable()) {
           nav.velocity_observed = true;
           nav.last_gnss = std::max(nav.last_gnss, accepted[1]);
         }
@@ -1386,6 +1401,7 @@ extern "C" Status ins_model_reset(const EstimatorResetRequest *request) {
   nav.cursor.cancel(); nav.probe_cursor.cancel(); nav.probe.queued=false;
   reset_alignment();
   nav.position_observed = nav.velocity_observed = nav.heading_observed = false;
+  nav.nis_health.reset();
   nav.initial_gnss = {};
   if(gnss_assisted) nav.initial_gnss=seed_gnss;
   nav.initial_mag = {};

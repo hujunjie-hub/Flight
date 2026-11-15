@@ -10,14 +10,14 @@
  *   3. feed a fix displaced by 40 m while the filter state stays put. The
  *      innovation is far outside the declared covariance, so the NIS gate
  *      rejects it;
- *   4. repeat the displaced fix many times. Because nothing inflates the
- *      covariance or resets the estimate, every repeat is rejected as well:
- *      gnss_pos_updates never advances again and the position never moves
- *      toward the (correct) fix.
+ *   4. repeat the displaced fix many times. The core must keep rejecting it:
+ *      this fixture has no independent truth source, so it cannot establish
+ *      whether the INS or the GNSS sequence is wrong.
  *
- * The assertions below therefore check the mechanism (gate fires, counter
- * advances for the acceptance, last_nis above the chi-square threshold,
- * no recovery) and print the numbers that a Stage B fix must change.
+ * M3 separately revokes the affected navigation capability after five
+ * consecutive GNSS NIS rejections. It does not auto-accept the disputed source
+ * or mark the GNSS device FAILED. The replay/latch behaviour is covered by
+ * test_m3_bridge; this test protects the underlying outlier gate.
  */
 
 #include <cmath>
@@ -33,7 +33,7 @@ alignas(16) unsigned char g_storage[16 * 1024];
 
 constexpr double kPi = 3.14159265358979323846;
 constexpr double kEarthRadiusM = 6378137.0;
-/* chi-square 99.5 % thresholds used by quad_core.cpp */
+/* chi-square 99 % threshold used by quad_core.cpp */
 constexpr double kNisThresholdDof3 = 11.3448667;
 
 kfg_quad_config_t make_config() {
@@ -145,32 +145,30 @@ int main() {
     CHECK(rejected_after_first == rejected_before + 1u);
     CHECK(first_nis > kNisThresholdDof3);
 
-    /* Repeat the correct fix twenty times over twenty seconds. A filter with a
-     * recovery path would eventually accept it again; today it never does. */
-    int recovered = 0;
+    /* Repeat the same displaced source twenty times over twenty seconds.
+     * Persistent disagreement must not make the core auto-accept it. */
+    int unexpected_accepts = 0;
     for (int i = 0; i < 20; ++i) {
         settle(1000);
         if (kfg_quad_update_gnss_position(g_storage, &displaced) == KFG_QUAD_OK)
-            ++recovered;
+            ++unexpected_accepts;
     }
     CHECK(kfg_quad_get_diagnostics(g_storage, &diagnostics) == KFG_QUAD_OK);
     kfg_quad_nav_t nav;
     CHECK(kfg_quad_get_nav(g_storage, &nav) == KFG_QUAD_OK);
 
-    std::printf("after 20 displaced fixes: accepted=%u rejected=%u recovered=%d "
+    std::printf("after 20 displaced fixes: accepted=%u rejected=%u unexpected_accepts=%d "
                 "north_error=%d mm last_nis=%.6f\n",
-                diagnostics.gnss_pos_updates, diagnostics.nis_rejected, recovered,
+                diagnostics.gnss_pos_updates, diagnostics.nis_rejected, unexpected_accepts,
                 north_mm(nav, init), diagnostics.last_nis);
 
-    /* Mechanism assertions, i.e. today's behaviour. When Stage B adds a bounded
-     * recovery path, `recovered` and `gnss_pos_updates` are the lines that must
-     * change; the gate counters below must not. */
+    /* The core must keep rejecting this disputed sequence. M3's capability
+     * latch, not an automatic estimator reset, is the fail-closed response. */
     CHECK(diagnostics.gnss_pos_updates == accepted_before);
     CHECK(diagnostics.nis_rejected == rejected_before + 21u);
-    CHECK(recovered == 0);
-    /* Rejecting a 40 m outlier is correct. What is missing is any way out of
-     * the state where every future fix is also rejected: last_nis remains far
-     * above the 11.34 threshold after 20 s of covariance growth. */
+    CHECK(unexpected_accepts == 0);
+    /* The repeated source remains inconsistent after 20 s; it is not labelled
+     * as the truth merely because the filter has continued to propagate. */
     CHECK(std::abs(north_mm(nav, init)) < 2000);
     CHECK(diagnostics.last_nis > kNisThresholdDof3);
 

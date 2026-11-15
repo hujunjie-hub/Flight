@@ -193,6 +193,8 @@ QuadCore::QuadCore() : has_previous_increment_(false), initialized_(false) {
     diagnostics_.nonfinite_events = 0;
     diagnostics_.spd_failures = 0;
     diagnostics_.last_nis = 0.0;
+    gnss_position_nis_reject_streak_ = 0u;
+    gnss_velocity_nis_reject_streak_ = 0u;
 }
 
 Status QuadCore::initialize(const QuadConfig &config, const QuadInitState &init) {
@@ -223,6 +225,8 @@ Status QuadCore::initialize(const QuadConfig &config, const QuadInitState &init)
     }
 
     config_ = config;
+    gnss_position_nis_reject_streak_ = 0u;
+    gnss_velocity_nis_reject_streak_ = 0u;
     nominal_ = init.nominal;
     nominal_.cbn = quatToMatrix(nominal_.qbn);
     nominal_.euler = matrixToEuler(nominal_.cbn);
@@ -699,6 +703,13 @@ Status QuadCore::applyUpdate(int m, const double *dz, const double *h, const dou
     const double threshold = (dof == 1) ? kNisThresholdDof1 : kNisThresholdDof3;
     if (config_.nis_gate_enable && nis > threshold) {
         ++diagnostics_.nis_rejected;
+        if (kind == kUpdateGnssPosition &&
+            gnss_position_nis_reject_streak_ < kNisConsecutiveRejectLimit) {
+            ++gnss_position_nis_reject_streak_;
+        } else if (kind == kUpdateGnssVelocity &&
+                   gnss_velocity_nis_reject_streak_ < kNisConsecutiveRejectLimit) {
+            ++gnss_velocity_nis_reject_streak_;
+        }
         return kErrNisRejected;
     }
 
@@ -820,9 +831,11 @@ Status QuadCore::applyUpdate(int m, const double *dz, const double *h, const dou
     switch (kind) {
     case kUpdateGnssPosition:
         ++diagnostics_.gnss_pos_updates;
+        gnss_position_nis_reject_streak_ = 0u;
         break;
     case kUpdateGnssVelocity:
         ++diagnostics_.gnss_vel_updates;
+        gnss_velocity_nis_reject_streak_ = 0u;
         break;
     case kUpdateBaro:
         ++diagnostics_.baro_updates;
@@ -888,6 +901,8 @@ Status QuadCore::saveCheckpoint(QuadCheckpoint *out, std::uint32_t fusion_revisi
     out->magic = kQuadCheckpointMagic;
     out->version = kQuadCheckpointVersion;
     out->flags = 0u;
+    out->reserved[0] = gnss_position_nis_reject_streak_;
+    out->reserved[1] = gnss_velocity_nis_reject_streak_;
     out->fusion_revision = fusion_revision;
     out->imu_sequence = imu_sequence;
     out->origin_id = origin_id;
@@ -935,8 +950,13 @@ Status QuadCore::saveCheckpoint(QuadCheckpoint *out, std::uint32_t fusion_revisi
 }
 
 Status QuadCore::restoreCheckpoint(const QuadCheckpoint &in) {
-    if (in.magic != kQuadCheckpointMagic || in.version != kQuadCheckpointVersion) {
+    if (in.magic != kQuadCheckpointMagic || in.version != kQuadCheckpointVersion ||
+        in.flags != 0u || in.reserved[0] > kNisConsecutiveRejectLimit ||
+        in.reserved[1] > kNisConsecutiveRejectLimit) {
         return kErrArgument;
+    }
+    for (std::size_t i = 2u; i < sizeof(in.reserved); ++i) {
+        if (in.reserved[i] != 0u) return kErrArgument;
     }
 
     QuadNominal nominal = nominal_;
@@ -983,6 +1003,8 @@ Status QuadCore::restoreCheckpoint(const QuadCheckpoint &in) {
         previous_increment_.dvel(i, 0) = in.previous_dvel[i];
     }
     has_previous_increment_ = (in.previous_dt > 0.0);
+    gnss_position_nis_reject_streak_ = in.reserved[0];
+    gnss_velocity_nis_reject_streak_ = in.reserved[1];
     initialized_ = true;
     return kOk;
 }

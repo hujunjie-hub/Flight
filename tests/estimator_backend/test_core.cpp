@@ -276,6 +276,83 @@ void test_nis_gate_and_failure_atomicity() {
     CHECK(core.updateBaro(good) == kOk);
 }
 
+void test_gnss_nis_rejection_streak_and_checkpoint() {
+    QuadCore core;
+    const QuadConfig cfg = make_config();
+    const QuadInitState init = make_init();
+    CHECK(core.initialize(cfg, init) == kOk);
+
+    for (int i = 0; i < 100; ++i) {
+        CHECK(core.propagate(static_increment(core.nominal(), 0.001)) == kOk);
+    }
+
+    GnssPositionObs good;
+    good.blh = gnssPositionPrediction(core.nominal(), cfg);
+    good.std = vec3(0.3, 0.3, 0.5);
+    CHECK(core.updateGnssPosition(good) == kOk);
+    CHECK(core.gnssPositionNisRejectStreak() == 0u);
+
+    GnssPositionObs displaced;
+    displaced.blh = gnssPositionPrediction(core.nominal(), cfg);
+    displaced.blh(0, 0) += 40.0 / (WGS84_RA + displaced.blh(2, 0));
+    displaced.std = vec3(0.2, 0.2, 0.4);
+
+    /* A transient outlier is still rejected, then a consistent fix clears the
+     * consecutive streak without changing the NIS threshold. */
+    for (unsigned i = 0; i < 3u; ++i) {
+        CHECK(core.updateGnssPosition(displaced) == kErrNisRejected);
+        CHECK(core.gnssPositionNisRejectStreak() == i + 1u);
+    }
+    good.blh = gnssPositionPrediction(core.nominal(), cfg);
+    CHECK(core.updateGnssPosition(good) == kOk);
+    CHECK(core.gnssPositionNisRejectStreak() == 0u);
+
+    /* Persistent disagreement saturates at the configured limit; it never
+     * causes the core to auto-accept the displaced source. */
+    displaced.blh = gnssPositionPrediction(core.nominal(), cfg);
+    displaced.blh(0, 0) += 40.0 / (WGS84_RA + displaced.blh(2, 0));
+    for (unsigned i = 0; i < kNisConsecutiveRejectLimit + 2u; ++i) {
+        CHECK(core.updateGnssPosition(displaced) == kErrNisRejected);
+        CHECK(core.gnssPositionNisRejectStreak() ==
+              (i + 1u < kNisConsecutiveRejectLimit
+                   ? i + 1u
+                   : kNisConsecutiveRejectLimit));
+    }
+
+    QuadCheckpoint checkpoint;
+    CHECK(core.saveCheckpoint(&checkpoint, 7u, 3u, 2u, 100000u, 100u) == kOk);
+    CHECK(checkpoint.version == kQuadCheckpointVersion);
+    CHECK(checkpoint.reserved[0] == kNisConsecutiveRejectLimit);
+    CHECK(checkpoint.reserved[1] == 0u);
+
+    QuadCore restored;
+    CHECK(restored.initialize(cfg, init) == kOk);
+    CHECK(restored.restoreCheckpoint(checkpoint) == kOk);
+    CHECK(restored.gnssPositionNisRejectStreak() == kNisConsecutiveRejectLimit);
+    CHECK(restored.gnssVelocityNisRejectStreak() == 0u);
+
+    good.blh = gnssPositionPrediction(restored.nominal(), cfg);
+    CHECK(restored.updateGnssPosition(good) == kOk);
+    CHECK(restored.gnssPositionNisRejectStreak() == 0u);
+
+    GnssVelocityObs bad_velocity;
+    bad_velocity.vel_ned = restored.nominal().vel + vec3(40.0, 0.0, 0.0);
+    bad_velocity.std = vec3(0.2, 0.2, 0.2);
+    bad_velocity.omega_ib = vec3(0.0, 0.0, 0.0);
+    for (unsigned i = 0; i < kNisConsecutiveRejectLimit; ++i) {
+        CHECK(restored.updateGnssVelocity(bad_velocity) == kErrNisRejected);
+        CHECK(restored.gnssVelocityNisRejectStreak() == i + 1u);
+        CHECK(restored.gnssPositionNisRejectStreak() == 0u);
+    }
+
+    CHECK(restored.saveCheckpoint(&checkpoint, 8u, 3u, 2u, 110000u, 110u) == kOk);
+    CHECK(checkpoint.reserved[0] == 0u);
+    CHECK(checkpoint.reserved[1] == kNisConsecutiveRejectLimit);
+    QuadCheckpoint malformed = checkpoint;
+    malformed.reserved[0] = static_cast<std::uint8_t>(kNisConsecutiveRejectLimit + 1u);
+    CHECK(restored.restoreCheckpoint(malformed) == kErrArgument);
+}
+
 void test_update_input_validation() {
     QuadCore core;
     const QuadConfig cfg = make_config();
@@ -329,6 +406,7 @@ int main() {
     test_gnss_position_update();
     test_gnss_velocity_update();
     test_nis_gate_and_failure_atomicity();
+    test_gnss_nis_rejection_streak_and_checkpoint();
     test_update_input_validation();
     test_uninitialized_use();
     return hosttest::summary("test_core");

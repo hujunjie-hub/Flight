@@ -59,6 +59,10 @@ constexpr double kNisThresholdDof1 = 6.6348966;
 constexpr double kNisThresholdDof3 = 11.3448667;
 constexpr double kNisThresholdDof6 = 16.8118938;
 
+/* M3 revokes only the affected aiding capability after this many consecutive
+ * GNSS NIS rejections of the same observation kind. The NIS gate is unchanged. */
+constexpr std::uint8_t kNisConsecutiveRejectLimit = 5u;
+
 /* Result codes.  No operation throws; every failure is a return value. */
 enum Status : int {
     kOk = 0,
