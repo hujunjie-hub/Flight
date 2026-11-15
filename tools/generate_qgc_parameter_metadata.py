@@ -54,7 +54,7 @@ def _estimator_profile(text: str) -> str:
     return _yaml_scalar(text, "profile")
 
 
-def _declared_reboot_requirement(item: dict) -> bool | None:
+def _declared_reboot_requirement(item: dict):
     keys = [key for key in ("reboot_required", "rebootRequired") if key in item]
     if not keys:
         return None
