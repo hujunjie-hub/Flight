@@ -115,7 +115,14 @@ if (-not [string]::IsNullOrWhiteSpace($InputEvidenceDirectory)) {
     $manualFiles = @(Get-ChildItem -LiteralPath $inputFull -Force -File -Recurse)
     if ($manualFiles.Count -eq 0) { throw "InputEvidenceDirectory contains no files: $inputFull" }
     $unsafeManualFiles = @($manualFiles | Where-Object {
-        $_.FullName -match '(^|[\\/])(\.env($|\.)|secrets?($|[\\/])|credentials?($|[\\/]))|\.(pem|p12|pfx|key)$'
+        $_.Extension -in @(".pem", ".p12", ".pfx", ".key") -or
+        $_.Name -like ".env*" -or
+        $_.Name -like "*secret*" -or
+        $_.Name -like "*credential*" -or
+        $_.DirectoryName -like "*\secrets*" -or
+        $_.DirectoryName -like "*/secrets*" -or
+        $_.DirectoryName -like "*\credentials*" -or
+        $_.DirectoryName -like "*/credentials*"
     })
     if ($unsafeManualFiles.Count -gt 0) {
         throw "InputEvidenceDirectory contains secret-like paths; remove them before archiving."
