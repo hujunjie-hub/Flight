@@ -7,7 +7,6 @@ The generated files are consumed by FlightParameterMetaData and FlightFirmwarePl
 """
 
 import argparse
-import hashlib
 import json
 import re
 from pathlib import Path
@@ -32,10 +31,6 @@ DOMAIN_BY_GROUP = {
     "SO3 姿态增益": "CONTROL",
     "仿真": "SIMULATION",
 }
-
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _estimator_status(text: str) -> str:
@@ -107,7 +102,6 @@ def build_model_catalog_document(
     model_config: dict,
     controller_config: dict,
     estimator_status: str,
-    source_hashes: dict,
     parameter_document: dict,
 ) -> dict:
     profile_status = model_config["status"]
@@ -152,18 +146,9 @@ def build_model_catalog_document(
                 "path": "middleware/protocol/mavlink/parameters/ground_parameters.json",
                 "sha256": catalog["sha256"],
             },
-            "vehicleModel": {
-                "path": "config/vehicle_model.yaml",
-                "sha256": source_hashes["vehicleModel"],
-            },
-            "controllerTuning": {
-                "path": "config/controller_tuning.yaml",
-                "sha256": source_hashes["controllerTuning"],
-            },
-            "estimatorTuning": {
-                "path": "config/estimator_tuning.yaml",
-                "sha256": source_hashes["estimatorTuning"],
-            },
+            "vehicleModel": "config/vehicle_model.yaml",
+            "controllerTuning": "config/controller_tuning.yaml",
+            "estimatorTuning": "config/estimator_tuning.yaml",
         },
         "profiles": [profile],
     }
@@ -202,17 +187,11 @@ def main() -> None:
     estimator_status = _estimator_status(arguments.estimator_config.read_text(encoding="utf-8"))
 
     parameter_document = build_parameter_document(catalog, model_config)
-    source_hashes = {
-        "vehicleModel": _sha256(arguments.model_config),
-        "controllerTuning": _sha256(arguments.controller_config),
-        "estimatorTuning": _sha256(arguments.estimator_config),
-    }
     model_catalog = build_model_catalog_document(
         catalog,
         model_config,
         controller_config,
         estimator_status,
-        source_hashes,
         parameter_document,
     )
 

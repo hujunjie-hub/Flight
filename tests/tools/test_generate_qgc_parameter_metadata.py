@@ -59,7 +59,6 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
             self.model,
             self.controller,
             "DRAFT_PENDING_DATASET",
-            {"vehicleModel": "a", "controllerTuning": "b", "estimatorTuning": "c"},
             self.parameter_document,
         )
         profile = catalog["profiles"][0]
