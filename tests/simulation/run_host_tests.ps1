@@ -39,12 +39,14 @@ $includes = @(
     'middleware/sensor',
     'sensor_device',
     'middleware/protocol',
+    'middleware/communication',
     'applications/tasks',
     'tests/simulation/golden'
 ) | ForEach-Object { Join-Path $repoRoot $_ }
 
 $sources = @(
     'tests/simulation/test_hil_link.c',
+    'middleware/communication/sim/fmt_sim_host.c',
     'middleware/protocol/mavlink/mavlink_frame.c',
     'middleware/protocol/mavlink/mavlink_hil.c',
     'middleware/sensor/sample_normalization/sensor_sample.c',
@@ -69,7 +71,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $arguments = @('-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-Wconversion',
     '-Wno-sign-conversion') + ($includes | ForEach-Object { "-I$_" }) +
-    $sources + @('-lm', '-o', (Join-Path $work 'test_hil_link.exe'))
+    $sources + @('-lws2_32', '-lm', '-o', (Join-Path $work 'test_hil_link.exe'))
 
 "== build ==" | Add-Content -LiteralPath $log -Encoding utf8
 "$Gcc $($arguments -join ' ')" | Add-Content -LiteralPath $log -Encoding utf8

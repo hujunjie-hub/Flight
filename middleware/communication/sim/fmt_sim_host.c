@@ -123,7 +123,7 @@ int fmt_sim_host_send(uint64_t now_us, const float controls[4], int armed)
     static const float stopped[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
     uint8_t frame[96];
     size_t length;
-    if (peer == FMT_INVALID_SOCKET || !controls) return 0;
+    if (peer == FMT_INVALID_SOCKET || (armed && !controls)) return 0;
     length = mavlink_hil_build_actuator(now_us, armed ? controls : stopped,
                                         armed ? 128u : 0u, sequence++, frame, sizeof(frame));
     return length != 0 && send(peer, (const char *)frame, (int)length, 0) == (int)length;

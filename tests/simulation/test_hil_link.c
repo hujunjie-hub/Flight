@@ -11,6 +11,10 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#include "sim/fmt_sim_host.h"
+#endif
 
 #include "hil_golden.h"
 
@@ -381,12 +385,55 @@ static void test_fmt_state(void)
     CHECK(!mavlink_hil_decode_fmt_state(broken, sizeof(broken), &state));
 }
 
+#ifdef _WIN32
+static void test_fmt_stop_without_controls(void)
+{
+    WSADATA data;
+    const int started = WSAStartup(MAKEWORD(2, 2), &data);
+    CHECK(started == 0);
+    if (started != 0)
+        return;
+
+    SOCKET receiver = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    struct sockaddr_in address = {0};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    int address_size = sizeof(address);
+    const DWORD receive_timeout_ms = 250u;
+    const int ready = receiver != INVALID_SOCKET &&
+        bind(receiver, (const struct sockaddr *)&address, sizeof(address)) == 0 &&
+        getsockname(receiver, (struct sockaddr *)&address, &address_size) == 0 &&
+        setsockopt(receiver, SOL_SOCKET, SO_RCVTIMEO,
+                   (const char *)&receive_timeout_ms, sizeof(receive_timeout_ms)) == 0 &&
+        fmt_sim_host_open(ntohs(address.sin_port));
+    CHECK(ready);
+    if (ready) {
+        const float stopped[] = {-1.0f, -1.0f, -1.0f, -1.0f};
+        uint8_t expected[96], received[96];
+        const size_t size = mavlink_hil_build_actuator(1234u, stopped, 0u, 0u,
+                                                       expected, sizeof(expected));
+        CHECK(size > 0u);
+        CHECK(!fmt_sim_host_send(1234u, NULL, 1));
+        CHECK(fmt_sim_host_send(1234u, NULL, 0));
+        const int length = recv(receiver, (char *)received, sizeof(received), 0);
+        CHECK(length == (int)size && memcmp(received, expected, size) == 0);
+        fmt_sim_host_close();
+    }
+    if (receiver != INVALID_SOCKET)
+        closesocket(receiver);
+    WSACleanup();
+}
+#endif
+
 int main(void)
 {
     test_crc_check_value();
     test_decode_sensor();
     test_decode_gps();
     test_fmt_state();
+#ifdef _WIN32
+    test_fmt_stop_without_controls();
+#endif
     test_parser_edges();
     test_encode_matches_golden();
     test_thrust_normalization();
