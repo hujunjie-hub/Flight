@@ -109,8 +109,15 @@ if (-not [string]::IsNullOrWhiteSpace($InputEvidenceDirectory)) {
     if (-not $inputFull.StartsWith($repoRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "InputEvidenceDirectory must resolve inside the Flight repository."
     }
-    if ($inputFull -eq [System.IO.Path]::GetFullPath($runDir)) {
-        throw "InputEvidenceDirectory cannot be the archive output directory."
+    $archiveRootFull = [System.IO.Path]::GetFullPath($archiveRoot).TrimEnd([System.IO.Path]::DirectorySeparatorChar)
+    $runDirPrefix = [System.IO.Path]::GetFullPath($runDir).TrimEnd([System.IO.Path]::DirectorySeparatorChar) +
+        [System.IO.Path]::DirectorySeparatorChar
+    $inputPrefix = $inputFull.TrimEnd([System.IO.Path]::DirectorySeparatorChar) +
+        [System.IO.Path]::DirectorySeparatorChar
+    if ($inputFull -eq $archiveRootFull -or
+        $runDirPrefix.StartsWith($inputPrefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+        $inputFull.StartsWith($runDirPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "InputEvidenceDirectory cannot be the archive root, output directory, or one of its parents/children."
     }
     $manualFiles = @(Get-ChildItem -LiteralPath $inputFull -Force -File -Recurse)
     if ($manualFiles.Count -eq 0) { throw "InputEvidenceDirectory contains no files: $inputFull" }
