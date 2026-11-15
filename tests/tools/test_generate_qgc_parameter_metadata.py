@@ -133,6 +133,35 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_parameter_document(catalog, self.model)
 
+    def test_supported_validation_rules_are_preserved(self):
+        catalog = dict(self.catalog)
+        catalog["parameters"] = [dict(item) for item in self.catalog["parameters"]]
+        catalog["parameters"][0]["dependencies"] = ["CTL_RATE_KP_X"]
+        catalog["parameters"][0]["validationRules"] = [
+            {"type": "GREATER_THAN", "value": 0.5},
+            {"type": "REQUIRES_PARAMETER_VALUE", "parameter": "CTL_RATE_KP_X", "value": 1.0},
+        ]
+        document = build_parameter_document(catalog, self.model)
+        parameter = document["parameters"][0]
+        self.assertEqual(parameter["dependencies"], ["CTL_RATE_KP_X"])
+        self.assertEqual(parameter["validationRules"][0]["type"], "GREATER_THAN")
+        self.assertEqual(parameter["validationRules"][1]["parameter"], "CTL_RATE_KP_X")
+
+    def test_unsupported_or_malformed_validation_rules_are_rejected(self):
+        invalid_rules = [
+            [{"type": "EXECUTE_SCRIPT", "value": 1.0}],
+            [{"type": "GREATER_THAN", "value": True}],
+            [{"type": "MULTIPLE_OF", "value": 0.0}],
+            [{"type": "GREATER_THAN", "value": 1.0, "unexpected": True}],
+            [{"type": "REQUIRES_PARAMETER_VALUE", "parameter": "CTL_RATE_KP_X", "value": 1.0}],
+        ]
+        for rules in invalid_rules:
+            catalog = dict(self.catalog)
+            catalog["parameters"] = [dict(item) for item in self.catalog["parameters"]]
+            catalog["parameters"][0]["validationRules"] = rules
+            with self.subTest(rules=rules), self.assertRaises(ValueError):
+                build_parameter_document(catalog, self.model)
+
     def test_invalid_parameter_policy_metadata_is_rejected(self):
         catalog = dict(self.catalog)
         catalog["parameters"] = [dict(item) for item in self.catalog["parameters"]]
