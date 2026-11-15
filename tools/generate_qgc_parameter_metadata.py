@@ -54,6 +54,33 @@ def _model_descriptor(model_config: dict) -> dict:
     }
 
 
+def _parameter_source(item: dict) -> dict:
+    source_file = item.get("file")
+    source_path = item.get("path")
+    source_kind = item.get("kind")
+    if not isinstance(source_file, str) or not source_file.strip() or source_file != source_file.strip():
+        raise ValueError(f"source file must be declared for {item.get('name', '<unnamed>')}")
+    if (not isinstance(source_path, list) or not source_path or
+            any(type(part) not in (str, int) or (isinstance(part, str) and
+                (not part.strip() or part != part.strip())) or
+                (type(part) is int and part < 0) for part in source_path)):
+        raise ValueError(f"source path must be a non-empty path for {item.get('name', '<unnamed>')}")
+    if source_kind not in {"scalar", "vector", "matrix", "stored"}:
+        raise ValueError(f"unsupported source kind for {item.get('name', '<unnamed>')}: {source_kind!r}")
+
+    label = ""
+    for part in source_path:
+        if type(part) is int:
+            label += f"[{part}]"
+        else:
+            label += ("." if label else "") + part
+    return {
+        "sourceFile": source_file,
+        "sourcePath": label,
+        "sourceKind": source_kind,
+    }
+
+
 def _parameter_policy(item: dict, reboot_required):
     writable = item.get("writable")
     if type(writable) is not bool:
@@ -165,6 +192,7 @@ def build_parameter_document(catalog: dict, model_config: dict) -> dict:
             "dependencies": dependencies,
             "validationRules": validation_rules,
             "readOnly": tuning_policy == "READ_ONLY",
+            **_parameter_source(item),
         })
         if reboot_required is not None:
             parameter["rebootRequired"] = reboot_required
@@ -191,6 +219,9 @@ def build_parameter_document(catalog: dict, model_config: dict) -> dict:
         "dependencies": [],
         "validationRules": [],
         "readOnly": False,
+        "sourceFile": "SIL runtime",
+        "sourcePath": "simulation.telemetry_hz",
+        "sourceKind": "scalar",
     })
 
     parameter_names = {parameter["name"] for parameter in parameters}
