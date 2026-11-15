@@ -289,7 +289,7 @@ Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析
 | NIS 连续拒绝计数 | IMPLEMENTED / CI PASS | position/velocity 分开计数、5 次饱和、成功同类观测清零、Checkpoint v2 保持 replay 一致性 |
 | M3 导航能力 fail-closed | IMPLEMENTED / CI PASS | 对应 position/velocity valid bits 锁存撤销，solution_state DEGRADED；不隔离 GNSS source、不自动接受被拒观测 |
 | M4 安全响应 | EXISTING REGRESSION PASS | nav_loss_recovery_dwell；水平位置能力丢失后 Mission PAUSED / AUTO_LAND |
-| R46 原生整批 | NOT_RUN | 必须在 main 28748c717e83b868ae58957c04bcd9dbe1c23e1b 上执行 Land → Return → Mission |
+| R46 原生整批 | NOT_RUN | 必须在最新 main 61442e10cb3d92a34f070f804e00be531e144025 上执行 Land → Return → Mission |
 | Stage B2 受控重新对准 | OPEN | 需要独立源健康证据与地面/DISARMED 授权，不允许空中自动 re-seed |
 
 CI：Host #43667830819（7/7）、M6/M7 #43667830805（5/5）、M7 #43667830814（2/2）全部 SUCCESS。FLIGHT-29 保持 OPEN，不得因 Stage B1 或 R45 通过而关闭。

@@ -252,7 +252,7 @@ R34 后 main 修复：
 
 ### R46 原生 FMT-SIM 复测（main 28748c71）
 
-必须在最新 main 28748c717e83b868ae58957c04bcd9dbe1c23e1b 上执行完整 Land → Return → Mission，不能只跑 Mission 单场景。R45 的 ada6bd65 结果是传输修复后的有效诊断证据，但不是 Stage B1 代码基线。
+必须在最新 main 61442e10cb3d92a34f070f804e00be531e144025 上执行完整 Land → Return → Mission，不能只跑 Mission 单场景。R45 的 ada6bd65 结果是传输修复后的有效诊断证据，但不是 Stage B1 代码基线。
 
 **本机一键执行：**
 
