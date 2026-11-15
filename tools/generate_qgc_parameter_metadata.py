@@ -28,7 +28,6 @@ def _ground_control_root() -> Path:
 
 DEFAULT_OUTPUT = (_ground_control_root() / "src/FirmwarePlugin/Flight"
                   / "FlightParameterFactMetaData.json")
-DEFAULT_CATALOG_OUTPUT = DEFAULT_OUTPUT.with_name("FlightVehicleModelCatalog.json")
 
 DOMAIN_BY_GROUP = {
     "机体模型": "VEHICLE_MODEL",
@@ -193,7 +192,7 @@ def _write_json(path: Path, document: dict) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--catalog-output", type=Path, default=DEFAULT_CATALOG_OUTPUT)
+    parser.add_argument("--catalog-output", type=Path, default=None)
     parser.add_argument("--model-config", type=Path, default=MODEL_CONFIG)
     parser.add_argument("--controller-config", type=Path, default=CONTROLLER_CONFIG)
     parser.add_argument("--estimator-config", type=Path, default=ESTIMATOR_CONFIG)
@@ -208,6 +207,7 @@ def main() -> None:
     validate_profile_alignment(catalog, model_config, controller_config, estimator_profile)
 
     parameter_document = build_parameter_document(catalog, model_config)
+    catalog_output = arguments.catalog_output or arguments.output.with_name("FlightVehicleModelCatalog.json")
     model_catalog = build_model_catalog_document(
         catalog,
         model_config,
@@ -217,7 +217,7 @@ def main() -> None:
     )
 
     _write_json(arguments.output, parameter_document)
-    _write_json(arguments.catalog_output, model_catalog)
+    _write_json(catalog_output, model_catalog)
     print(
         f"wrote {len(parameter_document['parameters'])} parameter entries, "
         f"{len(model_catalog['profiles'])} model profiles"
