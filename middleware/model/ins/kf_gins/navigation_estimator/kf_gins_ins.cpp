@@ -9,6 +9,10 @@
 #include <cmath>
 #include <cstring>
 #include <new>
+#ifdef FLIGHT_HOST_SIL
+#include <cinttypes>
+#include <cstdio>
+#endif
 
 namespace {
 struct Source {
@@ -1119,6 +1123,19 @@ extern "C" Status ins_model_update(uint64_t now) {
                                  nav.last_imu.sample_sequence) != kfg::kOk)
         result = STATUS_NUMERIC_ERROR;
       else {
+#ifdef FLIGHT_HOST_SIL
+        const auto &position = nav.candidate.latest_evaluation[0];
+        const auto &velocity = nav.candidate.latest_evaluation[1];
+        if (position.sample_time_us || velocity.sample_time_us)
+          std::printf("[gnss-commit] state_us=%" PRIu64 " revision=%" PRIu32
+                      " journal=%" PRIu32 " position_sample_us=%" PRIu64
+                      " position_accepted=%u velocity_sample_us=%" PRIu64
+                      " velocity_accepted=%u\n",
+                      nav.state_time, nav.fusion_revision + 1u,
+                      nav.candidate.journal_high_watermark, position.sample_time_us,
+                      static_cast<unsigned>(position.accepted), velocity.sample_time_us,
+                      static_cast<unsigned>(velocity.accepted));
+#endif
         publish_evaluations(nav.candidate,1,now);
         ++nav.fusion_revision;
         nav.history.invalidateAfter(base, nav.fusion_revision);

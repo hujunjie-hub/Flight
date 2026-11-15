@@ -1,6 +1,6 @@
 # FLIGHT-29 Navigation Health and Divergence — Change Request Package
 
-Status: **ROOT CAUSE IDENTIFIED (NIS deadlock) / AWAITING OWNER APPROVAL — NO ESTIMATOR CODE CHANGED**
+Status: **PERSISTENT NIS REJECTION REPRODUCED ON HOST / HOST-SIL TRACE IMPLEMENTED / NATIVE TRIGGER OPEN**
 
 Scope: QUAD_X4 / STM32H723ZGT6 / `OBSTACLE_SOURCE_MODE=NONE` / `BENCH_INHIBIT`.
 All evidence below is Host/SIL and Windows-native FMT-SIM software evidence. It is
@@ -41,7 +41,7 @@ The filter has a normalised-innovation-squared gate but **no recovery path**:
 | `kf_gins_quad_port.cpp:107,229,232` | `nis_gate_enable` is configurable and `nis_rejected` / `last_nis` are exposed by the port |
 | repo-wide search | no covariance inflation, no reset, no "re-accept after N rejections" anywhere |
 
-This produces a deadlock: once the INS has drifted, the GNSS position innovation is
+This can produce a deadlock: once the INS has drifted, the GNSS position innovation is
 large compared with the (still small) declared covariance, so NIS exceeds the
 threshold and **every** position fix is rejected for ever. The filter then
 integrates without position aiding, `horizontal_position_std` grows, and the
@@ -57,10 +57,11 @@ It also explains the measured signature better than a "sudden divergence":
   `diagnostics_.nis_rejected`, so the rejection storm is invisible to every
   consumer.
 
-The remaining question is what caused the *first* large innovation (a ground
-contact transient, a baro step at touchdown, or an attitude excursion). It sets
-the trigger but not the defect: a filter that cannot recover from a single bad
-innovation is unsafe regardless of the trigger.
+The native trace has no per-observation innovation or disposition, so it does
+not establish that this mechanism caused the first divergence. In the
+`...T191012782Z-0f21cf36` run the horizontal estimate was already 0.93 m from
+truth at t=30.000 s while the plant was 2.50 m above the ground. The first
+divergence flag followed at t=30.610 s, with the plant still airborne.
 
 ### 2.1 Deterministic reproduction (2026-11-15)
 
@@ -72,19 +73,20 @@ first displaced fix (40 m, 0.2 m std): result=5 nis=69932240.851060 nis_rejected
 after 20 displaced fixes over 20 s:    accepted=1 rejected=21 recovered=0 last_nis=3018.585036
 ```
 
-Twenty seconds of covariance growth brought NIS from 6.99e7 down to 3.0e3, which
-is still 266 times the dof-3 threshold: the gate cannot re-open by itself. The
-test is the red baseline for Stage B (the `recovered` and `gnss_pos_updates`
-assertions are the lines a fix must flip).
+Twenty seconds of covariance growth brought NIS from 6.99e7 down to 3.0e3, still
+266 times the dof-3 threshold. The fixture injects a displaced GNSS sequence
+into a nearly stationary INS. It measures persistent disagreement without an
+independent source that identifies which side is wrong. Preserve rejection of
+an isolated fix and of a sustained faulty source when validating recovery.
 
-Related gap: the estimator suite is not executed by any CI workflow
-([FLIGHT-35](https://github.com/hujunjie-hub/Flight/issues/35)), which is why this
-defect was never observed automatically.
+The estimator suite now runs in Host CI and in the local T31 regression. The
+coverage gap is tracked in [FLIGHT-35](https://github.com/hujunjie-hub/Flight/issues/35).
 
 ## 3. Trigger candidates (Stage A confirms which one fired)
 
-The NIS deadlock explains the divergence; it does not explain which event produced
-the first large innovation. Candidates, all reachable at touchdown:
+Correlate the first divergence with the last fused GNSS position, the position
+and velocity innovations, aircraft attitude and the raw plant state. Candidate
+events for subsequent runs include:
 
 1. a vertical ground-contact transient that steps the position/velocity estimate;
 2. a barometer step when the airframe reaches the surface;
@@ -97,13 +99,16 @@ NIS rejection, so Stage A must identify the trigger before any additional change
 
 ### Stage A — read-only instrumentation (no behaviour change)
 
-Add a Host/SIL-only diagnostic that logs, per GNSS sample: the implied local NED
-position, the navigation position at that instant, the innovation, and which
-`ins` adapter branch consumed it. Also count applied/rejected samples per
-rejection reason.
+`[gnss-fusion]` logs each replayed GNSS position or velocity observation with
+sample time, aligned IMU time, source/journal sequence, replay path, observed
+and predicted antenna values, innovation, result and NIS. Position values are
+metres in the NED tangent frame at the pre-update INS position. Velocity values
+are m/s in NED. `[gnss-commit]` identifies the latest position and velocity
+evaluated by each successfully committed candidate. A replay row can recur or
+belong to a probe, so use the sample times and commit rows when tallying inputs.
 
-- Risk: none in flight code if the counters live behind `FLIGHT_HOST_TEST`
-  (precedent: the existing MPC diagnostic records).
+- Scope: both log sites are gated by `FLIGHT_HOST_SIL`. The ARM build uses the
+  original observation and replay logic without diagnostic I/O.
 - Exit criterion: the trigger from section 3 is identified, and the NIS
   rejection storm is quantified (`nis_rejected`, `last_nis`) from the same trace.
 
@@ -161,5 +166,5 @@ consumer fail closed *before* the position is unusable.
 2. In principle, the *scope* of Stage B/C so the work is not blocked again after
    Stage A lands.
 
-Until this is approved, `middleware/model/ins/**` stays untouched and FLIGHT-29
+Native Stage A capture and Stage B/C decisions remain outstanding. FLIGHT-29
 remains OPEN.
