@@ -170,15 +170,6 @@ def build_parameter_document(catalog: dict, model_config: dict) -> dict:
             parameter["rebootRequired"] = reboot_required
         parameters.append(parameter)
 
-    parameter_names = {parameter["name"] for parameter in parameters}
-    for parameter in parameters:
-        unknown_dependencies = set(parameter["dependencies"]) - parameter_names
-        if parameter["name"] in parameter["dependencies"] or unknown_dependencies:
-            raise ValueError(
-                f"invalid dependencies for {parameter['name']}: "
-                f"{sorted(unknown_dependencies or {parameter['name']})}"
-            )
-
     # SIL-only parameter: the H723 catalog intentionally has no SIM_TLM_HZ,
     # but the Host SIL exposes it.
     parameters.append({
@@ -201,6 +192,15 @@ def build_parameter_document(catalog: dict, model_config: dict) -> dict:
         "validationRules": [],
         "readOnly": False,
     })
+
+    parameter_names = {parameter["name"] for parameter in parameters}
+    for parameter in parameters:
+        unknown_dependencies = set(parameter["dependencies"]) - parameter_names
+        if parameter["name"] in parameter["dependencies"] or unknown_dependencies:
+            raise ValueError(
+                f"invalid dependencies for {parameter['name']}: "
+                f"{sorted(unknown_dependencies or {parameter['name']})}"
+            )
 
     return {
         "version": 2,
