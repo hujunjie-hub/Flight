@@ -1,6 +1,6 @@
 # Flight Validation Archive Metadata Protocol
 
-Status: **IMPLEMENTED IN WORKING PATCH / WAITING PROJECT INTEGRATION TEST**
+Status: **IMPLEMENTED ON main / CI verification in progress**
 
 This protocol removes the archive self-reference and the post-archive metadata
 commit pattern. It is mandatory for new validation runs; historical R1-R28
@@ -12,7 +12,7 @@ The archive has four distinct Git identities:
 
 - `validated_code_commit`: the exact code revision whose tests were executed.
 - `tooling_commit`: latest committed revision affecting the validation collector,
-  evidence checker, stack analyzer and metadata preparation helper.
+  evidence checker, canonical parameter-catalog generator, stack analyzer and metadata preparation helper.
 - `collector_commit`: latest committed revision affecting
   `tools/collect_validation_results.py`.
 - `archive_script_commit`: latest committed revision affecting the archive
@@ -53,9 +53,15 @@ external-only digest policy, but must not contain its own ZIP SHA256 or size.
 
 The archive report must match the in-ZIP manifest and acceptance manifest for
 RUN_ID, branch, code/tooling/collector/archive-script commits, archive HEAD,
-remote HEAD and ahead count. The checker independently hashes the ZIP, verifies
-the sidecar, tests CRC, reads the internal manifest and verifies every listed
-evidence file's SHA256 and size.
+remote HEAD and ahead count. New ENG-07 archives require a clean `main`
+checkout with `HEAD == origin/main`, upstream `origin/main`, and a clean
+pre-archive worktree. When archive tooling is newer than the tested firmware,
+the exact tested code SHA must be supplied explicitly and must be an ancestor
+of the archive HEAD. The parameter catalog is checked read-only before archive
+creation; source hashes use canonical LF bytes and the archive includes all five
+authoritative YAML inputs, generated catalog and generator source. The checker
+independently hashes the ZIP, verifies the sidecar, tests CRC, reads the internal
+manifest and verifies every listed evidence file's SHA256 and size.
 
 ## 3. Forbidden patterns
 
@@ -74,9 +80,10 @@ The following are invalid for new runs:
 Before archive staging:
 
 ```bash
-python tools/prepare_archive_metadata.py \
-  --run-id M5-06-Rxx-YYYYMMDD \
-  --expected-branch opt/stage-02-m5-06-safety-validator
+python tools/generate_ground_config.py --check
+pwsh -NoProfile -File tools/archive_validation_run.ps1 \
+  -RunId ENG07-R46-YYYYMMDD \
+  -ValidatedCodeCommit <40-hex-tested-code-commit>
 ```
 
 After the archive is built and the external report exists:
@@ -87,9 +94,10 @@ python tools/check_validation_evidence.py --check archive
 python tools/check_validation_evidence.py --check all
 ```
 
-A missing remote tracking ref, invalid Git SHA, missing path history, mismatched
-branch, stale ahead count, missing ZIP, bad sidecar or internal/external metadata
-mismatch must fail closed.
+A missing remote tracking ref, invalid Git SHA, missing path history, branch
+other than `main`, dirty worktree, non-exact `origin/main` HEAD, stale
+parameter catalog, stale ahead count, missing ZIP, bad sidecar or
+internal/external metadata mismatch must fail closed.
 
 ## 5. Historical treatment
 

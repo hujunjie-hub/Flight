@@ -2,7 +2,7 @@
 
 > **2026-11-13 MR-009 R31 内部预审 CI 快照（代码/证明基线 8dcb60b3ac18e6a763c939d3e810984092cdd321）**：Host validation #43446380866（6/6）、M6/M7 #43446380836（5/5）、M7 #43446380724（2/2）全部 SUCCESS。M5 Host regression、M5 ASan/UBSan、MR-009 focused、S06-099/S06-107、Spec Audit、生产 ABI、18 mutation FP audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer 均 PASS。
 
-> **当前状态（2026-11-15；接管核对 HEAD `27763cd0c3463a96b31ae1a8e7faf3ed32a94416`）**：远程仅保留 `main`。B01～B04 的本地规范/生产 ABI/安装包锁/默认 Release 链接通过。B05 MR-009 按项目方指示完成技术复核，S06-100～102 Host 与 ASan/UBSan 通过。B06 的 Cortex-M7 专用镜像静态链为 `-O2` 3,576/4,096 B、`-O0` 3,968/4,096 B，均 COMPLETE。B07 实机、WCET/RTA、栈水位、台架 HIL 与飞行仍 NOT_RUN。M5-07 未启动。FLIGHT-29 Stage B1 已加入 M3 连续 NIS 拒绝 fail-closed 能力锁存并通过 CI；最新 HEAD 的 Host validation 7/7、M6/M7 5/5、M7 2/2 SUCCESS。R45 原生三场景 177,639/0 运行在 `ada6bd65`，早于 Stage B1；R46 exact-main 原生 FMT-SIM 复测仍待执行。
+> **当前状态（2026-11-15；最新归档工具 HEAD `b7bad3311bfe2cb87ab85e9b615fd84f2e7e80a3`；R46 测试代码 HEAD `7d8473401bad88bd9c9238c29b5d575976e55278`）**：远程仅保留 `main`。B01～B04 的本地规范/生产 ABI/安装包锁/默认 Release 链接通过。B05 MR-009 按项目方指示完成技术复核，S06-100～102 Host 与 ASan/UBSan 通过。B06 的 Cortex-M7 专用镜像静态链为 `-O2` 3,576/4,096 B、`-O0` 3,968/4,096 B，均 COMPLETE。B07 实机、WCET/RTA、栈水位、台架 HIL 与飞行仍 NOT_RUN。M5-07 未启动。R46 两次本机运行结果不一致：运行 1 Land PASS / Return FAIL 3 / Mission PASS；运行 2 Land PASS / Return PASS / Mission exit=-1。归档工具旧分支守卫已修复，参数目录哈希改为规范 LF，Host CI 正在验证；正式 R46 ZIP 仍待归档。FLIGHT-26 机制再次复现，Return 垂向加速度与真值不一致仍待原始日志定位。
 
 > **开放风险**：ICD+M4 余量 264 B（FLIGHT-13）；Release 的工具链枚举属性仍有 228 条链接警告（FLIGHT-14）。下方 B01～B06 的表格保留各原始验证时点。
 
@@ -184,3 +184,16 @@ Current-main CI on `3270cff5aec26e3ae0717c62d2d78e9f30752020`: Host [#4359370173
 | #29 | OPEN / Stage B1 implemented | R41 直接 FMT-SIM 触发由 UDP 帧覆盖定位并修复；main 28748c71 加入 5 连续 NIS 拒绝后 position/velocity 能力锁存撤销；R46 exact-main 待复测；Stage B2 受控重新对准仍开放 |
 
 Stage B1 代码提交 28748c717e83b868ae58957c04bcd9dbe1c23e1b 的 CI：Host #43667830819 7/7、M6/M7 #43667830805 5/5、M7 #43667830814 2/2 SUCCESS。后续文档提交会继续推进 main；R46 必须拉取最新 main，并在 manifest 中记录精确 HEAD、确认 28748c71 是其祖先。R45 原生 FMT-SIM 在 ada6bd65 运行，不能代替 R46。H723 实机、物理 HIL、WCET/RTA、栈水位与飞行仍 NOT_RUN。
+
+
+## ENG-07 R46 本机复测状态（2026-11-15）
+
+| Issue | 场景 / 问题 | 当前状态 | 处理结论 |
+|---|---|---|---|
+| [#17](https://github.com/hujunjie-hub/Flight/issues/17) | Land | OPEN / 两次均 PASS | 只能确认本场景两次通过；整批结果不一致且正式归档未完成，不关闭 |
+| [#18](https://github.com/hujunjie-hub/Flight/issues/18) | Return | OPEN / 运行 1 FAIL 3，运行 2 PASS | 失败类别 terminal_ack、disarm_ack、arm_state；需核对完整两次日志和垂向加速度差异 |
+| [#19](https://github.com/hujunjie-hub/Flight/issues/19) | Mission | OPEN / 运行 1 PASS，运行 2 exit=-1 | 第二次进程异常退出，整批证据不完整 |
+| [#26](https://github.com/hujunjie-hub/Flight/issues/26) | M6 近地水平极限环 | OPEN / R46 再次复现 | 先从原始日志确认与 Return 垂向加速度偏差的时间关系；不得直接改增益 |
+| [#29](https://github.com/hujunjie-hub/Flight/issues/29) | INS 导航健康 | OPEN / Stage B1 已实现 | R46 观察到垂向加速度与真值不一致；尚无证据证明它与 NIS latch 或 R41 水平发散为同一根因 |
+
+R46 测试 HEAD 为 `7d8473401bad88bd9c9238c29b5d575976e55278`，测试前后 worktree 0 项、stable=true。归档工具修复提交为 `b7bad3311bfe2cb87ab85e9b615fd84f2e7e80a3`。先用 `-ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278` 归档已有运行，再决定是否对 Return 垂向加速度建立独立回放。H723、HIL、WCET/RTA、栈水位和飞行仍 NOT_RUN。

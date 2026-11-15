@@ -100,3 +100,13 @@ pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $si
 ```
 
 该入口一次构建 SIL、分别启动 Land/Return/Mission 的新 FMT-SIM 进程（场景退出后关闭或按 PID 强制结束并等待进程退出），生成 RUN_ID、Manifest、原始日志、SHA256SUMS 和回传 ZIP。正式关闭门禁固定唯一目标分支 `main`、UDP 14653、350 ms、hover 0.62、显式确认 127.0.0.1 loopback、干净工作区及本地 HEAD 与脚本刚 fetch 的 `origin/main` 一致；更换端口或只跑单场景仅用于诊断，不具备 Issue 关闭资格。运行前执行 `git fetch origin --prune; git switch main; git pull --ff-only origin main`，并核对 `git rev-parse HEAD` 与 `git rev-parse origin/main` 完全一致。详细判据见 [本机复测交接方案](../../spec/validation/FMT_SIM_LOCAL_HANDOFF.md)。
+
+
+### R46 正式归档前置检查
+
+归档脚本只接受 clean `main` 且 `HEAD == origin/main`，并要求上游为 `origin/main`。归档前只读执行 `python tools/generate_ground_config.py --check`；若参数目录过期，先运行 `python tools/generate_ground_config.py` 并提交生成物，再重新执行检查。归档时显式传入实际被测代码 SHA，避免将后续归档工具提交误记为测试代码：
+
+```powershell
+python tools/generate_ground_config.py --check
+pwsh -NoProfile -File tools/archive_validation_run.ps1 -RunId ENG07-R46-20261115-7d847340 -ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278
+```

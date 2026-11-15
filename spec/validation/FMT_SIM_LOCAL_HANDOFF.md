@@ -1,10 +1,10 @@
 # ENG-07 原生 FMT-SIM 本机复测交接方案
 
-> 状态：**R45 在 `ada6bd65` 上完成 350 ms Land / Return / Mission 三场景 PASS（177,639 checks / 0 failures），但该测试 HEAD 早于 FLIGHT-29 Stage B1；R46 exact-main 三场景复测仍 NOT_RUN，#17/#18/#19/#21/#23/#24/#25 不得关闭。**
+> 状态：**R46 在 exact-main 测试代码 HEAD `7d8473401bad88bd9c9238c29b5d575976e55278` 上完成两次本机执行，但结果不一致：运行 1 Land PASS / Return FAIL 3 / Mission PASS；运行 2 Land PASS / Return PASS / Mission exit=-1。Return 观察到 terminal_ack、disarm_ack、arm_state 失败及导航垂向加速度与真值不一致。正式归档尚未完成，#17/#18/#19 不得关闭；FLIGHT-26 机制已复现。**
 >
 > 适用分支：**main（唯一远程分支）**
 >
-> 当前代码基线（本次接管核对）：**27763cd0c3463a96b31ae1a8e7faf3ed32a94416**；FLIGHT-29 Stage B1 代码提交：**28748c717e83b868ae58957c04bcd9dbe1c23e1b**。R46 必须在拉取本方案更新后的最新 `origin/main` 上运行，并确认 Stage B1 是测试 HEAD 的祖先。
+> 当前修复后的归档工具基线：**b7bad3311bfe2cb87ab85e9b615fd84f2e7e80a3**；本次被测飞控代码仍是 **7d8473401bad88bd9c9238c29b5d575976e55278**；FLIGHT-29 Stage B1 代码提交：**28748c717e83b868ae58957c04bcd9dbe1c23e1b**。归档时必须用 `-ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278`，不得把后续归档工具提交误记为被测代码。
 >
 > 本方案只覆盖 Windows 原生 FMT-SIM + Flight Host SIL 软件动态复测；不代表 H723 真机、台架 HIL、WCET/RTA、目标栈水位或飞行验收。
 
@@ -286,3 +286,34 @@ if ($LASTEXITCODE -ne 0) { throw 'R46 native FMT-SIM batch failed; preserve the 
 - 连续 5 次同类 GNSS NIS 拒绝应撤销对应导航位置/速度能力，solution_state=DEGRADED；不应自动接受争议观测，也不应将 GNSS 源级状态直接标为 FAILED。
 - 水平位置能力丢失时，M4 应按既有 nav_loss_recovery_dwell 策略暂停 Mission 并请求 AUTO_LAND；不能放宽现有安全门限。
 - R46 通过仍不等于 H723 实机、物理 HIL、WCET/RTA 或飞行放行。FLIGHT-29 在 R46 和 Stage B2 受控重新对准方案完成前保持 OPEN。
+
+
+## 2026-11-15 R46 两次本机执行结果与归档阻塞
+
+- 测试代码 HEAD：`7d8473401bad88bd9c9238c29b5d575976e55278`；用户确认测试前后均为 clean worktree（0 项）、`stable=true`，且 `main == origin/main`。该 HEAD 包含 FLIGHT-29 Stage B1。
+- 运行 1：Land PASS；Return FAIL（3 项）；Mission PASS。
+- 运行 2：Land PASS；Return PASS；Mission 进程退出码 `-1`，因此本次整批不完整。
+- Return 失败类别包括 `terminal_ack`、`disarm_ack`、`arm_state`；另观察到导航垂向加速度与 FMT 真值不一致。当前没有足够原始日志证明该偏差的根因，不将其直接归因于 INS、M6 或 Plant。
+- FLIGHT-26 近地水平振荡机制在本轮再次复现；其生产控制器阻尼修改仍须单独分析和独立审查。
+- 本轮没有运行 CI；H723、HIL、WCET/RTA、栈水位和实际飞行均 NOT_RUN。手工副本目录为 `work/validation/archives/eng07-r46-20261115-7d847340/`，正式归档脚本在旧分支守卫和参数目录哈希检查处 BLOCKED，不能将手工副本等同正式归档。
+
+### 归档工具修复
+
+main 提交 `b7bad3311bfe2cb87ab85e9b615fd84f2e7e80a3` 已完成以下修复：
+
+1. 归档守卫只接受 `main`，自动 fetch 并要求 `HEAD == origin/main`、upstream 为 `origin/main`、启动前工作区干净。
+2. 归档时可显式传入实际测试代码 SHA；该 SHA 必须存在且是归档 HEAD 的祖先。
+3. 参数目录源哈希改为规范化 LF；`generate_ground_config.py --check` 改为只读，不再在发现 stale 时覆盖生成物。
+4. 参数 YAML、生成目录及生成器源码纳入正式归档和工具身份清单。
+
+**先归档现有 R46 证据，不要先改控制器或放宽门槛。** 在本地同步到当前 main 后执行：
+
+~~~powershell
+git fetch origin --prune
+git switch main
+git pull --ff-only origin main
+python tools/generate_ground_config.py --check
+pwsh -NoProfile -File tools/archive_validation_run.ps1 -RunId ENG07-R46-20261115-7d847340 -ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278
+~~~
+
+归档通过后，回传 ZIP、sidecar SHA256、archive report 和逐场景原始日志。先核对两次执行是否有各自完整的状态流、末端状态与失败帧；只有证据完整后，才决定是否对 Return 垂向加速度单独建立回放/单元测试并重跑。任何诊断均不得修改 350 ms、终端 ACK、DISARM、arm_state、着陆速度、dwell 或安全授权阈值。
