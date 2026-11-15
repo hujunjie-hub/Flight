@@ -149,7 +149,8 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
         parameter = document["parameters"][0]
         self.assertEqual(parameter["dependencies"], ["CTL_RATE_KP_X"])
         self.assertEqual(parameter["validationRules"][0]["type"], "GREATER_THAN")
-        self.assertEqual(parameter["validationRules"][1]["parameter"], "CTL_RATE_KP_X")
+        self.assertEqual(parameter["validationRules"][5]["parameter"], "CTL_RATE_KP_X")
+        self.assertEqual(len(parameter["validationRules"]), 6)
 
     def test_unsupported_or_malformed_validation_rules_are_rejected(self):
         invalid_rules = [
