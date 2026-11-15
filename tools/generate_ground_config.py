@@ -17,6 +17,8 @@ does not have.  They are still recorded in the "sources" section for audit.
 
 Usage:
     python tools/generate_ground_config.py [--output DIR] [--check]
+
+--check is read-only. Source-file hashes use canonical LF bytes on every OS.
 """
 
 import argparse
@@ -24,6 +26,7 @@ import hashlib
 import json
 import math
 import sys
+import tempfile
 from pathlib import Path
 
 import yaml
@@ -52,6 +55,12 @@ CONTROLLER_FIELDS = {
     "mpc_s_diag", "actuation_preview_delay_s", "mpc_seed_position_error_limit_m",
     "mpc_seed_velocity_error_limit_mps",
 }
+
+def canonical_source_sha256(raw: bytes) -> str:
+    """Hash canonical LF bytes so source identities do not depend on checkout OS."""
+    canonical = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(canonical).hexdigest()
+
 
 AXIS = ("X", "Y", "Z")
 AXIS_CN = ("滚转", "俯仰", "偏航")
@@ -370,7 +379,7 @@ def write_outputs(out, groups, parameters, rows):
     digest = hashlib.sha256(json.dumps(
         [p.as_json() for p in parameters], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     sources = {
-        name: hashlib.sha256((ROOT / "config" / f"{name}.yaml").read_bytes()).hexdigest()
+        name: canonical_source_sha256((ROOT / "config" / f"{name}.yaml").read_bytes())
         for name in FILES
     }
     out.mkdir(parents=True, exist_ok=True)
@@ -509,15 +518,20 @@ def generate(out, check=False):
     controller_fields(parameters)
     rows = attach_names(build_rows(groups), parameters)
     if check:
-        before = {name: (out / name).read_bytes() for name in
-                  ("ground_parameters.h", "ground_parameters.json", "ground_parameters.md")
-                  if (out / name).is_file()}
-        if len(before) != 3:
-            raise SystemExit(f"parameter catalog is missing under {out}")
-        write_outputs(out, groups, parameters, rows)
-        changed = [name for name, old in before.items() if (out / name).read_bytes() != old]
+        names = ("ground_parameters.h", "ground_parameters.json", "ground_parameters.md")
+        with tempfile.TemporaryDirectory(prefix="flight-ground-parameters-") as temporary:
+            expected_dir = Path(temporary)
+            write_outputs(expected_dir, groups, parameters, rows)
+            changed = [
+                name for name in names
+                if not (out / name).is_file()
+                or (out / name).read_bytes() != (expected_dir / name).read_bytes()
+            ]
         if changed:
-            raise SystemExit(f"parameter catalog is stale: {', '.join(changed)}")
+            raise SystemExit(
+                f"parameter catalog is stale: {', '.join(changed)}; "
+                "run 'python tools/generate_ground_config.py' and commit the generated outputs"
+            )
         print(f"parameter catalog up to date: {len(parameters)} parameters")
         return
     write_outputs(out, groups, parameters, rows)

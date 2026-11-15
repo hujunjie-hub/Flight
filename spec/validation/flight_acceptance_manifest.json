@@ -9,7 +9,7 @@
   "local_agent_guide": "spec/AGENT-操作指南.md",
   "acceptance_guide": "spec/Flight-验收与结果提交.md",
   "archive_command": "pwsh -NoProfile -File .\\tools\\archive_validation_run.ps1",
-  "default_branch_for_current_milestone": "opt/stage-02-m5-06-safety-validator",
+  "default_branch_for_current_milestone": "main",
   "pr_number": 2,
   "pr_state": "CLOSED_UNMERGED",
   "profiles": {

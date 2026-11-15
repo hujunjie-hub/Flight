@@ -34,7 +34,7 @@ class ArchiveMetadataTests(unittest.TestCase):
     def build(self, **overrides):
         values = dict(
             run_id="M5-06-R29-20261111",
-            branch="opt/stage-02-m5-06-safety-validator",
+            branch="main",
             validated_code_commit=SHA_A,
             archive_head_sha=SHA_B,
             remote_head=SHA_C,
@@ -96,13 +96,14 @@ class ArchiveMetadataTests(unittest.TestCase):
             root = Path(td)
             def run(*args):
                 return subprocess.check_output(["git", "-C", str(root), *args], text=True).strip()
-            run("init", "-b", "opt/stage-02-m5-06-safety-validator")
+            run("init", "-b", "main")
             run("config", "user.email", "agent@example.invalid")
             run("config", "user.name", "Archive Metadata Test")
             (root / "tools").mkdir()
             for rel in ("SConstruct", "tools/check_rtt_package_tree.py",
                         "tools/collect_validation_results.py",
                         "tools/check_validation_evidence.py",
+                        "tools/generate_ground_config.py",
                         "tools/analyze_stack.py",
                         "tools/prepare_archive_metadata.py",
                         "tools/archive_validation_run.ps1"):
@@ -118,7 +119,7 @@ class ArchiveMetadataTests(unittest.TestCase):
             run("add", ".")
             run("commit", "-m", "baseline")
             base = run("rev-parse", "HEAD")
-            run("update-ref", "refs/remotes/origin/opt/stage-02-m5-06-safety-validator", base)
+            run("update-ref", "refs/remotes/origin/main", base)
             (root / "README.md").write_text("ahead\n", encoding="utf-8")
             run("add", "README.md")
             run("commit", "-m", "ahead")
@@ -129,7 +130,7 @@ class ArchiveMetadataTests(unittest.TestCase):
             data["latest_local_validation"]["validated_code_commit"] = base
             manifest.write_text(json.dumps(data), encoding="utf-8")
             result = prepare(root, manifest, "M5-06-R29-20261111",
-                             "opt/stage-02-m5-06-safety-validator")
+                             "main")
             self.assertEqual(result["archive_head_sha"], head)
             self.assertEqual(result["remote_head"], base)
             self.assertEqual(result["ahead_commit_count"], 1)

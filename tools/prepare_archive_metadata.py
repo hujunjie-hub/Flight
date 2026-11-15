@@ -24,6 +24,7 @@ TOOLING_PATHS = (
     ("tools/check_rtt_package_tree.py", "rtt_package_tree_guard"),
     ("tools/collect_validation_results.py", "collector"),
     ("tools/check_validation_evidence.py", "evidence_checker"),
+    ("tools/generate_ground_config.py", "parameter_catalog_generator"),
     ("tools/analyze_stack.py", "stack_analyzer"),
     ("tools/prepare_archive_metadata.py", "archive_metadata_preparer"),
     ("tools/archive_validation_run.ps1", "archive_entrypoint"),
@@ -170,7 +171,8 @@ def prepare(repo: Path, manifest_path: Path, run_id: str,
     tooling_commit = latest_commit_for_paths(
         repo, "SConstruct", "tools/check_rtt_package_tree.py",
         "tools/collect_validation_results.py", "tools/check_validation_evidence.py",
-        "tools/analyze_stack.py", "tools/prepare_archive_metadata.py")
+        "tools/generate_ground_config.py", "tools/analyze_stack.py",
+        "tools/prepare_archive_metadata.py")
     tooling_sources = [source_identity(repo, path, role)
                        for path, role in TOOLING_PATHS]
 

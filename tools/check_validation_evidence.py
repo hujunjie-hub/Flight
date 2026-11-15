@@ -140,6 +140,9 @@ def check_manifest(ctx):
     if lv.get("branch") != ctx["branch"]:
         fails.append("manifest branch mismatch")
     checks += 1
+    if lv.get("branch") != "main":
+        fails.append("new validation archives must be bound to the sole delivery branch main")
+    checks += 1
     if lv.get("validated_code_commit") != ctx["code_commit"]:
         fails.append("manifest validated_code_commit mismatch")
     for key in ("validated_code_commit", "tooling_commit", "collector_commit",
@@ -181,6 +184,7 @@ def check_manifest(ctx):
         "tooling_commit": _git_path_commit("SConstruct", "tools/check_rtt_package_tree.py",
                                             "tools/collect_validation_results.py",
                                             "tools/check_validation_evidence.py",
+                                            "tools/generate_ground_config.py",
                                             "tools/analyze_stack.py",
                                             "tools/prepare_archive_metadata.py"),
     }
@@ -195,6 +199,7 @@ def check_manifest(ctx):
         "tools/check_rtt_package_tree.py",
         "tools/collect_validation_results.py",
         "tools/check_validation_evidence.py",
+        "tools/generate_ground_config.py",
         "tools/analyze_stack.py",
         "tools/prepare_archive_metadata.py",
         "tools/archive_validation_run.ps1",

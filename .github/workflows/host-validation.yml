@@ -31,13 +31,13 @@ jobs:
 
       - name: Check Python validation scripts
         run: |
-          python -m py_compile tools/check_layout.py tests/algorithms/run_tests.py tests/algorithms/test_source_lock.py middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/source_lock.py tests/runtime/run_tests.py tests/runtime/verify_firmware.py tests/drivers/check_drivers.py tools/guidance/generate_kinodynamic_primitives.py tests/guidance/verify_norm_bounds.py tests/guidance/verify_dynamic_prediction.py tests/guidance/verify_curve_eval_gap.py
+          python -m py_compile tools/check_layout.py tools/generate_ground_config.py tests/tools/test_generate_ground_config.py tests/tools/test_prepare_archive_metadata.py tests/tools/test_validation_evidence_archive.py tests/algorithms/run_tests.py tests/algorithms/test_source_lock.py middleware/model/control/outer_loop/quad_x4/mpc_solver/osqp/source_lock.py tests/runtime/run_tests.py tests/runtime/verify_firmware.py tests/drivers/check_drivers.py tools/guidance/generate_kinodynamic_primitives.py tests/guidance/verify_norm_bounds.py tests/guidance/verify_dynamic_prediction.py tests/guidance/verify_curve_eval_gap.py
 
       - name: Parse local PowerShell regression runners
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          foreach ($path in @('tests/simulation/run_sil.ps1', 'tests/simulation/run_fmt_sim_regression.ps1')) {
+          foreach ($path in @('tests/simulation/run_sil.ps1', 'tests/simulation/run_fmt_sim_regression.ps1', 'tools/archive_validation_run.ps1')) {
             $tokens = $null
             $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path).Path, [ref]$tokens, [ref]$errors)
@@ -60,6 +60,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Install parameter catalog dependency
+        run: python -m pip install PyYAML
+
+      - name: Check generated ground parameter catalog
+        run: python tools/generate_ground_config.py --check
+
+      - name: Test parameter catalog and archive metadata contracts
+        run: |
+          python tests/tools/test_generate_ground_config.py
+          python tests/tools/test_prepare_archive_metadata.py
+          python tests/tools/test_validation_evidence_archive.py
 
       - name: Test python -O audit guard
         run: python tests/guidance/test_audit_optimized.py

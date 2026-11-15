@@ -17,7 +17,7 @@ SHA_B = "b" * 40
 SHA_C = "c" * 40
 SHA_D = "d" * 40
 SHA_E = "e" * 40
-BRANCH = "opt/stage-02-m5-06-safety-validator"
+BRANCH = "main"
 RUN_ID = "M5-06-R29-20261111"
 
 
@@ -54,6 +54,7 @@ class ArchiveManifestCheckerTests(unittest.TestCase):
             ("tools/check_rtt_package_tree.py", "rtt_package_tree_guard"),
             ("tools/collect_validation_results.py", "collector"),
             ("tools/check_validation_evidence.py", "evidence_checker"),
+            ("tools/generate_ground_config.py", "parameter_catalog_generator"),
             ("tools/analyze_stack.py", "stack_analyzer"),
             ("tools/prepare_archive_metadata.py", "archive_metadata_preparer"),
             ("tools/archive_validation_run.ps1", "archive_entrypoint"),
