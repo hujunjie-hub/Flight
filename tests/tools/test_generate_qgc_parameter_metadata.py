@@ -7,6 +7,7 @@ from tools.generate_qgc_parameter_metadata import (
     build_model_catalog_document,
     build_parameter_document,
     build_unregistered_metadata_document,
+    validate_profile_alignment,
 )
 
 
@@ -14,6 +15,7 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
     def setUp(self):
         self.catalog = {
             "sha256": "test-catalog-sha256",
+            "profile": "QUAD_X4",
             "parameters": [
                 {
                     "name": "VEH_MASS",
@@ -43,7 +45,7 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
             "source": "Synthetic fixture.",
             "hardware_thrust_curve": "TBD: no hardware calibration",
         }
-        self.controller = {"status": "SIM_ONLY"}
+        self.controller = {"profile": "QUAD_X4", "status": "SIM_ONLY"}
         self.parameter_document = build_parameter_document(self.catalog, self.model)
 
     def test_parameter_domains_and_model_scope_are_generated(self):
@@ -52,6 +54,15 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
         self.assertEqual(parameters[1]["domain"], "CONTROL")
         self.assertEqual(parameters[0]["modelProfiles"], ["QUAD_X4"])
         self.assertEqual(self.parameter_document["modelProfiles"], ["QUAD_X4"])
+
+    def test_model_sources_must_share_the_same_profile(self):
+        with self.assertRaises(ValueError):
+            validate_profile_alignment(
+                self.catalog,
+                self.model,
+                {"profile": "OTHER_MODEL"},
+                "QUAD_X4",
+            )
 
     def test_sim_only_profile_is_not_hardware_eligible(self):
         catalog = build_model_catalog_document(
@@ -75,7 +86,6 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
             model,
             controller,
             "HARDWARE_VALIDATED",
-            {"vehicleModel": "a", "controllerTuning": "b", "estimatorTuning": "c"},
             self.parameter_document,
         )
         self.assertTrue(catalog["profiles"][0]["hardwareEligible"])

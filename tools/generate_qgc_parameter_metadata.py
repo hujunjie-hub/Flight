@@ -33,11 +33,32 @@ DOMAIN_BY_GROUP = {
 }
 
 
-def _estimator_status(text: str) -> str:
-    match = re.search(r"^status:\s*([A-Za-z0-9_]+)\s*$", text, re.MULTILINE)
+def _yaml_scalar(text: str, key: str) -> str:
+    match = re.search(rf"^{re.escape(key)}:\\s*([A-Za-z0-9_]+)\\s*$", text, re.MULTILINE)
     if not match:
-        raise ValueError(f"estimator tuning status missing in {ESTIMATOR_CONFIG}")
+        raise ValueError(f"{key} missing in {ESTIMATOR_CONFIG}")
     return match.group(1)
+
+
+def _estimator_status(text: str) -> str:
+    return _yaml_scalar(text, "status")
+
+
+def _estimator_profile(text: str) -> str:
+    return _yaml_scalar(text, "profile")
+
+
+def validate_profile_alignment(catalog: dict, model_config: dict,
+                               controller_config: dict, estimator_profile: str) -> None:
+    profile = model_config["profile"]
+    sources = {
+        "parameter catalog": catalog.get("profile"),
+        "controller tuning": controller_config.get("profile"),
+        "estimator tuning": estimator_profile,
+    }
+    mismatches = {name: value for name, value in sources.items() if value != profile}
+    if mismatches:
+        raise ValueError(f"model profile {profile!r} does not match source profiles: {mismatches}")
 
 
 def build_parameter_document(catalog: dict, model_config: dict) -> dict:
@@ -184,7 +205,10 @@ def main() -> None:
     catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
     model_config = json.loads(arguments.model_config.read_text(encoding="utf-8"))
     controller_config = json.loads(arguments.controller_config.read_text(encoding="utf-8"))
-    estimator_status = _estimator_status(arguments.estimator_config.read_text(encoding="utf-8"))
+    estimator_text = arguments.estimator_config.read_text(encoding="utf-8")
+    estimator_status = _estimator_status(estimator_text)
+    estimator_profile = _estimator_profile(estimator_text)
+    validate_profile_alignment(catalog, model_config, controller_config, estimator_profile)
 
     parameter_document = build_parameter_document(catalog, model_config)
     model_catalog = build_model_catalog_document(
