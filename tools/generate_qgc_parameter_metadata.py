@@ -39,10 +39,10 @@ def _model_descriptor(model_config: dict) -> dict:
     model_variants = model_config.get("model_variants")
     control_law = model_config.get("control_law")
     profile = model_config.get("profile")
-    if vehicle_family not in ALLOWED_VEHICLE_FAMILIES:
+    if not isinstance(vehicle_family, str) or vehicle_family not in ALLOWED_VEHICLE_FAMILIES:
         raise ValueError(f"unsupported or missing vehicle_family: {vehicle_family!r}")
     if (not isinstance(model_variants, list) or not model_variants or
-            any(not isinstance(value, str) or not value.strip() for value in model_variants) or
+            any(not isinstance(value, str) or not value.strip() or value != value.strip() for value in model_variants) or
             len(set(model_variants)) != len(model_variants) or profile not in model_variants):
         raise ValueError("model_variants must be a unique non-empty list containing the active profile")
     if not isinstance(control_law, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]*", control_law):
@@ -54,20 +54,25 @@ def _model_descriptor(model_config: dict) -> dict:
     }
 
 
-def _parameter_policy(item: dict, reboot_required) -> tuple[str, str, list, list]:
+def _parameter_policy(item: dict, reboot_required):
     writable = item.get("writable")
     if type(writable) is not bool:
         raise ValueError(f"writable must be a boolean for {item.get('name', '<unnamed>')}")
     tuning_policy = "GROUND_ADJUSTABLE" if writable else "READ_ONLY"
     update_policy = "REBOOT_REQUIRED" if reboot_required is True else "FIRMWARE_CONFIRMATION"
+    if tuning_policy not in ALLOWED_TUNING_POLICIES or update_policy not in ALLOWED_UPDATE_POLICIES:
+        raise ValueError(f"unsupported tuning or update policy for {item.get('name', '<unnamed>')}")
     dependencies = item.get("dependencies", [])
     validation_rules = item.get("validationRules", [])
     if (not isinstance(dependencies, list) or
             any(not isinstance(value, str) or not value.strip() for value in dependencies) or
             len(set(dependencies)) != len(dependencies)):
         raise ValueError(f"dependencies must be a unique list of parameter names for {item.get('name', '<unnamed>')}")
-    if not isinstance(validation_rules, list) or any(not isinstance(value, dict) for value in validation_rules):
-        raise ValueError(f"validationRules must be a list of rule objects for {item.get('name', '<unnamed>')}")
+    if (not isinstance(validation_rules, list) or
+            any(not isinstance(value, dict) or
+                not isinstance(value.get("type"), str) or not value["type"].strip()
+                for value in validation_rules)):
+        raise ValueError(f"validationRules must be a list of typed rule objects for {item.get('name', '<unnamed>')}")
     return tuning_policy, update_policy, dependencies, validation_rules
 
 
@@ -164,6 +169,15 @@ def build_parameter_document(catalog: dict, model_config: dict) -> dict:
         if reboot_required is not None:
             parameter["rebootRequired"] = reboot_required
         parameters.append(parameter)
+
+    parameter_names = {parameter["name"] for parameter in parameters}
+    for parameter in parameters:
+        unknown_dependencies = set(parameter["dependencies"]) - parameter_names
+        if parameter["name"] in parameter["dependencies"] or unknown_dependencies:
+            raise ValueError(
+                f"invalid dependencies for {parameter['name']}: "
+                f"{sorted(unknown_dependencies or {parameter['name']})}"
+            )
 
     # SIL-only parameter: the H723 catalog intentionally has no SIM_TLM_HZ,
     # but the Host SIL exposes it.
