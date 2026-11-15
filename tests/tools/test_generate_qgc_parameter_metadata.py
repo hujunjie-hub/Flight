@@ -102,6 +102,20 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
         self.assertEqual(parameter["tuningPolicy"], "READ_ONLY")
         self.assertTrue(parameter["readOnly"])
 
+    def test_unknown_parameter_dependencies_are_rejected(self):
+        catalog = dict(self.catalog)
+        catalog["parameters"] = [dict(item) for item in self.catalog["parameters"]]
+        catalog["parameters"][0]["dependencies"] = ["MISSING_PARAMETER"]
+        with self.assertRaises(ValueError):
+            build_parameter_document(catalog, self.model)
+
+    def test_validation_rules_must_have_a_type(self):
+        catalog = dict(self.catalog)
+        catalog["parameters"] = [dict(item) for item in self.catalog["parameters"]]
+        catalog["parameters"][0]["validationRules"] = [{}]
+        with self.assertRaises(ValueError):
+            build_parameter_document(catalog, self.model)
+
     def test_invalid_parameter_policy_metadata_is_rejected(self):
         catalog = dict(self.catalog)
         catalog["parameters"] = [dict(item) for item in self.catalog["parameters"]]
