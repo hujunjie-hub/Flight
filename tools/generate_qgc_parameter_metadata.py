@@ -54,6 +54,19 @@ def _estimator_profile(text: str) -> str:
     return _yaml_scalar(text, "profile")
 
 
+def _declared_reboot_requirement(item: dict) -> bool | None:
+    keys = [key for key in ("reboot_required", "rebootRequired") if key in item]
+    if not keys:
+        return None
+    values = [item[key] for key in keys]
+    if len(values) > 1 and values[0] != values[1]:
+        raise ValueError(f"conflicting reboot requirement fields for {item.get('name', '<unnamed>')}")
+    value = values[0]
+    if type(value) is not bool:
+        raise ValueError(f"reboot requirement for {item.get('name', '<unnamed>')} must be a boolean")
+    return value
+
+
 def validate_profile_alignment(catalog: dict, model_config: dict,
                                controller_config: dict, estimator_profile: str) -> None:
     profile = model_config["profile"]
@@ -81,7 +94,7 @@ def build_parameter_document(catalog: dict, model_config: dict) -> dict:
             raise ValueError(
                 f"unmapped parameter group {item['group']!r} for {item['name']}"
             )
-        parameters.append({
+        parameter = {
             "name": item["name"],
             "type": "float",
             "group": item["group"],
@@ -92,10 +105,13 @@ def build_parameter_document(catalog: dict, model_config: dict) -> dict:
             "max": item["maximum"],
             "default": item["value"],
             "decimalPlaces": 0 if item["units"] in ("flag", "raw") else 4,
-            "rebootRequired": False,
             "domain": domain,
             "modelProfiles": [profile],
-        })
+        }
+        reboot_required = _declared_reboot_requirement(item)
+        if reboot_required is not None:
+            parameter["rebootRequired"] = reboot_required
+        parameters.append(parameter)
 
     # SIL-only parameter: the H723 catalog intentionally has no SIM_TLM_HZ,
     # but the Host SIL exposes it.
@@ -110,7 +126,6 @@ def build_parameter_document(catalog: dict, model_config: dict) -> dict:
         "max": 10.0,
         "default": 5.0,
         "decimalPlaces": 1,
-        "rebootRequired": False,
         "domain": "SIMULATION",
         "modelProfiles": [profile],
     })
