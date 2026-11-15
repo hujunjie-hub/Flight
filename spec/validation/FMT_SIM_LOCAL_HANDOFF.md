@@ -4,7 +4,7 @@
 >
 > 适用分支：**main（唯一远程分支）**
 >
-> 当前修复后的归档脚本提交：**62bea0420357c7da901b9ab6acce386e2448d09f**；本次文档/测试最新 main 基线：**0e38ddebfdb645e329918217ea10434f02d95e7f**；本次被测飞控代码仍是 **7d8473401bad88bd9c9238c29b5d575976e55278**；FLIGHT-29 Stage B1 代码提交：**28748c717e83b868ae58957c04bcd9dbe1c23e1b**。归档时必须用 `-ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278`，不得把后续归档工具提交误记为被测代码。
+> 归档脚本提交：**62bea0420357c7da901b9ab6acce386e2448d09f**；工具 CI 已在 main HEAD **76b18fd3b7bce7ff5522b0da6d337ec58a0deba5** 全部通过（Host 7/7、M6/M7 5/5、M7 2/2）；本次被测飞控代码仍是 **7d8473401bad88bd9c9238c29b5d575976e55278**；FLIGHT-29 Stage B1 代码提交：**28748c717e83b868ae58957c04bcd9dbe1c23e1b**。归档时必须用 `-ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278`，不得把后续归档工具提交误记为被测代码。
 >
 > 本方案只覆盖 Windows 原生 FMT-SIM + Flight Host SIL 软件动态复测；不代表 H723 真机、台架 HIL、WCET/RTA、目标栈水位或飞行验收。
 
@@ -314,6 +314,7 @@ git switch main
 git pull --ff-only origin main
 python tools/generate_ground_config.py --check
 pwsh -NoProfile -File tools/archive_validation_run.ps1 -RunId ENG07-R46-FORMAL-20261115-7d847340 -ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278 -InputEvidenceDirectory "work/validation/archives/eng07-r46-20261115-7d847340"
+python tools/check_validation_evidence.py --check archive --run-id ENG07-R46-FORMAL-20261115-7d847340 --code-commit 7d8473401bad88bd9c9238c29b5d575976e55278 --manifest spec/validation/flight_acceptance_manifest.json --archive-report "work/validation/archives/ENG07-R46-FORMAL-20261115-7d847340.archive_report.json"
 ~~~
 
 归档通过后，回传 ZIP、sidecar SHA256、archive report 和逐场景原始日志。先核对两次执行是否有各自完整的状态流、末端状态与失败帧；只有证据完整后，才决定是否对 Return 垂向加速度单独建立回放/单元测试并重跑。任何诊断均不得修改 350 ms、终端 ACK、DISARM、arm_state、着陆速度、dwell 或安全授权阈值。
