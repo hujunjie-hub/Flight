@@ -8,6 +8,7 @@ The generated files are consumed by FlightParameterMetaData and FlightFirmwarePl
 
 import argparse
 import json
+import math
 import re
 from pathlib import Path
 
@@ -95,11 +96,31 @@ def _parameter_policy(item: dict, reboot_required):
             any(not isinstance(value, str) or not value.strip() for value in dependencies) or
             len(set(dependencies)) != len(dependencies)):
         raise ValueError(f"dependencies must be a unique list of parameter names for {item.get('name', '<unnamed>')}")
-    if (not isinstance(validation_rules, list) or
-            any(not isinstance(value, dict) or
-                not isinstance(value.get("type"), str) or not value["type"].strip()
-                for value in validation_rules)):
-        raise ValueError(f"validationRules must be a list of typed rule objects for {item.get('name', '<unnamed>')}")
+    if not isinstance(validation_rules, list):
+        raise ValueError(f"validationRules must be a list for {item.get('name', '<unnamed>')}")
+    numeric_rule_types = {
+        "GREATER_THAN", "GREATER_THAN_OR_EQUAL", "LESS_THAN",
+        "LESS_THAN_OR_EQUAL", "MULTIPLE_OF",
+    }
+    for rule in validation_rules:
+        if not isinstance(rule, dict) or not isinstance(rule.get("type"), str):
+            raise ValueError(f"invalid validation rule for {item.get('name', '<unnamed>')}")
+        rule_type = rule["type"]
+        if rule_type in numeric_rule_types:
+            value = rule.get("value")
+            if (set(rule) != {"type", "value"} or type(value) not in (int, float) or
+                    not math.isfinite(value) or (rule_type == "MULTIPLE_OF" and value <= 0)):
+                raise ValueError(f"invalid {rule_type} rule for {item.get('name', '<unnamed>')}")
+        elif rule_type == "REQUIRES_PARAMETER_VALUE":
+            parameter = rule.get("parameter")
+            value = rule.get("value")
+            if (set(rule) != {"type", "parameter", "value"} or
+                    not isinstance(parameter, str) or not parameter.strip() or parameter != parameter.strip() or
+                    parameter == item.get("name") or parameter not in dependencies or
+                    type(value) not in (int, float) or not math.isfinite(value)):
+                raise ValueError(f"invalid REQUIRES_PARAMETER_VALUE rule for {item.get('name', '<unnamed>')}")
+        else:
+            raise ValueError(f"unsupported validation rule {rule_type!r} for {item.get('name', '<unnamed>')}")
     return tuning_policy, update_policy, dependencies, validation_rules
 
 
