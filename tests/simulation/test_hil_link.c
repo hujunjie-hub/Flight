@@ -386,7 +386,7 @@ static void test_fmt_state(void)
 }
 
 #ifdef _WIN32
-static void test_fmt_stop_without_controls(void)
+static void test_fmt_host_udp(void)
 {
     WSADATA data;
     const int started = WSAStartup(MAKEWORD(2, 2), &data);
@@ -415,8 +415,34 @@ static void test_fmt_stop_without_controls(void)
         CHECK(size > 0u);
         CHECK(!fmt_sim_host_send(1234u, NULL, 1));
         CHECK(fmt_sim_host_send(1234u, NULL, 0));
-        const int length = recv(receiver, (char *)received, sizeof(received), 0);
+        struct sockaddr_in host = {0};
+        int host_size = sizeof(host);
+        const int length = recvfrom(receiver, (char *)received, sizeof(received), 0,
+                                    (struct sockaddr *)&host, &host_size);
         CHECK(length == (int)size && memcmp(received, expected, size) == 0);
+        if (length > 0) {
+            /* Two valid states in one datagram and a third already queued.
+             * Each state must be delivered to a separate 10 ms SIL turn. */
+            uint8_t datagram[2 * sizeof(FMT_EXTERNAL_STATE_FRAME)];
+            uint8_t payload[85];
+            memcpy(datagram, FMT_EXTERNAL_STATE_FRAME, sizeof(FMT_EXTERNAL_STATE_FRAME));
+            memcpy(payload, FMT_EXTERNAL_STATE_FRAME + MAVLINK_V2_HEADER_SIZE, sizeof(payload));
+            memset(payload + 64u, 0, sizeof(float)); /* NED down = 0 m */
+            const size_t second = wire_encode(12001u, 168u, payload, sizeof(payload), 1u,
+                                              datagram + sizeof(FMT_EXTERNAL_STATE_FRAME),
+                                              sizeof(FMT_EXTERNAL_STATE_FRAME));
+            CHECK(second == sizeof(FMT_EXTERNAL_STATE_FRAME));
+            CHECK(sendto(receiver, (const char *)datagram, sizeof(datagram), 0,
+                         (const struct sockaddr *)&host, host_size) == (int)sizeof(datagram));
+            CHECK(sendto(receiver, (const char *)FMT_EXTERNAL_STATE_FRAME,
+                         sizeof(FMT_EXTERNAL_STATE_FRAME), 0, (const struct sockaddr *)&host,
+                         host_size) == (int)sizeof(FMT_EXTERNAL_STATE_FRAME));
+            mavlink_fmt_state_t state = {0};
+            CHECK(fmt_sim_host_receive(&state) == 1u && state.position_ned_m[2] == -2.0f);
+            CHECK(fmt_sim_host_receive(&state) == 1u && state.position_ned_m[2] == 0.0f);
+            CHECK(fmt_sim_host_receive(&state) == 1u && state.position_ned_m[2] == -2.0f);
+            CHECK(fmt_sim_host_receive(&state) == 0u);
+        }
         fmt_sim_host_close();
     }
     if (receiver != INVALID_SOCKET)
@@ -432,7 +458,7 @@ int main(void)
     test_decode_gps();
     test_fmt_state();
 #ifdef _WIN32
-    test_fmt_stop_without_controls();
+    test_fmt_host_udp();
 #endif
     test_parser_edges();
     test_encode_matches_golden();

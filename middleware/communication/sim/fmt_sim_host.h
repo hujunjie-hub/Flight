@@ -6,6 +6,7 @@
 /* The Windows Host fixture owns one loopback connection. */
 int fmt_sim_host_open(uint16_t port);
 void fmt_sim_host_close(void);
+/* Deliver at most one complete state. Queued frames remain in receive order. */
 unsigned fmt_sim_host_receive(mavlink_fmt_state_t *state);
 /* A disarmed send uses the stopped outputs and accepts a NULL controls array. */
 int fmt_sim_host_send(uint64_t now_us, const float controls[4], int armed);

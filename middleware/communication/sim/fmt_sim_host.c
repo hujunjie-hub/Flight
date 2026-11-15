@@ -26,6 +26,8 @@ typedef int fmt_socket_t;
 static fmt_socket_t peer = FMT_INVALID_SOCKET;
 static uint8_t sequence;
 static uint64_t next_heartbeat_us;
+static uint8_t state_datagram[1024];
+static unsigned state_bytes, state_offset;
 
 int fmt_sim_host_open(uint16_t port)
 {
@@ -70,6 +72,7 @@ int fmt_sim_host_open(uint16_t port)
 #endif
     next_heartbeat_us = 0;
     sequence = 0;
+    state_bytes = state_offset = 0u;
     return 1;
 }
 
@@ -84,38 +87,50 @@ void fmt_sim_host_close(void)
     }
 }
 
+static unsigned receive_buffered_state(mavlink_fmt_state_t *state)
+{
+    while (state_bytes - state_offset >= 12u) {
+        const uint8_t *frame = state_datagram + state_offset;
+        if (frame[0] != MAVLINK_V2_MAGIC) {
+            ++state_offset;
+            continue;
+        }
+        const unsigned size = 12u + frame[1] + ((frame[2] & 1u) ? 13u : 0u);
+        if (size > state_bytes - state_offset)
+            break;
+        state_offset += size;
+        if (mavlink_hil_decode_fmt_state(frame, size, state))
+            return 1u;
+    }
+    return 0u;
+}
+
 unsigned fmt_sim_host_receive(mavlink_fmt_state_t *state)
 {
-    uint8_t packet[1024];
-    unsigned received = 0;
-    const uint64_t wall_us = fmt_sim_host_now_us();
     if (peer == FMT_INVALID_SOCKET || !state) return 0u;
+    const uint64_t wall_us = fmt_sim_host_now_us();
     /* Simulator liveness is measured on the PC clock. The plant clock can
      * pause while waiting for a frame, including during slow rendering. */
     if (wall_us >= next_heartbeat_us) {
+        uint8_t packet[32];
         size_t length = mavlink_hil_build_heartbeat(sequence++, packet, sizeof(packet));
         if (send(peer, (const char *)packet, (int)length, 0) == (int)length)
             next_heartbeat_us = wall_us + 1000000u;
     }
-    /* Bound the receive work per scheduler turn. */
+    /* The SIL clock advances once per state. Keep any remaining wire frames
+     * for subsequent turns so a socket burst cannot skip plant time. */
+    if (receive_buffered_state(state))
+        return 1u;
     for (unsigned i = 0; i < 16; ++i) {
-        int bytes = (int)recv(peer, (char *)packet, sizeof(packet), 0);
+        const int bytes = (int)recv(peer, (char *)state_datagram, sizeof(state_datagram), 0);
         if (bytes <= 0)
             break;
-        for (unsigned offset = 0; offset + 12u <= (unsigned)bytes;) {
-            const uint8_t *frame = packet + offset;
-            if (frame[0] != MAVLINK_V2_MAGIC) {
-                ++offset;
-                continue;
-            }
-            unsigned size = 12u + frame[1] + ((frame[2] & 1u) ? 13u : 0u);
-            if (size > (unsigned)bytes - offset)
-                break;
-            received += (unsigned)mavlink_hil_decode_fmt_state(frame, size, state);
-            offset += size;
-        }
+        state_bytes = (unsigned)bytes;
+        state_offset = 0u;
+        if (receive_buffered_state(state))
+            return 1u;
     }
-    return received;
+    return 0u;
 }
 
 int fmt_sim_host_send(uint64_t now_us, const float controls[4], int armed)
