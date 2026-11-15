@@ -184,10 +184,11 @@ terminal ACK, DISARM ACK and DISARMED. Mission had 535 position/velocity pairs,
 zero NIS rejections and maximum horizontal nav/truth separation 0.055 m. The
 transport fix is verified locally; R45 is not the post-Stage-B1 baseline.
 
-R46 must run the full Land -> Return -> Mission batch after fetching the latest
-latest main commit 61442e10cb3d92a34f070f804e00be531e144025 (which includes Stage B1 code commit 28748c717e83b868ae58957c04bcd9dbe1c23e1b), with the existing
-350 ms status period, UDP 14653, hover 0.62 and explicit loopback. Archive the
-ZIP, sidecar SHA256, manifest, per-scenario sil_flight.log, exact HEAD and
+R46 must run the full Land -> Return -> Mission batch on the latest main that
+contains Stage B1 code commit 28748c717e83b868ae58957c04bcd9dbe1c23e1b. Record
+the exact HEAD and verify that commit is its ancestor. Keep the existing 350 ms
+status period, UDP 14653, hover 0.62 and explicit loopback. Archive the ZIP,
+sidecar SHA256, manifest, per-scenario sil_flight.log, exact HEAD and
 before/after worktree state. A nominal run must not spuriously latch either
 navigation capability. H723 target/HIL/WCET/flight remain NOT_RUN.
 

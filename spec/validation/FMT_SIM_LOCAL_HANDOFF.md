@@ -250,9 +250,9 @@ R34 后 main 修复：
 - **下一步（Owner/控制负责人）**：[#26](https://github.com/hujunjie-hub/Flight/issues/26) 记录接地后约 0.2 m/s、周期约 1.4 s 的旋转水平极限环（导航速度与 FMT 真值一致）。M5 冻结与跟随两种参考语义都复现；接地前静态参考下同样存在，而 2 m 悬停 `hold_error` 只有 0.019–0.028 m。该问题属 M6 近地水平环阻尼/稳定性，需要控制器侧修改与独立复核。不得放宽 M4 的 0.20/0.15 m/s、0.5 m/s²、2 s dwell。
 - 复测命令不变：在干净且与 `origin/main` 同步的 `main` 上运行 `tests/simulation/run_fmt_sim_regression.ps1`，350 ms / UDP 14653 / hover 0.62 / 显式 loopback。Host/CI PASS 不替代原生 FMT-SIM，FMT-SIM 也不替代 B07 实机证据。
 
-### R46 原生 FMT-SIM 复测（main 28748c71）
+### R46 原生 FMT-SIM 复测（latest main，必须包含 Stage B1）
 
-必须在最新 main 61442e10cb3d92a34f070f804e00be531e144025 上执行完整 Land → Return → Mission，不能只跑 Mission 单场景。R45 的 ada6bd65 结果是传输修复后的有效诊断证据，但不是 Stage B1 代码基线。
+必须在最新 main 上执行完整 Land → Return → Mission，不能只跑 Mission 单场景。运行前记录精确 HEAD，并确认 Stage B1 代码提交 28748c717e83b868ae58957c04bcd9dbe1c23e1b 是当前 HEAD 的祖先。R45 的 ada6bd65 结果是传输修复后的有效诊断证据，但不是 Stage B1 代码基线。
 
 **本机一键执行：**
 
@@ -261,6 +261,8 @@ git fetch origin
 git switch main
 git pull --ff-only origin main
 git rev-parse HEAD
+git merge-base --is-ancestor 28748c717e83b868ae58957c04bcd9dbe1c23e1b HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Current main does not contain the Stage B1 code commit' }
 git status --short
 pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1
 ~~~

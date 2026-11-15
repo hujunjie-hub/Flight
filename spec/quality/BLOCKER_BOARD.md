@@ -1,4 +1,4 @@
-# Flight M5-06 阻塞项视图（2026-11-15 / main 61442e10）
+# Flight M5-06 阻塞项视图（2026-11-15 / main 含 Stage B1）
 
 > **2026-11-13 MR-009 R31 内部预审 CI 快照（代码/证明基线 8dcb60b3ac18e6a763c939d3e810984092cdd321）**：Host validation #43446380866（6/6）、M6/M7 #43446380836（5/5）、M7 #43446380724（2/2）全部 SUCCESS。M5 Host regression、M5 ASan/UBSan、MR-009 focused、S06-099/S06-107、Spec Audit、生产 ABI、18 mutation FP audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer 均 PASS。
 
@@ -183,4 +183,4 @@ Current-main CI on `3270cff5aec26e3ae0717c62d2d78e9f30752020`: Host [#4359370173
 | #26 | OPEN / S1 | M6 近地水平极限环及生产阻尼独立审查未完成；R45 测试夹具参数不等于生产参数批准 |
 | #29 | OPEN / Stage B1 implemented | R41 直接 FMT-SIM 触发由 UDP 帧覆盖定位并修复；main 28748c71 加入 5 连续 NIS 拒绝后 position/velocity 能力锁存撤销；R46 exact-main 待复测；Stage B2 受控重新对准仍开放 |
 
-Stage B1 代码提交 28748c717e83b868ae58957c04bcd9dbe1c23e1b 的 CI：Host #43667830819 7/7、M6/M7 #43667830805 5/5、M7 #43667830814 2/2 SUCCESS；文档同步 main HEAD 为 61442e10cb3d92a34f070f804e00be531e144025。R45 原生 FMT-SIM 在 ada6bd65 运行，不能代替新 HEAD 的 R46。H723 实机、物理 HIL、WCET/RTA、栈水位与飞行仍 NOT_RUN。
+Stage B1 代码提交 28748c717e83b868ae58957c04bcd9dbe1c23e1b 的 CI：Host #43667830819 7/7、M6/M7 #43667830805 5/5、M7 #43667830814 2/2 SUCCESS。后续文档提交会继续推进 main；R46 必须拉取最新 main，并在 manifest 中记录精确 HEAD、确认 28748c71 是其祖先。R45 原生 FMT-SIM 在 ada6bd65 运行，不能代替 R46。H723 实机、物理 HIL、WCET/RTA、栈水位与飞行仍 NOT_RUN。
