@@ -29,6 +29,48 @@ def _ground_control_root() -> Path:
 DEFAULT_OUTPUT = (_ground_control_root() / "src/FirmwarePlugin/Flight"
                   / "FlightParameterFactMetaData.json")
 
+ALLOWED_VEHICLE_FAMILIES = {"MULTIROTOR", "FIXED_WING", "VTOL", "ROVER", "GROUND"}
+ALLOWED_TUNING_POLICIES = {"READ_ONLY", "GROUND_ADJUSTABLE", "ONLINE_ADJUSTABLE", "FLIGHT_RESTRICTED"}
+ALLOWED_UPDATE_POLICIES = {"IMMEDIATE", "FIRMWARE_CONFIRMATION", "REBOOT_REQUIRED", "OFFLINE_ONLY"}
+
+
+def _model_descriptor(model_config: dict) -> dict:
+    vehicle_family = model_config.get("vehicle_family")
+    model_variants = model_config.get("model_variants")
+    control_law = model_config.get("control_law")
+    profile = model_config.get("profile")
+    if vehicle_family not in ALLOWED_VEHICLE_FAMILIES:
+        raise ValueError(f"unsupported or missing vehicle_family: {vehicle_family!r}")
+    if (not isinstance(model_variants, list) or not model_variants or
+            any(not isinstance(value, str) or not value.strip() for value in model_variants) or
+            len(set(model_variants)) != len(model_variants) or profile not in model_variants):
+        raise ValueError("model_variants must be a unique non-empty list containing the active profile")
+    if not isinstance(control_law, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]*", control_law):
+        raise ValueError(f"unsupported or missing control_law: {control_law!r}")
+    return {
+        "vehicleFamily": vehicle_family,
+        "modelVariants": model_variants,
+        "controlLaw": control_law,
+    }
+
+
+def _parameter_policy(item: dict, reboot_required) -> tuple[str, str, list, list]:
+    writable = item.get("writable")
+    if type(writable) is not bool:
+        raise ValueError(f"writable must be a boolean for {item.get('name', '<unnamed>')}")
+    tuning_policy = "GROUND_ADJUSTABLE" if writable else "READ_ONLY"
+    update_policy = "REBOOT_REQUIRED" if reboot_required is True else "FIRMWARE_CONFIRMATION"
+    dependencies = item.get("dependencies", [])
+    validation_rules = item.get("validationRules", [])
+    if (not isinstance(dependencies, list) or
+            any(not isinstance(value, str) or not value.strip() for value in dependencies) or
+            len(set(dependencies)) != len(dependencies)):
+        raise ValueError(f"dependencies must be a unique list of parameter names for {item.get('name', '<unnamed>')}")
+    if not isinstance(validation_rules, list) or any(not isinstance(value, dict) for value in validation_rules):
+        raise ValueError(f"validationRules must be a list of rule objects for {item.get('name', '<unnamed>')}")
+    return tuning_policy, update_policy, dependencies, validation_rules
+
+
 DOMAIN_BY_GROUP = {
     "机体模型": "VEHICLE_MODEL",
     "MPC 权重": "CONTROL",
@@ -82,6 +124,7 @@ def validate_profile_alignment(catalog: dict, model_config: dict,
 
 def build_parameter_document(catalog: dict, model_config: dict) -> dict:
     profile = model_config["profile"]
+    descriptor = _model_descriptor(model_config)
     parameters = []
     for item in catalog["parameters"]:
         # Only the live controller tuning subset and model mass are editable
@@ -109,6 +152,15 @@ def build_parameter_document(catalog: dict, model_config: dict) -> dict:
             "modelProfiles": [profile],
         }
         reboot_required = _declared_reboot_requirement(item)
+        tuning_policy, update_policy, dependencies, validation_rules = _parameter_policy(item, reboot_required)
+        parameter.update(descriptor)
+        parameter.update({
+            "tuningPolicy": tuning_policy,
+            "updatePolicy": update_policy,
+            "dependencies": dependencies,
+            "validationRules": validation_rules,
+            "readOnly": tuning_policy == "READ_ONLY",
+        })
         if reboot_required is not None:
             parameter["rebootRequired"] = reboot_required
         parameters.append(parameter)
@@ -128,10 +180,16 @@ def build_parameter_document(catalog: dict, model_config: dict) -> dict:
         "decimalPlaces": 1,
         "domain": "SIMULATION",
         "modelProfiles": [profile],
+        **descriptor,
+        "tuningPolicy": "GROUND_ADJUSTABLE",
+        "updatePolicy": "FIRMWARE_CONFIRMATION",
+        "dependencies": [],
+        "validationRules": [],
+        "readOnly": False,
     })
 
     return {
-        "version": 1,
+        "version": 2,
         "source": "middleware/protocol/mavlink/parameters/ground_parameters.json",
         "sha256": catalog["sha256"],
         "modelProfiles": [profile],
@@ -167,8 +225,10 @@ def build_model_catalog_document(
         display_name = f"{model_config['profile']} · 尚未通过硬件验证"
 
     parameters = parameter_document["parameters"]
+    descriptor = _model_descriptor(model_config)
     profile = {
         "id": model_config["profile"],
+        **descriptor,
         "displayName": display_name,
         "status": profile_status,
         "hardwareEligible": hardware_eligible,
@@ -181,7 +241,7 @@ def build_model_catalog_document(
         "parameterNames": [item["name"] for item in parameters],
     }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "source": {
             "repository": "hujunjie-hub/Flight",
             "parameterCatalog": {
