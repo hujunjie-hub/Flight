@@ -1426,10 +1426,10 @@ int main(int argc, char **argv)
   if (fmt_online)
     sensor_imu_use_external_source(true);
 
-  /* Leave enough simulated time for the bounded contact probe and the
-   * unchanged 2 s LandDetector dwell. This changes only the scenario horizon,
-   * not any velocity, contact, ACK, or disarm acceptance threshold. */
-  unsigned duration_ms = mission_scenario ? 44000u : fmt_online ? 32000u : 8000u;
+  /* Mission includes two waypoints, the outbound-to-Home handoff and a
+   * horizontal settle before descent. Leave time for the final descent,
+   * contact probe and 2 s LandDetector dwell after the longer approach. */
+  unsigned duration_ms = mission_scenario ? 56000u : fmt_online ? 32000u : 8000u;
 #ifdef FLIGHT_GROUND_STATION
   if (ground_online)
     duration_ms = 24u * 60u * 60u * 1000u;
