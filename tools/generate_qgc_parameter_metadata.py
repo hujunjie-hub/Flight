@@ -19,9 +19,6 @@ ESTIMATOR_CONFIG = ROOT / "config/estimator_tuning.yaml"
 DEFAULT_OUTPUT = (ROOT.parent / "FMT_GroundControl/src/FirmwarePlugin/Flight"
                   / "FlightParameterFactMetaData.json")
 DEFAULT_CATALOG_OUTPUT = DEFAULT_OUTPUT.with_name("FlightVehicleModelCatalog.json")
-DEFAULT_UNREGISTERED_OUTPUT = DEFAULT_OUTPUT.with_name(
-    "FlightParameterFactMetaData-Unregistered.json"
-)
 
 DOMAIN_BY_GROUP = {
     "机体模型": "VEHICLE_MODEL",
@@ -175,15 +172,6 @@ def build_model_catalog_document(
     }
 
 
-def build_unregistered_metadata_document() -> dict:
-    return {
-        "version": 1,
-        "source": "No registered Flight model profile; intentionally empty metadata.",
-        "modelProfiles": [],
-        "parameters": [],
-    }
-
-
 def _write_json(path: Path, document: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -196,7 +184,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--catalog-output", type=Path, default=DEFAULT_CATALOG_OUTPUT)
-    parser.add_argument("--unregistered-output", type=Path, default=DEFAULT_UNREGISTERED_OUTPUT)
     parser.add_argument("--model-config", type=Path, default=MODEL_CONFIG)
     parser.add_argument("--controller-config", type=Path, default=CONTROLLER_CONFIG)
     parser.add_argument("--estimator-config", type=Path, default=ESTIMATOR_CONFIG)
@@ -221,11 +208,9 @@ def main() -> None:
 
     _write_json(arguments.output, parameter_document)
     _write_json(arguments.catalog_output, model_catalog)
-    _write_json(arguments.unregistered_output, build_unregistered_metadata_document())
     print(
         f"wrote {len(parameter_document['parameters'])} parameter entries, "
-        f"{len(model_catalog['profiles'])} model profiles, and an empty "
-        f"unregistered metadata catalog"
+        f"{len(model_catalog['profiles'])} model profiles"
     )
 
 

@@ -6,8 +6,9 @@ import unittest
 from tools.generate_qgc_parameter_metadata import (
     build_model_catalog_document,
     build_parameter_document,
-    build_unregistered_metadata_document,
     validate_profile_alignment,
+    _estimator_profile,
+    _estimator_status,
 )
 
 
@@ -91,10 +92,10 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
         self.assertTrue(catalog["profiles"][0]["hardwareEligible"])
         self.assertEqual(catalog["profiles"][0]["parameterWriteScope"], "HARDWARE_VALIDATED")
 
-    def test_unregistered_metadata_is_empty(self):
-        document = build_unregistered_metadata_document()
-        self.assertEqual(document["modelProfiles"], [])
-        self.assertEqual(document["parameters"], [])
+    def test_estimator_yaml_profile_and_status_are_parsed(self):
+        text = "schema_version: 1\nprofile: QUAD_X4\nstatus: DRAFT_PENDING_DATASET\n"
+        self.assertEqual(_estimator_profile(text), "QUAD_X4")
+        self.assertEqual(_estimator_status(text), "DRAFT_PENDING_DATASET")
 
 
 if __name__ == "__main__":
