@@ -139,6 +139,10 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
         catalog["parameters"][0]["dependencies"] = ["CTL_RATE_KP_X"]
         catalog["parameters"][0]["validationRules"] = [
             {"type": "GREATER_THAN", "value": 0.5},
+            {"type": "GREATER_THAN_OR_EQUAL", "value": 0.5},
+            {"type": "LESS_THAN", "value": 9.5},
+            {"type": "LESS_THAN_OR_EQUAL", "value": 10.0},
+            {"type": "MULTIPLE_OF", "value": 0.5},
             {"type": "REQUIRES_PARAMETER_VALUE", "parameter": "CTL_RATE_KP_X", "value": 1.0},
         ]
         document = build_parameter_document(catalog, self.model)
