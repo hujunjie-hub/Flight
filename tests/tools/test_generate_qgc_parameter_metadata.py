@@ -28,6 +28,9 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
                     "maximum": 50.0,
                     "value": 1.5,
                     "writable": True,
+                    "file": "vehicle_model.yaml",
+                    "path": ["mass_kg"],
+                    "kind": "scalar",
                 },
                 {
                     "name": "CTL_RATE_KP_X",
@@ -39,6 +42,9 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
                     "maximum": 20.0,
                     "value": 0.12,
                     "writable": True,
+                    "file": "controller_tuning.yaml",
+                    "path": ["inner_loop", "rate_kp_nm_per_radps", 0],
+                    "kind": "vector",
                 },
             ],
         }
@@ -68,6 +74,10 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
         self.assertEqual(parameters[0]["updatePolicy"], "FIRMWARE_CONFIRMATION")
         self.assertEqual(parameters[0]["dependencies"], [])
         self.assertEqual(parameters[0]["validationRules"], [])
+        self.assertEqual(parameters[0]["sourceFile"], "vehicle_model.yaml")
+        self.assertEqual(parameters[0]["sourcePath"], "mass_kg")
+        self.assertEqual(parameters[0]["sourceKind"], "scalar")
+        self.assertEqual(parameters[1]["sourcePath"], "inner_loop.rate_kp_nm_per_radps[0]")
 
     def test_reboot_requirement_is_unknown_unless_source_declares_it(self):
         self.assertNotIn("rebootRequired", self.parameter_document["parameters"][0])
@@ -101,6 +111,13 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
         parameter = document["parameters"][1]
         self.assertEqual(parameter["tuningPolicy"], "READ_ONLY")
         self.assertTrue(parameter["readOnly"])
+
+    def test_source_path_must_be_explicit_and_well_formed(self):
+        catalog = dict(self.catalog)
+        catalog["parameters"] = [dict(item) for item in self.catalog["parameters"]]
+        catalog["parameters"][0]["path"] = ["outer_loop", ""]
+        with self.assertRaises(ValueError):
+            build_parameter_document(catalog, self.model)
 
     def test_unknown_parameter_dependencies_are_rejected(self):
         catalog = dict(self.catalog)
