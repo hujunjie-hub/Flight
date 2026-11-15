@@ -130,7 +130,8 @@ if ($LASTEXITCODE -ne 0) { throw "Git Bundle list-heads failed." }
 $headRef = "$head HEAD"
 $branchRef = "$head refs/heads/$branch"
 if (($bundleRefs -notcontains $headRef) -or ($bundleRefs -notcontains $branchRef)) {
-    throw "Git Bundle must contain exact refs: '$headRef' and '$branchRef'. Found: $($bundleRefs -join '; ')"
+    $bundleRefList = $bundleRefs -join "; "
+    throw ("Git Bundle must contain exact refs: '{0}' and '{1}'. Found: {2}" -f $headRef, $branchRef, $bundleRefList)
 }
 $bundleHash = (Get-FileHash -LiteralPath $bundlePath -Algorithm SHA256).Hash.ToLowerInvariant()
 
