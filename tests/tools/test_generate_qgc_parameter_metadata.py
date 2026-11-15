@@ -59,6 +59,7 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
     def test_reboot_requirement_is_unknown_unless_source_declares_it(self):
         self.assertNotIn("rebootRequired", self.parameter_document["parameters"][0])
         self.assertNotIn("rebootRequired", self.parameter_document["parameters"][1])
+        self.assertNotIn("rebootRequired", self.parameter_document["parameters"][-1])
 
         catalog = dict(self.catalog)
         catalog["parameters"] = [dict(item) for item in self.catalog["parameters"]]
