@@ -27,6 +27,7 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
                     "minimum": 0.1,
                     "maximum": 50.0,
                     "value": 1.5,
+                    "writable": True,
                 },
                 {
                     "name": "CTL_RATE_KP_X",
@@ -37,6 +38,7 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
                     "minimum": 0.0,
                     "maximum": 20.0,
                     "value": 0.12,
+                    "writable": True,
                 },
             ],
         }
@@ -45,6 +47,9 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
             "status": "SIM_ONLY",
             "source": "Synthetic fixture.",
             "hardware_thrust_curve": "TBD: no hardware calibration",
+            "vehicle_family": "MULTIROTOR",
+            "model_variants": ["QUAD_X4"],
+            "control_law": "MPC_OUTER_SO3_ATTITUDE_RATE_PID",
         }
         self.controller = {"profile": "QUAD_X4", "status": "SIM_ONLY"}
         self.parameter_document = build_parameter_document(self.catalog, self.model)
@@ -55,6 +60,14 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
         self.assertEqual(parameters[1]["domain"], "CONTROL")
         self.assertEqual(parameters[0]["modelProfiles"], ["QUAD_X4"])
         self.assertEqual(self.parameter_document["modelProfiles"], ["QUAD_X4"])
+        self.assertEqual(self.parameter_document["version"], 2)
+        self.assertEqual(parameters[0]["vehicleFamily"], "MULTIROTOR")
+        self.assertEqual(parameters[0]["modelVariants"], ["QUAD_X4"])
+        self.assertEqual(parameters[0]["controlLaw"], "MPC_OUTER_SO3_ATTITUDE_RATE_PID")
+        self.assertEqual(parameters[0]["tuningPolicy"], "GROUND_ADJUSTABLE")
+        self.assertEqual(parameters[0]["updatePolicy"], "FIRMWARE_CONFIRMATION")
+        self.assertEqual(parameters[0]["dependencies"], [])
+        self.assertEqual(parameters[0]["validationRules"], [])
 
     def test_reboot_requirement_is_unknown_unless_source_declares_it(self):
         self.assertNotIn("rebootRequired", self.parameter_document["parameters"][0])
@@ -68,6 +81,33 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
         document = build_parameter_document(catalog, self.model)
         self.assertIs(document["parameters"][0]["rebootRequired"], False)
         self.assertIs(document["parameters"][1]["rebootRequired"], True)
+        self.assertEqual(document["parameters"][1]["updatePolicy"], "REBOOT_REQUIRED")
+
+    def test_model_descriptor_is_required_and_profile_scoped(self):
+        model = dict(self.model)
+        model.pop("control_law")
+        with self.assertRaises(ValueError):
+            build_parameter_document(self.catalog, model)
+
+        model = dict(self.model, model_variants=["HEX_X6"])
+        with self.assertRaises(ValueError):
+            build_parameter_document(self.catalog, model)
+
+    def test_read_only_source_parameter_gets_read_only_policy(self):
+        catalog = dict(self.catalog)
+        catalog["parameters"] = [dict(item) for item in self.catalog["parameters"]]
+        catalog["parameters"][1]["writable"] = False
+        document = build_parameter_document(catalog, self.model)
+        parameter = document["parameters"][1]
+        self.assertEqual(parameter["tuningPolicy"], "READ_ONLY")
+        self.assertTrue(parameter["readOnly"])
+
+    def test_invalid_parameter_policy_metadata_is_rejected(self):
+        catalog = dict(self.catalog)
+        catalog["parameters"] = [dict(item) for item in self.catalog["parameters"]]
+        catalog["parameters"][0]["dependencies"] = ["", "CTL_RATE_KP_X"]
+        with self.assertRaises(ValueError):
+            build_parameter_document(catalog, self.model)
 
     def test_invalid_reboot_requirement_is_rejected(self):
         catalog = dict(self.catalog)
@@ -97,6 +137,10 @@ class QgcParameterMetadataGeneratorTests(unittest.TestCase):
         self.assertEqual(profile["status"], "SIM_ONLY")
         self.assertFalse(profile["hardwareEligible"])
         self.assertEqual(profile["parameterWriteScope"], "SIL_ONLY")
+        self.assertEqual(catalog["schema_version"], 2)
+        self.assertEqual(profile["vehicleFamily"], "MULTIROTOR")
+        self.assertEqual(profile["modelVariants"], ["QUAD_X4"])
+        self.assertEqual(profile["controlLaw"], "MPC_OUTER_SO3_ATTITUDE_RATE_PID")
         self.assertIn("SIMULATION", profile["parameterDomains"])
 
     def test_hardware_eligibility_requires_all_three_validated_sources(self):
