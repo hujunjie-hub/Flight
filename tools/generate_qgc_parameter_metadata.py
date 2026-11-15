@@ -93,7 +93,8 @@ def _parameter_policy(item: dict, reboot_required):
     dependencies = item.get("dependencies", [])
     validation_rules = item.get("validationRules", [])
     if (not isinstance(dependencies, list) or
-            any(not isinstance(value, str) or not value.strip() for value in dependencies) or
+            any(not isinstance(value, str) or not value.strip() or value != value.strip()
+                for value in dependencies) or
             len(set(dependencies)) != len(dependencies)):
         raise ValueError(f"dependencies must be a unique list of parameter names for {item.get('name', '<unnamed>')}")
     if not isinstance(validation_rules, list):
