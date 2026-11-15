@@ -56,7 +56,60 @@ $aheadCountText = Get-GitValue -GitArgs @("rev-list", "--count", "$remoteRef..HE
 $behindCountText = Get-GitValue -GitArgs @("rev-list", "--count", "HEAD..$remoteRef")
 $upstream = Get-GitValue -GitArgs @("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
 if ($branch -ne $expectedBranch) { throw "Unexpected branch: $branch; archive requires main." }
-if ($head -notmatch '^[0-9a-f]{40}
+if ($head -notmatch '^[0-9a-f]{40}$') { throw "Unable to resolve HEAD: $head" }
+if ($remoteHead -notmatch '^[0-9a-f]{40}$') { throw "Unable to resolve $remoteRef: $remoteHead" }
+if ($aheadCountText -notmatch '^\d+$' -or $behindCountText -notmatch '^\d+$') {
+    throw "Unable to compute main ahead/behind counts."
+}
+if ($head -ne $remoteHead -or $aheadCountText -ne "0" -or $behindCountText -ne "0") {
+    throw "Archive requires exact main sync: HEAD=$head origin/main=$remoteHead ahead=$aheadCountText behind=$behindCountText"
+}
+if ($upstream -ne $remoteRef) { throw "main must track origin/main; found upstream '$upstream'." }
+$worktreeBefore = @(& git -C $repoRoot status --porcelain=v2 --untracked-files=all 2>&1)
+if ($LASTEXITCODE -ne 0) { throw "Unable to inspect the working tree before archiving." }
+if ($worktreeBefore.Count -ne 0) {
+    throw "Archive requires a clean worktree before metadata preparation; found $($worktreeBefore.Count) entries."
+}
+
+# The parameter catalog must already be generated from the authoritative YAML.
+# Check is read-only; archive creation never silently mutates generated files.
+$catalogOutput = & python (Join-Path $repoRoot "tools/generate_ground_config.py") --check 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "Generated parameter catalog is stale. Run 'python tools/generate_ground_config.py', commit the generated catalog, then retry. Details: $($catalogOutput -join [Environment]::NewLine)"
+}
+
+if ([string]::IsNullOrWhiteSpace($ValidatedCodeCommit)) { $ValidatedCodeCommit = $head }
+if ($ValidatedCodeCommit -notmatch '^[0-9a-f]{40}$') {
+    throw "ValidatedCodeCommit must be a full 40-character Git SHA."
+}
+& git -C $repoRoot cat-file -e "$ValidatedCodeCommit^{commit}" 2>$null
+if ($LASTEXITCODE -ne 0) { throw "ValidatedCodeCommit does not exist locally: $ValidatedCodeCommit" }
+& git -C $repoRoot merge-base --is-ancestor $ValidatedCodeCommit $head
+if ($LASTEXITCODE -ne 0) { throw "ValidatedCodeCommit must be an ancestor of archive HEAD." }
+
+# Prepare the in-ZIP acceptance manifest before copying evidence.
+$metadataArgs = @(
+    (Join-Path $repoRoot "tools/prepare_archive_metadata.py"),
+    "--repo", $repoRoot,
+    "--manifest", "spec/validation/flight_acceptance_manifest.json",
+    "--run-id", $RunId,
+    "--expected-branch", $expectedBranch,
+    "--validated-code", $ValidatedCodeCommit
+)
+$metadataOutput = & python @metadataArgs 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "Archive metadata preparation failed: $($metadataOutput -join [Environment]::NewLine)"
+}
+
+# The metadata preparer is allowed to change only the acceptance manifest.
+$changedPaths = @(& git -C $repoRoot diff --name-only HEAD)
+$stagedPaths = @(& git -C $repoRoot diff --cached --name-only)
+$untrackedPaths = @(& git -C $repoRoot ls-files --others --exclude-standard)
+if ($LASTEXITCODE -ne 0) { throw "Unable to verify archive metadata working-tree changes." }
+if ($changedPaths.Count -ne 1 -or $changedPaths[0] -ne "spec/validation/flight_acceptance_manifest.json" -or
+    $stagedPaths.Count -ne 0 -or $untrackedPaths.Count -ne 0) {
+    throw "Unexpected worktree changes after metadata preparation. Only spec/validation/flight_acceptance_manifest.json may change."
+}
 New-Item -ItemType Directory -Force -Path $runDir | Out-Null
 
 $copyPaths = @(
