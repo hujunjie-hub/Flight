@@ -313,7 +313,7 @@ git fetch origin --prune
 git switch main
 git pull --ff-only origin main
 python tools/generate_ground_config.py --check
-pwsh -NoProfile -File tools/archive_validation_run.ps1 -RunId ENG07-R46-20261115-7d847340 -ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278
+pwsh -NoProfile -File tools/archive_validation_run.ps1 -RunId ENG07-R46-FORMAL-20261115-7d847340 -ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278 -InputEvidenceDirectory "work/validation/archives/eng07-r46-20261115-7d847340"
 ~~~
 
 归档通过后，回传 ZIP、sidecar SHA256、archive report 和逐场景原始日志。先核对两次执行是否有各自完整的状态流、末端状态与失败帧；只有证据完整后，才决定是否对 Return 垂向加速度单独建立回放/单元测试并重跑。任何诊断均不得修改 350 ms、终端 ACK、DISARM、arm_state、着陆速度、dwell 或安全授权阈值。

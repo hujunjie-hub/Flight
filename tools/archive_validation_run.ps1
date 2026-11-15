@@ -4,7 +4,8 @@ param(
     [string]$CiRunUrl = "",
     [string]$InputBaselineCodeCommit = "",
     [string]$InputBaselineArchiveHead = "",
-    [string]$ValidatedCodeCommit = ""
+    [string]$ValidatedCodeCommit = "",
+    [string]$InputEvidenceDirectory = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -92,6 +93,37 @@ foreach ($relative in $copyPaths) {
     New-Item -ItemType Directory -Force -Path $destinationParent | Out-Null
     Copy-Item -LiteralPath $source -Destination $destination -Recurse -Force
     $copied += $relative
+}
+
+# Import an owner-preserved run folder as evidence. The manual folder is not
+# itself the formal archive; its contents are copied into the new archive.
+if (-not [string]::IsNullOrWhiteSpace($InputEvidenceDirectory)) {
+    $inputCandidate = if ([System.IO.Path]::IsPathRooted($InputEvidenceDirectory)) {
+        $InputEvidenceDirectory
+    } else {
+        Join-Path $repoRoot $InputEvidenceDirectory
+    }
+    $inputFull = (Resolve-Path -LiteralPath $inputCandidate).Path
+    $repoRootPrefix = [System.IO.Path]::GetFullPath($repoRoot).TrimEnd([System.IO.Path]::DirectorySeparatorChar) +
+        [System.IO.Path]::DirectorySeparatorChar
+    if (-not $inputFull.StartsWith($repoRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "InputEvidenceDirectory must resolve inside the Flight repository."
+    }
+    if ($inputFull -eq [System.IO.Path]::GetFullPath($runDir)) {
+        throw "InputEvidenceDirectory cannot be the archive output directory."
+    }
+    $manualFiles = @(Get-ChildItem -LiteralPath $inputFull -Force -File -Recurse)
+    if ($manualFiles.Count -eq 0) { throw "InputEvidenceDirectory contains no files: $inputFull" }
+    $unsafeManualFiles = @($manualFiles | Where-Object {
+        $_.FullName -match '(^|[\\/])(\.env($|\.)|secrets?($|[\\/])|credentials?($|[\\/]))|\.(pem|p12|pfx|key)$'
+    })
+    if ($unsafeManualFiles.Count -gt 0) {
+        throw "InputEvidenceDirectory contains secret-like paths; remove them before archiving."
+    }
+    $manualDestination = Join-Path $runDir "imported_manual_evidence"
+    New-Item -ItemType Directory -Force -Path $manualDestination | Out-Null
+    Get-ChildItem -LiteralPath $inputFull -Force | Copy-Item -Destination $manualDestination -Recurse -Force
+    $copied += "imported_manual_evidence"
 }
 
 # Preserve local tracked edits as a binary-capable patch. Inspect the archive

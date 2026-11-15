@@ -108,5 +108,5 @@ pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $si
 
 ```powershell
 python tools/generate_ground_config.py --check
-pwsh -NoProfile -File tools/archive_validation_run.ps1 -RunId ENG07-R46-20261115-7d847340 -ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278
+pwsh -NoProfile -File tools/archive_validation_run.ps1 -RunId ENG07-R46-FORMAL-20261115-7d847340 -ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278 -InputEvidenceDirectory "work/validation/archives/eng07-r46-20261115-7d847340"
 ```

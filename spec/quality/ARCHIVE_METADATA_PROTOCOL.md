@@ -82,8 +82,9 @@ Before archive staging:
 ```bash
 python tools/generate_ground_config.py --check
 pwsh -NoProfile -File tools/archive_validation_run.ps1 \
-  -RunId ENG07-R46-YYYYMMDD \
-  -ValidatedCodeCommit <40-hex-tested-code-commit>
+  -RunId ENG07-R46-FORMAL-YYYYMMDD \
+  -ValidatedCodeCommit <40-hex-tested-code-commit> \
+  -InputEvidenceDirectory work/validation/archives/<manual-run-folder>
 ```
 
 After the archive is built and the external report exists:
