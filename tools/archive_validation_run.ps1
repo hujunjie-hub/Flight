@@ -436,7 +436,7 @@ if ($LASTEXITCODE -ne 0) { throw "Git Bundle list-heads failed." }
 $headRef = "$head HEAD"
 $branchRef = "$head refs/heads/$branch"
 if (($bundleRefs -notcontains $headRef) -or ($bundleRefs -notcontains $branchRef)) {
-    throw "Git Bundle must contain exact refs: '$headRef' and '$branchRef'. Found: $($bundleRefs -join '; ')"
+    throw "Git Bundle must contain exact HEAD and branch refs; inspect bundle list-heads output."
 }
 $bundleHash = (Get-FileHash -LiteralPath $bundlePath -Algorithm SHA256).Hash.ToLowerInvariant()
 
@@ -713,7 +713,7 @@ if ($LASTEXITCODE -ne 0) { throw "Git Bundle list-heads failed." }
 $headRef = "$head HEAD"
 $branchRef = "$head refs/heads/$branch"
 if (($bundleRefs -notcontains $headRef) -or ($bundleRefs -notcontains $branchRef)) {
-    throw "Git Bundle must contain exact refs: '$headRef' and '$branchRef'. Found: $($bundleRefs -join '; ')"
+    throw "Git Bundle must contain exact HEAD and branch refs; inspect bundle list-heads output."
 }
 $bundleHash = (Get-FileHash -LiteralPath $bundlePath -Algorithm SHA256).Hash.ToLowerInvariant()
 
@@ -1003,7 +1003,7 @@ if ($LASTEXITCODE -ne 0) { throw "Git Bundle list-heads failed." }
 $headRef = "$head HEAD"
 $branchRef = "$head refs/heads/$branch"
 if (($bundleRefs -notcontains $headRef) -or ($bundleRefs -notcontains $branchRef)) {
-    throw "Git Bundle must contain exact refs: '$headRef' and '$branchRef'. Found: $($bundleRefs -join '; ')"
+    throw "Git Bundle must contain exact HEAD and branch refs; inspect bundle list-heads output."
 }
 $bundleHash = (Get-FileHash -LiteralPath $bundlePath -Algorithm SHA256).Hash.ToLowerInvariant()
 
