@@ -57,7 +57,7 @@ $behindCountText = Get-GitValue -GitArgs @("rev-list", "--count", "HEAD..$remote
 $upstream = Get-GitValue -GitArgs @("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
 if ($branch -ne $expectedBranch) { throw "Unexpected branch: $branch; archive requires main." }
 if ($head -notmatch '^[0-9a-f]{40}$') { throw "Unable to resolve HEAD: $head" }
-if ($remoteHead -notmatch '^[0-9a-f]{40}$') { throw "Unable to resolve $remoteRef: $remoteHead" }
+if ($remoteHead -notmatch '^[0-9a-f]{40}$') { throw "Unable to resolve ${remoteRef}: $remoteHead" }
 if ($aheadCountText -notmatch '^\d+$' -or $behindCountText -notmatch '^\d+$') {
     throw "Unable to compute main ahead/behind counts."
 }
