@@ -257,14 +257,19 @@ R34 后 main 修复：
 **本机一键执行：**
 
 ~~~powershell
-git fetch origin
+git fetch origin --prune
 git switch main
+git branch --set-upstream-to=origin/main main
 git pull --ff-only origin main
-git rev-parse HEAD
+$head = (git rev-parse HEAD).Trim()
+$remote = (git rev-parse origin/main).Trim()
+if ($head -ne $remote) { throw 'Local HEAD does not match origin/main' }
 git merge-base --is-ancestor 28748c717e83b868ae58957c04bcd9dbe1c23e1b HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Current main does not contain the Stage B1 code commit' }
 git status --short
-pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1
+$sim = (Resolve-Path 'build/validation/sim/fmt_release/FMT_SIM/Binaries/Win64/FMT_SIM.exe').Path
+pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $sim -FmtHilPort 14653 -FmtStateTimeoutMs 350 -FmtGraphicsAdapter 1 -FmtHover 0.62 -ConfirmLoopbackAddress
+if ($LASTEXITCODE -ne 0) { throw 'R46 native FMT-SIM batch failed; preserve the complete RUN_ID archive' }
 ~~~
 
 保持既有正式参数：350 ms 状态周期、UDP 14653、hover 0.62、显式 loopback。不得修改接地、近地速度、落点、dwell、DISARM、超时或授权门限。
