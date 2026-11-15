@@ -732,6 +732,7 @@ Sensor Integrity Manager 是 HEALTH & DIAGNOSTICS 的一个服务，不新增业
 5. 若只有“模型预测与观测不一致”，原因未定，保持 SUSPECT/DEGRADED 并输出证据；不得过早隔离。
 6. 多传感器一致也要检查共因：共用电源、天线、时钟、安装结构、总线、温度和软件路径。
 7. 对同一传感器的观测拒绝次数、连续时间和源级健康状态分开统计。
+8. QUAD_X4 的 GNSS position/velocity NIS 连续拒绝分别计数；同一观测类型达到 5 次连续拒绝后，M3 仅锁存撤销对应的 NavigationCapability 位置/速度有效位，solution_state 变为 DEGRADED。该动作不是 SensorUsePolicy=REJECT，也不把 GNSS 源标记为 FAILED；NIS 门限不变，不自动接纳争议观测。锁存只由现有授权的显式估计器重置/重新对准清除。
 
 ### 5. 状态机
 
@@ -1476,7 +1477,7 @@ BMP585首版压力高度固定h=44330.77*(1-(p/101325)^(0.1902632))m，p为Pa且
 
 ### 8. Checkpoint固定记录与回放量化边界
 
-Checkpoint内部持久历史记录固定2304B（非公共网络格式），LE：offset0 schema:u16/flags:u16；4 generation:u32；8 sample_time:u64；16 imu_sequence:u32；20 fusion_revision:u32；24 journal_cursor:u32；28 calibration_version:u32；32 policy_revision:u32；36 previous_imu_sequence:u32；40 time_epoch:u32；44 state_epoch:u32；48 origin_id:u32；52 mapping_epoch:u32；56 boot_id:u64；64起23个double名义量顺序LLH3/vNED3/q_wxyz4/bg3/ba3/sg3/sa3/bh1（184B）；248起253个double P上三角（2024B）；2272..2303保留为0。previous_imu_sequence必须仍在delta ring，否则该checkpoint不可用。策略/标定版本引用在历史有效期间不可回收，容量不足拒绝新辅助job。δx恒为0，不偷偷序列化另一份22维向量。
+Checkpoint内部持久历史记录固定2304B（非公共网络格式），LE：offset0 schema:u16/flags:u16；4 generation:u32；8 sample_time:u64；16 imu_sequence:u32；20 fusion_revision:u32；24 journal_cursor:u32；28 calibration_version:u32；32 policy_revision:u32；36 previous_imu_sequence:u32；40 time_epoch:u32；44 state_epoch:u32；48 origin_id:u32；52 mapping_epoch:u32；56 boot_id:u64；64起23个double名义量顺序LLH3/vNED3/q_wxyz4/bg3/ba3/sg3/sa3/bh1（184B）；248起253个double P上三角（2024B）；2272..2303为内部扩展区：offset 2272/2273 分别存 GNSS position/velocity NIS 连续拒绝计数（u8，饱和到5）；其余字节与对齐填充为0。Checkpoint schema version=2，sizeof仍为2304B。previous_imu_sequence必须仍在delta ring，否则该checkpoint不可用。策略/标定版本引用在历史有效期间不可回收，容量不足拒绝新辅助job。δx恒为0，不偷偷序列化另一份22维向量。
 
 最近IMU端点量化需等待左右两端样本均可见，刚到未来端点的观测最多等1100us，计入60ms job deadline。精确半间隔取较早端点；排序键仍用原始sample_time，额外记录chosen_imu_sequence。量化误差≤550us只在原始相邻dt≤1100us时成立；跨gap拒绝。观测恰在checkpoint时刻，先应用checkpoint已含的journal_cursor，再从下一条开始，禁止重复融合边界观测。
 

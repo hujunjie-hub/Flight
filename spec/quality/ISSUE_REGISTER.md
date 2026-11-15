@@ -232,11 +232,11 @@ Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析
 | [#26](https://github.com/hujunjie-hub/Flight/issues/26) | S1 | NEW | M6 近地水平极限环阻断 LANDED；需 M6/MPC 阻尼工作与独立复核 |
 | [#27](https://github.com/hujunjie-hub/Flight/issues/27) | S2 | NEW | 固化证据不可由当前生成器复现（abi_layout 顺序、round3 handoff 检查、memory-budget 对象新鲜度） |
 | [#28](https://github.com/hujunjie-hub/Flight/issues/28) | S2 | NEW | 仅记录在 spec/09 的验收工作流（Bootloader/MAVLink 安全/设置回滚/长航段/故障场景） |
-| #17/#18/#19 | S1 | OPEN / 技术闭合待 #26 | R39 仅剩终端链断言；落点与下降速度指标通过 |
-| #21 | S1 | OPEN | R39 近地下降 0.300/0.293 m/s 通过；整批关闭条件未满足 |
-| #23 | S1 | OPEN / 回归已修 | 1550/JERK 拒绝不再出现；LANDED 受 #26 阻塞 |
-| #24 | S1 | OPEN / 部分有效 | 接地点水平速度下降；LANDED 仍受 #26 阻塞 |
-| #25 | S1 | OPEN / 修复已验证 | RETURN handoff 不再拒绝；等待整批与独立复核 |
+| #17/#18/#19 | S1 | OPEN / R45 三场景 PASS，正式关闭待 R46 | R45 在 ada6bd65 三场景 0 failures；该运行不是 Stage B1 后的 exact-main 复测，仍须 R46 |
+| #21 | S1 | OPEN / R45 指标通过 | R45 三场景近地下降峰值 0.319/0.347/0.322 m/s；R46 exact-main 复测待完成 |
+| #23 | S1 | OPEN / 修复已验证 | R45 未复现 1550/JERK 拒绝；R46 复测及接地闭环证据待完成 |
+| #24 | S1 | OPEN / 部分有效 | R45 三场景通过；仍须 exact-main R46 和独立审查 |
+| #25 | S1 | OPEN / 修复已验证 | R45 未复现 RETURN handoff 拒绝；R46 exact-main 复测与独立复核待完成 |
 
 ## 线上 Issue 映射（本文件末尾）
 
@@ -260,7 +260,7 @@ Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析
 | [#26](https://github.com/hujunjie-hub/Flight/issues/26) | — | M6 近地极限环（R40 新增） |
 | [#27](https://github.com/hujunjie-hub/Flight/issues/27) | — | 固化证据不可复现（R40 新增；对象新鲜度项已修 `dd1ef142`） |
 | [#28](https://github.com/hujunjie-hub/Flight/issues/28) | — | 仅记录在 spec/09 的验收工作流（R40 新增） |
-| [#29](https://github.com/hujunjie-hub/Flight/issues/29) | — | 导航估计与真值发散（R41 新增；已加 SIL 检测器与 M6 fail-closed 门控） |
+| [#29](https://github.com/hujunjie-hub/Flight/issues/29) | — | R41 FMT-SIM 触发路径由 UDP 状态帧覆盖定位并由 ada6bd65 修复；28748c71 加入 5 连续 NIS 拒绝的 M3 fail-closed capability latch，R46 exact-main 复测待完成 |
 | [#30](https://github.com/hujunjie-hub/Flight/issues/30) | — | Bootloader 验收（TEST-V191-BOOT，由 #28 拆分） |
 | [#31](https://github.com/hujunjie-hub/Flight/issues/31) | — | MAVLink 安全验收（TEST-V191-MAVSEC，由 #28 拆分） |
 | [#32](https://github.com/hujunjie-hub/Flight/issues/32) | — | 非安全设置持久化（TEST-V191-PARAM，由 #28 拆分） |
@@ -277,5 +277,19 @@ Owner 在 Windows 本机运行；Agent 负责代码、Host/SIL/CI、归档分析
 - SIL 增加 `ESTIMATOR_DIVERGENCE` 断言与 `[nav] max` 统计（`7fd57508`）：armed 状态下导航与真值持续 500 ms 超过 1.0 m 水平 / 0.8 m 垂直即明确失败。实测在 `t=30610 ms`、`dh=1.37 m`、`pos_std=0.11` 时触发。
 - M6 增加消费端 fail-closed 门控（`7b55218e`）：有效标志下的导航加速度超过 20 m/s²/轴即 `STATUS_MODEL_OUT_OF_DOMAIN`，不再把发散估计转成姿态指令。M6 guard 26→28 checks。
 - memory-budget 拒绝过期对象（`dd1ef142`）：旧对象会报 24 B 而非 264 B 余量；修复后双向验证。
-- 仍缺：估计器侧创新门控与 `position_std` 健康标志（#29 未关闭）；M6 近地极限环（#26）待 #29 可信后重新评估。
-- 2026-11-15 静态定位：#29 的根因是 **NIS 门控无恢复路径**。`quad_core.cpp:699-703` 在 `nis > threshold`（dof1 6.6348966 / dof3 11.3448667）时直接拒绝更新，仓库内没有协方差膨胀、重置或"连续拒绝后重新接受"的任何代码。一旦 INS 漂移，GNSS 位置修正被永久拒绝，而速度观测仍被接受，于是出现"速度跟随真值、位置不动、`pos_std` 单调增长、`valid_mask=0xff`"的签名；`diagnostics_.nis_rejected / last_nis` 已存在但未进入消费端健康判断。
+- R45 已定位并修复 R41 的直接 FMT-SIM 触发因素：UDP 接收端突发报文覆盖状态帧；ada6bd65 改为每个 SIL tick 交付一帧并保留队列。R45 三场景 0 failures、Mission 535 对位置/速度观测无 NIS 拒绝、最大水平偏差 0.055 m。该证据不等于生产 INS 永无 NIS 恢复风险。
+- 28748c71 增加 GNSS position/velocity 独立连续 NIS 拒绝计数（5 次饱和），随 2304 B Checkpoint v2 保存；M3 锁存撤销对应 NavigationCapability 有效位，solution_state=DEGRADED。NIS 门限不变，不自动接受观测，不修改源级 SensorUsePolicy；显式授权 reset/re-alignment 才清除。Stage B2 受控重新对准仍开放，R46 exact-main FMT-SIM 复测待完成。
+
+
+## 2026-11-15 FLIGHT-29 Stage B1 最新状态（main 28748c71）
+
+| 项目 | 状态 | 证据 / 后续 |
+|---|---|---|
+| R41 原生仿真发散触发 | FIXED / LOCALLY VERIFIED | FMT-SIM UDP burst frame overwrite；ada6bd65 单帧交付与队列保留；R45 三场景 0 failures |
+| NIS 连续拒绝计数 | IMPLEMENTED / CI PASS | position/velocity 分开计数、5 次饱和、成功同类观测清零、Checkpoint v2 保持 replay 一致性 |
+| M3 导航能力 fail-closed | IMPLEMENTED / CI PASS | 对应 position/velocity valid bits 锁存撤销，solution_state DEGRADED；不隔离 GNSS source、不自动接受被拒观测 |
+| M4 安全响应 | EXISTING REGRESSION PASS | nav_loss_recovery_dwell；水平位置能力丢失后 Mission PAUSED / AUTO_LAND |
+| R46 原生整批 | NOT_RUN | 必须在 main 28748c717e83b868ae58957c04bcd9dbe1c23e1b 上执行 Land → Return → Mission |
+| Stage B2 受控重新对准 | OPEN | 需要独立源健康证据与地面/DISARMED 授权，不允许空中自动 re-seed |
+
+CI：Host #43667830819（7/7）、M6/M7 #43667830805（5/5）、M7 #43667830814（2/2）全部 SUCCESS。FLIGHT-29 保持 OPEN，不得因 Stage B1 或 R45 通过而关闭。

@@ -250,6 +250,32 @@ R34 后 main 修复：
 - **下一步（Owner/控制负责人）**：[#26](https://github.com/hujunjie-hub/Flight/issues/26) 记录接地后约 0.2 m/s、周期约 1.4 s 的旋转水平极限环（导航速度与 FMT 真值一致）。M5 冻结与跟随两种参考语义都复现；接地前静态参考下同样存在，而 2 m 悬停 `hold_error` 只有 0.019–0.028 m。该问题属 M6 近地水平环阻尼/稳定性，需要控制器侧修改与独立复核。不得放宽 M4 的 0.20/0.15 m/s、0.5 m/s²、2 s dwell。
 - 复测命令不变：在干净且与 `origin/main` 同步的 `main` 上运行 `tests/simulation/run_fmt_sim_regression.ps1`，350 ms / UDP 14653 / hover 0.62 / 显式 loopback。Host/CI PASS 不替代原生 FMT-SIM，FMT-SIM 也不替代 B07 实机证据。
 
-### FLIGHT-29 原生诊断
+### R46 原生 FMT-SIM 复测（main 28748c71）
 
-先在包含 GNSS 融合日志的干净 `main` 上，以 §4 相同参数加 `-Scenario Mission`。该单场景输出用于定位。回传归档中的 `Mission/sil_flight.log`、`manifest.json` 和 ZIP SHA256。合并查看 `[gnss-fusion]`、`[gnss-commit]`、`[settle]` 与 `[nav]`，确认首次偏离真值时最近一次成功提交的 GNSS 位置和速度观测。检查 t≈30 s 接地前的窗口，必要时回溯到返航命令。正式复测仍使用 §4 的三场景入口。
+必须在最新 main 28748c717e83b868ae58957c04bcd9dbe1c23e1b 上执行完整 Land → Return → Mission，不能只跑 Mission 单场景。R45 的 ada6bd65 结果是传输修复后的有效诊断证据，但不是 Stage B1 代码基线。
+
+**本机一键执行：**
+
+~~~powershell
+git fetch origin
+git switch main
+git pull --ff-only origin main
+git rev-parse HEAD
+git status --short
+pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1
+~~~
+
+保持既有正式参数：350 ms 状态周期、UDP 14653、hover 0.62、显式 loopback。不得修改接地、近地速度、落点、dwell、DISARM、超时或授权门限。
+
+**必须回传：**
+- 完整 ZIP 与 sidecar SHA256；
+- manifest.json、逐场景 sil_flight.log；
+- 测试 HEAD、启动前/结束后的 git status；
+- loopback/UDP/350 ms/hover 0.62 参数核对；
+- worktree_stable 与 issue_closure_eligible 的原始判定。
+
+**本轮新增安全行为核对：**
+- 正常三场景不应误触发 NIS latch；如出现连续 NIS 拒绝，记录 position/velocity 各自 streak、最后一次 NIS、valid_mask、NavigationCapability.solution_state 与 FMS 模式变化。
+- 连续 5 次同类 GNSS NIS 拒绝应撤销对应导航位置/速度能力，solution_state=DEGRADED；不应自动接受争议观测，也不应将 GNSS 源级状态直接标为 FAILED。
+- 水平位置能力丢失时，M4 应按既有 nav_loss_recovery_dwell 策略暂停 Mission 并请求 AUTO_LAND；不能放宽现有安全门限。
+- R46 通过仍不等于 H723 实机、物理 HIL、WCET/RTA 或飞行放行。FLIGHT-29 在 R46 和 Stage B2 受控重新对准方案完成前保持 OPEN。

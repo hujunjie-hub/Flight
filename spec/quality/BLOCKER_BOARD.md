@@ -1,12 +1,12 @@
-# Flight M5-06 阻塞项视图（R39）
+# Flight M5-06 阻塞项视图（2026-11-15 / main 28748c71）
 
 > **2026-11-13 MR-009 R31 内部预审 CI 快照（代码/证明基线 8dcb60b3ac18e6a763c939d3e810984092cdd321）**：Host validation #43446380866（6/6）、M6/M7 #43446380836（5/5）、M7 #43446380724（2/2）全部 SUCCESS。M5 Host regression、M5 ASan/UBSan、MR-009 focused、S06-099/S06-107、Spec Audit、生产 ABI、18 mutation FP audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer 均 PASS。
 
-> **当前状态（2026-11-14）**：B01～B04 的本地规范/生产 ABI/安装包锁/默认 Release 链接通过。B05 MR-009 按项目方指示完成技术复核，S06-100～102 Host 与 ASan/UBSan 通过。B06 的 Cortex-M7 专用镜像静态链为 `-O2` 3,576/4,096 B、`-O0` 3,968/4,096 B，均 COMPLETE。B07 实机、WCET/RTA、栈水位、台架 HIL 与飞行仍 NOT_RUN。M5-07 未启动。
+> **当前状态（2026-11-15）**：B01～B04 的本地规范/生产 ABI/安装包锁/默认 Release 链接通过。B05 MR-009 按项目方指示完成技术复核，S06-100～102 Host 与 ASan/UBSan 通过。B06 的 Cortex-M7 专用镜像静态链为 `-O2` 3,576/4,096 B、`-O0` 3,968/4,096 B，均 COMPLETE。B07 实机、WCET/RTA、栈水位、台架 HIL 与飞行仍 NOT_RUN。M5-07 未启动。FLIGHT-29 Stage B1 已加入 M3 连续 NIS 拒绝 fail-closed 能力锁存并通过三组 CI；R46 exact-main 原生 FMT-SIM 复测仍待执行。
 
 > **开放风险**：ICD+M4 余量 264 B（FLIGHT-13）；Release 的工具链枚举属性仍有 228 条链接警告（FLIGHT-14）。下方 B01～B06 的表格保留各原始验证时点。
 
-本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。
+本文件是 `spec/quality/ISSUE_REGISTER.md` 的**派生视图**，不维护第二套状态。以下 R39 动态复测表保留历史测试时点；最新动态状态以末尾 2026-11-15 R45/R46 记录及 ISSUE_REGISTER 为准。
 
 > **ENG-07 R39 诊断证据**。RUN_ID `FMT-SIM-LOCAL-20261114T174058156Z-547f3788`，测试 HEAD `547f37883186c888d786c4293f2a4341d348b994`。main/origin/main 匹配，loopback、UDP 14653、hover 0.62、350 ms 已核对。归档记录工作区启动前干净，结束时有 9 个 ABI 证据文件变更，`worktree_stable=false`、`issue_closure_eligible=false`。ZIP SHA256 `3a09ba6f4e2f7adda930ffb1633f498f3c8bb31f3c1d581ccc8043cdeeb78dfb`。
 >
@@ -169,3 +169,18 @@ R33 后 main 新增生产修复：`419f56962f74fd9d89bc62cfc11ee0923910177c` 在
 Current-main CI on `3270cff5aec26e3ae0717c62d2d78e9f30752020`: Host [#43593701736](https://github.com/hujunjie-hub/Flight/actions/runs/43593701736) 6/6, M6/M7 [#43593701892](https://github.com/hujunjie-hub/Flight/actions/runs/43593701892) 5/5, M7 [#43593701803](https://github.com/hujunjie-hub/Flight/actions/runs/43593701803) 2/2 SUCCESS. M4 969/0; M5 327,030/0; M4/M5 integration 1,042/0; MR-009 focused 430/0; M7 274/0.
 
 完整报告：[R33 archive review](../validation/FMT_SIM_LOCAL_20261114_5E3B74F4_REVIEW.md)。
+
+
+## 2026-11-15 ENG-07 / FLIGHT-29 最新状态（main 28748c71）
+
+| Issue | 当前状态 | 最新判断 |
+|---|---|---|
+| #17 Land | OPEN / R45 PASS | R45 0 failures；仍需 Stage B1 后 exact-main R46 与关闭证据 |
+| #18 Return | OPEN / R45 PASS | R45 0 failures；仍需 exact-main R46 |
+| #19 Mission | OPEN / R45 PASS | R45 0 failures；535 对 GNSS P/V、0 NIS rejects、最大水平偏差 0.055 m；仍需 exact-main R46 |
+| #21/#23/#24/#25 | OPEN / R45 PASS | 原生批次通过但尚未达到 exact-main 正式关闭条件 |
+| #22 | OPEN / independent review pending | advisory contact handoff 独立安全复核未完成 |
+| #26 | OPEN / S1 | M6 近地水平极限环及生产阻尼独立审查未完成；R45 测试夹具参数不等于生产参数批准 |
+| #29 | OPEN / Stage B1 implemented | R41 直接 FMT-SIM 触发由 UDP 帧覆盖定位并修复；main 28748c71 加入 5 连续 NIS 拒绝后 position/velocity 能力锁存撤销；R46 exact-main 待复测；Stage B2 受控重新对准仍开放 |
+
+main 28748c717e83b868ae58957c04bcd9dbe1c23e1b CI：Host #43667830819 7/7、M6/M7 #43667830805 5/5、M7 #43667830814 2/2 SUCCESS。R45 原生 FMT-SIM 在 ada6bd65 运行，不能代替新 HEAD 的 R46。H723 实机、物理 HIL、WCET/RTA、栈水位与飞行仍 NOT_RUN。
