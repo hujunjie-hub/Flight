@@ -131,7 +131,8 @@ $headRef = "$head HEAD"
 $branchRef = "$head refs/heads/$branch"
 if (($bundleRefs -notcontains $headRef) -or ($bundleRefs -notcontains $branchRef)) {
     $bundleRefList = $bundleRefs -join "; "
-    throw ("Git Bundle must contain exact refs: '{0}' and '{1}'. Found: {2}" -f $headRef, $branchRef, $bundleRefList)
+    $bundleError = "Git Bundle must contain exact refs: '" + $headRef + "' and '" + $branchRef + "'. Found: " + $bundleRefList
+    throw $bundleError
 }
 $bundleHash = (Get-FileHash -LiteralPath $bundlePath -Algorithm SHA256).Hash.ToLowerInvariant()
 
