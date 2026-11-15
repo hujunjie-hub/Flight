@@ -110,3 +110,12 @@ pwsh -NoProfile -File tests/simulation/run_fmt_sim_regression.ps1 -FmtSimExe $si
 python tools/generate_ground_config.py --check
 pwsh -NoProfile -File tools/archive_validation_run.ps1 -RunId ENG07-R46-FORMAL-20261115-7d847340 -ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278 -InputEvidenceDirectory "work/validation/archives/eng07-r46-20261115-7d847340"
 ```
+
+
+归档完成后，必须在提交 manifest 前执行 archive-only 检查：
+
+```powershell
+python tools/check_validation_evidence.py --check archive --run-id ENG07-R46-FORMAL-20261115-7d847340 --code-commit 7d8473401bad88bd9c9238c29b5d575976e55278 --manifest spec/validation/flight_acceptance_manifest.json --archive-report "work/validation/archives/ENG07-R46-FORMAL-20261115-7d847340.archive_report.json"
+```
+
+只有输出 `EVIDENCE_CHECK_PASS` 才算正式归档完成。回传 ZIP、ZIP 的 `.sha256` sidecar 和外部 `.archive_report.json`；归档检查前不要提交脚本自动更新的 acceptance manifest。

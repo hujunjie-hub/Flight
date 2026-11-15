@@ -302,5 +302,5 @@ CI：Host #43667830819（7/7）、M6/M7 #43667830805（5/5）、M7 #43667830814�
 - 运行 2：Land PASS / Return PASS / Mission 进程退出码 `-1`。两次结果不一致，不能将运行 1/2 合并成一次通过。
 - Return 失败类别：`terminal_ack`、`disarm_ack`、`arm_state`；另观察到导航垂向加速度与 FMT 真值不一致。当前缺少正式归档的原始日志与 SHA256，尚不能确定偏差来自 INS、Plant、坐标/时序转换还是控制反馈。
 - FLIGHT-26 近地水平振荡机制再次复现。#17/#18/#19/#21/#23/#24/#25 继续 OPEN；#26、#29 继续 OPEN。
-- 手工副本 `work/validation/archives/eng07-r46-20261115-7d847340/` 不是正式归档。旧归档脚本分支守卫及参数目录哈希问题已在 main `b7bad3311bfe2cb87ab85e9b615fd84f2e7e80a3` 修复。下一步先对现有证据执行正式归档，使用 `-ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278` 绑定真实测试代码，再依据原始日志决定 Return 垂向加速度专项定位。不得放宽任何安全阈值。
+- 手工副本 `work/validation/archives/eng07-r46-20261115-7d847340/` 不是正式归档。归档脚本 main-only 守卫、manual evidence import、参数目录规范 LF 哈希和只读检查已修复；工具提交 `62bea0420357c7da901b9ab6acce386e2448d09f`，Host/M6-M7/M7 CI 在 `0e38ddebfdb645e329918217ea10434f02d95e7f` 全部 PASS。下一步先用新的正式 RunId 将手工目录导入归档，使用 `-ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278` 绑定真实测试代码，执行 `--check archive`，再依据原始日志决定 Return 垂向加速度专项定位。不得放宽任何安全阈值。
 - 本轮没有运行 CI；H723、HIL、WCET/RTA、栈水位和飞行仍 NOT_RUN。

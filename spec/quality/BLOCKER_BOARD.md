@@ -2,7 +2,7 @@
 
 > **2026-11-13 MR-009 R31 内部预审 CI 快照（代码/证明基线 8dcb60b3ac18e6a763c939d3e810984092cdd321）**：Host validation #43446380866（6/6）、M6/M7 #43446380836（5/5）、M7 #43446380724（2/2）全部 SUCCESS。M5 Host regression、M5 ASan/UBSan、MR-009 focused、S06-099/S06-107、Spec Audit、生产 ABI、18 mutation FP audit、Cortex-M7 模块编译、M6/M7 Host/Sanitizer/SIL 与 M7 Host/Sanitizer 均 PASS。
 
-> **当前状态（2026-11-15；最新归档工具 HEAD `b7bad3311bfe2cb87ab85e9b615fd84f2e7e80a3`；R46 测试代码 HEAD `7d8473401bad88bd9c9238c29b5d575976e55278`）**：远程仅保留 `main`。B01～B04 的本地规范/生产 ABI/安装包锁/默认 Release 链接通过。B05 MR-009 按项目方指示完成技术复核，S06-100～102 Host 与 ASan/UBSan 通过。B06 的 Cortex-M7 专用镜像静态链为 `-O2` 3,576/4,096 B、`-O0` 3,968/4,096 B，均 COMPLETE。B07 实机、WCET/RTA、栈水位、台架 HIL 与飞行仍 NOT_RUN。M5-07 未启动。R46 两次本机运行结果不一致：运行 1 Land PASS / Return FAIL 3 / Mission PASS；运行 2 Land PASS / Return PASS / Mission exit=-1。归档工具旧分支守卫已修复，参数目录哈希改为规范 LF，Host CI 正在验证；正式 R46 ZIP 仍待归档。FLIGHT-26 机制再次复现，Return 垂向加速度与真值不一致仍待原始日志定位。
+> **当前状态（2026-11-15；最新归档脚本提交 `62bea0420357c7da901b9ab6acce386e2448d09f`；工具 CI HEAD `0e38ddebfdb645e329918217ea10434f02d95e7f`；R46 测试代码 HEAD `7d8473401bad88bd9c9238c29b5d575976e55278`）**：远程仅保留 `main`。B01～B04 的本地规范/生产 ABI/安装包锁/默认 Release 链接通过。B05 MR-009 按项目方指示完成技术复核，S06-100～102 Host 与 ASan/UBSan 通过。B06 的 Cortex-M7 专用镜像静态链为 `-O2` 3,576/4,096 B、`-O0` 3,968/4,096 B，均 COMPLETE。B07 实机、WCET/RTA、栈水位、台架 HIL 与飞行仍 NOT_RUN。M5-07 未启动。R46 两次本机运行结果不一致：运行 1 Land PASS / Return FAIL 3 / Mission PASS；运行 2 Land PASS / Return PASS / Mission exit=-1。归档工具旧分支守卫、重复损坏脚本尾部及 PowerShell 解析问题均已修复；参数目录哈希改为规范 LF，Host/M6-M7/M7 CI 全部 PASS（Host 7/7、M6/M7 5/5、M7 2/2；127 参数 up to date、34 项工具测试 PASS）；正式 R46 ZIP 仍待归档。FLIGHT-26 机制再次复现，Return 垂向加速度与真值不一致仍待原始日志定位。
 
 > **开放风险**：ICD+M4 余量 264 B（FLIGHT-13）；Release 的工具链枚举属性仍有 228 条链接警告（FLIGHT-14）。下方 B01～B06 的表格保留各原始验证时点。
 

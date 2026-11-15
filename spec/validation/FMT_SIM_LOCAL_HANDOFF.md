@@ -4,7 +4,7 @@
 >
 > 适用分支：**main（唯一远程分支）**
 >
-> 当前修复后的归档工具基线：**b7bad3311bfe2cb87ab85e9b615fd84f2e7e80a3**；本次被测飞控代码仍是 **7d8473401bad88bd9c9238c29b5d575976e55278**；FLIGHT-29 Stage B1 代码提交：**28748c717e83b868ae58957c04bcd9dbe1c23e1b**。归档时必须用 `-ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278`，不得把后续归档工具提交误记为被测代码。
+> 当前修复后的归档脚本提交：**62bea0420357c7da901b9ab6acce386e2448d09f**；本次文档/测试最新 main 基线：**0e38ddebfdb645e329918217ea10434f02d95e7f**；本次被测飞控代码仍是 **7d8473401bad88bd9c9238c29b5d575976e55278**；FLIGHT-29 Stage B1 代码提交：**28748c717e83b868ae58957c04bcd9dbe1c23e1b**。归档时必须用 `-ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278`，不得把后续归档工具提交误记为被测代码。
 >
 > 本方案只覆盖 Windows 原生 FMT-SIM + Flight Host SIL 软件动态复测；不代表 H723 真机、台架 HIL、WCET/RTA、目标栈水位或飞行验收。
 
@@ -317,3 +317,15 @@ pwsh -NoProfile -File tools/archive_validation_run.ps1 -RunId ENG07-R46-FORMAL-2
 ~~~
 
 归档通过后，回传 ZIP、sidecar SHA256、archive report 和逐场景原始日志。先核对两次执行是否有各自完整的状态流、末端状态与失败帧；只有证据完整后，才决定是否对 Return 垂向加速度单独建立回放/单元测试并重跑。任何诊断均不得修改 350 ms、终端 ACK、DISARM、arm_state、着陆速度、dwell 或安全授权阈值。
+
+
+### 归档工具 CI 验证（与 R46 FMT-SIM 结果分开）
+
+在 main `0e38ddebfdb645e329918217ea10434f02d95e7f` 上，归档/参数目录工具验证通过：
+
+- [Host validation](https://github.com/hujunjie-hub/Flight/actions/runs/43685026316)：7/7 jobs PASS
+- [M6/M7 host validation](https://github.com/hujunjie-hub/Flight/actions/runs/43685026328)：5/5 jobs PASS
+- [M7 host validation](https://github.com/hujunjie-hub/Flight/actions/runs/43685026262)：2/2 jobs PASS
+- 参数目录：127 parameters up to date；生成器、归档 metadata 和 evidence archive 共 34 项单元测试 PASS；PowerShell parser PASS
+
+这些 CI 只验证归档工具、参数目录与 Host/集成构建，不改变 R46 两次本机 FMT-SIM 的失败结论，也不构成 H723/HIL/WCET/飞行证据。

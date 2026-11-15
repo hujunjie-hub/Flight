@@ -1,6 +1,6 @@
 # Flight Validation Archive Metadata Protocol
 
-Status: **IMPLEMENTED ON main / CI verification in progress**
+Status: **IMPLEMENTED ON main / Host, M6-M7 and M7 CI PASS at `0e38ddebfdb645e329918217ea10434f02d95e7f`**
 
 This protocol removes the archive self-reference and the post-archive metadata
 commit pattern. It is mandatory for new validation runs; historical R1-R28
@@ -106,3 +106,16 @@ R28's ZIP and external report remain unchanged. Its acceptance manifest
 snapshot (`PENDING_ARCHIVE_*`, ahead 87), blocker board and handover values are
 historical defects, not values to rewrite retroactively. R29 and later archives
 must use this protocol and record the R28 defect in the issue register.
+
+
+## ENG-07 R46 formal archive command
+
+The archive script accepts the manually preserved R46 folder as an evidence input. Use a new formal RunId so it does not collide with the manual folder name. The archive script intentionally updates the acceptance manifest; run the archive checker before committing that manifest.
+
+~~~powershell
+pwsh -NoProfile -File tools/archive_validation_run.ps1 -RunId ENG07-R46-FORMAL-20261115-7d847340 -ValidatedCodeCommit 7d8473401bad88bd9c9238c29b5d575976e55278 -InputEvidenceDirectory "work/validation/archives/eng07-r46-20261115-7d847340"
+
+python tools/check_validation_evidence.py --check archive --run-id ENG07-R46-FORMAL-20261115-7d847340 --code-commit 7d8473401bad88bd9c9238c29b5d575976e55278 --manifest spec/validation/flight_acceptance_manifest.json --archive-report "work/validation/archives/ENG07-R46-FORMAL-20261115-7d847340.archive_report.json"
+~~~
+
+A formal archive is accepted only if the checker prints `EVIDENCE_CHECK_PASS`. Return the ZIP, its `.sha256` sidecar and the external `.archive_report.json`. Do not commit the modified acceptance manifest until the archive checker has passed and the evidence has been handed off.
