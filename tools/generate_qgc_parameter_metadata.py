@@ -65,7 +65,7 @@ def _parameter_source(item: dict) -> dict:
                 (not part.strip() or part != part.strip())) or
                 (type(part) is int and part < 0) for part in source_path)):
         raise ValueError(f"source path must be a non-empty path for {item.get('name', '<unnamed>')}")
-    if source_kind not in {"scalar", "vector", "matrix", "stored"}:
+    if not isinstance(source_kind, str) or source_kind not in {"scalar", "vector", "matrix", "stored"}:
         raise ValueError(f"unsupported source kind for {item.get('name', '<unnamed>')}: {source_kind!r}")
 
     label = ""
