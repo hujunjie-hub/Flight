@@ -26,11 +26,6 @@ static void stop_ground(int signal_number)
   (void)signal_number;
   ground_stop = 1;
 }
-void flight_sil_configure_controller(ProductControllerConfig *controller)
-{
-  if (ground_online)
-    ground_station_apply_config(controller);
-}
 #endif
 /* Execute one real owner turn at a time on a deterministic Host scheduler.
  * No Port is mocked. Only the RTOS/board/time boundary is replaced. */
@@ -62,6 +57,27 @@ static unsigned fmt_frames, fmt_active_frames;
 static int fmt_online;
 static float fmt_hover;
 static mavlink_fmt_state_t fmt_state, fmt_origin;
+
+void flight_sil_configure_controller(ProductControllerConfig *controller)
+{
+#ifdef FLIGHT_GROUND_STATION
+  if (ground_online) {
+    ground_station_apply_config(controller);
+    return;
+  }
+#endif
+  if (!fmt_online)
+    return;
+
+  /* FLIGHT-26: use the rate-loop damping measured against the FMT X-frame
+   * dynamics. This fixture runs with the UDP plant and SIM_CONTROLLED_STOP. */
+  for (unsigned axis = 0; axis < 3; ++axis) {
+    controller->payload.rate_kp_nm_per_radps[axis] = 0.30f;
+    controller->payload.rate_kd_nm_per_radps2[axis] = 0.004f;
+  }
+  printf("[fmt] rate gains kp=0.30 kd=0.004 on all axes\n");
+}
+
 static rt_err_t (*test_tx_complete)(rt_device_t,void *);
 #define CHECK(x) do { ++checks; if(!(x)) { ++failures; printf("FAIL %u: %s\n",__LINE__,#x); } } while(0)
 rt_base_t rt_hw_interrupt_disable(void) { return 0; }

@@ -11,7 +11,7 @@
 #include "parameter_store.h"
 #include <math.h>
 #include <string.h>
-#if defined(FLIGHT_HOST_SIL) && defined(FLIGHT_GROUND_STATION)
+#ifdef FLIGHT_HOST_SIL
 void flight_sil_configure_controller(ProductControllerConfig *controller);
 #endif
 #ifdef FLIGHT_BENCH_TUNING
@@ -117,7 +117,7 @@ static void load_bench_config(RuntimeConfig *out)
 #endif
 
     control_sim_config(&out->controller);
-#if defined(FLIGHT_HOST_SIL) && defined(FLIGHT_GROUND_STATION)
+#ifdef FLIGHT_HOST_SIL
     flight_sil_configure_controller(&out->controller);
 #endif
     fms_default_config(&out->fms);
