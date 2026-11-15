@@ -460,7 +460,17 @@ static void test_origin_reset_requires_disarmed(void)
   fill_header(&candidate, MSG_GNSS_SAMPLE, SOURCE_GNSS, sample_us, 20000u, sample_us);
   candidate.frame_id = FRAME_WGS84_GEODETIC;
   memset(&reset, 0, sizeof(reset));
-  CHECK(fms_authorize_origin_reset(&candidate, T_ORIGIN + 1u, &reset) == STATUS_OK);
+  {
+    Status auth_status = fms_authorize_origin_reset(&candidate, T_ORIGIN + 1u, &reset);
+    printf("origin reset diagnostic: status=%d arm=%u permit_flags=0x%x sample=%llu now=%llu frame=%u source=%u boot=%llu epoch=%u\\n",
+           (int)auth_status, (unsigned)fx.out.state_snapshot.arm_state,
+           (unsigned)fx.out.actuation_permit.permit_flags,
+           (unsigned long long)candidate.timestamp_sample_us,
+           (unsigned long long)(fx.now - STEP_US),
+           (unsigned)candidate.frame_id, (unsigned)candidate.source_id,
+           (unsigned long long)candidate.boot_id, (unsigned)candidate.time_epoch);
+    CHECK(auth_status == STATUS_OK);
+  }
   CHECK(reset.reset_type == RESET_TYPE_ORIGIN_REBUILD);
   CHECK(reset.initial_source == RESET_SOURCE_GNSS_ASSISTED);
   CHECK(reset.requested_origin_id == T_ORIGIN + 1u);
